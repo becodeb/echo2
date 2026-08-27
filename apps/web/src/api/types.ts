@@ -1,0 +1,164 @@
+export interface UserOut {
+  id: string;
+  email: string;
+  name: string;
+  avatar_color: string;
+  job_title: string | null;
+  locale: string;
+}
+
+export interface OrgOut {
+  id: string;
+  name: string;
+  slug: string;
+  role: string;
+}
+
+export interface SessionOut {
+  access_token: string;
+  user: UserOut;
+  organizations: OrgOut[];
+}
+
+export interface ParticipantOut {
+  id: string;
+  name: string;
+  email: string | null;
+  role_label: string | null;
+}
+
+export interface SpeakerOut {
+  id: string;
+  label: string;
+  display_name: string | null;
+  color: string;
+  identity_suggestion: { profile_id?: string; person_name?: string; confidence?: number } | null;
+}
+
+export interface MeetingOut {
+  id: string;
+  title: string;
+  status: "draft" | "live" | "paused" | "processing" | "completed" | "failed";
+  language: string;
+  audio_source: string;
+  stt_engine: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  duration_seconds: number;
+  created_at: string;
+  created_by: string;
+  processing_state: Record<string, unknown>;
+  meta: {
+    visibility?: string;
+    timeline?: { at_ms: number; label: string }[];
+    next_steps?: string[];
+    mentions?: Record<string, unknown>;
+  };
+  participants: ParticipantOut[];
+  speakers: SpeakerOut[];
+}
+
+export interface MeetingListItem {
+  id: string;
+  title: string;
+  status: string;
+  started_at: string | null;
+  duration_seconds: number;
+  created_at: string;
+  participant_count: number;
+  project_name: string | null;
+}
+
+export interface SegmentOut {
+  id: string;
+  seq: number;
+  start_ms: number;
+  end_ms: number;
+  text: string;
+  confidence: number | null;
+  speaker_id: string | null;
+  edited: boolean;
+}
+
+export interface DecisionOut {
+  id: string;
+  text: string;
+  context: string | null;
+  evidence_start_ms: number | null;
+  evidence_end_ms: number | null;
+  status: string;
+  source: string;
+}
+
+export interface TaskOut {
+  id: string;
+  text: string;
+  assignee_name: string | null;
+  assignee_user_id: string | null;
+  due_text: string | null;
+  due_date: string | null;
+  status: "pending" | "in_progress" | "done" | "cancelled";
+  source: string;
+  meeting_id: string | null;
+  meeting_title: string | null;
+  evidence_start_ms: number | null;
+  overdue: boolean;
+  created_at: string;
+}
+
+export interface QuestionOut {
+  id: string;
+  text: string;
+  resolved: boolean;
+  evidence_start_ms: number | null;
+  evidence_end_ms: number | null;
+}
+
+export interface InsightsOut {
+  decisions: DecisionOut[];
+  action_items: TaskOut[];
+  questions: QuestionOut[];
+}
+
+export interface ChatSource {
+  meeting_id: string;
+  meeting_title: string;
+  segment_id: string;
+  start_ms: number;
+  end_ms: number;
+  text: string;
+  speaker: string | null;
+}
+
+export interface ChatOut {
+  answer: string;
+  sources: ChatSource[];
+}
+
+export interface MinutesOut {
+  id: string;
+  status: "draft" | "in_review" | "approved";
+  current_version: number;
+  approved_at: string | null;
+  version: {
+    version: number;
+    body_markdown: string;
+    verification: { claim: string; status: string; evidence_ms: number | null; note: string }[] | null;
+    note: string | null;
+    model_used: string | null;
+    created_at: string;
+    created_by: string | null;
+  } | null;
+  versions: { version: number; note: string | null; created_at: string; model_used: string | null }[];
+}
+
+export type LiveEvent =
+  | { type: "hello_ack"; role: string; meeting_status: string }
+  | { type: "segment"; id: string; seq: number; start_ms: number; end_ms: number; text: string; confidence: number | null; speaker_hint: string | null }
+  | { type: "partial"; text: string; start_ms: number; speaker_hint?: string | null }
+  | { type: "status"; status: string }
+  | { type: "processing"; stage: string; progress: number }
+  | { type: "insights"; totals: { decisions: number; tasks: number; questions: number }; new: Record<string, number> }
+  | { type: "warning"; code: string; message: string }
+  | { type: "error"; code: string; message: string }
+  | { type: "pong" };

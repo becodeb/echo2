@@ -1,0 +1,36 @@
+# deps
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+target/
+.pio/
+
+# env / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# build
+dist/
+build/
+*.egg-info/
+.vite/
+coverage/
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+
+# os / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# echo specifics
+apps/bridge/config.local.json
+firmware/esp32/secrets.h

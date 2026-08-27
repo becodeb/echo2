@@ -1,0 +1,46 @@
+name: echo
+
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-echo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-echo_dev_pw}
+      POSTGRES_DB: ${POSTGRES_DB:-echo}
+    ports:
+      - "5433:5432"
+    volumes:
+      - echo_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-echo} -d ${POSTGRES_DB:-echo}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-echo}:${POSTGRES_PASSWORD:-echo_dev_pw}@db:5432/${POSTGRES_DB:-echo}
+      JWT_SECRET: ${JWT_SECRET:-dev_only_insecure_secret_change_me}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:5173}
+      ECHO_ENV: ${ECHO_ENV:-development}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./apps/api:/app
+    command: sh -c "alembic upgrade head && uvicorn echo_api.main:app --host 0.0.0.0 --port 8000 --reload"
+
+volumes:
+  echo_pgdata:
