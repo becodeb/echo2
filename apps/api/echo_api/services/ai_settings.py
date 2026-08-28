@@ -66,6 +66,16 @@ async def resolve_llm(db: AsyncSession, org_id: uuid.UUID) -> LLMConfig | None:
                 temperature=temperature,
             )
     # defaults de entorno
+    if env.default_llm_provider:
+        provider = env.default_llm_provider
+        key = _env_key_for(provider)
+        if key or provider == "ollama":
+            return LLMConfig(
+                provider,
+                _default_model(provider),
+                key,
+                base_url=env.ollama_base_url if provider == "ollama" else None,
+            )
     if env.anthropic_api_key:
         return LLMConfig("anthropic", "claude-sonnet-5", env.anthropic_api_key)
     if env.openai_api_key:
@@ -74,6 +84,8 @@ async def resolve_llm(db: AsyncSession, org_id: uuid.UUID) -> LLMConfig | None:
         return LLMConfig("groq", "llama-3.3-70b-versatile", env.groq_api_key)
     if env.openrouter_api_key:
         return LLMConfig("openrouter", "anthropic/claude-sonnet-4.5", env.openrouter_api_key)
+    if env.gmi_api_key:
+        return LLMConfig("gmi", "MiniMaxAI/MiniMax-M3", env.gmi_api_key)
     if env.ollama_base_url:
         return LLMConfig("ollama", "llama3.1", "", base_url=env.ollama_base_url)
     return None
@@ -142,6 +154,7 @@ def _env_key_for(provider: str) -> str:
         "groq": env.groq_api_key,
         "deepgram": env.deepgram_api_key,
         "openrouter": env.openrouter_api_key,
+        "gmi": env.gmi_api_key,
     }.get(provider, "")
 
 
@@ -152,5 +165,6 @@ def _default_model(provider: str) -> str:
         "gemini": "gemini-2.0-flash",
         "groq": "llama-3.3-70b-versatile",
         "openrouter": "anthropic/claude-sonnet-4.5",
+        "gmi": "MiniMaxAI/MiniMax-M3",
         "ollama": "llama3.1",
     }.get(provider, "gpt-4o-mini")

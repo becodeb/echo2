@@ -21,6 +21,14 @@ class WhisperApiProvider(TranscriptionProvider):
         self.api_key = api_key
         self.model = model
 
+    @property
+    def diarizes(self) -> bool:
+        """Los modelos *-transcribe-diarize devuelven hablante por segmento.
+
+        Piden `diarized_json`; con `verbose_json` la API rechaza el pedido.
+        """
+        return "diarize" in self.model
+
     async def _request(
         self,
         data: bytes,
@@ -28,7 +36,10 @@ class WhisperApiProvider(TranscriptionProvider):
         language: str | None,
         vocabulary: list[str] | None,
     ) -> dict:
-        form: dict = {"model": self.model, "response_format": "verbose_json"}
+        form: dict = {
+            "model": self.model,
+            "response_format": "diarized_json" if self.diarizes else "verbose_json",
+        }
         if language and language != "auto":
             form["language"] = language
         if vocabulary:
@@ -59,12 +70,14 @@ class WhisperApiProvider(TranscriptionProvider):
                 confidence = None
                 if seg.get("avg_logprob") is not None:
                     confidence = max(0.0, min(1.0, 1.0 + float(seg["avg_logprob"]) / 2.0))
+                speaker = seg.get("speaker")
                 result.segments.append(
                     SttSegment(
                         text=text,
                         start_ms=offset_ms + int(float(seg.get("start", 0)) * 1000),
                         end_ms=offset_ms + int(float(seg.get("end", 0)) * 1000),
                         confidence=confidence,
+                        speaker=f"Speaker {speaker}" if speaker else None,
                     )
                 )
         elif payload.get("text"):

@@ -300,7 +300,9 @@ async def start_meeting(
     meeting = await get_meeting_or_404(meeting_id, ctx, db)
     if not can_edit_meeting(ctx, meeting):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Sin permiso")
-    if meeting.status not in ("draft", "paused"):
+    # "live" es idempotente: si el navegador se cerró o se recargó la página, la
+    # reunión sigue live en el servidor y reconectar no debe fallar.
+    if meeting.status not in ("draft", "paused", "live"):
         raise HTTPException(status.HTTP_409_CONFLICT, f"No se puede iniciar desde estado {meeting.status}")
     if meeting.status == "draft":
         meeting.started_at = datetime.now(UTC)

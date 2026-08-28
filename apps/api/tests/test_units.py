@@ -2,8 +2,9 @@
 from datetime import date
 
 from echo_api.services.dates import resolve_relative_date
-from echo_api.services.llm.base import parse_json_loose
+from echo_api.services.llm.base import get_llm_provider, parse_json_loose
 from echo_api.services.minutes_gen import _claim_context
+from echo_api.services.rag import build_or_tsquery
 from echo_api.services.pipeline import _split_sections
 from echo_api.services.transcript_util import format_ms
 
@@ -57,6 +58,36 @@ class TestParseJsonLoose:
 
     def test_json_con_texto_alrededor(self):
         assert parse_json_loose('Claro, acá está:\n{"a": [1, 2]}\nEspero que sirva') == {"a": [1, 2]}
+
+
+class TestOrTsquery:
+    def test_une_terminos_con_or(self):
+        # plainto_tsquery los unía con AND y ninguna pregunta natural matcheaba
+        assert build_or_tsquery("¿Qué se dijo sobre el presupuesto?") == (
+            "qué | se | dijo | sobre | el | presupuesto"
+        )
+
+    def test_descarta_puntuacion_y_tokens_de_una_letra(self):
+        assert build_or_tsquery("¿Y el DOE, se aprobó?") == "el | doe | se | aprobó"
+
+    def test_pregunta_sin_lexemas_no_rompe(self):
+        assert build_or_tsquery("¿?  !") == ""
+
+
+class TestProviderGMI:
+    def test_defaults_de_gmi(self):
+        provider = get_llm_provider("gmi", "k", "MiniMaxAI/MiniMax-M3")
+        assert provider.name == "gmi"
+        assert provider.base_url == "https://api.gmi-serving.com/v1"
+        # GMI no lleva techo de salida: el modelo corta por finish_reason
+        assert provider.omit_max_tokens is True
+
+    def test_base_url_override(self):
+        provider = get_llm_provider("gmi", "k", "m", base_url="https://proxy.local/v1")
+        assert provider.base_url == "https://proxy.local/v1"
+
+    def test_otros_providers_conservan_max_tokens(self):
+        assert get_llm_provider("openai", "k", "gpt-4o-mini").omit_max_tokens is False
 
 
 class TestChunking:

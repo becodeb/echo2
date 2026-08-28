@@ -10,12 +10,17 @@ from ..db import get_db
 from ..deps import OrgContext, get_org_context
 from ..models import OrgAISettings
 from ..security import decrypt_secret, encrypt_secret, mask_secret
-from ..services.ai_settings import get_org_ai_settings
+from ..services.ai_settings import (
+    get_org_ai_settings,
+    resolve_embeddings,
+    resolve_llm,
+    resolve_stt,
+)
 from ..services.audit import audit
 
 router = APIRouter(prefix="/api/org/ai-settings", tags=["settings"])
 
-LLM_PROVIDERS = ["openai", "anthropic", "gemini", "groq", "openrouter", "ollama"]
+LLM_PROVIDERS = ["openai", "anthropic", "gemini", "groq", "openrouter", "gmi", "ollama"]
 STT_PROVIDERS = ["bridge", "openai", "groq", "deepgram"]
 EMBEDDING_PROVIDERS = ["openai", "ollama", "none"]
 
@@ -35,6 +40,9 @@ class AISettingsOut(BaseModel):
     diarization_provider: str | None
     minutes_language: str
     available: dict
+    # Qué está usando el servidor ahora mismo (provider+modelo, nunca la key).
+    # Sin esto "usar default del servidor" es una caja negra.
+    effective: dict
 
 
 class AISettingsIn(BaseModel):
@@ -60,7 +68,21 @@ def _masked(encrypted: str | None) -> str | None:
     return mask_secret(plain) if plain else None
 
 
-def _serialize(row: OrgAISettings | None) -> AISettingsOut:
+async def _effective(db: AsyncSession, org_id) -> dict:
+    """Configuración que realmente se aplica hoy, ya resuelta org → entorno."""
+    llm = await resolve_llm(db, org_id)
+    stt = await resolve_stt(db, org_id)
+    embeddings = await resolve_embeddings(db, org_id)
+    return {
+        "llm": {"provider": llm.provider, "model": llm.model} if llm else None,
+        "stt": {"provider": stt.provider, "model": stt.model or "whisper-1"} if stt else None,
+        "embeddings": (
+            {"provider": embeddings.provider, "model": embeddings.model} if embeddings else None
+        ),
+    }
+
+
+def _serialize(row: OrgAISettings | None, effective: dict) -> AISettingsOut:
     return AISettingsOut(
         llm_provider=row.llm_provider if row else None,
         llm_model=row.llm_model if row else None,
@@ -80,6 +102,7 @@ def _serialize(row: OrgAISettings | None) -> AISettingsOut:
             "stt_providers": STT_PROVIDERS,
             "embedding_providers": EMBEDDING_PROVIDERS,
         },
+        effective=effective,
     )
 
 
@@ -88,7 +111,7 @@ async def get_ai_settings(
     ctx: OrgContext = Depends(get_org_context), db: AsyncSession = Depends(get_db)
 ):
     row = await get_org_ai_settings(db, ctx.org_id)
-    return _serialize(row)
+    return _serialize(row, await _effective(db, ctx.org_id))
 
 
 @router.put("", response_model=AISettingsOut)
@@ -134,4 +157,4 @@ async def update_ai_settings(
     )
     await db.commit()
     await db.refresh(row)
-    return _serialize(row)
+    return _serialize(row, await _effective(db, ctx.org_id))

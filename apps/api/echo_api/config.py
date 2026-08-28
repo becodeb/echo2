@@ -22,12 +22,18 @@ class Settings(BaseSettings):
     web_origin: str = "http://localhost:5173"
     api_public_url: str = "http://localhost:8000"
 
+    # Proveedor LLM por defecto cuando la organización no configuró ninguno.
+    # Vacío = autodetectar por orden de keys presentes. Explicitarlo evita que
+    # cargar una key para STT (ej. OpenAI) cambie de golpe el modelo del chat.
+    default_llm_provider: str = ""
+
     # Defaults globales de providers (cada organización puede configurar el suyo)
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     groq_api_key: str = ""
     deepgram_api_key: str = ""
     openrouter_api_key: str = ""
+    gmi_api_key: str = ""
     ollama_base_url: str = ""
 
     # Límites

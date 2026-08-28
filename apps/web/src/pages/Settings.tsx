@@ -165,6 +165,28 @@ interface AISettings {
   embeddings_api_key_masked: string | null;
   minutes_language: string;
   available: { llm_providers: string[]; stt_providers: string[]; embedding_providers: string[] };
+  effective: {
+    llm: { provider: string; model: string } | null;
+    stt: { provider: string; model: string } | null;
+    embeddings: { provider: string; model: string } | null;
+  };
+}
+
+/** Qué está usando el servidor ahora mismo. "Default del servidor" sin esto
+ *  es una caja negra: no se ve si el chat quedó en GMI o si hay STT activo. */
+function ActiveBadge({ active }: { active: { provider: string; model: string } | null }) {
+  if (!active) {
+    return (
+      <p className="mb-3 inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
+        Sin configurar — esta función no va a andar
+      </p>
+    );
+  }
+  return (
+    <p className="mb-3 inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+      Activo: {active.provider} · {active.model}
+    </p>
+  );
 }
 
 function AISection() {
@@ -227,6 +249,7 @@ function AISection() {
     >
       <Card>
         <h2 className="mb-1 font-semibold text-ink-900">Modelo de IA (resúmenes, actas, chat)</h2>
+        <ActiveBadge active={settings.effective.llm} />
         <p className="mb-4 text-sm text-ink-400">
           La API key se guarda cifrada y nunca vuelve completa al navegador.
         </p>
@@ -255,6 +278,7 @@ function AISection() {
 
       <Card>
         <h2 className="mb-1 font-semibold text-ink-900">Motor de transcripción (cloud fallback)</h2>
+        <ActiveBadge active={settings.effective.stt} />
         <p className="mb-4 text-sm text-ink-400">
           El modo preferido es Echo Bridge (local, el audio no sale de tu máquina). El modo cloud envía
           temporalmente el audio al proveedor seleccionado y lo descarta al transcribir.
@@ -270,6 +294,12 @@ function AISection() {
             </select>
           </label>
           <Input
+            label="Modelo"
+            placeholder="whisper-1 · gpt-4o-transcribe-diarize (separa hablantes)"
+            value={form.stt_model ?? ""}
+            onChange={set("stt_model")}
+          />
+          <Input
             label={`API key ${settings.stt_api_key_masked ? `(actual: ${settings.stt_api_key_masked})` : ""}`}
             type="password"
             placeholder="Dejar vacío para no cambiar"
@@ -282,6 +312,7 @@ function AISection() {
 
       <Card>
         <h2 className="mb-1 font-semibold text-ink-900">Embeddings (búsqueda semántica y RAG)</h2>
+        <ActiveBadge active={settings.effective.embeddings} />
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium text-ink-700">Proveedor</span>

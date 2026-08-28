@@ -23,6 +23,9 @@ class SttSegment:
     start_ms: int
     end_ms: int
     confidence: float | None = None
+    # Etiqueta de hablante del motor ("A", "B", "speaker_0"…). El pipeline la
+    # agrupa en filas Speaker. None = el motor no diariza.
+    speaker: str | None = None
 
 
 @dataclass

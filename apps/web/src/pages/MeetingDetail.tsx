@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import type { ChatOut, InsightsOut, MeetingOut, MinutesOut, SegmentOut } from "../api/types";
 import { Badge, Button, Card, EmptyState, Input, Modal, Spinner, formatDate, formatDuration, formatMs } from "../components/ui";
 import { EchoFace } from "../components/EchoFace";
+import { AnswerText } from "../components/AnswerText";
 
 const TABS = [
   { id: "summary", label: "Resumen" },
@@ -742,7 +743,11 @@ function ChatTab({ meetingId, onJump }: { meetingId: string; onJump: (ms: number
                 message.role === "user" ? "bg-ink-900 text-white" : "bg-ink-50 text-ink-900"
               }`}
             >
-              <p className="whitespace-pre-wrap">{message.content}</p>
+              {message.role === "assistant" ? (
+                <AnswerText text={message.content} />
+              ) : (
+                <p className="whitespace-pre-wrap">{message.content}</p>
+              )}
               {message.sources && message.sources.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5 border-t border-ink-200/60 pt-2">
                   {message.sources.map((source, sourceIndex) => (

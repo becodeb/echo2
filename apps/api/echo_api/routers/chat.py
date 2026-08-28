@@ -9,11 +9,13 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
 from ..db import get_db
 from ..deps import OrgContext, get_meeting_or_404, get_org_context, rate_limit
+from ..models import ActionItem, Decision, Meeting, MeetingSummary, Question, Risk
 from ..services.ai_settings import resolve_embeddings, resolve_llm
 from ..services.llm import LLMError, get_llm_provider
 from ..services.memory_svc import query_memory_entities
@@ -22,29 +24,57 @@ from ..services.transcript_util import format_ms
 
 router = APIRouter(tags=["chat"])
 
-MEETING_CHAT_SYSTEM = """Sos Echo, el asistente de reuniones. Respondés preguntas sobre UNA
-reunión usando EXCLUSIVAMENTE los fragmentos de transcript provistos.
+FORMAT_RULES = """FORMATO DE LA RESPUESTA:
+- Empezá por la respuesta directa, en UNA frase. Nada de preámbulos.
+- Resaltá en **negrita** el dato que responde la pregunta (el número, el nombre,
+  la fecha, la decisión). Solo eso: si está todo en negrita, no se destaca nada.
+- Usá viñetas solo cuando enumerás tres cosas o más. Para una o dos, escribí prosa.
+- NADA de líneas horizontales (---), ni encabezados tipo "## Respuesta", ni
+  repetir la pregunta como título.
+- Sin cierres de relleno ("espero que te sirva", "si querés te amplío").
+- Cortito: 2 a 4 frases salvo que te pidan detalle."""
 
-REGLAS ESTRICTAS:
-1. Solo podés afirmar lo que esté en los fragmentos. NADA de conocimiento general.
-2. Si la respuesta no está en los fragmentos, respondé exactamente:
-   "No encontré eso en esta reunión."
-3. Citá SIEMPRE los timestamps de donde sale cada afirmación, formato [MM:SS].
-4. Si un hablante tiene nombre, usalo.
-5. Respondé en el idioma de la pregunta, conciso y directo."""
+MEETING_CHAT_SYSTEM = """Sos Echo, el asistente de reuniones. Respondés preguntas sobre UNA
+reunión usando los fragmentos de transcript provistos.
+
+CÓMO RAZONAR:
+1. Tu base es el transcript. No traigas conocimiento general del mundo.
+2. Pero SÍ interpretá lo que se dijo. La gente habla en borrador: no repite la
+   pregunta con las palabras que vos esperás. Si alguien dice "no sé para qué
+   tiene dos micrófonos, con uno alcanza", la respuesta a "¿cuántos quiere?" es
+   **uno** — no "no encontré eso". Sacá la conclusión y mostrá en qué se apoya.
+3. Distinguí lo dicho de lo inferido: "dijo X" vs "de X se desprende Y".
+4. Reservá "No encontré eso en esta reunión." para cuando los fragmentos
+   realmente no tocan el tema. Si hablan del tema pero no cierran la respuesta,
+   contá lo que sí se sabe y qué quedó sin definir — eso es útil; negarte no.
+5. Citá el timestamp de cada afirmación, formato [MM:SS].
+6. Si un hablante tiene nombre, usalo.
+7. Respondé en el idioma de la pregunta.
+
+""" + FORMAT_RULES
 
 GLOBAL_CHAT_SYSTEM = """Sos Echo, la memoria de reuniones de la organización. Respondés usando
-EXCLUSIVAMENTE los fragmentos de transcript y hechos de memoria provistos,
-que pueden venir de VARIAS reuniones.
+EXCLUSIVAMENTE los fragmentos de transcript, hechos de memoria y datos
+estructurados provistos, que pueden venir de VARIAS reuniones.
 
-REGLAS ESTRICTAS:
-1. Solo podés afirmar lo que esté en el contexto provisto.
-2. Si no hay evidencia, respondé exactamente: "No encontré eso en las reuniones registradas."
-3. Citá SIEMPRE la reunión y el timestamp de cada afirmación:
-   («Título de la reunión», DD/MM, [MM:SS]).
-4. Si la información evolucionó entre reuniones, contá la evolución en orden
-   cronológico citando cada reunión.
-5. Respondé en el idioma de la pregunta."""
+CÓMO RAZONAR:
+1. Tu base es el contexto provisto. No traigas conocimiento general del mundo.
+2. Pero SÍ interpretá lo que se dijo: la gente no habla con las palabras exactas
+   de la pregunta. Sacá la conclusión que el contexto sostiene y mostrá en qué
+   se apoya, en vez de negarte porque no está textual.
+3. Distinguí lo dicho de lo inferido: "dijo X" vs "de X se desprende Y".
+4. Reservá "No encontré eso en las reuniones registradas." para cuando el
+   contexto realmente no toca el tema. Si lo toca sin cerrarlo, contá lo que sí
+   se sabe y qué quedó abierto.
+5. Citá la reunión y el timestamp de lo que salga del transcript:
+   («Título», DD/MM, [MM:SS]). Los bloques REUNIONES REGISTRADAS, DECISIONES
+   VIGENTES, TAREAS ABIERTAS, PREGUNTAS ABIERTAS, RIESGOS y RESÚMENES son datos
+   ya consolidados: citá la reunión de origen, pero NO inventes timestamps.
+6. Si la información evolucionó entre reuniones, contá la evolución en orden
+   cronológico citando cada una.
+7. Respondé en el idioma de la pregunta.
+
+""" + FORMAT_RULES
 
 
 class ChatIn(BaseModel):
@@ -80,6 +110,93 @@ def _context_block(chunks: list[dict], include_meeting: bool) -> str:
     return "\n".join(lines)
 
 
+async def _structured_block(
+    db: AsyncSession, org_id: uuid.UUID, meeting_id: uuid.UUID | None
+) -> str:
+    """Decisiones, tareas y reuniones como contexto estructurado.
+
+    El transcript no alcanza: "¿qué decisiones siguen sin ejecutarse?" o
+    "¿cuántas reuniones tuvimos?" se responden con las tablas `decisions`,
+    `action_items` y `meetings`, no con los segmentos hablados.
+    """
+    meetings_q = select(Meeting).where(
+        Meeting.organization_id == org_id, Meeting.deleted_at.is_(None)
+    )
+    if meeting_id:
+        meetings_q = meetings_q.where(Meeting.id == meeting_id)
+    meetings = (await db.execute(meetings_q.order_by(Meeting.started_at.asc()))).scalars().all()
+    titles = {meeting.id: meeting.title for meeting in meetings}
+    if not meetings:
+        return ""
+
+    decisions_q = select(Decision).where(
+        Decision.organization_id == org_id, Decision.status == "active"
+    )
+    tasks_q = select(ActionItem).where(
+        ActionItem.organization_id == org_id, ActionItem.status.in_(("pending", "in_progress"))
+    )
+    if meeting_id:
+        decisions_q = decisions_q.where(Decision.meeting_id == meeting_id)
+        tasks_q = tasks_q.where(ActionItem.meeting_id == meeting_id)
+    questions_q = select(Question).where(Question.organization_id == org_id)
+    risks_q = select(Risk).where(Risk.organization_id == org_id)
+    summaries_q = select(MeetingSummary).where(
+        MeetingSummary.organization_id == org_id, MeetingSummary.kind == "executive"
+    )
+    if meeting_id:
+        questions_q = questions_q.where(Question.meeting_id == meeting_id)
+        risks_q = risks_q.where(Risk.meeting_id == meeting_id)
+        summaries_q = summaries_q.where(MeetingSummary.meeting_id == meeting_id)
+    decisions = (await db.execute(decisions_q.limit(50))).scalars().all()
+    tasks = (await db.execute(tasks_q.limit(50))).scalars().all()
+    questions = (await db.execute(questions_q.limit(30))).scalars().all()
+    risks = (await db.execute(risks_q.limit(30))).scalars().all()
+    summaries = (await db.execute(summaries_q.limit(20))).scalars().all()
+
+    parts: list[str] = []
+    if not meeting_id:
+        listing = "\n".join(
+            f"- «{meeting.title}»"
+            + (f" ({meeting.started_at.date().isoformat()})" if meeting.started_at else "")
+            + f" — estado: {meeting.status}"
+            for meeting in meetings
+        )
+        parts.append(f"REUNIONES REGISTRADAS ({len(meetings)} en total):\n{listing}")
+    if decisions:
+        listing = "\n".join(
+            f"- {decision.text} (reunión «{titles.get(decision.meeting_id, '?')}»)"
+            for decision in decisions
+        )
+        parts.append(f"DECISIONES VIGENTES ({len(decisions)}):\n{listing}")
+    if tasks:
+        listing = "\n".join(
+            f"- {task.text}"
+            + (f" — responsable: {task.assignee_name}" if task.assignee_name else "")
+            + (f" — vence: {task.due_text}" if task.due_text else "")
+            + f" — estado: {task.status}"
+            for task in tasks
+        )
+        parts.append(f"TAREAS ABIERTAS ({len(tasks)}):\n{listing}")
+    if questions:
+        listing = "\n".join(
+            f"- {item.text} (reunión «{titles.get(item.meeting_id, '?')}»)" for item in questions
+        )
+        parts.append(f"PREGUNTAS ABIERTAS ({len(questions)}):\n{listing}")
+    if risks:
+        listing = "\n".join(
+            f"- {item.text} (reunión «{titles.get(item.meeting_id, '?')}»)" for item in risks
+        )
+        parts.append(f"RIESGOS DETECTADOS ({len(risks)}):\n{listing}")
+    if summaries:
+        listing = "\n".join(
+            f"- «{titles.get(item.meeting_id, '?')}»: "
+            + json.dumps(item.content, ensure_ascii=False)[:800]
+            for item in summaries
+        )
+        parts.append(f"RESÚMENES EJECUTIVOS ({len(summaries)}):\n{listing}")
+    return ("\n\n" + "\n\n".join(parts)) if parts else ""
+
+
 async def _ask(
     db: AsyncSession,
     ctx: OrgContext,
@@ -106,7 +223,9 @@ async def _ask(
                 entities, ensure_ascii=False, indent=1
             )
 
-    if not chunks and not memory_block:
+    structured_block = await _structured_block(db, ctx.org_id, meeting_id)
+
+    if not chunks and not memory_block and not structured_block:
         no_info = (
             "No encontré eso en esta reunión."
             if meeting_id
@@ -125,7 +244,10 @@ async def _ask(
     messages.append(
         {
             "role": "user",
-            "content": f"FRAGMENTOS DEL TRANSCRIPT:\n{context}{memory_block}\n\nPREGUNTA: {question}",
+            "content": (
+                f"FRAGMENTOS DEL TRANSCRIPT:\n{context}"
+                f"{memory_block}{structured_block}\n\nPREGUNTA: {question}"
+            ),
         }
     )
 

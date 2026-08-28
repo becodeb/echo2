@@ -131,6 +131,7 @@ async def _process_import(
                         end_ms=segment.end_ms,
                         text=text,
                         confidence=segment.confidence,
+                        speaker_hint=segment.speaker,
                         is_final=True,
                     )
                 )

@@ -178,7 +178,7 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
             if not seg.text.strip():
                 continue
             event = await _store_segment(
-                meeting, seg.text.strip(), seg.start_ms, seg.end_ms, seg.confidence, None
+                meeting, seg.text.strip(), seg.start_ms, seg.end_ms, seg.confidence, seg.speaker
             )
             await live_bus.publish(channel, event)
             segments_since_insights += 1

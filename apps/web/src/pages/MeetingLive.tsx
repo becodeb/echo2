@@ -434,6 +434,14 @@ export default function MeetingLive() {
         )}
       </header>
 
+      {/* Errores del servidor durante la grabación (ej. stt_not_configured).
+          Sin esto la reunión graba en silencio y el transcript queda vacío. */}
+      {error && recording && (
+        <p className="border-b border-red-100 bg-red-50 px-6 py-2.5 text-sm text-red-700">
+          {error}
+        </p>
+      )}
+
       <div className="flex min-h-0 flex-1">
         {/* Transcript */}
         <div

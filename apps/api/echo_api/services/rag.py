@@ -1,5 +1,6 @@
 """RAG: embeddings del transcript + retrieval semántico con pgvector."""
 import logging
+import re
 import uuid
 
 from sqlalchemy import select, text as sql_text
@@ -111,6 +112,23 @@ async def semantic_search_segments(
     return results
 
 
+_TSQUERY_SPLIT = re.compile(r"[^0-9a-záéíóúüñ]+", re.IGNORECASE)
+
+
+def build_or_tsquery(question: str) -> str:
+    """Arma un tsquery con OR entre los términos de la pregunta.
+
+    plainto_tsquery une TODOS los lexemas con AND, así que una pregunta en
+    lenguaje natural ("¿qué se dijo sobre el presupuesto?") exige un segmento
+    que contenga "dijo" Y "presupuesto" juntos y no devuelve nada. Con OR el
+    ranking (ts_rank) decide la relevancia en vez de exigir coincidencia total.
+
+    Las stopwords las descarta el diccionario 'spanish' de Postgres.
+    """
+    tokens = [token for token in _TSQUERY_SPLIT.split(question.lower()) if len(token) > 1]
+    return " | ".join(tokens)
+
+
 async def keyword_search_segments(
     db: AsyncSession,
     org_id: uuid.UUID,
@@ -119,15 +137,18 @@ async def keyword_search_segments(
     meeting_id: uuid.UUID | None = None,
 ) -> list[dict]:
     """Full-text search (fallback sin embeddings y complemento del semántico)."""
-    filters = "s.organization_id = :org_id AND s.tsv @@ plainto_tsquery('spanish', :q)"
-    params: dict = {"org_id": str(org_id), "q": query, "limit": limit}
+    tsquery = build_or_tsquery(query)
+    if not tsquery:
+        return []
+    filters = "s.organization_id = :org_id AND s.tsv @@ to_tsquery('spanish', :q)"
+    params: dict = {"org_id": str(org_id), "q": tsquery, "limit": limit}
     if meeting_id:
         filters += " AND s.meeting_id = :meeting_id"
         params["meeting_id"] = str(meeting_id)
     sql = sql_text(
         f"""
         SELECT s.id, s.meeting_id, s.seq, s.start_ms, s.end_ms, s.text, s.speaker_id,
-               ts_rank(s.tsv, plainto_tsquery('spanish', :q)) AS rank
+               ts_rank(s.tsv, to_tsquery('spanish', :q)) AS rank
         FROM transcript_segments s
         WHERE {filters}
         ORDER BY rank DESC

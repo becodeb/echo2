@@ -9,6 +9,8 @@ import time
 
 from conftest import EchoTestUser
 
+from echo_api.config import get_settings
+
 SCRIPT = [
     ("Tenemos que terminar la compra esta semana.", 0, 3000, "speaker_1"),
     ("Yo puedo pedir los presupuestos, los pido el viernes.", 3200, 6800, "speaker_2"),
@@ -186,8 +188,15 @@ def test_full_meeting_lifecycle(client, fake_ai):
     assert any(hit["meeting_id"] == meeting_id for hit in results["transcript"])
 
 
-def test_cloud_audio_mode_stores_nothing_without_stt(client):
+def test_cloud_audio_mode_stores_nothing_without_stt(client, monkeypatch):
     """Sin STT configurado, mandar audio binario devuelve error claro (no simula)."""
+    # El entorno real puede tener keys cargadas (ej. OPENAI_API_KEY para STT):
+    # este test es sobre la ausencia de proveedor, así que la fuerza explícitamente
+    # en vez de depender de que el .env del desarrollador esté vacío.
+    settings = get_settings()
+    for field in ("openai_api_key", "groq_api_key", "deepgram_api_key"):
+        monkeypatch.setattr(settings, field, "")
+
     user = EchoTestUser(client, name="Sin STT", org_name="Org SinSTT")
     created = client.post("/api/meetings", json={"title": "Audio"}, headers=user.headers)
     meeting_id = created.json()["id"]

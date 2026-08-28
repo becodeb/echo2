@@ -1,7 +1,7 @@
 """Abstracción LLMProvider.
 
-Un solo cliente OpenAI-compatible cubre OpenAI, Groq, OpenRouter, Ollama y
-Gemini (endpoint compatible); Anthropic tiene cliente propio. El modelo NUNCA
+Un solo cliente OpenAI-compatible cubre OpenAI, Groq, OpenRouter, GMI Cloud,
+Ollama y Gemini (endpoint compatible); Anthropic tiene cliente propio. El modelo NUNCA
 está hardcodeado: viene de la configuración de la organización.
 """
 from __future__ import annotations
@@ -77,13 +77,23 @@ def parse_json_loose(text: str) -> dict | list:
 
 
 class OpenAICompatibleProvider(LLMProvider):
-    def __init__(self, name: str, base_url: str, api_key: str, model: str):
+    def __init__(
+        self,
+        name: str,
+        base_url: str,
+        api_key: str,
+        model: str,
+        omit_max_tokens: bool = False,
+    ):
         self.name = name
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model = model
+        # Sin techo de salida el modelo corta por finish_reason en vez de
+        # truncar a mitad de frase (necesario para minutas largas en GMI).
+        self.omit_max_tokens = omit_max_tokens
 
-    async def chat(self, system, messages, temperature=0.2, max_tokens=4096) -> str:
+    async def chat(self, system, messages, temperature=0.2, max_tokens: int | None = 4096) -> str:
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
@@ -91,8 +101,9 @@ class OpenAICompatibleProvider(LLMProvider):
             "model": self.model,
             "messages": [{"role": "system", "content": system}, *messages],
             "temperature": temperature,
-            "max_tokens": max_tokens,
         }
+        if not self.omit_max_tokens and max_tokens is not None:
+            payload["max_tokens"] = max_tokens
         started = time.monotonic()
         try:
             async with httpx.AsyncClient(timeout=180) as client:
@@ -186,6 +197,14 @@ def get_llm_provider(provider: str, api_key: str, model: str, base_url: str | No
         return OpenAICompatibleProvider("groq", base_url or "https://api.groq.com/openai/v1", api_key, model)
     if provider == "openrouter":
         return OpenAICompatibleProvider("openrouter", base_url or "https://openrouter.ai/api/v1", api_key, model)
+    if provider == "gmi":
+        return OpenAICompatibleProvider(
+            "gmi",
+            base_url or "https://api.gmi-serving.com/v1",
+            api_key,
+            model,
+            omit_max_tokens=True,
+        )
     if provider == "gemini":
         return OpenAICompatibleProvider(
             "gemini",

@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import type { ChatOut } from "../api/types";
 import { Button, EmptyState, formatMs } from "../components/ui";
 import { EchoFace } from "../components/EchoFace";
+import { AnswerText } from "../components/AnswerText";
 
 const SUGGESTIONS = [
   "¿Qué decisiones tomamos esta semana?",
@@ -89,7 +90,11 @@ export default function AskEcho() {
                 message.role === "user" ? "bg-ink-900 text-white" : "border border-ink-100 bg-white text-ink-900 shadow-sm"
               }`}
             >
-              <p className="whitespace-pre-wrap">{message.content}</p>
+              {message.role === "assistant" ? (
+                <AnswerText text={message.content} />
+              ) : (
+                <p className="whitespace-pre-wrap">{message.content}</p>
+              )}
               {message.sources && message.sources.length > 0 && (
                 <div className="mt-3 space-y-1 border-t border-ink-100 pt-2.5">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-400">Fuentes</p>
