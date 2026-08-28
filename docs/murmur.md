@@ -1,58 +1,48 @@
 # Murmur como motor de Echo
 
-Murmur es el motor STT local preferido de Echo. La integración vive en Echo
-Bridge (`apps/bridge`), que **no asume cómo está instalado**: lo detecta en
-runtime.
+**Estado: INSTALADO Y FUNCIONANDO.** Tu Murmur
+(`Downloads/murmur-youtube-main`) es una app de dictado cuyo motor en Windows
+es **NVIDIA Parakeet TDT 0.6B via sherpa-onnx** — y ese motor es exactamente
+lo que Echo Bridge usa ahora, de forma directa, 100% local y offline.
 
-## Estado en esta máquina
+## Qué quedó instalado
 
-Durante el desarrollo se buscó una instalación de Murmur en este equipo
-(PATH, procesos, servicios de Windows y carpetas típicas) y **no se
-encontró**. Por eso la integración quedó como autodetección + override
-manual, y el modo cloud cubre mientras tanto.
-
-## Cómo conectar tu Murmur
-
-### Caso A — `murmur` está en el PATH
-
-No hay que hacer nada: el bridge lo detecta al arrancar, sondea `murmur
---help` y elige el subcomando de transcripción (`transcribe`, `stt`,
-`recognize`, `run` o archivo directo). `GET http://127.0.0.1:8974/health`
-muestra `"engine": {"name": "murmur", "available": true}`.
-
-### Caso B — instalación no estándar
-
-Editá la config del bridge (`%APPDATA%\echo-bridge\config.json`):
-
-```json
-{
-  "engine_command": "C:/ruta/a/murmur.exe transcribe {input}"
-}
+```
+%LOCALAPPDATA%\echo-bridge├── sherpain\sherpa-onnx-offline.exe     (sherpa-onnx v1.13.5, ~20 MB)
+└── sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8    ├── encoder.int8.onnx   (~652 MB)
+    ├── decoder.int8.onnx
+    ├── joiner.int8.onnx
+    └── tokens.txt          (v3 multilingue: espanol + ingles + 23 mas)
 ```
 
-Placeholders disponibles:
-- `{input}` — WAV mono 16 kHz temporal (se borra tras cada uso)
-- `{lang}` — código de idioma de la reunión (`es`, `en`, …)
-- `{output}` — base de salida si tu versión escribe archivos
+- Modelo **v3 multilingüe** (el repo de Murmur usa v2 solo-inglés por
+  default; v3 era necesario para reuniones en español).
+- ~16× más rápido que tiempo real en CPU (RTF ≈ 0.06 con 4 threads).
+- Licencias: modelo CC-BY-4.0, sherpa-onnx Apache-2.0.
 
-El bridge lee la respuesta de dos formas:
-1. **JSON estilo whisper.cpp** (si el comando incluye `-oj`): timestamps por
-   segmento y speaker turns si el modelo los emite.
-2. **Texto plano por stdout**: se toma como un segmento con la duración de la
-   ventana.
+El bridge lo autodetecta al arrancar (paso 3 de la detección) y `/health`
+reporta `"name": "Parakeet (sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8)"`.
+Verificado end-to-end: PCM por WebSocket → VAD → Parakeet → texto con
+timestamps, en español y en inglés.
 
-### Caso C — Murmur expone un servicio HTTP
+## Detección del bridge (orden completo)
 
-```json
-{ "server_url": "http://127.0.0.1:PUERTO" }
-```
+1. `engine_command` de la config (override manual para cualquier CLI).
+2. `murmur` en PATH (sondea subcomandos vía `--help`).
+3. **sherpa-onnx + Parakeet** en `%LOCALAPPDATA%\echo-bridge\` (lo instalado).
+4. whisper.cpp CLI + modelo ggml/gguf.
+5. Servidor HTTP local compatible whisper.cpp server (`server_url`).
 
-Debe aceptar `POST /inference` multipart (`file`, `language`) y responder
-`{"text": "..."}` — el formato de whisper.cpp server.
+## Limitación conocida
 
-## Qué NO hace la integración
+En modo CLI el modelo se carga en cada utterance (~2 s de overhead sobre los
+~0.3 s de inferencia). Latencia total por frase: ~2.5 s. Mejora prevista:
+usar `sherpa-onnx-offline-websocket-server.exe` (incluido en el paquete) como
+proceso persistente — el modelo queda cargado y la latencia baja al RTF puro.
 
-- No usa el portapapeles como transporte (prohibido por diseño).
-- No guarda audio: el WAV temporal que exige un CLI vive milisegundos.
-- No inventa capacidades: si Murmur no está, `/health` lo dice y la UI ofrece
-  el modo cloud con su aviso de privacidad.
+## Si algún día querés otro motor
+
+- La app de dictado Murmur compilada: agregá su exe al PATH o usá
+  `engine_command`.
+- whisper.cpp: dejá un modelo ggml en `~/whisper.cpp/models` y borrá la
+  carpeta sherpa (o priorizá con `engine_command`).

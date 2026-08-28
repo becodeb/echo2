@@ -17,13 +17,22 @@ use std::{path::PathBuf, process::Stdio, time::Duration};
 use serde::Deserialize;
 use tokio::process::Command;
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CliOutput {
+    /// texto plano por stdout (murmur y CLIs genericos)
+    Plain,
+    /// JSON de whisper.cpp (-oj, archivo {output}.json)
+    WhisperJson,
+    /// linea JSON de sherpa-onnx ({"text": ..., "timestamps": [...]})
+    SherpaJson,
+}
+
 #[derive(Debug, Clone)]
 pub enum EngineKind {
     Cli {
         /// plantilla de argv; {input} => wav, {lang} => idioma, {model} => modelo
         argv: Vec<String>,
-        /// el motor emite JSON de whisper.cpp (-oj)
-        json_output: bool,
+        output: CliOutput,
     },
     HttpServer {
         url: String,
@@ -47,7 +56,13 @@ pub async fn detect(config: &super::Config) -> Engine {
                 name: argv[0].clone(),
                 kind: EngineKind::Cli {
                     argv,
-                    json_output: command.contains("-oj") || command.contains("--output-json"),
+                    output: if command.contains("-oj") || command.contains("--output-json") {
+                        CliOutput::WhisperJson
+                    } else if command.contains("sherpa-onnx") {
+                        CliOutput::SherpaJson
+                    } else {
+                        CliOutput::Plain
+                    },
                 },
                 models: vec![],
             };
@@ -61,7 +76,12 @@ pub async fn detect(config: &super::Config) -> Engine {
         }
     }
 
-    // 3. whisper.cpp CLI + modelo
+    // 3. sherpa-onnx + Parakeet (el motor de Murmur en Windows)
+    if let Some(engine) = detect_sherpa(config) {
+        return engine;
+    }
+
+    // 4. whisper.cpp CLI + modelo
     let model = find_model(config);
     for binary in ["whisper-cli", "whisper-cpp", "whisper", "main"] {
         if let Ok(path) = which::which(binary) {
@@ -84,7 +104,7 @@ pub async fn detect(config: &super::Config) -> Engine {
                             "-np".into(),
                             "{input}".into(),
                         ],
-                        json_output: true,
+                        output: CliOutput::WhisperJson,
                     },
                     models: vec![short_name(model_path)],
                 };
@@ -100,7 +120,7 @@ pub async fn detect(config: &super::Config) -> Engine {
         }
     }
 
-    // 4. Servidor HTTP local
+    // 5. Servidor HTTP local
     let candidates: Vec<String> = config
         .server_url
         .clone()
@@ -154,7 +174,7 @@ async fn probe_murmur(path: &std::path::Path) -> Option<Engine> {
                         sub.into(),
                         "{input}".into(),
                     ],
-                    json_output: false,
+                    output: CliOutput::Plain,
                 },
                 models: vec![],
             });
@@ -166,7 +186,7 @@ async fn probe_murmur(path: &std::path::Path) -> Option<Engine> {
             name: "murmur".into(),
             kind: EngineKind::Cli {
                 argv: vec![path.to_string_lossy().to_string(), "{input}".into()],
-                json_output: false,
+                output: CliOutput::Plain,
             },
             models: vec![],
         });
@@ -218,6 +238,116 @@ fn find_model(config: &super::Config) -> Option<PathBuf> {
         }
     }
     None
+}
+
+
+/// Detecta sherpa-onnx-offline + modelo Parakeet TDT (int8) — el motor que
+/// usa Murmur en Windows. Layout instalado por Echo:
+///   %LOCALAPPDATA%/echo-bridge/sherpa/bin/sherpa-onnx-offline.exe
+///   %LOCALAPPDATA%/echo-bridge/sherpa-onnx-nemo-parakeet-tdt-*/
+fn detect_sherpa(config: &super::Config) -> Option<Engine> {
+    let base = dirs::data_local_dir()
+        .unwrap_or_else(|| dirs::config_dir().unwrap_or_else(|| ".".into()))
+        .join("echo-bridge");
+
+    let mut binary = base.join("sherpa").join("bin").join("sherpa-onnx-offline.exe");
+    if !binary.exists() {
+        binary = base.join("sherpa").join("bin").join("sherpa-onnx-offline");
+    }
+    if !binary.exists() {
+        match which::which("sherpa-onnx-offline") {
+            Ok(found) => binary = found,
+            Err(_) => return None,
+        }
+    }
+
+    let mut model_dir: Option<PathBuf> = None;
+    if let Some(configured) = &config.model_path {
+        let path = PathBuf::from(configured);
+        if path.join("encoder.int8.onnx").exists() {
+            model_dir = Some(path);
+        }
+    }
+    if model_dir.is_none() {
+        if let Ok(entries) = std::fs::read_dir(&base) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let name = path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_lowercase();
+                if path.is_dir()
+                    && (name.contains("parakeet") || name.contains("nemo"))
+                    && path.join("encoder.int8.onnx").exists()
+                {
+                    model_dir = Some(path);
+                    break;
+                }
+            }
+        }
+    }
+    let model_dir = model_dir?;
+    let model_name = short_name(&model_dir);
+
+    Some(Engine {
+        name: format!("Parakeet ({model_name})"),
+        kind: EngineKind::Cli {
+            argv: vec![
+                binary.to_string_lossy().to_string(),
+                format!("--encoder={}", model_dir.join("encoder.int8.onnx").to_string_lossy()),
+                format!("--decoder={}", model_dir.join("decoder.int8.onnx").to_string_lossy()),
+                format!("--joiner={}", model_dir.join("joiner.int8.onnx").to_string_lossy()),
+                format!("--tokens={}", model_dir.join("tokens.txt").to_string_lossy()),
+                "--model-type=nemo_transducer".into(),
+                "--num-threads=4".into(),
+                "{input}".into(),
+            ],
+            output: CliOutput::SherpaJson,
+        },
+        models: vec![model_name],
+    })
+}
+
+#[derive(Deserialize)]
+struct SherpaResult {
+    text: String,
+    #[serde(default)]
+    timestamps: Vec<f64>,
+}
+
+/// Busca la linea JSON de resultado de sherpa-onnx en stdout+stderr.
+fn parse_sherpa_output(combined: &str, offset_ms: u64, duration_ms: u64) -> Vec<Segment> {
+    for line in combined.lines() {
+        let trimmed = line.trim();
+        if !trimmed.starts_with('{') || !trimmed.contains("\"text\"") {
+            continue;
+        }
+        if let Ok(result) = serde_json::from_str::<SherpaResult>(trimmed) {
+            let text = result.text.trim().to_string();
+            if text.is_empty() {
+                return vec![];
+            }
+            let start = result
+                .timestamps
+                .first()
+                .map(|s| (s * 1000.0) as u64)
+                .unwrap_or(0);
+            let end = result
+                .timestamps
+                .last()
+                .map(|s| (s * 1000.0) as u64 + 300)
+                .unwrap_or(duration_ms);
+            return vec![Segment {
+                text,
+                start_ms: offset_ms + start,
+                end_ms: offset_ms + end.min(duration_ms + 500),
+                confidence: None,
+                speaker: None,
+            }];
+        }
+    }
+    vec![]
 }
 
 fn short_name(path: &std::path::Path) -> String {
@@ -292,8 +422,8 @@ impl Engine {
                 self.transcribe_http(url, pcm16, sample_rate, language, offset_ms)
                     .await
             }
-            EngineKind::Cli { argv, json_output } => {
-                self.transcribe_cli(argv, *json_output, pcm16, sample_rate, language, offset_ms)
+            EngineKind::Cli { argv, output } => {
+                self.transcribe_cli(argv, *output, pcm16, sample_rate, language, offset_ms)
                     .await
             }
         }
@@ -302,7 +432,7 @@ impl Engine {
     async fn transcribe_cli(
         &self,
         argv: &[String],
-        json_output: bool,
+        output_kind: CliOutput,
         pcm16: &[i16],
         sample_rate: u32,
         language: &str,
@@ -338,8 +468,24 @@ impl Engine {
         drop(wav_file);
 
         let stdout = String::from_utf8_lossy(&result.stdout).to_string();
+        let duration_ms = (pcm16.len() as u64 * 1000) / sample_rate as u64;
 
-        if json_output {
+        if output_kind == CliOutput::SherpaJson {
+            let combined = format!("{}\n{}", stdout, String::from_utf8_lossy(&result.stderr));
+            let segments = parse_sherpa_output(&combined, offset_ms, duration_ms);
+            if !segments.is_empty() || result.status.success() {
+                return Ok(segments);
+            }
+            return Err(format!(
+                "sherpa-onnx termino con error: {}",
+                String::from_utf8_lossy(&result.stderr)
+                    .chars()
+                    .take(300)
+                    .collect::<String>()
+            ));
+        }
+
+        if output_kind == CliOutput::WhisperJson {
             let json_path = output_base.with_extension("out.json");
             let json_raw = tokio::fs::read_to_string(&json_path).await;
             let _ = tokio::fs::remove_file(&json_path).await;
@@ -365,7 +511,6 @@ impl Engine {
         if text.is_empty() {
             return Ok(vec![]);
         }
-        let duration_ms = (pcm16.len() as u64 * 1000) / sample_rate as u64;
         Ok(vec![Segment {
             text,
             start_ms: offset_ms,

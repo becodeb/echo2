@@ -132,16 +132,17 @@ Config del bridge: `%APPDATA%/echo-bridge/config.json` (Windows) o
 `~/.config/echo-bridge/config.json`. Ver [docs/murmur.md](docs/murmur.md) y
 [docs/bridge.md](docs/bridge.md).
 
-> En esta máquina no se encontró una instalación de Murmur (PATH, servicios,
-> carpetas típicas). El bridge queda en autodetección: cuando Murmur esté
-> disponible o configures `engine_command`, pasa a ser el motor preferido.
+> **En esta máquina el motor local ya está instalado y verificado**: el motor
+> de Murmur (Parakeet TDT 0.6B v3 multilingüe vía sherpa-onnx) vive en
+> `%LOCALAPPDATA%\echo-bridge\` y el bridge lo autodetecta. Transcripción
+> en español e inglés, offline, ~16× tiempo real.
 
 ## Proveedores
 
 | Rol | Opciones |
 |---|---|
 | LLM | OpenAI, Anthropic, Gemini, Groq, OpenRouter, Ollama (ningún modelo hardcodeado) |
-| STT local | Murmur / whisper.cpp / servidor compatible (vía Echo Bridge) |
+| STT local | **Parakeet/sherpa-onnx (motor de Murmur — instalado)**, whisper.cpp, servidor compatible (vía Echo Bridge) |
 | STT cloud | OpenAI Whisper, Groq, Deepgram |
 | Embeddings | OpenAI, Ollama (pgvector con normalización de dimensión) |
 
