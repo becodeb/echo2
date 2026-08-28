@@ -8,11 +8,13 @@ lo que Echo Bridge usa ahora, de forma directa, 100% local y offline.
 ## Qué quedó instalado
 
 ```
-%LOCALAPPDATA%\echo-bridge├── sherpain\sherpa-onnx-offline.exe     (sherpa-onnx v1.13.5, ~20 MB)
-└── sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8    ├── encoder.int8.onnx   (~652 MB)
-    ├── decoder.int8.onnx
-    ├── joiner.int8.onnx
-    └── tokens.txt          (v3 multilingue: espanol + ingles + 23 mas)
+%LOCALAPPDATA%/echo-bridge/
+|-- sherpa/bin/sherpa-onnx-offline.exe     (sherpa-onnx v1.13.5, ~20 MB)
+`-- sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/
+    |-- encoder.int8.onnx   (~652 MB)
+    |-- decoder.int8.onnx
+    |-- joiner.int8.onnx
+    `-- tokens.txt          (v3 multilingue: espanol + ingles + 23 mas)
 ```
 
 - Modelo **v3 multilingüe** (el repo de Murmur usa v2 solo-inglés por
@@ -29,7 +31,7 @@ timestamps, en español y en inglés.
 
 1. `engine_command` de la config (override manual para cualquier CLI).
 2. `murmur` en PATH (sondea subcomandos vía `--help`).
-3. **sherpa-onnx + Parakeet** en `%LOCALAPPDATA%\echo-bridge\` (lo instalado).
+3. **sherpa-onnx + Parakeet** en `%LOCALAPPDATA%/echo-bridge/` (lo instalado).
 4. whisper.cpp CLI + modelo ggml/gguf.
 5. Servidor HTTP local compatible whisper.cpp server (`server_url`).
 
