@@ -28,6 +28,13 @@ from ..services.ai_settings import get_vocabulary, resolve_stt
 from ..services.insights_live import maybe_extract_live_insights
 from ..services.live_bus import live_bus
 from ..services.stt import get_stt_provider
+from ..services.stt.channels import (
+    attribute_speaker,
+    downmix,
+    is_hallucination,
+    is_silent,
+    split_channels,
+)
 
 log = logging.getLogger("echo.live")
 
@@ -132,6 +139,9 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
     # Estado de ingesta cloud (solo si el recorder manda audio binario)
     audio_buffer = bytearray()
     sample_rate = 16000
+    # 2 = PCM intercalado L(micrófono)/R(sistema); habilita atribución de
+    # hablante por energía de canal.
+    channels = 1
     stream_offset_ms = 0
     stt_provider = None
     vocabulary: list[str] = []
@@ -155,9 +165,21 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
             return
         chunk = bytes(audio_buffer)
         audio_buffer = bytearray()  # el audio saliente ya no se retiene
-        duration_ms = int(len(chunk) / 2 / sample_rate * 1000)
+        duration_ms = int(len(chunk) / 2 / channels / sample_rate * 1000)
         offset = stream_offset_ms
         stream_offset_ms += duration_ms
+
+        mic_track: bytes | None = None
+        system_track: bytes | None = None
+        if channels == 2:
+            mic_track, system_track = split_channels(chunk)
+            chunk = downmix(mic_track, system_track)
+
+        # Whisper alucina créditos de subtitulado sobre silencio; además una
+        # llamada por ventana muda es gasto puro.
+        if is_silent(chunk, sample_rate):
+            del chunk
+            return
         try:
             result = await stt_provider.transcribe_chunk(
                 chunk, sample_rate, meeting.language, vocabulary, offset_ms=offset
@@ -175,10 +197,24 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
             del chunk  # descartar el audio explícitamente
         stt_error_sent = False
         for seg in result.segments:
-            if not seg.text.strip():
+            if is_hallucination(seg.text):
                 continue
+            speaker = seg.speaker
+            if mic_track is not None and system_track is not None:
+                # La energía de canal manda sobre la etiqueta del modelo: es
+                # medición y se mantiene estable entre chunks.
+                speaker = (
+                    attribute_speaker(
+                        mic_track,
+                        system_track,
+                        seg.start_ms - offset,
+                        seg.end_ms - offset,
+                        sample_rate,
+                    )
+                    or speaker
+                )
             event = await _store_segment(
-                meeting, seg.text.strip(), seg.start_ms, seg.end_ms, seg.confidence, seg.speaker
+                meeting, seg.text.strip(), seg.start_ms, seg.end_ms, seg.confidence, speaker
             )
             await live_bus.publish(channel, event)
             segments_since_insights += 1
@@ -213,7 +249,7 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
                         continue
                     stt_provider = get_stt_provider(config.provider, config.api_key, config.model)
                 audio_buffer.extend(message["bytes"])
-                if len(audio_buffer) >= sample_rate * 2 * CLOUD_WINDOW_SECONDS:
+                if len(audio_buffer) >= sample_rate * 2 * channels * CLOUD_WINDOW_SECONDS:
                     await flush_audio()
                 continue
 
@@ -229,6 +265,11 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
             if msg_type == "hello":
                 requested = data.get("role", "viewer")
                 role = "recorder" if requested == "recorder" else "viewer"
+                if role == "recorder" and data.get("channels"):
+                    try:
+                        channels = 2 if int(data["channels"]) == 2 else 1
+                    except (TypeError, ValueError):
+                        channels = 1
                 if role == "recorder" and data.get("sample_rate"):
                     with contextlib.suppress(ValueError, TypeError):
                         sample_rate = max(8000, min(48000, int(data["sample_rate"])))

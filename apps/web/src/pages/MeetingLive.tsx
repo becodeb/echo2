@@ -169,7 +169,16 @@ export default function MeetingLive() {
       const socket = new WebSocket(wsUrl(`/api/meetings/${id}/ws?token=${encodeURIComponent(token)}`));
       socket.binaryType = "arraybuffer";
       socket.onopen = () => {
-        socket.send(JSON.stringify({ type: "hello", role: "recorder", sample_rate: 16000 }));
+        // channels=2 avisa que el PCM viene intercalado L=micrófono, R=sistema,
+        // que es como el servidor distingue quién habló.
+        socket.send(
+          JSON.stringify({
+            type: "hello",
+            role: "recorder",
+            sample_rate: 16000,
+            channels: captureSystem ? 2 : 1,
+          }),
+        );
         setWsConnected(true);
         resolve(socket);
       };
@@ -197,7 +206,7 @@ export default function MeetingLive() {
         }
       };
     });
-  }, [id, handleLiveEvent]);
+  }, [id, handleLiveEvent, captureSystem]);
 
   const start = useCallback(async () => {
     if (!id) return;
@@ -486,7 +495,12 @@ export default function MeetingLive() {
                     onChange={(event) => setCaptureSystem(event.target.checked)}
                     className="rounded border-ink-300"
                   />
-                  Incluir audio del sistema (Meet, Zoom, Teams)
+                  <span>
+                    Incluir audio del sistema (Meet, Zoom, Teams, Discord)
+                    <span className="block text-xs text-ink-400">
+                      Separa tu voz de la de los remotos: quedan como Speaker 1 y Speaker 2
+                    </span>
+                  </span>
                 </label>
 
                 <div className="border-t border-ink-100 pt-3">

@@ -12,6 +12,8 @@ export interface AudioSource {
   start(onFrame: (pcm16: Int16Array) => void, onLevel: (level: number) => void): Promise<void>;
   stop(): Promise<void>;
   readonly sampleRate: number;
+  /** 1 = mono. 2 = intercalado L=micrófono, R=audio del sistema. */
+  readonly channels: number;
 }
 
 const WORKLET_CODE = `
@@ -28,6 +30,24 @@ class EchoCapture extends AudioWorkletProcessor {
 registerProcessor("echo-capture", EchoCapture);
 `;
 
+/** Igual que echo-capture pero conserva los dos canales por separado.
+ *  Se usa para mic (canal 0) + audio del sistema (canal 1): mezclarlos antes
+ *  de enviarlos borra la única señal que distingue quién habló. */
+const WORKLET_CODE_STEREO = `
+class EchoCaptureStereo extends AudioWorkletProcessor {
+  process(inputs) {
+    const input = inputs[0];
+    const left = input && input[0];
+    if (left && left.length) {
+      const right = (input[1] && input[1].length === left.length) ? input[1] : left;
+      this.port.postMessage({ left: new Float32Array(left), right: new Float32Array(right) });
+    }
+    return true;
+  }
+}
+registerProcessor("echo-capture-stereo", EchoCaptureStereo);
+`;
+
 export const TARGET_SAMPLE_RATE = 16000;
 
 export async function listMicrophones(): Promise<MediaDeviceInfo[]> {
@@ -37,6 +57,7 @@ export async function listMicrophones(): Promise<MediaDeviceInfo[]> {
 
 export class MicrophoneSource implements AudioSource {
   readonly sampleRate = TARGET_SAMPLE_RATE;
+  readonly channels = 1;
   private stream: MediaStream | null = null;
   private context: AudioContext | null = null;
   private node: AudioWorkletNode | null = null;
@@ -135,10 +156,16 @@ export class MicrophoneSource implements AudioSource {
 }
 
 /** Micrófono + audio del sistema (getDisplayMedia con audio). Modo avanzado
- *  para reuniones de Meet/Zoom/Teams: mezcla ambas fuentes en un solo PCM y
- *  reporta qué fuente domina cada frame como hint de diarización. */
+ *  para reuniones de Meet/Zoom/Teams/Discord.
+ *
+ *  Las dos fuentes viajan en canales separados (L=mic, R=sistema) en vez de
+ *  mezcladas: así el servidor atribuye cada frase por energía de canal, sin
+ *  depender de un modelo de diarización ni de que las etiquetas se mantengan
+ *  estables entre chunks. */
 export class SystemAudioSource implements AudioSource {
   readonly sampleRate = TARGET_SAMPLE_RATE;
+  readonly channels = 2;
+  private micStream: MediaStream | null = null;
   private mic: MicrophoneSource;
   private displayStream: MediaStream | null = null;
   private context: AudioContext | null = null;
@@ -166,19 +193,29 @@ export class SystemAudioSource implements AudioSource {
     this.displayStream.getVideoTracks().forEach((track) => (track.enabled = false));
 
     this.context = new AudioContext();
-    const workletUrl = URL.createObjectURL(new Blob([WORKLET_CODE], { type: "application/javascript" }));
+    const workletUrl = URL.createObjectURL(
+      new Blob([WORKLET_CODE_STEREO], { type: "application/javascript" }),
+    );
     try {
       await this.context.audioWorklet.addModule(workletUrl);
     } finally {
       URL.revokeObjectURL(workletUrl);
     }
     const micStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1 } });
+    this.micStream = micStream;
     const micNode = this.context.createMediaStreamSource(micStream);
     const systemNode = this.context.createMediaStreamSource(new MediaStream(audioTracks));
-    const merger = this.context.createGain();
-    micNode.connect(merger);
-    systemNode.connect(merger);
-    this.node = new AudioWorkletNode(this.context, "echo-capture");
+    // Canal 0 = micrófono (vos), canal 1 = audio del sistema (el remoto).
+    // Separados, el servidor sabe quién habló por energía de canal; mezclados
+    // esa información se pierde para siempre.
+    const merger = this.context.createChannelMerger(2);
+    micNode.connect(merger, 0, 0);
+    systemNode.connect(merger, 0, 1);
+    this.node = new AudioWorkletNode(this.context, "echo-capture-stereo", {
+      channelCount: 2,
+      channelCountMode: "explicit",
+      channelInterpretation: "discrete",
+    });
     merger.connect(this.node);
 
     const inputRate = this.context.sampleRate;
@@ -186,29 +223,45 @@ export class SystemAudioSource implements AudioSource {
     let pending = new Float32Array(0);
     const FRAME_SAMPLES = 1600;
 
-    this.node.port.onmessage = (event: MessageEvent<Float32Array>) => {
-      const chunk = event.data;
-      let sum = 0;
-      for (let index = 0; index < chunk.length; index++) sum += chunk[index] * chunk[index];
-      onLevel(Math.min(1, Math.sqrt(sum / chunk.length) * 4));
+    let pendingRight = new Float32Array(0);
 
-      const outLength = Math.floor(chunk.length / ratio);
-      const merged = new Float32Array(pending.length + outLength);
-      merged.set(pending);
+    this.node.port.onmessage = (
+      event: MessageEvent<{ left: Float32Array; right: Float32Array }>,
+    ) => {
+      const { left, right } = event.data;
+      let sum = 0;
+      for (let index = 0; index < left.length; index++) {
+        const mixed = left[index] + right[index];
+        sum += mixed * mixed;
+      }
+      onLevel(Math.min(1, Math.sqrt(sum / left.length) * 4));
+
+      const outLength = Math.floor(left.length / ratio);
+      const mergedLeft = new Float32Array(pending.length + outLength);
+      const mergedRight = new Float32Array(pendingRight.length + outLength);
+      mergedLeft.set(pending);
+      mergedRight.set(pendingRight);
       for (let index = 0; index < outLength; index++) {
-        merged[pending.length + index] = chunk[Math.floor(index * ratio)];
+        const source = Math.floor(index * ratio);
+        mergedLeft[pending.length + index] = left[source];
+        mergedRight[pendingRight.length + index] = right[source];
       }
       let offset = 0;
-      while (merged.length - offset >= FRAME_SAMPLES) {
-        const frame = new Int16Array(FRAME_SAMPLES);
+      while (mergedLeft.length - offset >= FRAME_SAMPLES) {
+        // Intercalado L,R,L,R… El servidor separa los canales para atribuir
+        // hablante y los mezcla para transcribir.
+        const frame = new Int16Array(FRAME_SAMPLES * 2);
         for (let index = 0; index < FRAME_SAMPLES; index++) {
-          const sample = Math.max(-1, Math.min(1, merged[offset + index]));
-          frame[index] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+          const l = Math.max(-1, Math.min(1, mergedLeft[offset + index]));
+          const r = Math.max(-1, Math.min(1, mergedRight[offset + index]));
+          frame[index * 2] = l < 0 ? l * 0x8000 : l * 0x7fff;
+          frame[index * 2 + 1] = r < 0 ? r * 0x8000 : r * 0x7fff;
         }
         onFrame(frame);
         offset += FRAME_SAMPLES;
       }
-      pending = merged.slice(offset);
+      pending = mergedLeft.slice(offset);
+      pendingRight = mergedRight.slice(offset);
     };
   }
 
@@ -219,6 +272,8 @@ export class SystemAudioSource implements AudioSource {
     this.context = null;
     this.displayStream?.getTracks().forEach((track) => track.stop());
     this.displayStream = null;
+    this.micStream?.getTracks().forEach((track) => track.stop());
+    this.micStream = null;
     await this.mic.stop();
   }
 }
