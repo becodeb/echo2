@@ -3,8 +3,9 @@
 Compañero físico de reuniones: una carita que escucha. Firmware en
 `firmware/esp32` (PlatformIO + Arduino, ESP32-S3).
 
-> ⚠️ El firmware compila con PlatformIO pero **no fue probado sobre hardware
-> real** en este repositorio. Tratalo como base funcional a validar.
+> ⚠️ El firmware está escrito como base funcional pero **no fue compilado ni
+> probado sobre hardware** en este repositorio (la máquina de desarrollo no
+> tiene el toolchain de PlatformIO). Validalo con `pio run` antes de flashear.
 
 ## Hardware de referencia
 

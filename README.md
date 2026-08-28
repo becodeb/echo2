@@ -174,7 +174,7 @@ tokens de sesión. Detalle: [docs/security.md](docs/security.md).
 Firmware PlatformIO para ESP32-S3 + micrófono I2S + OLED con la carita de
 Echo (estados 🙂 👂 ··· 😴 ✓ ⚠, indicador GRABANDO, botón físico, pairing por
 código de 6 dígitos, streaming PCM16). Ver [docs/esp32.md](docs/esp32.md).
-*El firmware compila pero no fue probado sobre hardware en este repo.*
+*El firmware está escrito como base funcional; no fue compilado ni probado sobre hardware en este repo.*
 
 ## Estado y limitaciones actuales
 
