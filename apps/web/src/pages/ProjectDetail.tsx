@@ -43,9 +43,18 @@ interface Snapshot {
   open_questions: string[];
 }
 
+interface Prep {
+  has_previous: boolean;
+  previous_meeting?: { id: string; title: string };
+  pending_tasks: { id: string; text: string; assignee_name: string | null }[];
+  open_questions: { id: string; text: string }[];
+  decisions_to_follow: { id: string; text: string }[];
+  suggested_agenda: string[];
+}
+
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
-  const [tab, setTab] = useState<"timeline" | "meetings" | "changes">("timeline");
+  const [tab, setTab] = useState<"timeline" | "meetings" | "changes" | "prepare">("timeline");
 
   const { data: project } = useQuery({
     queryKey: ["project", id],
@@ -57,6 +66,12 @@ export default function ProjectDetail() {
     queryKey: ["project-changes", id],
     queryFn: () => api<Changes>(`/api/projects/${id}/changes`),
     enabled: !!id && tab === "changes",
+  });
+
+  const { data: prep } = useQuery({
+    queryKey: ["project-prep", id],
+    queryFn: () => api<Prep>(`/api/prepare-meeting?project_id=${id}`),
+    enabled: !!id && tab === "prepare",
   });
 
   if (!project) {
@@ -76,6 +91,7 @@ export default function ProjectDetail() {
             ["timeline", "Línea de tiempo"],
             ["meetings", `Reuniones (${project.meetings.length})`],
             ["changes", "¿Qué cambió?"],
+            ["prepare", "Preparar reunión"],
           ] as const
         ).map(([value, label]) => (
           <button
@@ -144,6 +160,50 @@ export default function ProjectDetail() {
             </Link>
           ))}
         </Card>
+      )}
+
+      {tab === "prepare" && (
+        <>
+          {!prep && <div className="flex justify-center py-10 text-ink-300"><Spinner /></div>}
+          {prep && !prep.has_previous && (
+            <Card>
+              <EmptyState title="Sin reunión anterior completada" mood="idle">
+                Cuando termines una reunión del proyecto, Echo prepara la agenda de la siguiente.
+              </EmptyState>
+            </Card>
+          )}
+          {prep?.has_previous && (
+            <div className="space-y-4">
+              <Card>
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-400">
+                  Desde «{prep.previous_meeting?.title}»
+                </p>
+                <div className="grid gap-4 sm:grid-cols-3 text-center">
+                  <div>
+                    <p className="text-2xl font-semibold text-ink-900">{prep.pending_tasks.length}</p>
+                    <p className="text-xs text-ink-400">tareas pendientes</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-semibold text-ink-900">{prep.open_questions.length}</p>
+                    <p className="text-xs text-ink-400">preguntas abiertas</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-semibold text-ink-900">{prep.decisions_to_follow.length}</p>
+                    <p className="text-xs text-ink-400">decisiones a seguir</p>
+                  </div>
+                </div>
+              </Card>
+              {prep.suggested_agenda.length > 0 && (
+                <Card>
+                  <h3 className="mb-2 font-semibold text-ink-900">Agenda sugerida</h3>
+                  <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-ink-700">
+                    {prep.suggested_agenda.join("\n")}
+                  </pre>
+                </Card>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       {tab === "changes" && (
