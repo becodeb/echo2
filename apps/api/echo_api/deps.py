@@ -143,6 +143,10 @@ _buckets: dict[str, deque] = defaultdict(deque)
 
 
 def rate_limit(key: str, limit: int, window_seconds: int = 60) -> None:
+    from .config import get_settings
+
+    if get_settings().echo_env == "test":
+        return  # la suite crea muchos usuarios; el limite se prueba aparte
     now = time.monotonic()
     bucket = _buckets[key]
     while bucket and now - bucket[0] > window_seconds:

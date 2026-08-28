@@ -108,6 +108,13 @@ def resolve_relative_date(text: str | None, reference: date) -> date | None:
             resolved = date(year + 1, month, day)
         return resolved
 
+    iso = re.search(r"(\d{4})-(\d{2})-(\d{2})", normalized)
+    if iso:
+        try:
+            return date(int(iso.group(1)), int(iso.group(2)), int(iso.group(3)))
+        except ValueError:
+            return None
+
     slash = re.search(r"(\d{1,2})[/\-](\d{1,2})(?:[/\-](\d{2,4}))?", normalized)
     if slash:
         day, month = int(slash.group(1)), int(slash.group(2))
@@ -123,13 +130,6 @@ def resolve_relative_date(text: str | None, reference: date) -> date | None:
         if not slash.group(3) and resolved < reference:
             resolved = _add_months(resolved, 12)
         return resolved
-
-    iso = re.search(r"(\d{4})-(\d{2})-(\d{2})", normalized)
-    if iso:
-        try:
-            return date(int(iso.group(1)), int(iso.group(2)), int(iso.group(3)))
-        except ValueError:
-            return None
 
     return None
 

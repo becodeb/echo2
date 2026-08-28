@@ -72,6 +72,7 @@ def _include_optional_routers() -> None:
         "people",
         "search",
         "devices",
+        "device_stream",
         "settings_ai",
         "sharing",
         "comments",
