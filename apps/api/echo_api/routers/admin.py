@@ -31,7 +31,7 @@ from ..services.audit import audit
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
-LLM_PROVIDERS = ["openai", "anthropic", "gemini", "groq", "openrouter", "gmi", "ollama"]
+LLM_PROVIDERS = ["openai", "anthropic", "gemini", "groq", "openrouter", "orcarouter", "gmi", "ollama"]
 
 
 async def get_superadmin(user: User = Depends(get_current_user)) -> User:

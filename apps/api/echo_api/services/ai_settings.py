@@ -102,6 +102,8 @@ async def resolve_llm(db: AsyncSession, org_id: uuid.UUID) -> LLMConfig | None:
         return LLMConfig("groq", _env_default_model("groq"), env.groq_api_key)
     if env.openrouter_api_key:
         return LLMConfig("openrouter", _env_default_model("openrouter"), env.openrouter_api_key)
+    if env.orcarouter_api_key:
+        return LLMConfig("orcarouter", _env_default_model("orcarouter"), env.orcarouter_api_key)
     if env.gmi_api_key:
         return LLMConfig("gmi", _env_default_model("gmi"), env.gmi_api_key)
     if env.ollama_base_url:
@@ -173,6 +175,7 @@ def _env_key_for(provider: str) -> str:
         "deepgram": env.deepgram_api_key,
         "openrouter": env.openrouter_api_key,
         "gmi": env.gmi_api_key,
+        "orcarouter": env.orcarouter_api_key,
     }.get(provider, "")
 
 
@@ -189,5 +192,6 @@ def _default_model(provider: str) -> str:
         "groq": "llama-3.3-70b-versatile",
         "openrouter": "anthropic/claude-sonnet-4.5",
         "gmi": "MiniMaxAI/MiniMax-M3",
+        "orcarouter": "orcarouter/free",
         "ollama": "llama3.1",
     }.get(provider, "gpt-4o-mini")

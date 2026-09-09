@@ -122,9 +122,19 @@ class OpenAICompatibleProvider(LLMProvider):
             raise LLMError(f"{self.name} devolvió {response.status_code}: {response.text[:300]}")
         data = response.json()
         try:
-            return data["choices"][0]["message"]["content"] or ""
+            choice = data["choices"][0]
+            content = choice["message"]["content"] or ""
         except (KeyError, IndexError) as exc:
             raise LLMError(f"Respuesta inesperada de {self.name}") from exc
+        if not content.strip():
+            # Los modelos razonadores pueden gastar todo el presupuesto pensando
+            # y devolver 200 con contenido vacío. Tratarlo como éxito produce
+            # actas en blanco sin que nadie se entere; es una falla y como tal
+            # tiene que poder disparar el siguiente modelo de la cadena.
+            reason = choice.get("finish_reason")
+            detail = " (se quedó sin tokens razonando)" if reason == "length" else ""
+            raise LLMError(f"{self.name} devolvió una respuesta vacía{detail}")
+        return content
 
 
 class AnthropicProvider(LLMProvider):
@@ -187,7 +197,57 @@ class FakeLLMProvider(LLMProvider):
         return "{}"
 
 
+class FallbackLLMProvider(LLMProvider):
+    """Prueba varios modelos en orden hasta que uno responda.
+
+    Los modelos gratuitos se caen, se saturan o devuelven vacío con más
+    frecuencia que los pagos. Con una sola opción, cada una de esas veces es
+    un acta que no sale; con la cadena, es un reintento que nadie nota.
+
+    Solo cubre fallas del modelo. Si ninguno responde, propaga el error del
+    último para no esconder el motivo real.
+    """
+
+    name = "fallback"
+
+    def __init__(self, providers: list[LLMProvider]):
+        if not providers:
+            raise ValueError("La cadena de modelos no puede estar vacía")
+        self.providers = providers
+        self.model = ", ".join(getattr(p, "model", p.name) for p in providers)
+
+    async def chat(self, system, messages, temperature=0.2, max_tokens: int | None = 4096) -> str:
+        last: Exception | None = None
+        for index, provider in enumerate(self.providers):
+            try:
+                return await provider.chat(system, messages, temperature, max_tokens)
+            except LLMError as exc:
+                last = exc
+                log.warning(
+                    "llm: %s (%s) fallo, %s",
+                    getattr(provider, "model", provider.name),
+                    provider.name,
+                    "probando el siguiente" if index + 1 < len(self.providers) else "no quedan más",
+                )
+        raise LLMError(str(last))
+
+
 def get_llm_provider(provider: str, api_key: str, model: str, base_url: str | None = None) -> LLMProvider:
+    # Varios modelos separados por coma = cadena con reserva, en ese orden.
+    if "," in (model or ""):
+        chain = [
+            _single_provider(provider, api_key, name.strip(), base_url)
+            for name in model.split(",")
+            if name.strip()
+        ]
+        if len(chain) > 1:
+            return FallbackLLMProvider(chain)
+        if chain:
+            return chain[0]
+    return _single_provider(provider, api_key, model, base_url)
+
+
+def _single_provider(provider: str, api_key: str, model: str, base_url: str | None = None) -> LLMProvider:
     provider = (provider or "").lower()
     if provider == "anthropic":
         return AnthropicProvider(api_key, model)
@@ -197,6 +257,10 @@ def get_llm_provider(provider: str, api_key: str, model: str, base_url: str | No
         return OpenAICompatibleProvider("groq", base_url or "https://api.groq.com/openai/v1", api_key, model)
     if provider == "openrouter":
         return OpenAICompatibleProvider("openrouter", base_url or "https://openrouter.ai/api/v1", api_key, model)
+    if provider == "orcarouter":
+        return OpenAICompatibleProvider(
+            "orcarouter", base_url or "https://api.orcarouter.ai/v1", api_key, model
+        )
     if provider == "gmi":
         return OpenAICompatibleProvider(
             "gmi",

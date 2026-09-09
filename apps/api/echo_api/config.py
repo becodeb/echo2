@@ -62,6 +62,7 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     deepgram_api_key: str = ""
     openrouter_api_key: str = ""
+    orcarouter_api_key: str = ""
     gmi_api_key: str = ""
     ollama_base_url: str = ""
 
