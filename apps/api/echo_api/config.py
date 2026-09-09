@@ -50,6 +50,11 @@ class Settings(BaseSettings):
     # Vacío = autodetectar por orden de keys presentes. Explicitarlo evita que
     # cargar una key para STT (ej. OpenAI) cambie de golpe el modelo del chat.
     default_llm_provider: str = ""
+    # Modelo del default del servidor. Vacío = el que Echo trae por proveedor.
+    # Existe para poder apuntar a un modelo gratuito (por ejemplo uno ":free"
+    # de OpenRouter) sin tocar código: el default del servidor es lo que usa
+    # toda organización que no configuró el suyo.
+    default_llm_model: str = ""
 
     # Defaults globales de providers (cada organización puede configurar el suyo)
     openai_api_key: str = ""

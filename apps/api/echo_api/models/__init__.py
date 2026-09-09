@@ -1,4 +1,12 @@
 from .base import Base
+from .families import (
+    RELATIONSHIPS,
+    SEVERITIES,
+    Family,
+    FamilyMember,
+    MeetingAttendance,
+    MeetingReason,
+)
 from .core import (
     ROLES,
     ROLE_ADMIN,
@@ -42,6 +50,8 @@ from .workspace import (
 
 __all__ = [
     "Base", "User", "Organization", "OrganizationMember", "OrganizationInvite",
+    "Family", "FamilyMember", "MeetingReason", "MeetingAttendance",
+    "RELATIONSHIPS", "SEVERITIES",
     "RefreshToken", "ROLES", "ROLE_OWNER", "ROLE_ADMIN", "ROLE_MEMBER", "ROLE_VIEWER",
     "EMBEDDING_DIM", "Meeting", "MeetingParticipant", "Speaker", "SpeakerProfile",
     "TranscriptSegment", "SegmentRevision", "Bookmark", "MeetingLink",

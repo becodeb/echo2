@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import type { ChatOut, InsightsOut, MeetingOut, MinutesOut, SegmentOut } from "../api/types";
 import { Badge, Button, Card, EmptyState, Input, Modal, Spinner, formatDate, formatDuration, formatMs } from "../components/ui";
 import { EchoFace } from "../components/EchoFace";
+import { ClassificationPanel } from "../components/ClassificationPanel";
 import { AnswerText } from "../components/AnswerText";
 
 const TABS = [
@@ -65,6 +66,7 @@ export default function MeetingDetail() {
           {meeting.participants.length > 0 &&
             ` · ${meeting.participants.map((participant) => participant.name).join(", ")}`}
         </p>
+        <ClassificationPanel meetingId={meeting.id} />
         {aiSkipped && (
           <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
             El análisis con IA se salteó porque no hay un modelo configurado.{" "}

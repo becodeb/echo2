@@ -2,12 +2,14 @@ import { useEffect, useState, type FormEvent } from "react";
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
+import type { ReasonOut } from "../api/types";
 import { Badge, Button, Card, Input, Modal, Spinner } from "../components/ui";
 import { useAuth } from "../state/auth";
 
 const SECTIONS = [
   { path: "org", label: "Organización" },
   { path: "ai", label: "IA y transcripción" },
+  { path: "reasons", label: "Motivos de reunión" },
   { path: "dictionary", label: "Diccionario" },
   { path: "template", label: "Formato de acta" },
   { path: "devices", label: "Dispositivos" },
@@ -40,6 +42,7 @@ export default function Settings() {
             <Route index element={<Navigate to="org" replace />} />
             <Route path="org" element={<OrgSection />} />
             <Route path="ai" element={<AISection />} />
+            <Route path="reasons" element={<ReasonsSection />} />
             <Route path="dictionary" element={<DictionarySection />} />
             <Route path="template" element={<TemplateSection />} />
             <Route path="devices" element={<DevicesSection />} />
@@ -673,6 +676,113 @@ function PrivacySection() {
           devuelven completas al navegador ni se registran en logs.
         </p>
       </div>
+    </Card>
+  );
+}
+
+
+// ── Motivos de reunión ───────────────────────────────────────────
+
+function ReasonsSection() {
+  const queryClient = useQueryClient();
+  const [name, setName] = useState("");
+
+  const { data: reasons, isLoading } = useQuery({
+    queryKey: ["reasons", "all"],
+    queryFn: () => api<ReasonOut[]>("/api/org/meeting-reasons?include_inactive=true"),
+  });
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["reasons"] });
+    queryClient.invalidateQueries({ queryKey: ["reasons", "all"] });
+  };
+
+  const create = useMutation({
+    mutationFn: () =>
+      api<ReasonOut>("/api/org/meeting-reasons", {
+        method: "POST",
+        body: JSON.stringify({ name, is_active: true, position: (reasons?.length ?? 0) + 1 }),
+      }),
+    onSuccess: () => {
+      setName("");
+      invalidate();
+    },
+  });
+
+  const toggle = useMutation({
+    mutationFn: (reason: ReasonOut) =>
+      api<ReasonOut>(`/api/org/meeting-reasons/${reason.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: reason.name,
+          is_active: !reason.is_active,
+          position: reason.position,
+        }),
+      }),
+    onSuccess: invalidate,
+  });
+
+  if (isLoading) {
+    return <div className="flex justify-center py-10 text-ink-300"><Spinner className="h-5 w-5" /></div>;
+  }
+
+  return (
+    <Card className="space-y-4">
+      <div>
+        <h2 className="text-[15px] font-semibold text-ink-900">Motivos de reunión</h2>
+        <p className="mt-1 text-sm text-ink-500">
+          La lista que aparece al clasificar una reunión. Tenerla cerrada es lo que hace que los
+          reportes por motivo sirvan para algo.
+        </p>
+      </div>
+
+      {(reasons ?? []).length > 0 && (
+        <ul className="space-y-1.5">
+          {(reasons ?? []).map((reason) => (
+            <li key={reason.id} className="flex items-center gap-2 text-sm">
+              <span className={reason.is_active ? "text-ink-800" : "text-ink-400 line-through"}>
+                {reason.name}
+              </span>
+              {!reason.is_active && <Badge tone="gray">Inactivo</Badge>}
+              <button
+                onClick={() => toggle.mutate(reason)}
+                className="ml-auto text-xs text-ink-400 hover:text-ink-700"
+              >
+                {reason.is_active ? "Desactivar" : "Reactivar"}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (name.trim()) create.mutate();
+        }}
+        className="flex flex-wrap items-end gap-2"
+      >
+        <div className="min-w-[200px] flex-1">
+          <Input
+            label="Nuevo motivo"
+            placeholder="ej: Seguimiento pedagógico, Conducta, Inasistencias"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </div>
+        <Button type="submit" variant="soft" disabled={create.isPending}>
+          {create.isPending ? <Spinner /> : "Agregar"}
+        </Button>
+      </form>
+      {create.isError && (
+        <p className="text-sm text-red-600">
+          {create.error instanceof Error ? create.error.message : "No se pudo agregar"}
+        </p>
+      )}
+      <p className="text-xs text-ink-400">
+        Los motivos se desactivan en vez de borrarse: las reuniones viejas tienen que seguir
+        mostrando con qué motivo se cargaron.
+      </p>
     </Card>
   );
 }

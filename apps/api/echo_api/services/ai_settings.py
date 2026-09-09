@@ -72,20 +72,20 @@ async def resolve_llm(db: AsyncSession, org_id: uuid.UUID) -> LLMConfig | None:
         if key or provider == "ollama":
             return LLMConfig(
                 provider,
-                _default_model(provider),
+                _env_default_model(provider),
                 key,
                 base_url=env.ollama_base_url if provider == "ollama" else None,
             )
     if env.anthropic_api_key:
-        return LLMConfig("anthropic", "claude-sonnet-5", env.anthropic_api_key)
+        return LLMConfig("anthropic", _env_default_model("anthropic"), env.anthropic_api_key)
     if env.openai_api_key:
-        return LLMConfig("openai", "gpt-4o-mini", env.openai_api_key)
+        return LLMConfig("openai", _env_default_model("openai"), env.openai_api_key)
     if env.groq_api_key:
-        return LLMConfig("groq", "llama-3.3-70b-versatile", env.groq_api_key)
+        return LLMConfig("groq", _env_default_model("groq"), env.groq_api_key)
     if env.openrouter_api_key:
-        return LLMConfig("openrouter", "anthropic/claude-sonnet-4.5", env.openrouter_api_key)
+        return LLMConfig("openrouter", _env_default_model("openrouter"), env.openrouter_api_key)
     if env.gmi_api_key:
-        return LLMConfig("gmi", "MiniMaxAI/MiniMax-M3", env.gmi_api_key)
+        return LLMConfig("gmi", _env_default_model("gmi"), env.gmi_api_key)
     if env.ollama_base_url:
         return LLMConfig("ollama", "llama3.1", "", base_url=env.ollama_base_url)
     return None
@@ -156,6 +156,11 @@ def _env_key_for(provider: str) -> str:
         "openrouter": env.openrouter_api_key,
         "gmi": env.gmi_api_key,
     }.get(provider, "")
+
+
+def _env_default_model(provider: str) -> str:
+    """Modelo del default del servidor: lo configurado gana sobre el built-in."""
+    return get_settings().default_llm_model or _default_model(provider)
 
 
 def _default_model(provider: str) -> str:

@@ -31,6 +31,7 @@ class Meeting(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
     __table_args__ = (
         Index("ix_meetings_org_started", "organization_id", "started_at"),
         Index("ix_meetings_org_status", "organization_id", "status"),
+        Index("ix_meetings_family", "family_id"),
     )
 
     organization_id: Mapped[uuid.UUID] = mapped_column(
@@ -47,6 +48,17 @@ class Meeting(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
     duration_seconds: Mapped[int] = mapped_column(Integer, default=0)
     processing_state: Mapped[dict] = mapped_column(JSONB, default=dict)  # progreso del pipeline
     meta: Mapped[dict] = mapped_column(JSONB, default=dict)
+
+    # Clasificación institucional de la reunión. Los tres son opcionales: una
+    # reunión se puede grabar primero y clasificar después, y no toda reunión
+    # es con una familia.
+    family_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("families.id", ondelete="SET NULL")
+    )
+    reason_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("meeting_reasons.id", ondelete="SET NULL")
+    )
+    severity: Mapped[str | None] = mapped_column(String(10))  # verde|amarillo|rojo
 
     participants: Mapped[list["MeetingParticipant"]] = relationship(
         back_populates="meeting", cascade="all, delete-orphan"

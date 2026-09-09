@@ -21,6 +21,8 @@ const SearchPage = lazy(() => import("./pages/SearchPage"));
 const Settings = lazy(() => import("./pages/Settings"));
 const SharedView = lazy(() => import("./pages/SharedView"));
 const Admin = lazy(() => import("./pages/Admin"));
+const Families = lazy(() => import("./pages/Families"));
+const Reports = lazy(() => import("./pages/Reports"));
 
 function FullLoader() {
   return (
@@ -71,6 +73,8 @@ export default function App() {
           <Route path="/projects" element={<Projects />} />
           <Route path="/projects/:id" element={<ProjectDetail />} />
           <Route path="/people" element={<People />} />
+          <Route path="/families" element={<Families />} />
+          <Route path="/reports" element={<Reports />} />
           <Route path="/people/:id" element={<PersonDetail />} />
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/ask" element={<AskEcho />} />

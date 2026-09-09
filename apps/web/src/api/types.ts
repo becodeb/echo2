@@ -169,6 +169,85 @@ export interface MinutesOut {
   generation_error: string | null;
 }
 
+export interface FamilyMemberOut {
+  id: string;
+  name: string;
+  relationship_type: "madre" | "padre" | "tutor" | "estudiante" | "otro";
+  /** Solo los responsables cuentan para "¿estuvieron todos?". */
+  is_guardian: boolean;
+  email: string | null;
+  phone: string | null;
+}
+
+export interface FamilyOut {
+  id: string;
+  name: string;
+  reference: string | null;
+  notes: string | null;
+  members: FamilyMemberOut[];
+  meetings: number;
+}
+
+export interface ReasonOut {
+  id: string;
+  name: string;
+  is_active: boolean;
+  position: number;
+}
+
+export type Severity = "verde" | "amarillo" | "rojo";
+
+export interface AttendanceRow {
+  member_id: string;
+  name: string;
+  relationship_type: string;
+  is_guardian: boolean;
+  attended: boolean;
+  /** false = nunca se registró asistencia para esta persona en esta reunión. */
+  recorded: boolean;
+}
+
+export interface ClassificationOut {
+  family_id: string | null;
+  family_name: string | null;
+  reason_id: string | null;
+  reason_name: string | null;
+  severity: Severity | null;
+  attendance: AttendanceRow[];
+  /** null = no hay registro de asistencia, que no es lo mismo que "faltaron". */
+  all_guardians_present: boolean | null;
+}
+
+export interface ReportOut {
+  range_from: string;
+  range_to: string;
+  totals: {
+    meetings: number;
+    families_with_meetings: number;
+    classified: number;
+    unclassified: number;
+  };
+  by_family: {
+    family_id: string;
+    name: string;
+    reference: string | null;
+    meetings: number;
+    last_meeting_at: string | null;
+    verde: number;
+    amarillo: number;
+    rojo: number;
+  }[];
+  by_reason: { reason_id: string | null; name: string; meetings: number }[];
+  by_severity: { verde: number; amarillo: number; rojo: number; sin_clasificar: number };
+  attendance: {
+    complete: number;
+    incomplete: number;
+    unknown: number;
+    absentees: { member_id: string; name: string; family: string | null; missed: number }[];
+  };
+  timeline: { month: string; meetings: number; verde: number; amarillo: number; rojo: number }[];
+}
+
 export type LiveEvent =
   | { type: "hello_ack"; role: string; meeting_status: string }
   | { type: "segment"; id: string; seq: number; start_ms: number; end_ms: number; text: string; confidence: number | null; speaker_hint: string | null }

@@ -13,6 +13,8 @@ const NAV = [
   { to: "/tasks", label: "Mi trabajo", icon: "M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2" },
   { to: "/projects", label: "Proyectos", icon: "M3 7h6l2 2h10v10H3V7z" },
   { to: "/people", label: "Personas", icon: "M16 11a4 4 0 1 0-8 0M4 21c0-4 3.5-6 8-6s8 2 8 6" },
+  { to: "/families", label: "Familias", icon: "M7 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm10 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 20c0-3 2.2-5 5-5s5 2 5 5m0 0c0-3 2.2-5 5-5s5 2 5 5" },
+  { to: "/reports", label: "Reportes", icon: "M4 20V10m5 10V4m5 16v-7m5 7V8" },
   { to: "/ask", label: "Preguntale a Echo", icon: "M12 3a9 9 0 1 0 4.5 16.8L21 21l-1.2-4.5A9 9 0 0 0 12 3z" },
 ];
 
