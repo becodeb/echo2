@@ -1,0 +1,72 @@
+# Echo en producción (Coolify). Un solo stack, todo en la VM:
+#   web (nginx + SPA)  ──/api──▶  api (FastAPI)  ──▶  db (Postgres + pgvector)
+# Solo `web` sale a internet; api y db viven en la red interna del stack.
+# El audio sigue sin persistirse: nada acá monta almacenamiento de audio.
+
+services:
+  db:
+    image: 'pgvector/pgvector:pg17'
+    environment:
+      POSTGRES_USER: '${POSTGRES_USER:-echo}'
+      POSTGRES_PASSWORD: '${POSTGRES_PASSWORD:-echo}'
+      POSTGRES_DB: '${POSTGRES_DB:-echo}'
+    volumes:
+      - 'echo_pgdata:/var/lib/postgresql/data'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U ${POSTGRES_USER:-echo} -d ${POSTGRES_DB:-echo}'
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: 'postgresql+asyncpg://${POSTGRES_USER:-echo}:${POSTGRES_PASSWORD:-echo}@db:5432/${POSTGRES_DB:-echo}'
+      ECHO_ENV: '${ECHO_ENV:-production}'
+      JWT_SECRET: '${JWT_SECRET}'
+      ENCRYPTION_KEY: '${ENCRYPTION_KEY}'
+      ACCESS_TOKEN_MINUTES: '${ACCESS_TOKEN_MINUTES:-15}'
+      REFRESH_TOKEN_DAYS: '${REFRESH_TOKEN_DAYS:-14}'
+      WEB_ORIGIN: '${WEB_ORIGIN:-https://echo.becode.com.ar}'
+      API_PUBLIC_URL: '${API_PUBLIC_URL:-https://echo.becode.com.ar}'
+      DEFAULT_LLM_PROVIDER: '${DEFAULT_LLM_PROVIDER:-}'
+      OPENAI_API_KEY: '${OPENAI_API_KEY:-}'
+      ANTHROPIC_API_KEY: '${ANTHROPIC_API_KEY:-}'
+      GROQ_API_KEY: '${GROQ_API_KEY:-}'
+      DEEPGRAM_API_KEY: '${DEEPGRAM_API_KEY:-}'
+      OPENROUTER_API_KEY: '${OPENROUTER_API_KEY:-}'
+      GMI_API_KEY: '${GMI_API_KEY:-}'
+      OLLAMA_BASE_URL: '${OLLAMA_BASE_URL:-}'
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'curl -fsS http://127.0.0.1:8000/api/health || exit 1'
+      interval: 10s
+      timeout: 5s
+      start_period: 40s
+      retries: 10
+    command:
+      - sh
+      - '-c'
+      - 'alembic upgrade head && exec uvicorn echo_api.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips=*'
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  echo_pgdata: null
