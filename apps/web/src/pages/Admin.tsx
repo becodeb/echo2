@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
-import type { AdminOrgOut } from "../api/types";
+import type { AdminOrgOut, ServerAIOut, ServerAITestOut } from "../api/types";
 import { Badge, Button, Card, EmptyState, Input, Spinner } from "../components/ui";
 
 /**
@@ -161,6 +161,144 @@ function OrgRow({ org }: { org: AdminOrgOut }) {
   );
 }
 
+function ServerDefaultCard() {
+  const queryClient = useQueryClient();
+  const [form, setForm] = useState({ llm_provider: "", llm_model: "", llm_api_key: "" });
+  const [loaded, setLoaded] = useState(false);
+  const [test, setTest] = useState<ServerAITestOut | null>(null);
+
+  const { data: defaults } = useQuery({
+    queryKey: ["ai-defaults"],
+    queryFn: () => api<ServerAIOut>("/api/admin/ai-defaults", { skipOrg: true }),
+  });
+
+  if (defaults && !loaded) {
+    setForm({
+      llm_provider: defaults.llm_provider ?? "",
+      llm_model: defaults.llm_model ?? "",
+      llm_api_key: "",
+    });
+    setLoaded(true);
+  }
+
+  const save = useMutation({
+    mutationFn: () =>
+      api<ServerAIOut>("/api/admin/ai-defaults", {
+        method: "PUT",
+        skipOrg: true,
+        body: JSON.stringify({
+          llm_provider: form.llm_provider,
+          llm_model: form.llm_model,
+          llm_api_key: form.llm_api_key === "" ? null : form.llm_api_key,
+        }),
+      }),
+    onSuccess: () => {
+      setForm((current) => ({ ...current, llm_api_key: "" }));
+      setTest(null);
+      queryClient.invalidateQueries({ queryKey: ["ai-defaults"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-orgs"] });
+    },
+  });
+
+  const probe = useMutation({
+    mutationFn: () =>
+      api<ServerAITestOut>("/api/admin/ai-defaults/test", { method: "POST", skipOrg: true }),
+    onSuccess: (result) => setTest(result),
+  });
+
+  return (
+    <Card className="space-y-4">
+      <div>
+        <h2 className="text-[15px] font-semibold text-ink-900">Modelo por defecto</h2>
+        <p className="mt-1 text-sm text-ink-500">
+          Lo que usa toda organización que no configuró el suyo. Cambiarlo acá aplica al
+          instante, sin reiniciar nada.
+        </p>
+      </div>
+
+      {defaults?.source === "entorno" && (
+        <p className="rounded-lg bg-ink-50 px-3 py-2 text-sm text-ink-600">
+          Hoy sale de las variables de entorno del servidor
+          {defaults.llm_provider && <> (<span className="font-medium">{defaults.llm_provider}</span>)</>}.
+          Lo que cargues acá pasa a mandar.
+        </p>
+      )}
+      {defaults?.source === "sin_configurar" && (
+        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+          No hay ningún modelo por defecto: ninguna organización sin configuración propia puede
+          generar actas.
+        </p>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block">
+          <span className="mb-1.5 block text-sm font-medium text-ink-700">Proveedor</span>
+          <select
+            value={form.llm_provider}
+            onChange={(event) => setForm({ ...form, llm_provider: event.target.value })}
+            className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm"
+          >
+            <option value="">— sin default —</option>
+            {LLM_PROVIDERS.map((provider) => (
+              <option key={provider} value={provider}>
+                {provider}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Input
+          label="Modelo"
+          placeholder="ej: Qwen/Qwen3.8-Max-0902"
+          value={form.llm_model}
+          onChange={(event) => setForm({ ...form, llm_model: event.target.value })}
+        />
+      </div>
+      <Input
+        label="API key"
+        type="password"
+        autoComplete="off"
+        placeholder={
+          defaults?.llm_api_key_masked
+            ? `Guardada (${defaults.llm_api_key_masked}). Dejar vacío para no cambiarla`
+            : "Pegá la key del proveedor"
+        }
+        value={form.llm_api_key}
+        onChange={(event) => setForm({ ...form, llm_api_key: event.target.value })}
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button onClick={() => save.mutate()} disabled={save.isPending}>
+          {save.isPending ? <Spinner /> : "Guardar"}
+        </Button>
+        <Button variant="soft" onClick={() => probe.mutate()} disabled={probe.isPending}>
+          {probe.isPending ? <Spinner /> : "Probar ahora"}
+        </Button>
+        {save.isSuccess && <span className="text-sm text-emerald-600">Guardado</span>}
+      </div>
+
+      {test && (
+        <div
+          className={`rounded-lg px-3 py-2 text-sm ${
+            test.ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"
+          }`}
+        >
+          <span className="font-medium">
+            {test.ok ? "Funciona" : "No funciona"}
+            {test.provider && ` · ${test.provider}`}
+            {test.model && ` · ${test.model}`}
+          </span>
+          <p className="mt-0.5 break-words">{test.message}</p>
+        </div>
+      )}
+      <p className="text-xs text-ink-400">
+        "Probar ahora" le pide una respuesta real al proveedor. Es la única forma de distinguir
+        una key bien escrita de una que de verdad funciona: una cuenta sin saldo pasa cualquier
+        validación y recién falla cuando alguien intenta generar un acta.
+      </p>
+    </Card>
+  );
+}
+
 export default function Admin() {
   const { data: orgs, isLoading, isError, error } = useQuery({
     queryKey: ["admin-orgs"],
@@ -195,6 +333,8 @@ export default function Admin() {
           Todas las organizaciones de esta instalación y el modelo de IA que usa cada una.
         </p>
       </div>
+
+      <ServerDefaultCard />
 
       {sinIA > 0 && (
         <div className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">

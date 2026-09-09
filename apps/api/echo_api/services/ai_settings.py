@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
-from ..models import OrgAISettings, OrgDictionaryEntry
+from ..models import OrgAISettings, ServerAISettings, OrgDictionaryEntry
 from ..security import decrypt_secret
 
 
@@ -65,6 +65,24 @@ async def resolve_llm(db: AsyncSession, org_id: uuid.UUID) -> LLMConfig | None:
                 base_url=row.llm_base_url or (env.ollama_base_url if row.llm_provider == "ollama" else None),
                 temperature=temperature,
             )
+    # Default de la instalación cargado por el superadmin. Va antes que las
+    # variables de entorno: es lo que permite cambiar la key sin redeploy.
+    server = (
+        await db.execute(select(ServerAISettings).limit(1))
+    ).scalar_one_or_none()
+    if server and server.llm_provider:
+        key = decrypt_secret(server.llm_api_key_enc) if server.llm_api_key_enc else ""
+        if not key:
+            key = _env_key_for(server.llm_provider)
+        if key or server.llm_provider == "ollama":
+            return LLMConfig(
+                provider=server.llm_provider,
+                model=server.llm_model or _default_model(server.llm_provider),
+                api_key=key,
+                base_url=server.llm_base_url
+                or (env.ollama_base_url if server.llm_provider == "ollama" else None),
+            )
+
     # defaults de entorno
     if env.default_llm_provider:
         provider = env.default_llm_provider

@@ -44,3 +44,25 @@ class OrgGoogleDrive(PKMixin, TimestampMixin, Base):
     # integración que dejó de funcionar es invisible hasta que alguien va a
     # buscar un acta a Drive y no está.
     last_error: Mapped[str | None] = mapped_column(String(400))
+
+
+class ServerAISettings(PKMixin, TimestampMixin, Base):
+    """Default de IA de toda la instalación, editable por el superadmin.
+
+    Existe para que cambiar la key o el modelo del default no dependa de un
+    redeploy ni de tocar variables de entorno: el superadmin lo carga desde el
+    panel y aplica al instante a toda organización que no configuró la suya.
+
+    Es una fila única. Gana sobre las variables de entorno, que quedan como
+    piso para una instalación recién levantada.
+    """
+
+    __tablename__ = "server_ai_settings"
+
+    llm_provider: Mapped[str | None] = mapped_column(String(40))
+    llm_model: Mapped[str | None] = mapped_column(String(120))
+    llm_api_key_enc: Mapped[str | None] = mapped_column(Text)
+    llm_base_url: Mapped[str | None] = mapped_column(String(300))
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id")
+    )

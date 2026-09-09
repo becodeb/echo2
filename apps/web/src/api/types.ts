@@ -281,6 +281,22 @@ export interface ReportOut {
   timeline: { month: string; meetings: number; verde: number; amarillo: number; rojo: number }[];
 }
 
+export interface ServerAIOut {
+  llm_provider: string | null;
+  llm_model: string | null;
+  llm_api_key_masked: string | null;
+  llm_base_url: string | null;
+  /** "panel" = cargado acá · "entorno" = variables del servidor · "sin_configurar" */
+  source: "panel" | "entorno" | "sin_configurar";
+}
+
+export interface ServerAITestOut {
+  ok: boolean;
+  provider: string | null;
+  model: string | null;
+  message: string;
+}
+
 export interface DriveStatusOut {
   /** false = el servidor no tiene credenciales de Google configuradas. */
   enabled: boolean;
