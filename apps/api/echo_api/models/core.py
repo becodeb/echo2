@@ -29,6 +29,10 @@ class User(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
     job_title: Mapped[str | None] = mapped_column(String(200))
     locale: Mapped[str] = mapped_column(String(10), default="es")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Superadmin de la instalación, no de una organización: ve todas las
+    # organizaciones y les configura la IA. Se otorga por SUPERADMIN_EMAILS,
+    # nunca desde la propia app.
+    is_superadmin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     memberships: Mapped[list["OrganizationMember"]] = relationship(back_populates="user")
 

@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     # callback registrado en Google apunta a otro host.
     google_redirect_uri: str = ""
 
+    # Superadmins de la instalación, separados por coma. Se sincronizan al
+    # arrancar. Deliberadamente fuera de la app: nadie se asciende a sí mismo
+    # desde la UI, se cambia acá y se reinicia.
+    superadmin_emails: str = ""
+
     @property
     def google_enabled(self) -> bool:
         return bool(self.google_client_id and self.google_client_secret)
@@ -63,6 +68,10 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.echo_env == "production"
+
+    @property
+    def superadmin_email_list(self) -> list[str]:
+        return [e.strip().lower() for e in self.superadmin_emails.split(",") if e.strip()]
 
 
 @lru_cache

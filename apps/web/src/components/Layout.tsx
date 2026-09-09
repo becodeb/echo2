@@ -91,6 +91,20 @@ export function Layout({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="border-t border-ink-100 p-3">
+          {user?.is_superadmin && (
+            <NavLink
+              to="/admin"
+              onClick={() => setMobileNav(false)}
+              className={({ isActive }) =>
+                `mb-1 flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium ${
+                  isActive ? "bg-ink-100 text-ink-900" : "text-ink-500 hover:bg-ink-50"
+                }`
+              }
+            >
+              <NavIcon d="M12 3 4 7v6c0 4.4 3.4 7.6 8 8 4.6-.4 8-3.6 8-8V7l-8-4z" />
+              Organizaciones
+            </NavLink>
+          )}
           <NavLink
             to="/settings"
             onClick={() => setMobileNav(false)}

@@ -54,6 +54,7 @@ class UserOut(BaseModel):
     avatar_color: str
     job_title: str | None
     locale: str
+    is_superadmin: bool
 
     class Config:
         from_attributes = True

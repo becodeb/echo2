@@ -61,6 +61,7 @@ def _include_optional_routers() -> None:
 
     for name in (
         "auth_google",
+        "admin",
         "orgs",
         "meetings",
         "live",
@@ -90,3 +91,42 @@ def _include_optional_routers() -> None:
 
 
 _include_optional_routers()
+
+
+@app.on_event("startup")
+async def _sync_superadmins() -> None:
+    """Aplica SUPERADMIN_EMAILS sobre los usuarios existentes.
+
+    Va acá y no en la app para que nadie se ascienda solo: se cambia la
+    variable de entorno y se reinicia. Si el usuario todavía no se registró,
+    queda marcado en el próximo arranque.
+
+    Nunca puede impedir que la API levante: si esto falla, se loguea y sigue.
+    """
+    emails = settings.superadmin_email_list
+    if not emails:
+        return
+    try:
+        from sqlalchemy import select, update
+
+        from .db import SessionLocal
+        from .models import User
+
+        async with SessionLocal() as db:
+            await db.execute(update(User).where(User.email.in_(emails)).values(is_superadmin=True))
+            # Quien deja de estar en la lista pierde el privilegio.
+            await db.execute(
+                update(User)
+                .where(User.is_superadmin.is_(True), User.email.notin_(emails))
+                .values(is_superadmin=False)
+            )
+            await db.commit()
+            found = (
+                (await db.execute(select(User.email).where(User.email.in_(emails)))).scalars().all()
+            )
+        log.info("superadmins activos: %s", ", ".join(sorted(found)) or "ninguno")
+        faltan = sorted(set(emails) - set(found))
+        if faltan:
+            log.info("superadmins declarados sin cuenta todavía: %s", ", ".join(faltan))
+    except Exception:
+        log.exception("no se pudo sincronizar la lista de superadmins")

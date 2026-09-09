@@ -42,6 +42,10 @@ class MinutesOut(BaseModel):
     approved_at: datetime | None
     version: MinutesVersionOut | None
     versions: list[dict]
+    # Estado del generador: idle|generating|ok|failed. La UI se apoya en esto
+    # para saber si tiene que seguir esperando o mostrar el motivo de la falla.
+    generation_status: str
+    generation_error: str | None
 
 
 @router.get("/api/meetings/{meeting_id}/minutes", response_model=MinutesOut | None)
@@ -101,6 +105,8 @@ async def get_minutes(
             }
             for v in all_versions
         ],
+        generation_status=minutes.generation_status,
+        generation_error=minutes.generation_error,
     )
 
 
@@ -122,6 +128,27 @@ async def regenerate_minutes(
     provider = get_llm_provider(
         llm_config.provider, llm_config.api_key, llm_config.model, llm_config.base_url
     )
+
+    # La fila se marca como "generating" acá y no dentro de la tarea: si no,
+    # entre que responde el 202 y arranca el background hay una ventana en la
+    # que la UI no sabe que hay algo en curso.
+    minutes = (
+        await db.execute(select(Minutes).where(Minutes.meeting_id == meeting.id))
+    ).scalar_one_or_none()
+    if minutes is None:
+        template = await get_active_template(db, ctx.org_id)
+        minutes = Minutes(
+            meeting_id=meeting.id,
+            organization_id=ctx.org_id,
+            template_id=template.id,
+            status="draft",
+            current_version=0,
+        )
+        db.add(minutes)
+    minutes.generation_status = "generating"
+    minutes.generation_error = None
+    minutes.generation_started_at = datetime.now(UTC)
+
     background.add_task(generate_minutes, meeting.id, provider)
     await audit(db, ctx.org_id, ctx.user.id, "minutes.regenerate", "meeting", str(meeting.id))
     await db.commit()
@@ -165,6 +192,10 @@ async def save_minutes_edit(
     minutes.current_version = next_version
     if minutes.status == "approved":
         minutes.status = "in_review"  # una edición sobre acta aprobada la vuelve a revisión
+    # Si la generación había fallado y la persona escribió el acta a mano, el
+    # cartel de error ya no corresponde.
+    minutes.generation_status = "ok"
+    minutes.generation_error = None
     await audit(db, ctx.org_id, ctx.user.id, "minutes.edit", "minutes", str(minutes.id))
     await db.commit()
     return await get_minutes(meeting_id, None, ctx, db)

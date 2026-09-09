@@ -34,6 +34,7 @@ services:
       REFRESH_TOKEN_DAYS: '${REFRESH_TOKEN_DAYS:-14}'
       WEB_ORIGIN: '${WEB_ORIGIN:-https://echo.becode.com.ar}'
       API_PUBLIC_URL: '${API_PUBLIC_URL:-https://echo.becode.com.ar}'
+      SUPERADMIN_EMAILS: '${SUPERADMIN_EMAILS:-}'
       GOOGLE_CLIENT_ID: '${GOOGLE_CLIENT_ID:-}'
       GOOGLE_CLIENT_SECRET: '${GOOGLE_CLIENT_SECRET:-}'
       GOOGLE_REDIRECT_URI: '${GOOGLE_REDIRECT_URI:-}'

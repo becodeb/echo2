@@ -20,6 +20,7 @@ const AskEcho = lazy(() => import("./pages/AskEcho"));
 const SearchPage = lazy(() => import("./pages/SearchPage"));
 const Settings = lazy(() => import("./pages/Settings"));
 const SharedView = lazy(() => import("./pages/SharedView"));
+const Admin = lazy(() => import("./pages/Admin"));
 
 function FullLoader() {
   return (
@@ -75,6 +76,9 @@ export default function App() {
           <Route path="/ask" element={<AskEcho />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/settings/*" element={<Settings />} />
+          {/* El panel de superadmin no existe para el resto: sin la ruta, /admin
+              cae en el catch-all y vuelve al inicio. */}
+          {user.is_superadmin && <Route path="/admin" element={<Admin />} />}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

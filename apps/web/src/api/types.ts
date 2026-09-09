@@ -5,6 +5,21 @@ export interface UserOut {
   avatar_color: string;
   job_title: string | null;
   locale: string;
+  /** Superadmin de la instalación: ve todas las organizaciones, no solo las suyas. */
+  is_superadmin: boolean;
+}
+
+export interface AdminOrgOut {
+  id: string;
+  name: string;
+  slug: string;
+  members: number;
+  meetings: number;
+  llm_provider: string | null;
+  llm_model: string | null;
+  llm_api_key_masked: string | null;
+  /** false = está viviendo del default del servidor, no tiene key propia. */
+  uses_own_key: boolean;
 }
 
 export interface OrgOut {
@@ -150,6 +165,8 @@ export interface MinutesOut {
     created_by: string | null;
   } | null;
   versions: { version: number; note: string | null; created_at: string; model_used: string | null }[];
+  generation_status: "idle" | "generating" | "ok" | "failed";
+  generation_error: string | null;
 }
 
 export type LiveEvent =

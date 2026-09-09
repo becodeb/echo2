@@ -11,6 +11,7 @@ cargue su modelo real de acta (Ajustes → Formato de acta), ese pasa a mandar.
 import json
 import logging
 import uuid
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 
@@ -116,7 +117,56 @@ async def get_active_template(db, org_id: uuid.UUID) -> MinutesTemplate:
     return template
 
 
+def friendly_generation_error(exc: Exception) -> str:
+    """Traduce una falla del generador a algo que la persona pueda accionar.
+
+    Los LLMError traen el cuerpo crudo del proveedor (códigos HTTP, JSON de
+    error, a veces la URL). Eso va al log y no a la pantalla.
+    """
+    text = str(exc).lower()
+    if "api key" in text or "401" in text or "403" in text:
+        return "La API key de IA no es válida o no tiene permisos. Revisala en Ajustes → IA."
+    if "rate limit" in text or "429" in text:
+        return "El proveedor de IA está limitando las solicitudes. Probá de nuevo en unos minutos."
+    if "402" in text or "credit" in text or "quota" in text or "insufficient" in text:
+        return "La cuenta del proveedor de IA se quedó sin crédito disponible."
+    if "not found" in text or "404" in text or "does not exist" in text:
+        return "El modelo configurado no existe para ese proveedor. Revisalo en Ajustes → IA."
+    if "sin transcript" in text or "transcript" in text:
+        return "La reunión no tiene transcript suficiente para armar un acta."
+    if "error de red" in text or "timeout" in text or "connect" in text:
+        return "No se pudo contactar al proveedor de IA. Probá de nuevo en un momento."
+    return "No se pudo generar el acta. Revisá la configuración de IA en Ajustes → IA."
+
+
+async def _set_generation_state(
+    meeting_id: uuid.UUID, state: str, error: str | None = None
+) -> None:
+    async with SessionLocal() as db:
+        minutes = (
+            await db.execute(select(Minutes).where(Minutes.meeting_id == meeting_id))
+        ).scalar_one_or_none()
+        if not minutes:
+            return
+        minutes.generation_status = state
+        minutes.generation_error = error
+        await db.commit()
+
+
 async def generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider) -> None:
+    """Genera el acta y deja registrado cómo terminó.
+
+    Corre como BackgroundTask, o sea que nadie está esperando el resultado: si
+    revienta y no lo anotamos, la falla no existe para nadie.
+    """
+    try:
+        await _generate_minutes(meeting_id, provider)
+    except Exception as exc:  # noqa: BLE001 - cualquier falla tiene que quedar registrada
+        log.exception("falló la generación del acta de %s", meeting_id)
+        await _set_generation_state(meeting_id, "failed", friendly_generation_error(exc))
+
+
+async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider) -> None:
     async with SessionLocal() as db:
         meeting = await db.get(Meeting, meeting_id)
         if not meeting:
@@ -229,6 +279,8 @@ Devolvé JSON:
                 template_id=template.id,
                 status="draft",
                 current_version=0,
+                generation_status="generating",
+                generation_started_at=datetime.now(UTC),
             )
             db.add(minutes)
             await db.flush()
@@ -245,6 +297,8 @@ Devolvé JSON:
             )
         )
         minutes.current_version = next_version
+        minutes.generation_status = "ok"
+        minutes.generation_error = None
         await db.commit()
 
 

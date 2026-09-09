@@ -46,6 +46,14 @@ class Minutes(PKMixin, TimestampMixin, Base):
     )
     status: Mapped[str] = mapped_column(String(20), default="draft")  # draft|in_review|approved
     current_version: Mapped[int] = mapped_column(Integer, default=1)
+    # Estado del generador, separado del estado editorial de arriba. Sin esto
+    # una generación que falla queda invisible y la UI espera para siempre.
+    generation_status: Mapped[str] = mapped_column(
+        String(20), default="idle", nullable=False
+    )  # idle|generating|ok|failed
+    # Motivo en castellano y apto para mostrar. El detalle técnico va al log.
+    generation_error: Mapped[str | None] = mapped_column(String(400))
+    generation_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     template_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("minutes_templates.id", ondelete="SET NULL")
     )

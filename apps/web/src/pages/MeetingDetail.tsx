@@ -468,10 +468,17 @@ function MinutesTab({ meetingId }: { meetingId: string }) {
   const { data: minutes, isLoading } = useQuery({
     queryKey: ["minutes", meetingId],
     queryFn: () => api<MinutesOut | null>(`/api/meetings/${meetingId}/minutes`),
+    // Generar el acta es una tarea de fondo: sin esto la pantalla se queda en
+    // "generando" hasta que la persona recarga a mano.
+    refetchInterval: (query) =>
+      query.state.data?.generation_status === "generating" ? 3000 : false,
   });
 
   const regenerate = useMutation({
     mutationFn: () => api(`/api/meetings/${meetingId}/minutes/generate`, { method: "POST" }),
+    // Sin esto el estado en cache sigue siendo el viejo y el refetchInterval
+    // nunca se enciende: al reintentar después de un fallo quedaba clavado.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["minutes", meetingId] }),
   });
 
   const saveEdit = useMutation({
@@ -499,23 +506,38 @@ function MinutesTab({ meetingId }: { meetingId: string }) {
     return <div className="flex justify-center py-16 text-ink-300"><Spinner className="h-6 w-6" /></div>;
   }
 
+  const generating =
+    minutes?.generation_status === "generating" || regenerate.isPending || regenerate.isSuccess;
+  const generationFailed = minutes?.generation_status === "failed";
+
   if (!minutes || !minutes.version) {
+    if (generating && !generationFailed) {
+      return (
+        <Card>
+          <EmptyState title="Echo está redactando el acta…" mood="thinking">
+            <p>Lee el transcript, arma el acta y verifica cada afirmación. Suele tardar menos de un minuto.</p>
+          </EmptyState>
+        </Card>
+      );
+    }
     return (
       <Card>
-        <EmptyState title="Todavía no hay acta" mood="idle">
+        <EmptyState
+          title={generationFailed ? "No se pudo generar el acta" : "Todavía no hay acta"}
+          mood={generationFailed ? "error" : "idle"}
+        >
           <p className="mb-4">
-            El acta se genera automáticamente al finalizar la reunión (requiere IA configurada).
+            {generationFailed
+              ? minutes?.generation_error
+              : "El acta se genera automáticamente al finalizar la reunión (requiere IA configurada)."}
           </p>
           <Button onClick={() => regenerate.mutate()} disabled={regenerate.isPending}>
-            {regenerate.isPending ? <Spinner /> : "Generar acta ahora"}
+            {regenerate.isPending ? <Spinner /> : generationFailed ? "Reintentar" : "Generar acta ahora"}
           </Button>
           {regenerate.isError && (
             <p className="mt-2 text-sm text-red-600">
-              {regenerate.error instanceof Error ? regenerate.error.message : "Error"}
+              {regenerate.error instanceof Error ? regenerate.error.message : "No se pudo iniciar la generación"}
             </p>
-          )}
-          {regenerate.isSuccess && (
-            <p className="mt-2 text-sm text-emerald-600">Generando… recargá en unos segundos.</p>
           )}
         </EmptyState>
       </Card>
@@ -533,6 +555,17 @@ function MinutesTab({ meetingId }: { meetingId: string }) {
 
   return (
     <div className="space-y-4">
+      {generationFailed && (
+        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+          <span className="font-medium">No se pudo regenerar el acta.</span>{" "}
+          {minutes.generation_error} Abajo seguís viendo la última versión que sí se generó.
+        </div>
+      )}
+      {generating && !generationFailed && (
+        <div className="flex items-center gap-2 rounded-lg bg-ink-50 px-4 py-3 text-sm text-ink-600">
+          <Spinner /> Echo está redactando una versión nueva…
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         {statusBadge}
         <span className="text-xs text-ink-400">
