@@ -1,7 +1,7 @@
 {
   "name": "Echo",
   "short_name": "Echo",
-  "description": "La reunion termina. Echo recuerda.",
+  "description": "La reunión termina. Echo recuerda.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#fafbfc",
