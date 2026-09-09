@@ -59,6 +59,8 @@ class Meeting(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
         UUID(as_uuid=True), ForeignKey("meeting_reasons.id", ondelete="SET NULL")
     )
     severity: Mapped[str | None] = mapped_column(String(10))  # verde|amarillo|rojo
+    # Con quién fue: familia|profesionales|mixta|docentes|interna
+    audience: Mapped[str | None] = mapped_column(String(20))
 
     participants: Mapped[list["MeetingParticipant"]] = relationship(
         back_populates="meeting", cascade="all, delete-orphan"
@@ -199,3 +201,21 @@ class MeetingLink(PKMixin, TimestampMixin, Base):
     kind: Mapped[str] = mapped_column(String(30), default="related")  # related|continues
     confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
     suggested_reason: Mapped[str | None] = mapped_column(Text)
+
+
+class MeetingAttachment(PKMixin, TimestampMixin, Base):
+    """Enlace adjunto a una reunión: informe, carpeta de Drive, planilla.
+
+    Solo la URL: Echo no guarda ni copia el archivo. Es a propósito, el
+    material sensible sigue viviendo donde la institución ya lo tiene.
+    """
+
+    __tablename__ = "meeting_attachments"
+    __table_args__ = (Index("ix_meeting_attachments_meeting", "meeting_id"),)
+
+    meeting_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("meetings.id", ondelete="CASCADE"), nullable=False
+    )
+    url: Mapped[str] = mapped_column(String(1000), nullable=False)
+    title: Mapped[str | None] = mapped_column(String(200))
+    added_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))

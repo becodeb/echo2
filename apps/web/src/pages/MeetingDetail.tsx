@@ -6,6 +6,7 @@ import type { ChatOut, InsightsOut, MeetingOut, MinutesOut, SegmentOut } from ".
 import { Badge, Button, Card, EmptyState, Input, Modal, Spinner, formatDate, formatDuration, formatMs } from "../components/ui";
 import { EchoFace } from "../components/EchoFace";
 import { ClassificationPanel } from "../components/ClassificationPanel";
+import { Attachments } from "../components/Attachments";
 import { AnswerText } from "../components/AnswerText";
 
 const TABS = [
@@ -97,7 +98,12 @@ export default function MeetingDetail() {
         ))}
       </nav>
 
-      {tab === "summary" && <SummaryTab meeting={meeting} onJump={(ms) => { params.set("t", String(ms)); setParams(params); }} />}
+      {tab === "summary" && (
+        <div className="space-y-4">
+          <SummaryTab meeting={meeting} onJump={(ms) => { params.set("t", String(ms)); setParams(params); }} />
+          <Card><Attachments meetingId={meeting.id} /></Card>
+        </div>
+      )}
       {tab === "transcript" && <TranscriptTab meeting={meeting} jumpMs={jumpMs ? Number(jumpMs) : null} onRefetch={refetch} />}
       {tab === "minutes" && <MinutesTab meetingId={meeting.id} />}
       {tab === "tasks" && <TasksTab meetingId={meeting.id} />}

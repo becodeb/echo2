@@ -1,11 +1,15 @@
 from .base import Base
 from .families import (
+    AUDIENCES,
     RELATIONSHIPS,
     SEVERITIES,
     Family,
     FamilyMember,
+    FamilyProfessional,
     MeetingAttendance,
+    MeetingProfessionalAttendance,
     MeetingReason,
+    Professional,
 )
 from .core import (
     ROLES,
@@ -24,6 +28,7 @@ from .meetings import (
     EMBEDDING_DIM,
     Bookmark,
     Meeting,
+    MeetingAttachment,
     MeetingLink,
     MeetingParticipant,
     SegmentRevision,
@@ -51,7 +56,9 @@ from .workspace import (
 __all__ = [
     "Base", "User", "Organization", "OrganizationMember", "OrganizationInvite",
     "Family", "FamilyMember", "MeetingReason", "MeetingAttendance",
-    "RELATIONSHIPS", "SEVERITIES",
+    "Professional", "FamilyProfessional", "MeetingProfessionalAttendance",
+    "MeetingAttachment",
+    "RELATIONSHIPS", "SEVERITIES", "AUDIENCES",
     "RefreshToken", "ROLES", "ROLE_OWNER", "ROLE_ADMIN", "ROLE_MEMBER", "ROLE_VIEWER",
     "EMBEDDING_DIM", "Meeting", "MeetingParticipant", "Speaker", "SpeakerProfile",
     "TranscriptSegment", "SegmentRevision", "Bookmark", "MeetingLink",

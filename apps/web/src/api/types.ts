@@ -179,13 +179,43 @@ export interface FamilyMemberOut {
   phone: string | null;
 }
 
+export interface ProfessionalOut {
+  id: string;
+  name: string;
+  role_label: string | null;
+  affiliation: string | null;
+  email: string | null;
+  phone: string | null;
+  is_active: boolean;
+}
+
 export interface FamilyOut {
   id: string;
   name: string;
   reference: string | null;
   notes: string | null;
+  /** Carpeta de Drive de la familia. Echo solo guarda el enlace. */
+  drive_url: string | null;
   members: FamilyMemberOut[];
+  professionals: ProfessionalOut[];
   meetings: number;
+}
+
+export interface AttachmentOut {
+  id: string;
+  url: string;
+  title: string | null;
+}
+
+export type Audience = "familia" | "profesionales" | "mixta" | "docentes" | "interna";
+
+export interface ProfessionalAttendanceRow {
+  professional_id: string;
+  name: string;
+  role_label: string | null;
+  attended: boolean;
+  /** true = acompaña a esta familia; false = participó de forma puntual. */
+  linked: boolean;
 }
 
 export interface ReasonOut {
@@ -210,6 +240,9 @@ export interface AttendanceRow {
 export interface ClassificationOut {
   family_id: string | null;
   family_name: string | null;
+  family_drive_url: string | null;
+  audience: Audience | null;
+  professionals: ProfessionalAttendanceRow[];
   reason_id: string | null;
   reason_name: string | null;
   severity: Severity | null;

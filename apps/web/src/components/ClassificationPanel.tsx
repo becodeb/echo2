@@ -2,7 +2,14 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import type { ClassificationOut, FamilyOut, ReasonOut, Severity } from "../api/types";
+import type {
+  Audience,
+  ClassificationOut,
+  FamilyOut,
+  ProfessionalOut,
+  ReasonOut,
+  Severity,
+} from "../api/types";
 import { Badge, Button, Spinner } from "./ui";
 
 /**
@@ -18,6 +25,14 @@ const SEVERITIES: { value: Severity; label: string; dot: string }[] = [
   { value: "rojo", label: "Rojo", dot: "bg-red-500" },
 ];
 
+const AUDIENCES: { value: Audience; label: string }[] = [
+  { value: "familia", label: "Con la familia" },
+  { value: "profesionales", label: "Con profesionales" },
+  { value: "mixta", label: "Familia y profesionales" },
+  { value: "docentes", label: "Con docentes" },
+  { value: "interna", label: "Interna del equipo" },
+];
+
 const SEVERITY_TONE: Record<Severity, "green" | "amber" | "red"> = {
   verde: "green",
   amarillo: "amber",
@@ -31,6 +46,8 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
   const [reasonId, setReasonId] = useState("");
   const [severity, setSeverity] = useState<Severity | "">("");
   const [attended, setAttended] = useState<Set<string>>(new Set());
+  const [audience, setAudience] = useState<Audience | "">("");
+  const [attendedPros, setAttendedPros] = useState<Set<string>>(new Set());
 
   const { data: classification, isLoading } = useQuery({
     queryKey: ["classification", meetingId],
@@ -46,6 +63,11 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
     queryFn: () => api<ReasonOut[]>("/api/org/meeting-reasons"),
     enabled: editing,
   });
+  const { data: professionals } = useQuery({
+    queryKey: ["professionals"],
+    queryFn: () => api<ProfessionalOut[]>("/api/professionals"),
+    enabled: editing,
+  });
 
   // Al abrir el editor se parte de lo que ya está guardado.
   useEffect(() => {
@@ -53,8 +75,16 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
     setFamilyId(classification.family_id ?? "");
     setReasonId(classification.reason_id ?? "");
     setSeverity(classification.severity ?? "");
+    setAudience(classification.audience ?? "");
     setAttended(
       new Set(classification.attendance.filter((row) => row.attended).map((row) => row.member_id)),
+    );
+    setAttendedPros(
+      new Set(
+        classification.professionals
+          .filter((row) => row.attended)
+          .map((row) => row.professional_id),
+      ),
     );
   }, [editing, classification]);
 
@@ -66,7 +96,9 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
           family_id: familyId || null,
           reason_id: reasonId || null,
           severity: severity || null,
+          audience: audience || null,
           attended_member_ids: [...attended],
+          attended_professional_ids: [...attendedPros],
         }),
       }),
     onSuccess: () => {
@@ -93,6 +125,13 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
         }))
       : classification?.attendance ?? [];
 
+  // Los profesionales que acompañan a la familia elegida se muestran primero.
+  const linkedProIds = new Set(
+    selectedFamily && selectedFamily.id !== classification?.family_id
+      ? selectedFamily.professionals.map((pro) => pro.id)
+      : (classification?.professionals ?? []).filter((row) => row.linked).map((row) => row.professional_id),
+  );
+
   if (!editing) {
     const nothingSet =
       !classification?.family_id && !classification?.reason_id && !classification?.severity;
@@ -104,6 +143,11 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
           <>
             {classification?.family_name && (
               <Badge tone="indigo">{classification.family_name}</Badge>
+            )}
+            {classification?.audience && (
+              <Badge tone="sky">
+                {AUDIENCES.find((a) => a.value === classification.audience)?.label}
+              </Badge>
             )}
             {classification?.reason_name && <Badge>{classification.reason_name}</Badge>}
             {classification?.severity && (
@@ -122,6 +166,16 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
             )}
           </>
         )}
+        {classification?.family_drive_url && (
+          <a
+            href={classification.family_drive_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm font-medium text-accent-600 hover:underline"
+          >
+            Carpeta de la familia ↗
+          </a>
+        )}
         <button
           onClick={() => setEditing(true)}
           className="ml-auto text-sm font-medium text-accent-600 hover:underline"
@@ -134,6 +188,22 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
 
   return (
     <div className="mt-4 space-y-4 rounded-lg border border-ink-100 bg-white px-4 py-4">
+      <label className="block">
+        <span className="mb-1.5 block text-sm font-medium text-ink-700">¿Con quién fue?</span>
+        <select
+          value={audience}
+          onChange={(event) => setAudience(event.target.value as Audience | "")}
+          className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm sm:max-w-xs"
+        >
+          <option value="">— sin definir —</option>
+          {AUDIENCES.map((item) => (
+            <option key={item.value} value={item.value}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">
           <span className="mb-1.5 block text-sm font-medium text-ink-700">Familia</span>
@@ -248,6 +318,41 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {(professionals ?? []).length > 0 && (
+        <div>
+          <span className="mb-1.5 block text-sm font-medium text-ink-700">
+            Profesionales presentes
+          </span>
+          <div className="space-y-1.5">
+            {[...(professionals ?? [])]
+              .sort((a, b) => {
+                // Primero los que acompañan a esta familia: son los esperables.
+                const aLinked = linkedProIds.has(a.id) ? 0 : 1;
+                const bLinked = linkedProIds.has(b.id) ? 0 : 1;
+                return aLinked - bLinked || a.name.localeCompare(b.name);
+              })
+              .map((pro) => (
+                <label key={pro.id} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={attendedPros.has(pro.id)}
+                    onChange={(event) => {
+                      const next = new Set(attendedPros);
+                      if (event.target.checked) next.add(pro.id);
+                      else next.delete(pro.id);
+                      setAttendedPros(next);
+                    }}
+                    className="h-4 w-4 rounded border-ink-300 text-accent-600 focus:ring-accent-500"
+                  />
+                  <span className="text-ink-800">{pro.name}</span>
+                  {pro.role_label && <Badge tone="gray">{pro.role_label}</Badge>}
+                  {linkedProIds.has(pro.id) && <Badge tone="indigo">acompaña</Badge>}
+                </label>
+              ))}
+          </div>
         </div>
       )}
 

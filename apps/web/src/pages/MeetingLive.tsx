@@ -451,6 +451,17 @@ export default function MeetingLive() {
         </p>
       )}
 
+      {/* Avisar ANTES y no después: si el motor no separa hablantes, todo lo
+          dicho en la sala queda atribuido a una sola persona y eso no se puede
+          arreglar sobre la grabación una vez terminada. */}
+      {recording && !captureSystem && (
+        <p className="border-b border-amber-100 bg-amber-50 px-6 py-2.5 text-sm text-amber-800">
+          Con un solo micrófono, separar quién habla depende del modelo de transcripción. Si el
+          acta te junta a dos personas en un mismo hablante, cambiá el modelo de voz a uno que
+          separe hablantes en Ajustes → IA y transcripción.
+        </p>
+      )}
+
       <div className="flex min-h-0 flex-1">
         {/* Transcript */}
         <div

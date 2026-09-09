@@ -63,6 +63,7 @@ def _include_optional_routers() -> None:
         "auth_google",
         "admin",
         "families",
+        "attachments",
         "reports",
         "orgs",
         "meetings",
