@@ -34,3 +34,6 @@ Thumbs.db
 # echo specifics
 apps/bridge/config.local.json
 firmware/esp32/secrets.h
+
+# typescript incremental build
+*.tsbuildinfo
