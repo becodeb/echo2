@@ -1,8 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { NavLink, Navigate, Route, Routes, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
-import type { ReasonOut } from "../api/types";
+import type { DriveStatusOut, ReasonOut } from "../api/types";
 import { Badge, Button, Card, Input, Modal, Spinner } from "../components/ui";
 import { useAuth } from "../state/auth";
 
@@ -12,6 +12,7 @@ const SECTIONS = [
   { path: "reasons", label: "Motivos de reunión" },
   { path: "dictionary", label: "Diccionario" },
   { path: "template", label: "Formato de acta" },
+  { path: "drive", label: "Google Drive" },
   { path: "devices", label: "Dispositivos" },
   { path: "notifications", label: "Notificaciones" },
   { path: "privacy", label: "Privacidad" },
@@ -45,6 +46,7 @@ export default function Settings() {
             <Route path="reasons" element={<ReasonsSection />} />
             <Route path="dictionary" element={<DictionarySection />} />
             <Route path="template" element={<TemplateSection />} />
+            <Route path="drive" element={<DriveSection />} />
             <Route path="devices" element={<DevicesSection />} />
             <Route path="notifications" element={<NotificationsSection />} />
             <Route path="privacy" element={<PrivacySection />} />
@@ -783,6 +785,130 @@ function ReasonsSection() {
         Los motivos se desactivan en vez de borrarse: las reuniones viejas tienen que seguir
         mostrando con qué motivo se cargaron.
       </p>
+    </Card>
+  );
+}
+
+// ── Google Drive ─────────────────────────────────────────────────
+
+const DRIVE_ERRORS: Record<string, string> = {
+  cancelado: "Cancelaste la conexión con Google Drive.",
+  estado: "La conexión tardó demasiado. Probá de nuevo.",
+  permisos: "Necesitás ser administrador de la organización para conectar Drive.",
+  google: "Google rechazó la conexión. Probá de nuevo en un momento.",
+  sin_refresh:
+    "Google no devolvió un permiso duradero. Quitá el acceso de Echo en tu cuenta de Google y volvé a conectar.",
+};
+
+function DriveSection() {
+  const queryClient = useQueryClient();
+  const [params, setParams] = useSearchParams();
+
+  const { data: drive, isLoading } = useQuery({
+    queryKey: ["drive-status"],
+    queryFn: () => api<DriveStatusOut>("/api/org/drive/status"),
+  });
+
+  const connect = useMutation({
+    mutationFn: () => api<{ url: string }>("/api/org/drive/connect-url", { method: "POST" }),
+    onSuccess: (data) => {
+      window.location.href = data.url;
+    },
+  });
+
+  const disconnect = useMutation({
+    mutationFn: () => api("/api/org/drive", { method: "DELETE" }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["drive-status"] }),
+  });
+
+  const oauthError = DRIVE_ERRORS[params.get("error") ?? ""] ?? null;
+  const justConnected = params.get("connected") === "1";
+
+  if (isLoading) {
+    return <div className="flex justify-center py-10 text-ink-300"><Spinner className="h-5 w-5" /></div>;
+  }
+
+  return (
+    <Card className="space-y-4">
+      <div>
+        <h2 className="text-[15px] font-semibold text-ink-900">Google Drive</h2>
+        <p className="mt-1 text-sm text-ink-500">
+          Al aprobar un acta, Echo la guarda sola en Drive: crea la carpeta de la familia si no
+          existe y completa su enlace. Nadie tiene que subir nada a mano.
+        </p>
+      </div>
+
+      {oauthError && (
+        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{oauthError}</p>
+      )}
+      {justConnected && drive?.connected && (
+        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+          Drive conectado.
+        </p>
+      )}
+      {drive?.last_error && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Última subida fallida: {drive.last_error}
+        </p>
+      )}
+
+      {!drive?.enabled ? (
+        <p className="text-sm text-ink-500">
+          El servidor no tiene credenciales de Google configuradas, así que esta integración no
+          está disponible.
+        </p>
+      ) : drive.connected ? (
+        <div className="space-y-3">
+          <p className="text-sm text-ink-700">
+            Conectada con <span className="font-medium">{drive.connected_email}</span>.
+          </p>
+          {drive.root_folder_url && (
+            <p className="text-sm text-ink-500">
+              Carpeta madre:{" "}
+              <a
+                href={drive.root_folder_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-accent-600 hover:underline"
+              >
+                abrir en Drive ↗
+              </a>
+              . Podés moverla a donde quieras dentro de tu Drive, incluso a una unidad compartida:
+              el acceso no depende de dónde esté.
+            </p>
+          )}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="soft"
+              onClick={() => {
+                setParams({});
+                disconnect.mutate();
+              }}
+              disabled={disconnect.isPending}
+            >
+              {disconnect.isPending ? <Spinner /> : "Desconectar"}
+            </Button>
+            <span className="text-xs text-ink-400">
+              Desconectar borra el permiso, no los archivos: lo que ya está en Drive queda.
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <Button onClick={() => connect.mutate()} disabled={connect.isPending}>
+            {connect.isPending ? <Spinner /> : "Conectar Google Drive"}
+          </Button>
+          {connect.isError && (
+            <p className="text-sm text-red-600">
+              {connect.error instanceof Error ? connect.error.message : "No se pudo iniciar"}
+            </p>
+          )}
+          <p className="text-xs text-ink-400">
+            Echo pide el permiso mínimo de Drive: solo puede ver y tocar lo que él mismo crea. No
+            accede al resto de tus archivos.
+          </p>
+        </div>
+      )}
     </Card>
   );
 }

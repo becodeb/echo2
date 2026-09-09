@@ -281,6 +281,15 @@ export interface ReportOut {
   timeline: { month: string; meetings: number; verde: number; amarillo: number; rojo: number }[];
 }
 
+export interface DriveStatusOut {
+  /** false = el servidor no tiene credenciales de Google configuradas. */
+  enabled: boolean;
+  connected: boolean;
+  connected_email: string | null;
+  root_folder_url: string | null;
+  last_error: string | null;
+}
+
 export type LiveEvent =
   | { type: "hello_ack"; role: string; meeting_status: string }
   | { type: "segment"; id: string; seq: number; start_ms: number; end_ms: number; text: string; confidence: number | null; speaker_hint: string | null }

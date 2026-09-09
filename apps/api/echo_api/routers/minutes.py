@@ -20,6 +20,7 @@ from ..models import (
 from ..services.ai_settings import resolve_llm
 from ..services.audit import audit
 from ..services.llm import get_llm_provider
+from ..services.drive import upload_minutes
 from ..services.minutes_gen import DEFAULT_TEMPLATE, generate_minutes, get_active_template
 
 router = APIRouter(tags=["minutes"])
@@ -209,6 +210,7 @@ class MinutesStatusIn(BaseModel):
 async def change_minutes_status(
     meeting_id: uuid.UUID,
     data: MinutesStatusIn,
+    background: BackgroundTasks,
     ctx: OrgContext = Depends(get_org_context),
     db: AsyncSession = Depends(get_db),
 ):
@@ -222,6 +224,9 @@ async def change_minutes_status(
         ctx.require_role("admin")
         minutes.approved_by = ctx.user.id
         minutes.approved_at = datetime.now(UTC)
+        # Solo se sube la versión aprobada: Drive queda con el acta definitiva
+        # y no con los borradores intermedios.
+        background.add_task(upload_minutes, meeting.id)
         # notificar aprobación
         members = (
             (

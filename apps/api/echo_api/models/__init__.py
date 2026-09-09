@@ -23,6 +23,7 @@ from .core import (
     RefreshToken,
     User,
 )
+from .integrations import OrgGoogleDrive
 from .insights import ActionItem, Decision, MeetingSummary, MeetingTopic, Question, Risk
 from .meetings import (
     EMBEDDING_DIM,
@@ -57,7 +58,7 @@ __all__ = [
     "Base", "User", "Organization", "OrganizationMember", "OrganizationInvite",
     "Family", "FamilyMember", "MeetingReason", "MeetingAttendance",
     "Professional", "FamilyProfessional", "MeetingProfessionalAttendance",
-    "MeetingAttachment",
+    "MeetingAttachment", "OrgGoogleDrive",
     "RELATIONSHIPS", "SEVERITIES", "AUDIENCES",
     "RefreshToken", "ROLES", "ROLE_OWNER", "ROLE_ADMIN", "ROLE_MEMBER", "ROLE_VIEWER",
     "EMBEDDING_DIM", "Meeting", "MeetingParticipant", "Speaker", "SpeakerProfile",

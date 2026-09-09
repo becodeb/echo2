@@ -54,6 +54,9 @@ class Minutes(PKMixin, TimestampMixin, Base):
     # Motivo en castellano y apto para mostrar. El detalle técnico va al log.
     generation_error: Mapped[str | None] = mapped_column(String(400))
     generation_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Enlace al acta subida a Drive, si la organización tiene Drive conectado.
+    drive_file_url: Mapped[str | None] = mapped_column(String(600))
+    drive_synced_version: Mapped[int | None] = mapped_column(Integer)
     template_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("minutes_templates.id", ondelete="SET NULL")
     )

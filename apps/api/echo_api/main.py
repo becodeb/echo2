@@ -64,6 +64,7 @@ def _include_optional_routers() -> None:
         "admin",
         "families",
         "attachments",
+        "drive",
         "reports",
         "orgs",
         "meetings",
