@@ -9,7 +9,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
@@ -197,6 +197,36 @@ async def _structured_block(
     return ("\n\n" + "\n\n".join(parts)) if parts else ""
 
 
+async def _empty_answer(
+    db: AsyncSession, ctx: OrgContext, meeting_id: uuid.UUID | None
+) -> str:
+    """Explica POR QUÉ no hay respuesta, que no siempre es la misma razón."""
+    if meeting_id is not None:
+        return (
+            "Esta reunión todavía no tiene transcript procesado, así que no puedo "
+            "responder sobre lo que se dijo."
+        )
+
+    total = (
+        await db.execute(
+            select(func.count())
+            .select_from(Meeting)
+            .where(Meeting.organization_id == ctx.org_id, Meeting.deleted_at.is_(None))
+        )
+    ).scalar_one()
+
+    if total == 0:
+        return (
+            "Todavía no hay ninguna reunión registrada en esta organización. "
+            "Grabá una desde Reuniones y después preguntame lo que quieras sobre "
+            "lo que se dijo."
+        )
+    return (
+        f"Busqué en las {total} reuniones registradas y ninguna toca ese tema. "
+        "Probá con otras palabras, o con el nombre de una persona o una familia."
+    )
+
+
 async def _ask(
     db: AsyncSession,
     ctx: OrgContext,
@@ -226,12 +256,12 @@ async def _ask(
     structured_block = await _structured_block(db, ctx.org_id, meeting_id)
 
     if not chunks and not memory_block and not structured_block:
-        no_info = (
-            "No encontré eso en esta reunión."
-            if meeting_id
-            else "No encontré eso en las reuniones registradas."
-        )
-        return ChatOut(answer=no_info, sources=[])
+        # Sin contexto no se llama al modelo: dejarlo responder de memoria es
+        # justo lo que haría que Echo invente reuniones que nunca pasaron.
+        # Pero "todavía no hay nada cargado" y "hay reuniones y ninguna habla
+        # de esto" son situaciones distintas, y contestar lo mismo a las dos
+        # hace que la app parezca rota cuando en realidad está vacía.
+        return ChatOut(answer=await _empty_answer(db, ctx, meeting_id), sources=[])
 
     system = MEETING_CHAT_SYSTEM if meeting_id else GLOBAL_CHAT_SYSTEM
     context = _context_block(chunks, include_meeting=meeting_id is None)
