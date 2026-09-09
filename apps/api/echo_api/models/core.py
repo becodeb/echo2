@@ -19,7 +19,11 @@ class User(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "users"
 
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
-    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    # Nulo cuando la cuenta se creó con Google y nunca definió contraseña.
+    password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # "sub" de Google: identificador estable de la cuenta; no cambia aunque
+    # el usuario cambie de email.
+    google_sub: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     avatar_color: Mapped[str] = mapped_column(String(16), default="#6366f1")
     job_title: Mapped[str | None] = mapped_column(String(200))

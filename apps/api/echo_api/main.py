@@ -60,6 +60,7 @@ def _include_optional_routers() -> None:
     from importlib import import_module
 
     for name in (
+        "auth_google",
         "orgs",
         "meetings",
         "live",

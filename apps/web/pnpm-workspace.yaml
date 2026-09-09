@@ -1,2 +1,5 @@
-allowBuilds:
-  esbuild: set this to true or false
+# pnpm 10+ exige declarar que dependencias pueden correr scripts de build.
+# esbuild los necesita para bajar su binario nativo; sin esto `pnpm install`
+# falla con ERR_PNPM_IGNORED_BUILDS.
+onlyBuiltDependencies:
+  - esbuild

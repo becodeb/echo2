@@ -165,6 +165,11 @@ async def login(
     user = (
         await db.execute(select(User).where(User.email == data.email.lower()))
     ).scalar_one_or_none()
+    if user and not user.password_hash:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            "Esta cuenta entra con Google. Usá el botón “Continuar con Google”.",
+        )
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Email o contraseña incorrectos")
     if not user.is_active or user.deleted_at is not None:

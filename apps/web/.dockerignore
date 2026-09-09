@@ -2,6 +2,5 @@ node_modules
 dist
 .vite
 coverage
-pnpm-workspace.yaml
 Dockerfile
 .dockerignore

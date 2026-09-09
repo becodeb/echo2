@@ -22,6 +22,25 @@ class Settings(BaseSettings):
     web_origin: str = "http://localhost:5173"
     api_public_url: str = "http://localhost:8000"
 
+    # Google OAuth (crear cuenta / iniciar sesión con Google). Si el id o el
+    # secret están vacíos, la app no ofrece el botón y el endpoint no existe
+    # a efectos prácticos: el flujo entero queda apagado.
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    # Por defecto se deriva de api_public_url; se puede fijar a mano si el
+    # callback registrado en Google apunta a otro host.
+    google_redirect_uri: str = ""
+
+    @property
+    def google_enabled(self) -> bool:
+        return bool(self.google_client_id and self.google_client_secret)
+
+    @property
+    def google_callback_url(self) -> str:
+        if self.google_redirect_uri:
+            return self.google_redirect_uri
+        return self.api_public_url.rstrip("/") + "/api/auth/google/callback"
+
     # Proveedor LLM por defecto cuando la organización no configuró ninguno.
     # Vacío = autodetectar por orden de keys presentes. Explicitarlo evita que
     # cargar una key para STT (ej. OpenAI) cambie de golpe el modelo del chat.
