@@ -1,0 +1,53 @@
+# Configuración de ruff para apps/api.
+#
+# Existe sólo para el linter: el proyecto no se empaqueta, se instala con
+# requirements.txt.
+#
+# El set de reglas es el default de ruff (E4 imports, E7 sentencias, E9
+# errores de sintaxis, F pyflakes). NO se amplía a isort, bugbear, pyupgrade
+# ni nada más: el objetivo es un CI verde y honesto sobre el código que ya
+# existe, no un pretexto para reescribir el repo.
+#
+# Reglas que SÍ están activas y hoy pasan limpias en todo el repo:
+#   E4 (imports mal ubicados), E7 (comparaciones y sentencias dudosas),
+#   E9 (sintaxis), F (pyflakes: nombres indefinidos, imports duplicados,
+#   f-strings rotas, etc).
+#
+# Lo que quedó afuera está en [tool.ruff.lint.per-file-ignores], archivo por
+# archivo y no de forma global, a propósito: un archivo nuevo o uno que hoy
+# no figura en la lista se chequea con todo el set. Cada entrada es deuda
+# anotada, no una regla apagada para siempre. Si algún día se corren los
+# fixes (`ruff check --fix` arregla 14 de los 21 hallazgos automáticamente),
+# la entrada correspondiente se borra de acá.
+#
+# Reglas NO seleccionadas que vale la pena conocer: E501 (largo de línea),
+# I (orden de imports), UP (modernización), B (bugbear). Ninguna se activó
+# porque el código actual no las cumple y arreglarlas es un trabajo aparte.
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint.per-file-ignores]
+# F401: imports muertos que hoy no se usan. Son borrables, pero borrarlos es
+# un cambio de código que este trabajo no toca.
+"echo_api/deps.py" = ["F401"]                    # ROLE_ADMIN/MEMBER/OWNER sin usar
+"echo_api/routers/device_stream.py" = ["F401"]   # asyncio sin usar
+"echo_api/routers/imports.py" = ["F401"]         # sqlalchemy.select sin usar
+"echo_api/routers/minutes.py" = ["F401"]         # MinutesTemplate sin usar
+"echo_api/services/insights_live.py" = ["F401"]  # TranscriptSegment sin usar
+"echo_api/services/memory_svc.py" = ["F401"]     # datetime.UTC y datetime sin usar
+"echo_api/services/minutes_gen.py" = ["F401"]    # format_ms sin usar
+"echo_api/services/pipeline.py" = ["F401"]       # asyncio sin usar
+
+# E741: variable llamada `l` en comprensiones de exportación.
+"echo_api/routers/exports.py" = ["E741"]
+"echo_api/routers/sharing.py" = ["E741"]
+
+# F541: una f-string sin placeholders.
+"echo_api/routers/tasks.py" = ["F541"]
+
+# conftest.py tiene que fijar DATABASE_URL y ECHO_ENV ANTES de importar
+# echo_api, así que los imports de módulo van después del código a propósito
+# (E402): no es desprolijidad, es el orden que la suite necesita.
+# F401/F841 acá sí son deuda común (imports y una variable sin usar).
+"tests/conftest.py" = ["E402", "F401", "F841"]

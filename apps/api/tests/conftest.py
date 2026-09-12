@@ -5,6 +5,13 @@ pgvector, tsvector y aislamiento de tenant de verdad. Ejecutar con:
 
     docker compose exec api pytest
 
+El schema de la base de test lo arma `alembic upgrade head` sobre una base
+recién creada y vacía, NO Base.metadata.create_all(). Es a propósito: correr
+la cadena de migraciones en cada suite es lo único que detecta una migración
+que explota en una base nueva, que es exactamente lo que se escapó a
+producción como un 502 (commit 818b3dc). Si esto se vuelve a cambiar por un
+create_all(), ese agujero vuelve a abrirse.
+
 Los providers externos (LLM/STT/embeddings) se reemplazan por fakes DE TEST
 que implementan las mismas interfaces — nunca llegan a producción.
 """
@@ -12,6 +19,7 @@ import asyncio
 import json
 import os
 import uuid
+from pathlib import Path
 
 # Configurar la base de test ANTES de importar echo_api
 _default = os.environ.get("DATABASE_URL", "postgresql+asyncpg://echo:echo_dev_pw@db:5432/echo")
@@ -22,62 +30,63 @@ os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["ECHO_ENV"] = "test"
 
 import pytest
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from echo_api.models import Base  # noqa: E402
+# Raíz de apps/api: alembic.ini y el directorio alembic/ cuelgan de acá.
+API_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _admin_url() -> str:
     return TEST_DATABASE_URL.rsplit("/", 1)[0] + "/postgres"
 
 
-async def _prepare_database() -> None:
-    admin = create_async_engine(_admin_url(), isolation_level="AUTOCOMMIT")
-    database_name = TEST_DATABASE_URL.rsplit("/", 1)[1]
-    async with admin.connect() as connection:
-        from sqlalchemy import text
+async def _recreate_empty_database() -> None:
+    """Borra y vuelve a crear la base de test, vacía del todo.
 
-        exists = await connection.execute(
-            text("SELECT 1 FROM pg_database WHERE datname = :name"), {"name": database_name}
-        )
-        if not exists.scalar():
-            await connection.execute(text(f'CREATE DATABASE "{database_name}"'))
+    Se recrea en vez de limpiar tablas para que las migraciones se apliquen
+    siempre sobre una base nueva de verdad, que es el caso que rompió en
+    producción. WITH (FORCE) corta las conexiones que hayan quedado colgadas
+    de una corrida anterior (necesita PostgreSQL 13+; la imagen es pg17).
+    """
+    database_name = TEST_DATABASE_URL.rsplit("/", 1)[1]
+    admin = create_async_engine(_admin_url(), isolation_level="AUTOCOMMIT")
+    async with admin.connect() as connection:
+        await connection.execute(text(f'DROP DATABASE IF EXISTS "{database_name}" WITH (FORCE)'))
+        await connection.execute(text(f'CREATE DATABASE "{database_name}"'))
     await admin.dispose()
 
-    engine = create_async_engine(TEST_DATABASE_URL)
-    async with engine.begin() as connection:
-        from sqlalchemy import text
 
-        await connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        await connection.run_sync(Base.metadata.drop_all)
-        await connection.run_sync(Base.metadata.create_all)
-        await connection.execute(
-            text(
-                """
-                CREATE OR REPLACE FUNCTION transcript_segments_tsv_update() RETURNS trigger AS $$
-                BEGIN
-                    NEW.tsv := to_tsvector('spanish', coalesce(NEW.text, ''));
-                    RETURN NEW;
-                END
-                $$ LANGUAGE plpgsql;
-                """
-            )
-        )
-        await connection.execute(
-            text(
-                """
-                CREATE TRIGGER trg_transcript_segments_tsv
-                BEFORE INSERT OR UPDATE OF text ON transcript_segments
-                FOR EACH ROW EXECUTE FUNCTION transcript_segments_tsv_update();
-                """
-            )
-        )
-    await engine.dispose()
+def _run_migrations() -> None:
+    """Aplica `alembic upgrade head` contra la base de test recién creada.
+
+    env.py toma la URL de DATABASE_URL, que arriba ya apunta a echo_test.
+    La extensión pgvector la crea la migración 0001: a propósito NO se crea
+    acá, así una migración que se olvide de la extensión falla en los tests
+    en vez de fallar en el deploy.
+
+    El Config se arma a mano en vez de leer alembic.ini: env.py llama a
+    fileConfig() cuando hay archivo de config, y eso desactiva los loggers ya
+    existentes, con lo cual caplog deja de ver los warnings de la app y los
+    tests que los verifican fallan. Sin archivo, config_file_name es None,
+    env.py saltea fileConfig() y el logging de pytest queda intacto. Lo único
+    que alembic.ini aporta además del logging es script_location, que se fija
+    acá abajo en absoluto porque los tests no siempre corren con cwd en
+    apps/api.
+    """
+    from alembic import command
+    from alembic.config import Config
+
+    config = Config()
+    config.set_main_option("script_location", str(API_ROOT / "alembic"))
+    config.set_main_option("prepend_sys_path", str(API_ROOT))
+    command.upgrade(config, "head")
 
 
 @pytest.fixture(scope="session", autouse=True)
 def prepare_database():
-    asyncio.run(_prepare_database())
+    asyncio.run(_recreate_empty_database())
+    _run_migrations()
     yield
 
 

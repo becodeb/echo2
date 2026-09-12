@@ -1,0 +1,239 @@
+# CI de Echo.
+#
+# Existe porque tres de los últimos trece commits fueron arreglos reactivos
+# de build y de deploy (818b3dc el 502 de la migración 0002, f368415 y
+# ba73645 el build de la web). Los tres los agarraba un pipeline de cinco
+# minutos, y hasta ahora el repo no tenía ninguno.
+#
+# El firmware ESP32 queda AFUERA a propósito: firmware/esp32/platformio.ini
+# declara que nunca fue compilado ni probado, así que sumarlo hoy pinta el CI
+# de rojo sin aportar información nueva.
+#
+# Los cuatro jobs son independientes y corren en paralelo: ninguno declara
+# `needs`, así que una rotura en la web no esconde una rotura en el API.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# Una sola corrida viva por rama: dos pushes seguidos cancelan la anterior.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Secretos de juguete, sólo para que la app levante dentro del runner.
+  # El API se niega a arrancar con el secreto de fábrica, así que hay que
+  # darle uno propio aunque no proteja nada real.
+  ECHO_ENV: test
+  JWT_SECRET: ci_secreto_de_prueba_sin_valor_fuera_del_runner_1234
+
+jobs:
+  api:
+    name: API — ruff y pytest
+    runs-on: ubuntu-latest
+    services:
+      db:
+        # La misma imagen que docker-compose.yml: los tests usan pgvector y
+        # tsvector de verdad, no los simulan.
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: echo
+          POSTGRES_PASSWORD: echo_dev_pw
+          POSTGRES_DB: echo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U echo -d echo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preparar Python 3.12 con caché de pip
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          # Ojo: esta ruta es relativa a la raíz del repo, no a
+          # working-directory.
+          cache-dependency-path: |
+            apps/api/requirements.txt
+            apps/api/requirements-dev.txt
+
+      - name: Instalar dependencias
+        # requirements-dev.txt arrastra requirements.txt con un -r.
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint con ruff
+        # Las reglas y las excepciones por archivo están en
+        # apps/api/pyproject.toml, con el motivo de cada una anotado.
+        run: ruff check .
+
+      - name: Tests
+        # conftest.py deriva echo_test de esta URL, la recrea vacía y le
+        # aplica `alembic upgrade head`. O sea que este job también prueba
+        # las migraciones, además del job de abajo.
+        env:
+          DATABASE_URL: postgresql+asyncpg://echo:echo_dev_pw@localhost:5432/echo
+        run: pytest -q
+
+  migraciones:
+    name: Migraciones sobre una base vacía
+    # Este es el job que habría cazado el 502 de 818b3dc: una base recién
+    # creada, sin una sola tabla, y la cadena completa de Alembic encima.
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: echo
+          POSTGRES_PASSWORD: echo_dev_pw
+          # Base aparte y con nombre explícito: nada más la toca.
+          POSTGRES_DB: echo_vacia
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U echo -d echo_vacia"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: apps/api
+    env:
+      DATABASE_URL: postgresql+asyncpg://echo:echo_dev_pw@localhost:5432/echo_vacia
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preparar Python 3.12 con caché de pip
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            apps/api/requirements.txt
+            apps/api/requirements-dev.txt
+
+      - name: Instalar dependencias
+        run: pip install -r requirements-dev.txt
+
+      - name: Comprobar que la base arranca realmente vacía
+        # Sin esto el job podría pasar por estar corriendo contra una base ya
+        # migrada, que es justo el caso que NO interesa probar.
+        run: |
+          python - <<'PY'
+          import psycopg
+
+          with psycopg.connect("postgresql://echo:echo_dev_pw@localhost:5432/echo_vacia") as conexion:
+              tablas = conexion.execute(
+                  "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
+              ).fetchall()
+          assert not tablas, f"La base no estaba vacía, ya tenía: {tablas}"
+          print("La base arranca vacía: 0 tablas en el schema public.")
+          PY
+
+      - name: alembic upgrade head
+        run: alembic upgrade head
+
+      - name: Comprobar lo que dejó la cadena
+        # No alcanza con que el comando no explote: se verifica que quedó en
+        # la última revisión, que la extensión pgvector existe y que el
+        # trigger de full-text search de 0001 está puesto.
+        run: |
+          alembic current
+          python - <<'PY'
+          import psycopg
+
+          with psycopg.connect("postgresql://echo:echo_dev_pw@localhost:5432/echo_vacia") as conexion:
+              revision = conexion.execute("SELECT version_num FROM alembic_version").fetchone()
+              extension = conexion.execute(
+                  "SELECT 1 FROM pg_extension WHERE extname = 'vector'"
+              ).fetchone()
+              trigger = conexion.execute(
+                  "SELECT 1 FROM pg_trigger WHERE tgname = 'trg_transcript_segments_tsv'"
+              ).fetchone()
+
+          assert revision, "No quedó ninguna revisión aplicada en alembic_version."
+          assert extension, "La extensión pgvector no quedó creada."
+          assert trigger, "El trigger de full-text search de 0001 no quedó creado."
+          print(f"Cadena aplicada hasta {revision[0]}, pgvector y trigger presentes.")
+          PY
+
+  web:
+    name: Web — tsc, vitest y build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preparar pnpm
+        # Va ANTES de setup-node: `cache: pnpm` necesita el binario ya puesto.
+        # pnpm 11 porque apps/web/pnpm-workspace.yaml usa `allowBuilds`, que
+        # es de la 11; el lockfile 9.0 se lee sin reescribirse.
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Preparar Node 22 con caché de pnpm
+        # Node 22 para que coincida con apps/web/Dockerfile (node:22-alpine):
+        # el build del CI tiene que ser el mismo que el del deploy.
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        # En este repo `lint` es `tsc --noEmit`, no eslint.
+        run: pnpm lint
+
+      - name: Tests
+        run: pnpm test
+
+      - name: Build
+        # El paso que más valor tiene de la web: dos de los tres arreglos
+        # reactivos del historial fueron roturas de este build.
+        run: pnpm build
+
+  bridge:
+    name: Bridge — cargo build y test
+    runs-on: ubuntu-latest
+    # No bloquea el merge: el bridge es un binario que corre en la máquina de
+    # cada usuario y hoy no se despliega desde acá. Corre igual para que una
+    # rotura se vea en el momento en vez de descubrirse meses después.
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: apps/bridge
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cachear cargo
+        # El runner de Ubuntu ya trae la toolchain estable de Rust, así que
+        # sólo hace falta cachear el registry y los artefactos.
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/bridge/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('apps/bridge/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Tests
+        run: cargo test
