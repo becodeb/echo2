@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 
 import jwt
 from argon2 import PasswordHasher
-from argon2.exceptions import VerifyMismatchError
+from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 from cryptography.fernet import Fernet, InvalidToken
 
 from .config import get_settings
@@ -22,11 +22,20 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(password: str, hashed: str) -> bool:
+    """Verifica la contraseña distinguiendo el fallo esperado del anómalo.
+
+    Una contraseña incorrecta es tráfico normal y se calla. Un hash ilegible en
+    la base no lo es: significa datos corruptos o una fila escrita por algo que
+    no es este código, y el usuario legítimo queda afuera de su cuenta sin que
+    nadie se entere. Las dos ramas devuelven False —no se le abre la puerta a
+    nadie— pero sólo la segunda deja rastro para poder investigarla.
+    """
     try:
         return _ph.verify(hashed, password)
     except VerifyMismatchError:
         return False
-    except Exception:
+    except (InvalidHashError, VerificationError) as exc:
+        log.warning("hash de contraseña ilegible en la base: %s", exc)
         return False
 
 
@@ -80,9 +89,21 @@ def encrypt_secret(plaintext: str) -> str:
 
 
 def decrypt_secret(ciphertext: str) -> str | None:
+    """Devuelve None SÓLO cuando el ciphertext no abre con esta clave.
+
+    Antes esto atrapaba `Exception` y se tragaba, entre otras cosas, el
+    RuntimeError de `_fernet()` por ENCRYPTION_KEY faltante: la app respondía
+    "no hay API key configurada" cuando la verdad era "la instalación está mal
+    configurada", y nadie iba a buscar el problema donde estaba. Todo lo que no
+    sea un token inválido tiene que propagar y hacer ruido.
+
+    None sigue significando lo que significaba: el valor guardado no se puede
+    descifrar con la clave actual —típicamente porque alguien rotó
+    ENCRYPTION_KEY— y hay que volver a cargar la key del provider.
+    """
     try:
         return _fernet().decrypt(ciphertext.encode()).decode()
-    except (InvalidToken, Exception):
+    except InvalidToken:
         return None
 
 

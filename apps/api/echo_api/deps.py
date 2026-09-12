@@ -95,6 +95,78 @@ async def get_org_context(
     return OrgContext(org=org, member=member, user=user)
 
 
+# Desenlaces de la regla de visibilidad. Son tres y no dos porque "para vos
+# esta reunión no existe" y "existe pero no con ese permiso" son respuestas
+# distintas: la primera se responde como inexistente justamente para no filtrar
+# que existe, y colapsarlas en un booleano perdería esa diferencia.
+MEETING_ACCESS_OK = "ok"
+MEETING_ACCESS_HIDDEN = "hidden"
+MEETING_ACCESS_INSUFFICIENT_ROLE = "insufficient_role"
+
+
+async def check_meeting_access(
+    db: AsyncSession,
+    meeting: Meeting,
+    user: User,
+    role: str,
+    minimum_role: str = "viewer",
+) -> str:
+    """Regla de visibilidad de una reunión, en un solo lugar.
+
+    Vive suelta y no adentro de `get_meeting_or_404` porque el WebSocket en
+    vivo (`routers/live.py`) necesita exactamente esta decisión y no tiene un
+    `OrgContext` que pasarle: recibe el rol del `OrganizationMember` que ya
+    consultó. Mientras la regla estuvo escrita dos veces, una de las dos copia
+    se quedó atrás y un `member` que comía 404 por REST igual abría el WS y se
+    llevaba el transcript privado completo.
+
+    Asume que la reunión ya fue cargada y que la pertenencia a la organización
+    ya fue verificada: acá sólo se decide visibilidad. Quien llama traduce el
+    resultado al vocabulario de su transporte (404 en HTTP, 4403 en WebSocket).
+
+    Un `admin` o superior ve todo por definición del rol; el creador siempre ve
+    lo suyo, sin importar `minimum_role`, porque un compartido no puede darle
+    menos permiso del que ya tenía sobre su propia reunión.
+    """
+    visibility = (meeting.meta or {}).get("visibility", "org")
+    if visibility != "private" or ROLE_ORDER.get(role, -1) >= ROLE_ORDER["admin"]:
+        return MEETING_ACCESS_OK
+    if meeting.created_by == user.id:
+        return MEETING_ACCESS_OK
+
+    share = (
+        await db.execute(
+            select(MeetingShare).where(
+                MeetingShare.meeting_id == meeting.id,
+                MeetingShare.user_id == user.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if not share:
+        return MEETING_ACCESS_HIDDEN
+    if ROLE_ORDER.get(share.role, 0) < ROLE_ORDER.get(minimum_role, 0):
+        return MEETING_ACCESS_INSUFFICIENT_ROLE
+    return MEETING_ACCESS_OK
+
+
+async def user_can_access_meeting(
+    db: AsyncSession,
+    meeting: Meeting,
+    user: User,
+    role: str,
+    minimum_role: str = "viewer",
+) -> bool:
+    """Versión booleana para quien no distingue "oculta" de "sin permiso".
+
+    El WebSocket es ese caso: cierra con 4403 en cualquiera de los dos
+    desenlaces negativos, porque su protocolo no tiene forma de decir otra cosa.
+    """
+    return (
+        await check_meeting_access(db, meeting, user, role, minimum_role)
+        == MEETING_ACCESS_OK
+    )
+
+
 async def get_meeting_or_404(
     meeting_id: uuid.UUID,
     ctx: OrgContext,
@@ -114,21 +186,11 @@ async def get_meeting_or_404(
     if not meeting:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Reunión no encontrada")
 
-    visibility = (meeting.meta or {}).get("visibility", "org")
-    if visibility == "private" and ROLE_ORDER.get(ctx.role, -1) < ROLE_ORDER["admin"]:
-        if meeting.created_by != ctx.user.id:
-            share = (
-                await db.execute(
-                    select(MeetingShare).where(
-                        MeetingShare.meeting_id == meeting.id,
-                        MeetingShare.user_id == ctx.user.id,
-                    )
-                )
-            ).scalar_one_or_none()
-            if not share:
-                raise HTTPException(status.HTTP_404_NOT_FOUND, "Reunión no encontrada")
-            if ROLE_ORDER.get(share.role, 0) < ROLE_ORDER.get(minimum_role, 0):
-                raise HTTPException(status.HTTP_403_FORBIDDEN, "Permisos insuficientes")
+    access = await check_meeting_access(db, meeting, ctx.user, ctx.role, minimum_role)
+    if access == MEETING_ACCESS_HIDDEN:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Reunión no encontrada")
+    if access == MEETING_ACCESS_INSUFFICIENT_ROLE:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Permisos insuficientes")
     return meeting
 
 

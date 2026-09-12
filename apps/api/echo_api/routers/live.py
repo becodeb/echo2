@@ -22,6 +22,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import func, select
 
 from ..db import SessionLocal
+from ..deps import user_can_access_meeting
 from ..models import Meeting, OrganizationMember, TranscriptSegment, User
 from ..security import decode_token
 from ..services.ai_settings import get_vocabulary, resolve_stt
@@ -73,6 +74,15 @@ async def _authorize(websocket: WebSocket, meeting_id: uuid.UUID) -> tuple[Meeti
             )
         ).scalar_one_or_none()
         if not member:
+            await websocket.close(code=4403, reason="Sin acceso")
+            return None
+        # Pertenecer a la organización no alcanza: una reunión privada sólo la
+        # ve su creador, un compartido explícito o un admin. Esta regla es la
+        # misma que aplica el REST y se consulta desde `deps` a propósito,
+        # porque cuando estaba copiada acá se quedó vieja y este WS entregaba
+        # el transcript en vivo de reuniones que el mismo usuario no podía
+        # abrir por HTTP.
+        if not await user_can_access_meeting(db, meeting, user, member.role):
             await websocket.close(code=4403, reason="Sin acceso")
             return None
         return meeting, user
