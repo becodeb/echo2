@@ -1,0 +1,182 @@
+/* Landing pública de Echo. Tipografía propia (Geist), botones en píldora como
+ * los ojos, mosaicos a 16px. Todo lo que se mueve es transform u opacity. */
+
+.landing {
+  font-family: "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-feature-settings: "cv11", "ss01";
+}
+
+/* Botones: siempre píldora. */
+.landing .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 46px;
+  padding: 0 22px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 500;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.landing .btn:active { transform: scale(0.98); }
+.landing .btn-ink { background: #0c0e16; color: #fafbfc; }
+.landing .btn-ink:hover { background: #23293a; }
+.landing .btn-ghost { color: #0c0e16; box-shadow: inset 0 0 0 1px #d9dde5; }
+.landing .btn-ghost:hover { box-shadow: inset 0 0 0 1px #8b94a7; }
+.landing .btn-paper { background: #fafbfc; color: #0c0e16; }
+.landing .btn-paper:hover { background: #ffffff; }
+.landing .btn-sm { height: 38px; padding: 0 16px; font-size: 14px; }
+
+/* Secciones que entran al llegar con el scroll (IntersectionObserver). */
+.landing .reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.landing .reveal[data-shown] {
+  opacity: 1;
+  transform: none;
+}
+
+/* La cara escuchando: los ojos crecen y bajan como si siguieran la voz. */
+.landing .listen .echo-listening .echo-eye {
+  animation: landing-listen 2.6s ease-in-out infinite;
+  transform-origin: center;
+}
+@keyframes landing-listen {
+  0%, 100% { transform: scaleY(0.85); }
+  18%      { transform: scaleY(1.2); }
+  34%      { transform: scaleY(0.9); }
+  52%      { transform: scaleY(1.35); }
+  70%      { transform: scaleY(1); }
+  86%      { transform: scaleY(1.22); }
+}
+
+/* Ojos vivos del hero: mismo tamaño y lugar que en el video (--s es la escala
+ * de object-fit: cover). El parpadeo viene de .echo-eye (index.css). */
+.landing .hero-ojos {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(112px * var(--s, 1));
+  background: #fafbfc;
+  pointer-events: none;
+}
+.landing .hero-ojos [data-eye] { will-change: transform; }
+.landing .hero-ojos .echo-eye {
+  display: block;
+  width: calc(150px * var(--s, 1));
+  height: calc(225px * var(--s, 1));
+  border-radius: 999px;
+  background: #0c0e16;
+}
+
+/* Navbar del hero: entra cuando el video ya pestañeó, con una curva larga. */
+.landing .hero-fade {
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1), transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.landing .hero-fade[data-shown] {
+  opacity: 1;
+  transform: none;
+}
+
+/* Texto del hero: título, párrafo y botones entran uno detrás del otro. */
+.landing .hero-copy-in > * {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1), transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.landing .hero-copy-in[data-shown] > * {
+  opacity: 1;
+  transform: none;
+}
+.landing .hero-copy-in[data-shown] > :nth-child(2) { transition-delay: 0.1s; }
+.landing .hero-copy-in[data-shown] > :nth-child(3) { transition-delay: 0.2s; }
+
+/* Hoja del acta de ejemplo: papel con membrete, título, campos y firmas. */
+.landing .acta-hoja {
+  background: #ffffff;
+  border: 1px solid #d9dde5;
+  border-radius: 16px;
+  padding: 28px 28px 24px;
+  color: #23293a;
+  font-size: 14px;
+  line-height: 1.55;
+}
+@media (min-width: 768px) {
+  .landing .acta-hoja { padding: 40px 44px 32px; font-size: 15px; }
+}
+.landing .acta-membrete {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  color: #8b94a7;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.landing .acta-membrete p { margin: 0; }
+.landing .acta-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #0c0e16;
+  color: #fafbfc;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: -0.02em;
+  flex: none;
+}
+.landing .acta-titulo {
+  margin: 28px 0 0;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #0c0e16;
+}
+.landing .acta-campos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 24px;
+  margin: 24px 0 0;
+  padding: 18px 0;
+  border-top: 1px solid #eceef2;
+  border-bottom: 1px solid #eceef2;
+}
+.landing .acta-campos dt { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #8b94a7; }
+.landing .acta-campos dd { margin: 2px 0 0; font-weight: 500; color: #0c0e16; }
+.landing .acta-texto { margin: 20px 0 0; }
+.landing .acta-marcas { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 0; }
+.landing .acta-marcas span {
+  display: inline-flex;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #0c0e16;
+  color: #fafbfc;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.landing .acta-firmas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin: 36px 0 0;
+  font-size: 12px;
+  color: #8b94a7;
+}
+.landing .acta-firmas span { padding-top: 8px; border-top: 1px solid #b7becc; }
+
+/* La landing anima siempre, aunque el sistema pida "menos movimiento": son
+ * entradas cortas y suaves, y la apertura es parte de la marca. */

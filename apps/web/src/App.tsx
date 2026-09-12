@@ -23,6 +23,7 @@ const SharedView = lazy(() => import("./pages/SharedView"));
 const Admin = lazy(() => import("./pages/Admin"));
 const Families = lazy(() => import("./pages/Families"));
 const Reports = lazy(() => import("./pages/Reports"));
+const Landing = lazy(() => import("./pages/Landing"));
 
 function FullLoader() {
   return (
@@ -42,6 +43,23 @@ export default function App() {
         <Routes>
           <Route path="/s/:token" element={<SharedView />} />
         </Routes>
+      </Suspense>
+    );
+  }
+
+  // Las rutas viejas de la landing viven ahora en la raíz.
+  if (location.pathname.startsWith("/landing")) {
+    return <Navigate to="/" replace />;
+  }
+
+  // Sin sesión, la raíz es la landing pública. Mientras se resuelve el refresh
+  // se muestra negro (igual que el primer frame del video), así quien sí tiene
+  // sesión pasa al panel sin ver arrancar la apertura.
+  if (!user && location.pathname === "/") {
+    if (loading) return <div className="min-h-[100dvh] bg-ink-950" />;
+    return (
+      <Suspense fallback={<div className="min-h-[100dvh] bg-ink-950" />}>
+        <Landing />
       </Suspense>
     );
   }

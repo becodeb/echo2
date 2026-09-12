@@ -37,3 +37,6 @@ firmware/esp32/secrets.h
 
 # typescript incremental build
 *.tsbuildinfo
+
+# renders de Remotion (se regeneran)
+apps/video/out/
