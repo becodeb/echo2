@@ -134,3 +134,93 @@ async def _sync_superadmins() -> None:
             log.info("superadmins declarados sin cuenta todavía: %s", ", ".join(faltan))
     except Exception:
         log.exception("no se pudo sincronizar la lista de superadmins")
+
+
+# Cuánto puede llevar un trabajo antes de darlo por muerto.
+#
+# El número está del lado generoso a propósito. Un pipeline post-reunión con un
+# transcript largo y un LLM lento (resumen jerárquico + verificación de citas,
+# reintentos incluidos) puede tardar bastante; y sobre todo: este hook corre al
+# arrancar, o sea que puede haber OTRA instancia de la API viva procesando esa
+# misma reunión mientras ésta levanta. Con un umbral corto le mataríamos
+# trabajo en curso a un proceso sano. 3 horas es varias veces el peor caso
+# medido y sigue siendo infinitamente menos que "para siempre", que es lo que
+# pasa hoy cuando nadie limpia estos estados.
+STALE_JOB_HOURS = 3
+
+_STALE_MINUTES_MESSAGE = (
+    "La generación quedó interrumpida (probablemente el servidor se reinició en el medio). "
+    "No se perdió nada del contenido de la reunión: tocá «Regenerar» para volver a intentarlo."
+)
+_STALE_MEETING_MESSAGE = (
+    "El procesamiento quedó interrumpido (probablemente el servidor se reinició en el medio). "
+    "La transcripción está guardada; se puede volver a procesar la reunión."
+)
+
+
+@app.on_event("startup")
+async def _fail_stale_jobs() -> None:
+    """Cierra los trabajos que quedaron colgados por un reinicio.
+
+    "generating" y "processing" son estados que sólo termina la tarea que los
+    empezó. Si la API se cae en el medio, no queda nadie que los toque nunca
+    más: el acta se queda en "generando" y la UI le hace polling cada 3
+    segundos hasta el fin de los tiempos (MeetingDetail.tsx), y la reunión se
+    queda en "processing", que es justo el estado que `finish_meeting` rechaza
+    con 409 — o sea que desde la interfaz no hay forma de recuperarla.
+
+    Nunca puede impedir que la API levante: si esto falla, se loguea y sigue.
+    """
+    try:
+        from datetime import UTC, datetime, timedelta
+
+        from sqlalchemy import or_, update
+
+        from .db import SessionLocal
+        from .models import Meeting, Minutes
+
+        cutoff = datetime.now(UTC) - timedelta(hours=STALE_JOB_HOURS)
+        async with SessionLocal() as db:
+            stale_minutes = await db.execute(
+                update(Minutes)
+                .where(
+                    Minutes.generation_status == "generating",
+                    # generation_started_at se escribía en dos lugares y no lo
+                    # leía nadie: existe exactamente para esto. NULL cuenta como
+                    # vencido — un "generating" sin fecha de arranque es de una
+                    # fila vieja y no hay forma de saber si sigue viva, y
+                    # dejarla colgada es peor que pedir un reintento.
+                    or_(
+                        Minutes.generation_started_at < cutoff,
+                        Minutes.generation_started_at.is_(None),
+                    ),
+                )
+                .values(generation_status="failed", generation_error=_STALE_MINUTES_MESSAGE)
+            )
+            stale_meetings = await db.execute(
+                update(Meeting)
+                .where(
+                    Meeting.status == "processing",
+                    # Meeting no tiene un `processing_started_at`. Se usa
+                    # updated_at (TimestampMixin) y no ended_at justamente
+                    # porque NO es fijo: el pipeline reescribe processing_state
+                    # en cada etapa (pipeline._set_stage), así que mientras algo
+                    # avance el reloj se corre solo y el trabajo vivo queda a
+                    # salvo. Si el proceso murió, nadie lo vuelve a tocar y la
+                    # fila envejece sola hasta vencer.
+                    Meeting.updated_at < cutoff,
+                )
+                .values(
+                    status="failed",
+                    processing_state={"stage": "failed", "error": _STALE_MEETING_MESSAGE},
+                )
+            )
+            await db.commit()
+        if stale_minutes.rowcount or stale_meetings.rowcount:
+            log.info(
+                "trabajos vencidos cerrados al arrancar: %s actas, %s reuniones",
+                stale_minutes.rowcount,
+                stale_meetings.rowcount,
+            )
+    except Exception:
+        log.exception("no se pudieron cerrar los trabajos colgados")

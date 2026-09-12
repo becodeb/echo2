@@ -23,6 +23,7 @@ from ..models import Device, Meeting
 from ..routers.live import _store_segment
 from ..security import hash_refresh_token
 from ..services.ai_settings import get_vocabulary, resolve_stt
+from ..services.background import spawn
 from ..services.insights_live import maybe_extract_live_insights
 from ..services.live_bus import live_bus
 from ..services.stt import get_stt_provider
@@ -102,7 +103,7 @@ async def device_finish_meeting(
     await db.commit()
     from ..services.pipeline import run_finalize_pipeline
 
-    asyncio.create_task(run_finalize_pipeline(str(meeting.id)))
+    spawn(run_finalize_pipeline(str(meeting.id)), name=f"finalize:{meeting.id}")
     await live_bus.publish(str(meeting.id), {"type": "status", "status": "processing"})
     return {"status": "processing"}
 
@@ -180,7 +181,7 @@ async def device_stream(websocket: WebSocket):
             segments_since_insights += 1
         if segments_since_insights >= 8:
             segments_since_insights = 0
-            asyncio.create_task(maybe_extract_live_insights(channel))
+            spawn(maybe_extract_live_insights(channel), name=f"insights:{channel}")
 
     try:
         while True:
