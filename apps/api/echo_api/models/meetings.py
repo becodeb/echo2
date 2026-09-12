@@ -109,7 +109,17 @@ class Speaker(PKMixin, TimestampMixin, Base):
 
 
 class SpeakerProfile(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
-    """Voice profile OPT-IN de una persona. Guarda solo el embedding, nunca audio."""
+    """Voice profile OPT-IN de una persona. Guarda solo el embedding, nunca audio.
+
+    ⚠️ SCHEMA PREPARADO, SIN IMPLEMENTACIÓN. La tabla existe y la migración la
+    crea, pero NINGÚN código la lee ni la escribe: no hay endpoint que dé de
+    alta un perfil, no hay nada que calcule este embedding y el pipeline de
+    finalización no consulta esta tabla. Identificar hablantes por voz
+    requiere primero un extractor de embeddings de voz (ECAPA/pyannote o
+    similar), que hoy no está en el repo.
+
+    No la documentes como una feature viva ni asumas que hay datos acá.
+    """
 
     __tablename__ = "speaker_profiles"
     __table_args__ = (Index("ix_speaker_profiles_org", "organization_id"),)
@@ -149,6 +159,18 @@ class TranscriptSegment(PKMixin, TimestampMixin, Base):
     is_final: Mapped[bool] = mapped_column(Boolean, default=True)
     edited: Mapped[bool] = mapped_column(Boolean, default=False)
     tsv: Mapped[str | None] = mapped_column(TSVECTOR)  # full-text search
+    # ⚠️ TRAMPA DE AUTOGENERATE — LEER ANTES DE TOCAR MIGRACIONES ⚠️
+    # El índice HNSW de esta columna (`ix_segments_embedding`) NO está
+    # declarado acá: lo crea por SQL crudo `alembic/versions/0001_initial.py`,
+    # porque el opclass `vector_cosine_ops` de pgvector no se expresa bien en
+    # la capa declarativa de SQLAlchemy.
+    # Consecuencia: `alembic revision --autogenerate` no lo ve en los modelos,
+    # lo interpreta como índice borrado a mano y GENERA UN `drop_index`. Si esa
+    # migración se aplica, la búsqueda semántica pasa a escaneo secuencial sin
+    # un solo error visible — sólo se pone lenta.
+    # `alembic check` ya reporta `Detected removed index` para este índice: es
+    # ruido ESPERADO, no un drift que haya que "arreglar" declarándolo.
+    # Si autogenerás: borrá a mano el `drop_index` del archivo resultante.
     embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM))
     topic: Mapped[str | None] = mapped_column(String(200))
     # hint de diarización en vivo (canal/cluster del bridge o dispositivo)

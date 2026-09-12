@@ -388,13 +388,14 @@ void setup() {
   prefs.begin("echo", false);
   deviceToken = prefs.getString("token", "");
 
-  // WiFi: credenciales fijas o portal de configuración
+  // WiFi: credenciales compiladas, o las últimas guardadas en NVS.
+  // ⚠️ NO hay portal de configuración. Si WIFI_SSID está vacío y el equipo no
+  // tiene credenciales previas en NVS, no hay forma de configurarlo sin
+  // volver a flashearlo. Provisioning (SoftAP/BLE/SmartConfig) está pendiente.
   if (strlen(WIFI_SSID) > 0) {
     WiFi.begin(WIFI_SSID, WIFI_PASS);
   } else {
-    // portal simple: AP con credenciales en /  (para producción usar
-    // provisioning BLE/SmartConfig; ver docs/esp32.md)
-    WiFi.begin();  // intenta las últimas credenciales guardadas
+    WiFi.begin();  // intenta las últimas credenciales guardadas en NVS
   }
   drawMessage("Conectando WiFi...");
   uint32_t started = millis();

@@ -166,6 +166,12 @@ class OrgAISettings(PKMixin, TimestampMixin, Base):
     embeddings_model: Mapped[str | None] = mapped_column(String(120))
     embeddings_api_key_enc: Mapped[str | None] = mapped_column(Text)
     # Diarización
+    # ⚠️ CONFIG MUERTA. Se puede setear desde Ajustes → IA y se persiste acá,
+    # pero NINGÚN consumidor la lee: no existe un `DiarizationProvider` ni
+    # nada que se ramifique según este valor. Hoy la separación de hablantes
+    # sale siempre de los `speaker_hint` del motor local / dispositivo.
+    # Un admin la cambia y no pasa absolutamente nada. Borrarla o cablearla,
+    # pero no documentarla como si hiciera algo.
     diarization_provider: Mapped[str | None] = mapped_column(String(40))  # local_onnx|none
     # Idioma del acta (puede diferir del hablado)
     minutes_language: Mapped[str] = mapped_column(String(10), default="es")
@@ -238,6 +244,17 @@ class MemoryEntity(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
     normalized_name: Mapped[str] = mapped_column(String(300), nullable=False)
     summary: Mapped[str | None] = mapped_column(Text)  # estado actual consolidado
     attributes: Mapped[dict] = mapped_column(JSONB, default=dict)
+    # ⚠️ TRAMPA DE AUTOGENERATE — LEER ANTES DE TOCAR MIGRACIONES ⚠️
+    # Mismo caso que `TranscriptSegment.embedding`: el índice HNSW de esta
+    # columna (`ix_memory_entities_embedding`) lo crea por SQL crudo
+    # `alembic/versions/0001_initial.py` y NO está declarado acá, porque el
+    # opclass `vector_cosine_ops` de pgvector no se expresa bien en la capa
+    # declarativa de SQLAlchemy.
+    # Consecuencia: `alembic revision --autogenerate` GENERA UN `drop_index`
+    # que, si se aplica, degrada el grafo de memoria a escaneo secuencial sin
+    # ningún error visible.
+    # `alembic check` ya reporta `Detected removed index` acá: es ruido
+    # ESPERADO. Si autogenerás, borrá a mano el `drop_index` del resultado.
     embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM))
 
 

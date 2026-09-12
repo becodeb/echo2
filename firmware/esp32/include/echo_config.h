@@ -1,16 +1,26 @@
 #pragma once
 
 // ── Configuración de Echo Device ─────────────────────────────────
-// Completá WiFi y servidor antes de flashear (o dejá WIFI_SSID vacío para
-// que el dispositivo levante un portal de configuración propio).
+// Completá WiFi y servidor antes de flashear. NO hay portal de configuración:
+// estos valores son la única forma de configurar el equipo.
 
 #define ECHO_FW_VERSION "1.0.0"
 
-// WiFi (vacío => portal de configuración en el AP "Echo-Setup")
+// WiFi — OBLIGATORIO.
+// ⚠️ NO hay portal de configuración ni AP "Echo-Setup". No existe SoftAP,
+// ni DNSServer, ni WebServer en este firmware: `main.cpp` hace `WiFi.begin()`
+// y nada más. Si dejás WIFI_SSID vacío, el equipo intenta reconectarse a las
+// últimas credenciales guardadas en NVS; si no hay ninguna (equipo recién
+// flasheado), queda en pantalla de error SIN NINGUNA FORMA DE CONFIGURARLO
+// salvo volver a flashearlo. Completalo.
 #define WIFI_SSID ""
 #define WIFI_PASS ""
 
-// Servidor de Echo (API cloud) — sin barra final
+// Servidor de Echo — sin barra final.
+// ⚠️ SOLO HTTP/WS EN TEXTO PLANO. Este firmware no habla TLS: no usa
+// WiFiClientSecure ni wss://. No puede conectarse al deploy de producción
+// (que es HTTPS); apuntalo a un Echo API alcanzable por HTTP plano en la LAN,
+// o al Echo Bridge de una PC de la sala.
 #define ECHO_API_BASE "http://192.168.1.100:8787"
 // Host/puerto para el WebSocket (mismo host del API)
 #define ECHO_API_HOST "192.168.1.100"

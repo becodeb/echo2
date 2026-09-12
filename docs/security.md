@@ -8,7 +8,17 @@
 | Transcript y derivados | PostgreSQL, aislados por organización |
 | API keys de providers | Cifradas en reposo (Fernet/AES128-CBC+HMAC) con `ENCRYPTION_KEY`; al frontend solo vuelven enmascaradas (`sk-a…xyz`); excluidas de logs |
 | Contraseñas | Argon2id |
-| Voice profiles | Solo embedding matemático, opt-in con `consent_at`, borrables |
+| Refresh token de Google Drive | Uno por organización, cifrado en reposo con la misma `ENCRYPTION_KEY` (`OrgGoogleDrive.refresh_token_enc`). El access token se canjea en cada operación y vive solo en memoria. Scope mínimo `drive.file` |
+| Google Login | **No persiste ningún token.** Pide `access_type=online` y guarda únicamente el `google_sub` en el usuario |
+
+> **Voice profiles: no están en esta tabla a propósito.** El modelo
+> `SpeakerProfile` (embedding de voz + `consent_at`) existe en
+> `models/meetings.py` y la migración crea la tabla, pero **ningún código la
+> lee ni la escribe**: no hay endpoint para dar de alta un perfil ni nada que
+> calcule ese embedding. Es una tabla vacía. Listarla como dato sensible
+> tratado sería describir una feature que no existe — y de paso sugerir que
+> Echo guarda biometría de voz, cosa que hoy no hace. Si algún día se
+> implementa, vuelve a la tabla con su fila.
 
 ## Autenticación y sesiones
 

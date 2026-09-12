@@ -38,9 +38,37 @@ haya captura activa (nunca grabación oculta).
 - **Corta**: iniciar reunión / pausar / reanudar.
 - **Larga (>1.5 s)**: finalizar (dispara el pipeline y pasa a thinking→done).
 
+## ⚠️ Dos límites que hay que saber antes de comprar el hardware
+
+**1. No habla TLS. No puede conectarse al Echo de producción.**
+El firmware usa `HTTPClient` sobre `http://` y `WebSocketsClient` sin SSL: no
+hay `WiFiClientSecure`, ni `wss://`, ni `https://` en todo `src/main.cpp`. Si tu
+Echo está deployado detrás de HTTPS, el dispositivo **no puede alcanzarlo** —
+y no por configuración, sino porque no tiene el código para hacerlo.
+
+Hoy el dispositivo sirve para un solo escenario: un Echo API accesible por
+**HTTP plano en la misma LAN**, o el Echo Bridge de una PC de la sala. Eso
+además es coherente con la promesa de privacidad (el audio no sale de la red),
+pero conviene decirlo como lo que es: una limitación, no una decisión.
+
+Implementarlo requiere `WiFiClientSecure` + el certificado raíz embebido, y
+subir de `WebSocketsClient` a su variante SSL. No es un `#define`.
+
+**2. No hay portal de configuración WiFi.**
+El comentario que prometía un AP `Echo-Setup` era falso y ya se corrigió: no
+existe `SoftAP`, ni `DNSServer`, ni `WebServer` en el firmware. `main.cpp`
+hace `WiFi.begin()` y nada más.
+
+Consecuencia práctica: **flashear con `WIFI_SSID` vacío deja el equipo
+inutilizable.** Sin credenciales compiladas y sin credenciales previas en NVS,
+el dispositivo queda en la carita de error y no hay forma de configurarlo
+salvo volver a flashearlo por USB. Completá siempre `WIFI_SSID` y `WIFI_PASS`
+en `include/echo_config.h`.
+
 ## Onboarding (pairing)
 
-1. Flasheá con tu WiFi y servidor en `include/echo_config.h`.
+1. Flasheá con tu WiFi y servidor en `include/echo_config.h`. Las credenciales
+   WiFi son obligatorias (ver arriba) y el servidor tiene que ser HTTP plano.
 2. Al arrancar sin token, el equipo pide un código al servidor y muestra
    `CODE ######` en pantalla (expira a los 10 min y se renueva).
 3. En Echo web: **Ajustes → Dispositivos → Vincular** → ingresá el código.

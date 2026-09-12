@@ -79,6 +79,39 @@ en vivo (cada ~8 segmentos, con lock anti-reentrada), estado del pipeline y
 warnings. El frontend re-conecta con backoff; el transcript confirmado nunca
 se pierde (vive en DB).
 
+### ⚠️ Esto obliga a correr un solo proceso de API
+
+Leé esto antes de escalar. Hay dos estructuras que viven **en la memoria de un
+único proceso Python**, sin Redis ni nada compartido detrás:
+
+| Qué | Dónde | Qué es realmente |
+|---|---|---|
+| Bus de eventos en vivo | `services/live_bus.py` | `dict[str, set[asyncio.Queue]]` |
+| Rate limiting | `deps.py` (`_buckets`) | `dict[str, deque]` de timestamps |
+
+Hoy funciona porque `docker-compose.prod.yml` arranca **un solo uvicorn sin
+`--workers`**. Esa línea es la que sostiene todo el diseño.
+
+Qué se rompe si agregás `--workers 2`, un segundo contenedor de API, o
+cualquier réplica horizontal:
+
+- **La transcripción en vivo deja de llegar.** El WS del viewer aterriza en el
+  worker A y los segmentos entran por el worker B: el `publish` de B escribe en
+  un dict que el viewer de A no está mirando. La pantalla queda vacía.
+- **El rate limiting se divide por la cantidad de workers.** Cada proceso tiene
+  su propio contador, así que un límite de 5 intentos con 4 workers tolera
+  hasta 20.
+
+**Lo peor es cómo falla: sin un solo error.** No hay excepción, no hay log, no
+hay healthcheck en rojo. El `publish` encuentra cero suscriptores y retorna
+normalmente; el rate limit simplemente cuenta menos. Todo "anda", sólo que la
+transcripción en vivo no aparece y el límite no limita. Alguien va a perder
+días buscando esto en el frontend.
+
+Antes de escalar hay que mover el bus a un pub/sub real (Redis, NATS, LISTEN/
+NOTIFY de Postgres) y el rate limit a un store compartido. Hasta entonces:
+**un solo worker, y que quede escrito en el compose.**
+
 ## Decisiones técnicas destacadas
 
 - **Puerto API 8787** (no 8000): en la máquina de desarrollo había otro
@@ -88,8 +121,18 @@ se pierde (vive en DB).
   coseno entre vectores del mismo provider.
 - **Diarización en el borde**: como el servidor jamás retiene audio, la
   separación de hablantes ocurre donde el audio vive (bridge/dispositivo) y
-  viaja como `speaker_hint`; el servidor solo consolida. Interface
-  `DiarizationProvider` lista para un modelo de embeddings de voz.
+  viaja como `speaker_hint`; el servidor solo consolida.
+  Que quede claro qué **no** hay: no existe ninguna interfaz
+  `DiarizationProvider` ni ningún punto de extensión preparado para enchufar
+  un modelo de embeddings de voz. Agregar identificación automática de
+  hablantes (ECAPA/pyannote) es trabajo de diseño desde cero, no un plug-in.
+  El campo `diarization_provider` que se puede setear en Ajustes → IA se
+  persiste pero **nadie lo lee**: es config muerta.
+- **Voice profiles: schema sin implementación**. `SpeakerProfile`
+  (`models/meetings.py`) tiene columna de embedding y `consent_at`, y la
+  migración crea la tabla, pero ningún código la lee ni la escribe. No hay
+  endpoint para dar de alta un perfil ni nada que calcule ese embedding.
+  Es una tabla vacía esperando una feature que no está escrita.
 - **Actas versionadas**: cada edición crea `MinutesVersion` nueva; editar un
   acta aprobada la vuelve a "en revisión". El acta generada guarda su
   verificación.

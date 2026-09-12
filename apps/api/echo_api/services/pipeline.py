@@ -2,16 +2,22 @@
 
 Al tocar "Finalizar" corre en background:
   1. consolidar hablantes (hints de diarización → Speaker rows)
-  2. sugerir identidades por voice profile (si hay embeddings de speaker)
-  3. extracción estructurada final (temas, decisiones, tareas, etc.)
-  4. resolución de fechas relativas
+  2. extracción estructurada final (temas, decisiones, tareas, etc.)
+  3. resolución de fechas relativas (dentro del paso 2, al persistir)
+  4. generación del acta: arranca acá y corre en paralelo con embeddings y
+     resúmenes, porque es lo primero que se quiere ver al terminar
   5. embeddings del transcript (RAG)
   6. resúmenes (jerárquicos si la reunión es larga)
-  7. generación + verificación del acta (arranca en paralelo apenas hay
-     extracción: es lo primero que se quiere ver al terminar)
+  7. espera y verificación del acta
   8. actualización de la memoria organizacional
-  9. sugerencia de reuniones relacionadas
- 10. notificaciones
+  9. sugerencia de reuniones relacionadas (dentro del paso 8)
+ 10. notificaciones «tu acta está lista» (en _finish)
+
+NO hay paso de identificación de hablantes por voice profile. El modelo
+`SpeakerProfile` existe en `models/meetings.py` con su columna de embedding y
+su `consent_at`, pero NADIE lo lee ni lo escribe: es schema preparado, no una
+etapa del pipeline. La identidad de un hablante hoy se resuelve sólo por los
+hints del motor local y por el renombrado manual desde la UI.
 
 Cada etapa reporta progreso vía live_bus y processing_state. Si el LLM no está
 configurado, las etapas de IA se saltean y quedan marcadas como "skipped"
@@ -142,7 +148,7 @@ async def _run(meeting_id: uuid.UUID) -> None:
             llm_config.provider, llm_config.api_key, llm_config.model, llm_config.base_url
         )
 
-    # 3. Extracción estructurada final
+    # 2. Extracción estructurada final (+ resolución de fechas al persistir)
     insights: dict = {}
     if provider:
         await _set_stage(meeting_id, "insights", 20)
@@ -195,7 +201,7 @@ async def _run(meeting_id: uuid.UUID) -> None:
             log.warning("acta fallo: %s", exc)
             skipped.append(f"minutes:{exc}")
 
-    # 8. Memoria organizacional
+    # 8. Memoria organizacional (+ sugerencia de reuniones relacionadas)
     if provider:
         await _set_stage(meeting_id, "memory", 88)
         try:

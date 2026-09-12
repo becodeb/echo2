@@ -1,7 +1,34 @@
 """Resolución de configuración efectiva de IA por organización.
 
-Prioridad: settings de la organización (keys cifradas en DB) → defaults
-globales del entorno (.env). Nunca se expone la key completa al frontend.
+`resolve_llm` baja por CUATRO niveles y devuelve el primero que resuelve:
+
+  1. **Organización** (`OrgAISettings`, key cifrada en DB) — Ajustes → IA.
+  2. **Servidor** (`ServerAISettings`, fila única en DB) — el default de la
+     instalación que carga el superadmin en `/admin`. Va ANTES que el entorno
+     a propósito: es lo que permite cambiar la key sin redeploy.
+  3. **Entorno explícito** — `DEFAULT_LLM_PROVIDER` + `DEFAULT_LLM_MODEL`.
+  4. **Autodetección** — la primera key presente en el entorno, en orden fijo:
+     anthropic → openai → groq → openrouter → orcarouter → gmi → ollama.
+
+Si ninguno resuelve devuelve `None`: no hay IA configurada, y quien llama
+saltea la etapa en vez de simularla.
+
+Dos matices que sorprenden:
+
+- Elegir provider sin cargar key NO salta al nivel siguiente por sí solo: se
+  busca la key de ESE provider en el entorno (`_env_key_for`). Recién si no
+  hay ninguna se baja de nivel. O sea, el provider de la org se respeta
+  aunque la key venga del `.env`. `ollama` es la excepción: no necesita key.
+- `resolve_llm` con un `org_id` inexistente saltea el nivel 1 y devuelve el
+  default puro de la instalación. Es un truco deliberado, no un accidente:
+  lo usa el panel de admin para probar la conexión sin tomar prestada la
+  configuración de ninguna organización.
+
+Ojo: `resolve_stt` y `resolve_embeddings` NO miran `ServerAISettings`. Sólo
+tienen dos niveles (organización → entorno). El default del superadmin
+gobierna el LLM y nada más.
+
+Nunca se expone la key completa al frontend.
 """
 import uuid
 from dataclasses import dataclass

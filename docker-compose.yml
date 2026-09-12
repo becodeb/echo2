@@ -27,12 +27,28 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
       WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:5173}
       ECHO_ENV: ${ECHO_ENV:-development}
+      # Sesión: los defaults del código sirven, pero se exponen para poder
+      # bajarlos y probar la expiración del access token sin esperar 15 min.
+      ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-15}
+      REFRESH_TOKEN_DAYS: ${REFRESH_TOKEN_DAYS:-14}
+      # URL pública del API. Google OAuth y Drive la usan para armar el
+      # callback; sin esto el login con Google no cierra el círculo en local.
+      API_PUBLIC_URL: ${API_PUBLIC_URL:-http://localhost:8787}
+      # Superadmin: lista de emails separados por coma. Sin esto no hay forma
+      # de entrar al panel /admin en desarrollo.
+      SUPERADMIN_EMAILS: ${SUPERADMIN_EMAILS:-}
+      # Google (Login + Drive). Van las tres o no va ninguna.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
       DEFAULT_LLM_PROVIDER: ${DEFAULT_LLM_PROVIDER:-}
+      DEFAULT_LLM_MODEL: ${DEFAULT_LLM_MODEL:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      ORCAROUTER_API_KEY: ${ORCAROUTER_API_KEY:-}
       GMI_API_KEY: ${GMI_API_KEY:-}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
     ports:

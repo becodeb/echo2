@@ -688,8 +688,9 @@ function PrivacySection() {
           participantes sepan que la reunión está siendo transcripta.
         </p>
         <p>
-          <strong className="text-ink-800">Voice profiles:</strong> son opt-in y guardan solo un embedding
-          matemático de la voz (no audio). Se pueden eliminar en cualquier momento.
+          <strong className="text-ink-800">Identificación por voz:</strong> Echo <strong>no</strong> analiza
+          ni almacena características biométricas de la voz. Los hablantes se separan por los turnos que
+          informa el motor de transcripción y se identifican renombrándolos a mano.
         </p>
         <p>
           <strong className="text-ink-800">API keys:</strong> se guardan cifradas (Fernet/AES) y nunca se

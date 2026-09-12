@@ -21,6 +21,39 @@ y muestra:
 - 🟡 Bridge corriendo pero sin motor STT
 - ⚪ Echo Bridge no encontrado → se ofrece el modo cloud
 
+### ⚠️ Si usás Echo desde el dominio de producción, agregá ese origin
+
+Los `allowed_origins` por defecto (`apps/bridge/src/main.rs`, `default_origins`)
+son exactamente tres, todos locales:
+
+```
+http://localhost:5173    http://127.0.0.1:5173    http://localhost:4173
+```
+
+**El dominio de producción no está en esa lista.** Si abrís Echo desde el sitio
+deployado, el `POST /session` del bridge valida el header `Origin`, no lo
+encuentra en la allowlist y responde **403**. El bridge está corriendo, el
+motor está instalado, y aun así la web te va a ofrecer el modo cloud como si no
+hubiera bridge.
+
+Esto no es un bug: la allowlist es justamente lo que impide que una página
+cualquiera use tu micrófono y tu motor local. Pero hay que completarla a mano,
+una vez por máquina:
+
+```jsonc
+// %APPDATA%\echo-bridge\config.json  ·  ~/.config/echo-bridge/config.json
+{
+  "allowed_origins": [
+    "http://localhost:5173",
+    "https://echo.tu-dominio.com"   // ← agregá el tuyo
+  ]
+}
+```
+
+Reiniciá el bridge después de editarlo. Poné el origin exacto (esquema, host y
+puerto): `https://echo.tu-dominio.com` y `https://www.echo.tu-dominio.com` son
+orígenes distintos para esta validación.
+
 ## Configuración
 
 Primera ejecución crea `config.json` en:
