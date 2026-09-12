@@ -5,6 +5,8 @@ import { api } from "../api/client";
 import type { DriveStatusOut, ReasonOut } from "../api/types";
 import { Badge, Button, Card, Input, Modal, Spinner } from "../components/ui";
 import { useAuth } from "../state/auth";
+import { ACTA_ENTREVISTA_COLEGIO } from "../lib/actaTemplates";
+import { LetterheadSection } from "./settings/LetterheadSection";
 
 const SECTIONS = [
   { path: "org", label: "Organización" },
@@ -12,6 +14,7 @@ const SECTIONS = [
   { path: "reasons", label: "Motivos de reunión" },
   { path: "dictionary", label: "Diccionario" },
   { path: "template", label: "Formato de acta" },
+  { path: "letterhead", label: "Membrete" },
   { path: "drive", label: "Google Drive" },
   { path: "devices", label: "Dispositivos" },
   { path: "notifications", label: "Notificaciones" },
@@ -46,6 +49,7 @@ export default function Settings() {
             <Route path="reasons" element={<ReasonsSection />} />
             <Route path="dictionary" element={<DictionarySection />} />
             <Route path="template" element={<TemplateSection />} />
+            <Route path="letterhead" element={<LetterheadSection />} />
             <Route path="drive" element={<DriveSection />} />
             <Route path="devices" element={<DevicesSection />} />
             <Route path="notifications" element={<NotificationsSection />} />
@@ -476,6 +480,20 @@ function TemplateSection() {
         Este modelo es la <strong>source of truth</strong> del generador de actas: pegá acá el modelo real
         de tu organización (estructura, títulos, tablas, firmas) y Echo lo respetará al pie de la letra.
       </p>
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Button
+          variant="soft"
+          onClick={() => {
+            setName("Acta de entrevista");
+            setBody(ACTA_ENTREVISTA_COLEGIO);
+          }}
+        >
+          Cargar modelo: acta de entrevista (colegio)
+        </Button>
+        <span className="text-xs text-ink-400">
+          Alumno, curso, solicitada por, motivo, desarrollo, acuerdos y firmas. Ajustalo y guardalo.
+        </span>
+      </div>
       <div className="space-y-3">
         <Input label="Nombre de la plantilla" value={name} onChange={(event) => setName(event.target.value)} />
         <textarea

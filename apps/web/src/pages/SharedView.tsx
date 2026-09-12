@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { EchoFace } from "../components/EchoFace";
 import { Card, Spinner, formatDuration, formatMs } from "../components/ui";
-import { MarkdownView } from "./MeetingDetail";
+import { MarkdownView } from "../components/MarkdownView";
 
 interface SharedData {
   meeting: { title: string; started_at: string | null; duration_seconds: number };

@@ -3,7 +3,7 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +15,7 @@ from ..models import (
     MinutesTemplate,
     MinutesVersion,
     Notification,
+    Organization,
     OrganizationMember,
 )
 from ..services.ai_settings import resolve_llm
@@ -330,3 +331,82 @@ async def reset_template(
     template.is_provisional = True
     await db.commit()
     return {"ok": True}
+
+
+# ── Membrete: logo, institución, dirección, título y firmas ─────
+# Va en la organización y solo lo usa la hoja impresa (y los exports): el
+# generador no lo ve, así el LLM no puede inventar una dirección.
+
+LOGO_PREFIXES = (
+    "data:image/png;base64,",
+    "data:image/jpeg;base64,",
+    "data:image/jpg;base64,",
+    "data:image/webp;base64,",
+    "data:image/svg+xml;base64,",
+)
+LOGO_MAX_CHARS = 600_000  # unos 450 KB de imagen
+
+
+class LetterheadIn(BaseModel):
+    institution: str = Field(default="", max_length=200)
+    lines: list[str] = Field(default_factory=list, max_length=8)
+    address: str = Field(default="", max_length=300)
+    phone: str = Field(default="", max_length=60)
+    email: str = Field(default="", max_length=120)
+    title: str = Field(default="Acta de reunión", max_length=120)
+    signatures: list[str] = Field(default_factory=list, max_length=4)
+    logo_data_url: str | None = Field(default=None, max_length=LOGO_MAX_CHARS)
+
+    @field_validator("lines", "signatures")
+    @classmethod
+    def _sin_vacias(cls, value: list[str]) -> list[str]:
+        return [item.strip()[:120] for item in value if item and item.strip()]
+
+    @field_validator("logo_data_url")
+    @classmethod
+    def _logo_es_imagen(cls, value: str | None) -> str | None:
+        if not value:
+            return None
+        if not value.startswith(LOGO_PREFIXES):
+            raise ValueError("El logo tiene que ser una imagen PNG, JPG, WebP o SVG")
+        return value
+
+
+def _letterhead_out(org: Organization) -> dict:
+    data = dict(org.letterhead or {})
+    return {
+        "institution": data.get("institution") or org.name,
+        "lines": data.get("lines") or [],
+        "address": data.get("address") or "",
+        "phone": data.get("phone") or "",
+        "email": data.get("email") or "",
+        "title": data.get("title") or "Acta de reunión",
+        "signatures": data.get("signatures") if data.get("signatures") is not None else ["Firma", "Firma"],
+        "logo_data_url": data.get("logo_data_url") or None,
+    }
+
+
+@router.get("/api/org/letterhead")
+async def get_letterhead(
+    ctx: OrgContext = Depends(get_org_context), db: AsyncSession = Depends(get_db)
+):
+    org = await db.get(Organization, ctx.org_id)
+    if org is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Organización no encontrada")
+    return _letterhead_out(org)
+
+
+@router.put("/api/org/letterhead")
+async def update_letterhead(
+    data: LetterheadIn,
+    ctx: OrgContext = Depends(get_org_context),
+    db: AsyncSession = Depends(get_db),
+):
+    ctx.require_role("admin")
+    org = await db.get(Organization, ctx.org_id)
+    if org is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Organización no encontrada")
+    org.letterhead = data.model_dump()
+    await audit(db, ctx.org_id, ctx.user.id, "letterhead.update", "organization", str(org.id))
+    await db.commit()
+    return _letterhead_out(org)

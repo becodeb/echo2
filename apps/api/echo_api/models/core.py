@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, PKMixin, SoftDeleteMixin, TimestampMixin
@@ -42,6 +42,9 @@ class Organization(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
 
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     slug: Mapped[str] = mapped_column(String(80), unique=True, index=True, nullable=False)
+    # Membrete del acta impresa: institución, líneas de encabezado, dirección,
+    # contacto, título y logo como data URL. La forma la define el router.
+    letterhead: Mapped[dict | None] = mapped_column(JSONB)
 
     members: Mapped[list["OrganizationMember"]] = relationship(back_populates="organization")
 

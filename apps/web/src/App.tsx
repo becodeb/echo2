@@ -24,6 +24,7 @@ const Admin = lazy(() => import("./pages/Admin"));
 const Families = lazy(() => import("./pages/Families"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Landing = lazy(() => import("./pages/Landing"));
+const ActaPrint = lazy(() => import("./pages/ActaPrint"));
 
 function FullLoader() {
   return (
@@ -78,6 +79,17 @@ export default function App() {
 
   if (organizations.length === 0) {
     return <OnboardingOrg />;
+  }
+
+  // La hoja del acta para imprimir va sin el marco de la app.
+  if (/^\/meetings\/[^/]+\/acta$/.test(location.pathname)) {
+    return (
+      <Suspense fallback={<FullLoader />}>
+        <Routes>
+          <Route path="/meetings/:id/acta" element={<ActaPrint />} />
+        </Routes>
+      </Suspense>
+    );
   }
 
   return (

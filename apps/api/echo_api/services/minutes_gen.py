@@ -1,13 +1,14 @@
 """Generación y verificación de actas.
 
 Flujo: template (source of truth) + transcript + insights → LLM genera el acta
-→ ActaVerifier contrasta cada afirmación contra el transcript y anota el
-resultado. La regla crítica es NO INVENTAR: los campos sin información llevan
-"No especificado durante la reunión".
+→ se publica enseguida → ActaVerifier contrasta cada afirmación contra el
+transcript y anota el resultado. La regla crítica es NO INVENTAR: los campos
+sin información llevan "No especificado durante la reunión".
 
 El template default es PROVISIONAL y está marcado como tal: cuando el usuario
 cargue su modelo real de acta (Ajustes → Formato de acta), ese pasa a mandar.
 """
+import asyncio
 import json
 import logging
 import uuid
@@ -208,6 +209,10 @@ async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider) -> Non
         ai_settings = await get_org_ai_settings(db, org_id)
         language = ai_settings.minutes_language if ai_settings else meeting.language
 
+    # El pipeline no pasa por el endpoint de regenerar: sin esto la pantalla
+    # dice "todavía no hay acta" mientras el acta se está escribiendo.
+    await _mark_generating(meeting_id, org_id, template.id)
+
     transcript_text = transcript_to_text(lines)
     if len(transcript_text) > 28000:
         transcript_text = transcript_text[:28000] + "\n[transcript truncado para el prompt; los datos estructurados cubren el resto]"
@@ -265,9 +270,59 @@ Devolvé JSON:
     markdown = str(result["markdown"])
     claims = [c for c in (result.get("claims") or []) if isinstance(c, dict) and c.get("text")]
 
-    # ── Verificación contra el transcript ────────────────────────
-    verification = await _verify_claims(provider, claims, lines)
+    # ── Guardar primero: el acta se ve apenas existe ─────────────
+    # La verificación tarda (una consulta por afirmación) y no cambia el
+    # texto, así que corre después, con el acta ya publicada en "verifying".
+    version_id = await _store_version(meeting_id, org_id, template.id, markdown, provider)
 
+    # ── Verificación contra el transcript ────────────────────────
+    try:
+        verification = await _verify_claims(provider, claims, lines)
+    except Exception:  # noqa: BLE001 - el acta ya está; la verificación no la tira abajo
+        log.exception("falló la verificación del acta de %s", meeting_id)
+        verification = []
+
+    async with SessionLocal() as db:
+        row = await db.get(MinutesVersion, version_id)
+        if row is not None:
+            row.verification = verification
+        minutes = (
+            await db.execute(select(Minutes).where(Minutes.meeting_id == meeting_id))
+        ).scalar_one_or_none()
+        if minutes is not None and minutes.generation_status == "verifying":
+            minutes.generation_status = "ok"
+        await db.commit()
+
+
+async def _mark_generating(meeting_id: uuid.UUID, org_id: uuid.UUID, template_id: uuid.UUID) -> None:
+    """Deja la fila del acta en "generating" desde el primer momento."""
+    async with SessionLocal() as db:
+        minutes = (
+            await db.execute(select(Minutes).where(Minutes.meeting_id == meeting_id))
+        ).scalar_one_or_none()
+        if minutes is None:
+            minutes = Minutes(
+                meeting_id=meeting_id,
+                organization_id=org_id,
+                template_id=template_id,
+                status="draft",
+                current_version=0,
+            )
+            db.add(minutes)
+        minutes.generation_status = "generating"
+        minutes.generation_error = None
+        minutes.generation_started_at = datetime.now(UTC)
+        await db.commit()
+
+
+async def _store_version(
+    meeting_id: uuid.UUID,
+    org_id: uuid.UUID,
+    template_id: uuid.UUID,
+    markdown: str,
+    provider: LLMProvider,
+) -> uuid.UUID:
+    """Publica el acta como versión nueva y deja el estado en "verifying"."""
     async with SessionLocal() as db:
         minutes = (
             await db.execute(select(Minutes).where(Minutes.meeting_id == meeting_id))
@@ -276,7 +331,7 @@ Devolvé JSON:
             minutes = Minutes(
                 meeting_id=meeting_id,
                 organization_id=org_id,
-                template_id=template.id,
+                template_id=template_id,
                 status="draft",
                 current_version=0,
                 generation_status="generating",
@@ -285,65 +340,79 @@ Devolvé JSON:
             db.add(minutes)
             await db.flush()
         next_version = minutes.current_version + 1
-        db.add(
-            MinutesVersion(
-                minutes_id=minutes.id,
-                version=next_version,
-                body_markdown=markdown,
-                blocks=None,
-                verification=verification,
-                note="Generada automáticamente",
-                model_used=getattr(provider, "model", provider.name),
-            )
+        row = MinutesVersion(
+            minutes_id=minutes.id,
+            version=next_version,
+            body_markdown=markdown,
+            blocks=None,
+            verification=None,
+            note="Generada automáticamente",
+            model_used=getattr(provider, "model", provider.name),
         )
+        db.add(row)
+        await db.flush()
+        version_id = row.id
         minutes.current_version = next_version
-        minutes.generation_status = "ok"
+        minutes.generation_status = "verifying"
         minutes.generation_error = None
         await db.commit()
+        return version_id
 
 
 async def _verify_claims(provider: LLMProvider, claims: list[dict], lines: list[dict]) -> list[dict]:
-    """Verifica cada claim buscando primero por keyword y consultando al LLM."""
-    verification: list[dict] = []
-    for claim in claims[:30]:  # límite razonable de verificaciones por acta
+    """Verifica cada claim buscando primero por keyword y consultando al LLM.
+
+    Las consultas van en paralelo (de a cuatro) y el resultado conserva el
+    orden de las afirmaciones: treinta verificaciones en serie tardaban lo
+    mismo que treinta actas.
+    """
+    limite = asyncio.Semaphore(4)
+
+    async def verificar(claim: dict) -> dict | None:
         text = str(claim.get("text", "")).strip()
         if not text:
-            continue
+            return None
         # contexto: segmentos cercanos al timestamp + coincidencias léxicas
         context_lines = _claim_context(text, claim.get("approx_ms"), lines)
         if not context_lines:
-            verification.append({"claim": text, "status": "missing", "evidence_ms": None, "note": "sin coincidencias en el transcript"})
-            continue
+            return {
+                "claim": text,
+                "status": "missing",
+                "evidence_ms": None,
+                "note": "sin coincidencias en el transcript",
+            }
         context_text = transcript_to_text(context_lines)
-        try:
-            result = await provider.chat_json(
-                VERIFIER_SYSTEM,
-                [
-                    {
-                        "role": "user",
-                        "content": f"Afirmación: {text}\n\nFragmentos del transcript:\n{context_text}",
-                    }
-                ],
-                temperature=0.0,
-                max_tokens=400,
-            )
-        except LLMError:
-            result = {}
+        async with limite:
+            try:
+                result = await provider.chat_json(
+                    VERIFIER_SYSTEM,
+                    [
+                        {
+                            "role": "user",
+                            "content": f"Afirmación: {text}\n\nFragmentos del transcript:\n{context_text}",
+                        }
+                    ],
+                    temperature=0.0,
+                    max_tokens=400,
+                )
+            except LLMError:
+                result = {}
         status = result.get("status") if isinstance(result, dict) else None
         if status not in ("verified", "weak", "missing"):
             status = "weak"
         evidence_ms = result.get("evidence_ms") if isinstance(result, dict) else None
         if evidence_ms is None and context_lines:
             evidence_ms = context_lines[0]["start_ms"]
-        verification.append(
-            {
-                "claim": text,
-                "status": status,
-                "evidence_ms": evidence_ms,
-                "note": (result.get("note") if isinstance(result, dict) else None) or "",
-            }
-        )
-    return verification
+        return {
+            "claim": text,
+            "status": status,
+            "evidence_ms": evidence_ms,
+            "note": (result.get("note") if isinstance(result, dict) else None) or "",
+        }
+
+    # límite razonable de verificaciones por acta
+    resultados = await asyncio.gather(*(verificar(claim) for claim in claims[:30]))
+    return [item for item in resultados if item is not None]
 
 
 def _claim_context(claim_text: str, approx_ms, lines: list[dict], window: int = 6) -> list[dict]:

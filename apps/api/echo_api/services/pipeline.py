@@ -7,7 +7,8 @@ Al tocar "Finalizar" corre en background:
   4. resolución de fechas relativas
   5. embeddings del transcript (RAG)
   6. resúmenes (jerárquicos si la reunión es larga)
-  7. generación + verificación del acta
+  7. generación + verificación del acta (arranca en paralelo apenas hay
+     extracción: es lo primero que se quiere ver al terminar)
   8. actualización de la memoria organizacional
   9. sugerencia de reuniones relacionadas
  10. notificaciones
@@ -154,6 +155,16 @@ async def _run(meeting_id: uuid.UUID) -> None:
     else:
         skipped.append("insights:llm_no_configurado")
 
+    # 4. Acta: arranca apenas hay insights y corre en paralelo con embeddings y
+    #    resúmenes. Es lo primero que la persona quiere ver al terminar, así
+    #    que no espera a nada más. generate_minutes registra sus propias fallas.
+    minutes_task: asyncio.Task | None = None
+    if provider:
+        await _set_stage(meeting_id, "minutes", 30)
+        minutes_task = asyncio.create_task(generate_minutes(meeting_id, provider))
+    else:
+        skipped.append("minutes:llm_no_configurado")
+
     # 5. Embeddings para RAG
     if embeddings_config:
         await _set_stage(meeting_id, "embeddings", 45)
@@ -174,16 +185,15 @@ async def _run(meeting_id: uuid.UUID) -> None:
             log.warning("resumen fallo: %s", exc)
             skipped.append(f"summary:{exc}")
 
-    # 7. Acta (generación + verificación)
-    if provider:
-        await _set_stage(meeting_id, "minutes", 75)
+    # 7. Esperar el acta si todavía no terminó (generación + verificación)
+    if minutes_task is not None:
+        if not minutes_task.done():
+            await _set_stage(meeting_id, "minutes", 75)
         try:
-            await generate_minutes(meeting_id, provider)
-        except Exception as exc:
+            await minutes_task
+        except Exception as exc:  # noqa: BLE001 - generate_minutes ya dejó registrada la falla
             log.warning("acta fallo: %s", exc)
             skipped.append(f"minutes:{exc}")
-    else:
-        skipped.append("minutes:llm_no_configurado")
 
     # 8. Memoria organizacional
     if provider:

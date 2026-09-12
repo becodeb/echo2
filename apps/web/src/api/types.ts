@@ -165,8 +165,21 @@ export interface MinutesOut {
     created_by: string | null;
   } | null;
   versions: { version: number; note: string | null; created_at: string; model_used: string | null }[];
-  generation_status: "idle" | "generating" | "ok" | "failed";
+  // "verifying": el acta ya se puede leer e imprimir; falta la verificación.
+  generation_status: "idle" | "generating" | "verifying" | "ok" | "failed";
   generation_error: string | null;
+}
+
+/** Membrete del acta impresa (Ajustes → Membrete). */
+export interface LetterheadOut {
+  institution: string;
+  lines: string[];
+  address: string;
+  phone: string;
+  email: string;
+  title: string;
+  signatures: string[];
+  logo_data_url: string | null;
 }
 
 export interface FamilyMemberOut {
