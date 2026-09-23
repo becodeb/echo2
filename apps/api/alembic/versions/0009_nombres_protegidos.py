@@ -15,6 +15,11 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # 0001 hace create_all con los modelos actuales: en una base nueva la
+    # tabla ya existe cuando llega esta migración (misma guarda que 0004/0005).
+    inspector = sa.inspect(op.get_bind())
+    if "organization_protected_names" in set(inspector.get_table_names()):
+        return
     op.create_table(
         "organization_protected_names",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
