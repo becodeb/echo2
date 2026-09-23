@@ -12,7 +12,7 @@ import { Badge, Button, Card, EmptyState, Input, Spinner } from "../components/u
  * activa que aplique acá, y el superadmin no es miembro de las que administra.
  */
 
-const LLM_PROVIDERS = ["openai", "anthropic", "gemini", "groq", "openrouter", "orcarouter", "gmi", "ollama"];
+const LLM_PROVIDERS = ["openai", "anthropic", "gemini", "groq", "openrouter", "orcarouter", "gmi", "vercel", "deepseek", "ollama"];
 
 interface AIForm {
   llm_provider: string;

@@ -203,6 +203,8 @@ def _env_key_for(provider: str) -> str:
         "openrouter": env.openrouter_api_key,
         "gmi": env.gmi_api_key,
         "orcarouter": env.orcarouter_api_key,
+        "vercel": env.ai_gateway_api_key,
+        "deepseek": env.deepseek_api_key,
     }.get(provider, "")
 
 
@@ -213,12 +215,14 @@ def _env_default_model(provider: str) -> str:
 
 def _default_model(provider: str) -> str:
     return {
-        "openai": "gpt-4o-mini",
+        "openai": "gpt-5.5",
         "anthropic": "claude-sonnet-5",
         "gemini": "gemini-2.0-flash",
         "groq": "llama-3.3-70b-versatile",
         "openrouter": "anthropic/claude-sonnet-4.5",
         "gmi": "MiniMaxAI/MiniMax-M3",
         "orcarouter": "orcarouter/free",
+        "vercel": "deepseek/deepseek-v4-pro",
+        "deepseek": "deepseek-v4-pro",
         "ollama": "llama3.1",
     }.get(provider, "gpt-4o-mini")

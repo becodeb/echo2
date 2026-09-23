@@ -56,6 +56,13 @@ class Settings(BaseSettings):
     # desde la UI, se cambia acá y se reinicia.
     superadmin_emails: str = ""
 
+    # Alta automática por dominio: "dominio=slug-de-la-org", separados por
+    # coma. Quien entra con Google con un email verificado de ese dominio
+    # queda como miembro de esa organización sin pasar por una invitación.
+    # Solo Google: el registro con contraseña no verifica el email, y sin eso
+    # cualquiera se inventaría una casilla del colegio para entrar.
+    auto_join_domains: str = ""
+
     @property
     def google_enabled(self) -> bool:
         return bool(self.google_client_id and self.google_client_secret)
@@ -84,6 +91,9 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ""
     orcarouter_api_key: str = ""
     gmi_api_key: str = ""
+    # Vercel AI Gateway (OpenAI-compatible, cientos de modelos con una key).
+    ai_gateway_api_key: str = ""
+    deepseek_api_key: str = ""
     ollama_base_url: str = ""
 
     # Límites
@@ -98,6 +108,17 @@ class Settings(BaseSettings):
     @property
     def superadmin_email_list(self) -> list[str]:
         return [e.strip().lower() for e in self.superadmin_emails.split(",") if e.strip()]
+
+    @property
+    def auto_join_domain_map(self) -> dict[str, str]:
+        """{dominio: slug}. Las entradas mal formadas se ignoran."""
+        out: dict[str, str] = {}
+        for entry in self.auto_join_domains.split(","):
+            domain, sep, slug = entry.partition("=")
+            domain, slug = domain.strip().lower().lstrip("@"), slug.strip()
+            if sep and domain and slug:
+                out[domain] = slug
+        return out
 
     @model_validator(mode="after")
     def _check_production_secrets(self) -> "Settings":

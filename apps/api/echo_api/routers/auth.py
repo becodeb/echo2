@@ -118,6 +118,40 @@ async def _issue_refresh(db: AsyncSession, user: User, request: Request) -> str:
     return token
 
 
+async def join_domain_organizations(db: AsyncSession, user: User) -> None:
+    """Suma al usuario a la organización de su dominio (AUTO_JOIN_DOMAINS).
+
+    Solo para cuentas vinculadas a Google: es la única vía en la que Echo
+    sabe que el email es de quien dice ser. Entra como `member`; subirle el
+    rol sigue siendo decisión de un admin. No hace commit: lo hace quien llama.
+    """
+    if not user.google_sub:
+        return
+    domain = user.email.rsplit("@", 1)[-1].lower()
+    slug = get_settings().auto_join_domain_map.get(domain)
+    if not slug:
+        return
+    org = (
+        await db.execute(
+            select(Organization).where(Organization.slug == slug, Organization.deleted_at.is_(None))
+        )
+    ).scalar_one_or_none()
+    if org is None:
+        return
+    already = (
+        await db.execute(
+            select(OrganizationMember).where(
+                OrganizationMember.organization_id == org.id,
+                OrganizationMember.user_id == user.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if already:
+        return
+    db.add(OrganizationMember(organization_id=org.id, user_id=user.id, role="member"))
+    await audit(db, org.id, user.id, "org.domain_joined", "organization", str(org.id))
+
+
 async def _session_payload(db: AsyncSession, user: User) -> SessionOut:
     return SessionOut(
         access_token=create_access_token(str(user.id)),
@@ -207,6 +241,9 @@ async def refresh_session(request: Request, response: Response, db: AsyncSession
     # Rotación: revocar el token usado y emitir uno nuevo
     stored.revoked_at = now
     new_raw = await _issue_refresh(db, user, request)
+    # Acá y no solo en el login con Google: así también entran quienes ya
+    # tenían sesión abierta antes de que se configurara su dominio.
+    await join_domain_organizations(db, user)
     await db.commit()
 
     _set_refresh_cookie(response, new_raw)

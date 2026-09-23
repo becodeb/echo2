@@ -32,7 +32,7 @@ from ..config import Settings, get_settings
 from ..db import get_db
 from ..models import User
 from ..services.audit import audit
-from .auth import AVATAR_COLORS, _issue_refresh, _set_refresh_cookie
+from .auth import AVATAR_COLORS, _issue_refresh, _set_refresh_cookie, join_domain_organizations
 
 log = logging.getLogger("echo.auth.google")
 
@@ -197,6 +197,7 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
         return _back_to_login(settings, "cuenta_deshabilitada")
 
     refresh = await _issue_refresh(db, user, request)
+    await join_domain_organizations(db, user)
     await audit(
         db,
         None,

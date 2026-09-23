@@ -90,6 +90,60 @@ class TestProviderGMI:
         assert get_llm_provider("openai", "k", "gpt-4o-mini").omit_max_tokens is False
 
 
+class TestCadenaEntreProveedores:
+    def test_eslabon_de_otro_proveedor_usa_su_key_del_entorno(self, monkeypatch):
+        from echo_api.config import get_settings
+
+        monkeypatch.setattr(get_settings(), "openai_api_key", "sk-openai")
+        chain = get_llm_provider("deepseek", "sk-ds", "deepseek-v4-pro,openai:gpt-5.5")
+        first, second = chain.providers
+        assert (first.name, first.model, first.api_key) == ("deepseek", "deepseek-v4-pro", "sk-ds")
+        assert (second.name, second.model, second.api_key) == ("openai", "gpt-5.5", "sk-openai")
+
+    def test_eslabon_sin_key_se_saltea(self, monkeypatch):
+        from echo_api.config import get_settings
+
+        monkeypatch.setattr(get_settings(), "anthropic_api_key", "")
+        provider = get_llm_provider("deepseek", "k", "deepseek-v4-pro,anthropic:claude-sonnet-5")
+        assert (provider.name, provider.model) == ("deepseek", "deepseek-v4-pro")
+
+    def test_dos_puntos_de_ollama_no_cambian_de_proveedor(self):
+        chain = get_llm_provider("ollama", "", "llama3.1:8b,qwen3:4b")
+        assert [(p.name, p.model) for p in chain.providers] == [
+            ("ollama", "llama3.1:8b"),
+            ("ollama", "qwen3:4b"),
+        ]
+
+
+class TestModelosRazonadores:
+    def _payload(self, monkeypatch, model: str) -> dict:
+        import asyncio
+
+        import httpx
+
+        sent: dict = {}
+
+        async def fake_post(self, url, json=None, headers=None):
+            sent.update(json)
+            return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
+
+        monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
+        provider = get_llm_provider("openai", "k", model)
+        asyncio.run(provider.chat("sys", [{"role": "user", "content": "hola"}], 0.2, 1000))
+        return sent
+
+    def test_gpt5_manda_max_completion_tokens_y_sin_temperatura(self, monkeypatch):
+        payload = self._payload(monkeypatch, "gpt-5.5")
+        assert "temperature" not in payload and "max_tokens" not in payload
+        assert payload["max_completion_tokens"] > 1000
+        assert payload["reasoning_effort"] == "low"
+
+    def test_modelo_clasico_conserva_temperatura(self, monkeypatch):
+        payload = self._payload(monkeypatch, "gpt-4.1")
+        assert payload["temperature"] == 0.2 and payload["max_tokens"] == 1000
+        assert "reasoning_effort" not in payload
+
+
 class TestChunking:
     def test_split_sections_respeta_limite(self):
         lines = [

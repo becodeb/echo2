@@ -1,7 +1,7 @@
 """Abstracción LLMProvider.
 
 Un solo cliente OpenAI-compatible cubre OpenAI, Groq, OpenRouter, GMI Cloud,
-Ollama y Gemini (endpoint compatible); Anthropic tiene cliente propio. El modelo NUNCA
+Vercel AI Gateway, Ollama y Gemini (endpoint compatible); Anthropic tiene cliente propio. El modelo NUNCA
 está hardcodeado: viene de la configuración de la organización.
 """
 from __future__ import annotations
@@ -76,6 +76,17 @@ def parse_json_loose(text: str) -> dict | list:
         raise LLMError("El modelo no devolvió JSON válido")
 
 
+REASONING_TOKEN_MARGIN = 8000
+
+
+def is_reasoning_model(model: str) -> bool:
+    """GPT-5.x y serie o de OpenAI, también detrás de un gateway (`openai/gpt-5.5`)."""
+    name = (model or "").lower().rsplit("/", 1)[-1]
+    if "-chat" in name:
+        return False
+    return name.startswith("gpt-5") or bool(re.match(r"o\d", name))
+
+
 class OpenAICompatibleProvider(LLMProvider):
     def __init__(
         self,
@@ -100,10 +111,18 @@ class OpenAICompatibleProvider(LLMProvider):
         payload = {
             "model": self.model,
             "messages": [{"role": "system", "content": system}, *messages],
-            "temperature": temperature,
         }
-        if not self.omit_max_tokens and max_tokens is not None:
-            payload["max_tokens"] = max_tokens
+        if is_reasoning_model(self.model):
+            # GPT-5.x / o-series rechazan `max_tokens` y cualquier temperatura
+            # distinta de 1. El razonamiento consume del mismo techo, así que
+            # se le suma margen: sin eso vuelve 200 con el contenido vacío.
+            payload["reasoning_effort"] = "low"
+            if not self.omit_max_tokens and max_tokens is not None:
+                payload["max_completion_tokens"] = max_tokens + REASONING_TOKEN_MARGIN
+        else:
+            payload["temperature"] = temperature
+            if not self.omit_max_tokens and max_tokens is not None:
+                payload["max_tokens"] = max_tokens
         started = time.monotonic()
         try:
             async with httpx.AsyncClient(timeout=180) as client:
@@ -232,19 +251,45 @@ class FallbackLLMProvider(LLMProvider):
         raise LLMError(str(last))
 
 
+KNOWN_PROVIDERS = {
+    "openai", "anthropic", "gemini", "groq", "openrouter", "orcarouter", "gmi", "vercel",
+    "deepseek", "ollama",
+}
+
+
 def get_llm_provider(provider: str, api_key: str, model: str, base_url: str | None = None) -> LLMProvider:
     # Varios modelos separados por coma = cadena con reserva, en ese orden.
+    # Un eslabón puede ser de otro proveedor con `proveedor:modelo`
+    # (ej. "deepseek-v4-pro,openai:gpt-5.5"): usa la key de ese proveedor en
+    # el entorno. Así quedarse sin saldo en uno no deja la reunión sin acta.
     if "," in (model or ""):
         chain = [
-            _single_provider(provider, api_key, name.strip(), base_url)
+            _chain_link(provider, api_key, name.strip(), base_url)
             for name in model.split(",")
             if name.strip()
         ]
+        chain = [link for link in chain if link is not None]
         if len(chain) > 1:
             return FallbackLLMProvider(chain)
         if chain:
             return chain[0]
     return _single_provider(provider, api_key, model, base_url)
+
+
+def _chain_link(provider: str, api_key: str, name: str, base_url: str | None) -> LLMProvider | None:
+    prefix, sep, rest = name.partition(":")
+    # "llama3.1:8b" de Ollama también lleva dos puntos: solo cuenta como
+    # cambio de proveedor si el prefijo es un proveedor conocido.
+    if not sep or prefix.lower() not in KNOWN_PROVIDERS or prefix.lower() == (provider or "").lower():
+        model = rest if sep and prefix.lower() == (provider or "").lower() else name
+        return _single_provider(provider, api_key, model, base_url)
+    from ..ai_settings import _env_key_for
+
+    other_key = _env_key_for(prefix.lower())
+    if not other_key and prefix.lower() != "ollama":
+        log.warning("llm: %s sin key en el entorno, se saltea de la cadena", prefix)
+        return None
+    return _single_provider(prefix.lower(), other_key, rest, None)
 
 
 def _single_provider(provider: str, api_key: str, model: str, base_url: str | None = None) -> LLMProvider:
@@ -260,6 +305,14 @@ def _single_provider(provider: str, api_key: str, model: str, base_url: str | No
     if provider == "orcarouter":
         return OpenAICompatibleProvider(
             "orcarouter", base_url or "https://api.orcarouter.ai/v1", api_key, model
+        )
+    if provider == "deepseek":
+        return OpenAICompatibleProvider(
+            "deepseek", base_url or "https://api.deepseek.com/v1", api_key, model
+        )
+    if provider == "vercel":
+        return OpenAICompatibleProvider(
+            "vercel", base_url or "https://ai-gateway.vercel.sh/v1", api_key, model
         )
     if provider == "gmi":
         return OpenAICompatibleProvider(

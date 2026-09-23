@@ -37,6 +37,7 @@ services:
       # Superadmin: lista de emails separados por coma. Sin esto no hay forma
       # de entrar al panel /admin en desarrollo.
       SUPERADMIN_EMAILS: ${SUPERADMIN_EMAILS:-}
+      AUTO_JOIN_DOMAINS: ${AUTO_JOIN_DOMAINS:-}
       # Google (Login + Drive). Van las tres o no va ninguna.
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
@@ -49,6 +50,8 @@ services:
       DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       ORCAROUTER_API_KEY: ${ORCAROUTER_API_KEY:-}
+      AI_GATEWAY_API_KEY: ${AI_GATEWAY_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       GMI_API_KEY: ${GMI_API_KEY:-}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
     ports:
