@@ -1,0 +1,126 @@
+/* Formulario "Acta de entrevista": medidas tomadas del PDF del colegio (A4,
+ * Arial 12pt, renglones cada 20pt, membrete gris arriba a la izquierda).
+ * Se mide en pt/mm y no en px para que lo impreso coincida con el papel. */
+
+.entrevista-hoja {
+  page: entrevista;
+  box-sizing: border-box;
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 5mm 18mm 12mm 21mm;
+  background: #ffffff;
+  color: #000000;
+  font-family: Arial, Helvetica, "Liberation Sans", sans-serif;
+  font-size: 12pt;
+  line-height: 1.45;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 12px 40px rgba(16, 24, 40, 0.08);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  /* Si el acta pasa a una segunda hoja, esa hoja también lleva márgenes. */
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+/* :where() deja el reset en especificidad 0: si no, pisa los márgenes de
+ * cada fila y el formulario queda apelmazado. */
+.entrevista-hoja :where(p) { margin: 0; }
+.entrevista-hoja b { font-weight: 700; }
+
+.ent-membrete p {
+  font-size: 10.8pt;
+  line-height: 14pt;
+  color: #999999;
+}
+.ent-logo {
+  display: block;
+  margin: 12pt auto 0;
+  height: 29pt;
+  width: auto;
+}
+.ent-titulo {
+  margin: 12pt 0 0;
+  text-align: center;
+  font-size: 12pt;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.ent-fila {
+  display: flex;
+  align-items: baseline;
+  gap: 2pt;
+}
+.ent-fila:first-of-type { margin-top: 34pt; }
+.ent-solicitada { margin-top: 10pt; }
+.ent-motivo { margin-top: 15pt; }
+
+.ent-fill {
+  border-bottom: 1pt dotted #000000;
+  padding: 0 3pt;
+}
+.ent-vacio { display: inline-block; min-width: 60pt; }
+.ent-grow { flex: 1 1 auto; }
+.ent-curso { margin-left: 10pt; }
+.ent-corto { flex: 0 0 90pt; }
+
+.ent-checks {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 3pt;
+}
+.ent-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5pt;
+}
+.ent-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13pt;
+  height: 11pt;
+  border: 1pt solid #555555;
+  font-size: 10pt;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.ent-parrafo {
+  margin-top: 22pt;
+  line-height: 20pt;
+}
+
+/* El desarrollo va sobre renglones, como el "con____" del papel. La raya es
+ * el borde inferior de cada línea de 20pt, así el texto queda apoyado. */
+.ent-renglones {
+  line-height: 20pt;
+  background-image: linear-gradient(to bottom, transparent calc(20pt - 0.75pt), #000000 calc(20pt - 0.75pt));
+  background-size: 100% 20pt;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ent-renglones p + p { text-indent: 24pt; }
+
+.ent-firmas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140pt, 1fr));
+  gap: 36pt;
+  margin-top: 40pt;
+  break-inside: avoid;
+}
+.ent-firmas span {
+  padding-top: 5pt;
+  border-top: 1pt solid #000000;
+  text-align: center;
+  font-size: 10pt;
+}
+
+/* Sin márgenes del navegador: sin ellos tampoco salen la URL ni la fecha en
+ * los bordes, que en un acta firmada no van. Los márgenes los pone la hoja. */
+@page entrevista { size: A4; margin: 0; }
+
+@media print {
+  /* min-height de A4 exacto puede redondear y tirar una hoja en blanco. */
+  .entrevista-hoja { box-shadow: none; margin: 0; min-height: 0; }
+}

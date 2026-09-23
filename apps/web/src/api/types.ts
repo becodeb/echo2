@@ -158,6 +158,8 @@ export interface MinutesOut {
   version: {
     version: number;
     body_markdown: string;
+    /** Formulario del acta de entrevista; null en actas de texto libre. */
+    blocks: { kind: "entrevista"; fields: InterviewFields } | null;
     verification: { claim: string; status: string; evidence_ms: number | null; note: string }[] | null;
     note: string | null;
     model_used: string | null;
@@ -168,6 +170,21 @@ export interface MinutesOut {
   // "verifying": el acta ya se puede leer e imprimir; falta la verificación.
   generation_status: "idle" | "generating" | "verifying" | "ok" | "failed";
   generation_error: string | null;
+  /** Quien grabó la reunión (o un admin) puede confirmar el acta. */
+  can_confirm: boolean;
+}
+
+/** Campos del formulario "Acta de entrevista" del colegio. */
+export interface InterviewFields {
+  alumno: string;
+  curso: string;
+  solicitada_por: "familia" | "colegio" | "";
+  motivo: string;
+  /** ISO yyyy-mm-dd; de acá salen el día, el mes y el año del párrafo. */
+  fecha: string;
+  reunen: string;
+  con: string;
+  desarrollo: string;
 }
 
 /** Membrete del acta impresa (Ajustes → Membrete). */
@@ -180,6 +197,7 @@ export interface LetterheadOut {
   title: string;
   signatures: string[];
   logo_data_url: string | null;
+  interview_place: string;
 }
 
 export interface FamilyMemberOut {

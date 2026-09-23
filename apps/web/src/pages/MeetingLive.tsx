@@ -145,7 +145,8 @@ export default function MeetingLive() {
         case "status":
           if (event.status === "completed") {
             queryClient.invalidateQueries({ queryKey: ["meeting", id] });
-            navigate(`/meetings/${id}`);
+            // Al terminar, lo que sigue es revisar y confirmar el acta.
+            navigate(`/meetings/${id}?tab=minutes`);
           } else if (event.status === "failed") {
             setProcessing(null);
             setError("El procesamiento falló. Podés reintentar desde la página de la reunión.");

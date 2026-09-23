@@ -9,6 +9,7 @@ import { ClassificationPanel } from "../components/ClassificationPanel";
 import { Attachments } from "../components/Attachments";
 import { AnswerText } from "../components/AnswerText";
 import { MarkdownView } from "../components/MarkdownView";
+import { InterviewReview } from "../components/InterviewReview";
 
 const TABS = [
   { id: "summary", label: "Resumen" },
@@ -565,6 +566,56 @@ function MinutesTab({ meetingId }: { meetingId: string }) {
 
   const verification = minutes.version.verification ?? [];
   const weak = verification.filter((claim) => claim.status !== "verified");
+  const interview = minutes.version.blocks?.kind === "entrevista" ? minutes.version.blocks.fields : null;
+
+  // Acta de entrevista (formulario del colegio): se revisa campo por campo y
+  // la confirma quien grabó; recién ahí se imprime.
+  if (interview) {
+    return (
+      <div className="space-y-4">
+        {generating && !generationFailed && (
+          <div className="flex items-center gap-2 rounded-lg bg-ink-50 px-4 py-3 text-sm text-ink-600">
+            <Spinner /> Echo está redactando una versión nueva…
+          </div>
+        )}
+        <InterviewReview
+          key={minutes.version.version}
+          meetingId={meetingId}
+          minutes={minutes}
+          fields={interview}
+        />
+        {minutes.status !== "approved" && weak.length > 0 && (
+          <Card className="border-amber-200 bg-amber-50/50">
+            <h3 className="mb-2 text-sm font-semibold text-amber-800">
+              Antes de confirmar, revisá {weak.length === 1 ? "esta afirmación" : "estas afirmaciones"}: Echo no
+              {weak.length === 1 ? " la encontró clara" : " las encontró claras"} en la grabación
+            </h3>
+            <ul className="space-y-1.5 text-sm text-amber-800">
+              {weak.map((claim, index) => (
+                <li key={index}>
+                  ⚠ {claim.claim}
+                  {claim.evidence_ms != null && <span className="ml-2 font-mono text-xs">{formatMs(claim.evidence_ms)}</span>}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+        <div className="flex justify-end">
+          <Button
+            variant="ghost"
+            onClick={() => {
+              if (window.confirm("Echo va a redactar el acta de nuevo y se pierden las correcciones hechas a mano. ¿Seguir?")) {
+                regenerate.mutate();
+              }
+            }}
+            disabled={regenerate.isPending}
+          >
+            Volver a generar con IA
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

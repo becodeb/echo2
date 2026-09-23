@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { LetterheadOut, MeetingOut, MinutesOut } from "../api/types";
+import { InterviewSheet } from "../components/InterviewSheet";
 import { MarkdownView } from "../components/MarkdownView";
 import { Spinner, formatDate, formatDuration } from "../components/ui";
 import "./acta-print.css";
@@ -49,6 +50,7 @@ export default function ActaPrint() {
   }
 
   const version = minutes?.version ?? null;
+  const interview = version?.blocks?.kind === "entrevista" ? version.blocks.fields : null;
   const body = version?.body_markdown ?? "";
   // Si el modelo ya trae su propio título como encabezado, no lo repetimos.
   const bodyHasTitle = /^\s*#\s/.test(body);
@@ -68,6 +70,9 @@ export default function ActaPrint() {
         </div>
       </div>
 
+      {interview ? (
+        <InterviewSheet fields={interview} letterhead={letterhead} />
+      ) : (
       <article className="acta-hoja-print">
         <header className="acta-print-membrete">
           <div className="acta-print-lineas">
@@ -111,6 +116,7 @@ export default function ActaPrint() {
           {version?.version ? ` · versión ${version.version}` : ""} · Generada con Echo
         </p>
       </article>
+      )}
     </div>
   );
 }

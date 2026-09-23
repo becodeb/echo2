@@ -20,7 +20,10 @@ from ..db import SessionLocal
 from ..models import (
     ActionItem,
     Decision,
+    Family,
+    FamilyMember,
     Meeting,
+    MeetingReason,
     MeetingParticipant,
     MeetingTopic,
     Minutes,
@@ -28,6 +31,7 @@ from ..models import (
     MinutesVersion,
     Question,
 )
+from . import acta_entrevista
 from .llm import LLMError, LLMProvider
 from .transcript_util import format_ms, load_transcript_lines, transcript_to_text
 
@@ -209,6 +213,26 @@ async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider) -> Non
         ai_settings = await get_org_ai_settings(db, org_id)
         language = ai_settings.minutes_language if ai_settings else meeting.language
 
+        # Lo que se cargó a mano en la clasificación vale más que lo que el
+        # modelo pueda deducir del audio: va como pista explícita.
+        reason_name = None
+        if meeting.reason_id:
+            reason = await db.get(MeetingReason, meeting.reason_id)
+            reason_name = reason.name if reason else None
+        family_hint = None
+        if meeting.family_id:
+            family = await db.get(Family, meeting.family_id)
+            if family is not None:
+                members = (
+                    (await db.execute(select(FamilyMember).where(FamilyMember.family_id == family.id)))
+                    .scalars()
+                    .all()
+                )
+                family_hint = {
+                    "familia": family.name,
+                    "integrantes": [{"nombre": m.name, "vinculo": m.relationship_type} for m in members],
+                }
+
     # El pipeline no pasa por el endpoint de regenerar: sin esto la pantalla
     # dice "todavía no hay acta" mientras el acta se está escribiendo.
     await _mark_generating(meeting_id, org_id, template.id)
@@ -241,6 +265,44 @@ async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider) -> Non
         "pendientes": [q.text for q in questions if not q.resolved],
     }
 
+    if acta_entrevista.is_interview_template(template.body_markdown):
+        fecha = acta_entrevista.meeting_date(meeting.started_at or meeting.created_at)
+        hints = {**structured, "motivo_cargado": reason_name, "familia_cargada": family_hint}
+        result = await provider.chat_json(
+            acta_entrevista.GENERATOR_SYSTEM.format(language=language),
+            [
+                {
+                    "role": "user",
+                    "content": f"""{acta_entrevista.FIELDS_SPEC}
+
+DATOS DE LA REUNIÓN (lo "cargado" lo ingresó una persona: tiene prioridad):
+{json.dumps(hints, ensure_ascii=False, indent=1)}
+
+TRANSCRIPT (con timestamps [MM:SS] y hablantes):
+
+{transcript_text}
+
+Devolvé JSON:
+{{
+  "fields": {{"alumno": "", "curso": "", "solicitada_por": "", "motivo": "", "reunen": "", "con": "", "desarrollo": ""}},
+  "claims": [{{"text": "afirmación verificable del acta", "approx_ms": <int|null>}}]
+}}""",
+                }
+            ],
+            temperature=0.1,
+            max_tokens=8000,
+        )
+        if not isinstance(result, dict) or not isinstance(result.get("fields"), dict):
+            raise LLMError("El generador de actas no devolvió contenido")
+        fields = acta_entrevista.normalize_fields({**result["fields"], "fecha": fecha.isoformat()}, fecha)
+        if reason_name and not fields["motivo"]:
+            fields["motivo"] = reason_name
+        await _publish_and_verify(
+            meeting_id, org_id, template.id, acta_entrevista.render_markdown(fields),
+            acta_entrevista.to_blocks(fields), result, lines, provider,
+        )
+        return
+
     prompt = f"""MODELO DE ACTA (respetalo al pie de la letra):
 
 {template.body_markdown}
@@ -267,13 +329,27 @@ Devolvé JSON:
     if not isinstance(result, dict) or not result.get("markdown"):
         raise LLMError("El generador de actas no devolvió contenido")
 
-    markdown = str(result["markdown"])
+    await _publish_and_verify(
+        meeting_id, org_id, template.id, str(result["markdown"]), None, result, lines, provider
+    )
+
+
+async def _publish_and_verify(
+    meeting_id: uuid.UUID,
+    org_id: uuid.UUID,
+    template_id: uuid.UUID,
+    markdown: str,
+    blocks: dict | None,
+    result: dict,
+    lines: list[dict],
+    provider: LLMProvider,
+) -> None:
     claims = [c for c in (result.get("claims") or []) if isinstance(c, dict) and c.get("text")]
 
     # ── Guardar primero: el acta se ve apenas existe ─────────────
     # La verificación tarda (una consulta por afirmación) y no cambia el
     # texto, así que corre después, con el acta ya publicada en "verifying".
-    version_id = await _store_version(meeting_id, org_id, template.id, markdown, provider)
+    version_id = await _store_version(meeting_id, org_id, template_id, markdown, provider, blocks)
 
     # ── Verificación contra el transcript ────────────────────────
     try:
@@ -321,6 +397,7 @@ async def _store_version(
     template_id: uuid.UUID,
     markdown: str,
     provider: LLMProvider,
+    blocks: dict | None = None,
 ) -> uuid.UUID:
     """Publica el acta como versión nueva y deja el estado en "verifying"."""
     async with SessionLocal() as db:
@@ -344,7 +421,7 @@ async def _store_version(
             minutes_id=minutes.id,
             version=next_version,
             body_markdown=markdown,
-            blocks=None,
+            blocks=blocks,
             verification=None,
             note="Generada automáticamente",
             model_used=getattr(provider, "model", provider.name),

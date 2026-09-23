@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..deps import OrgContext, can_edit_meeting, get_meeting_or_404, get_org_context
+from ..deps import ROLE_ORDER, OrgContext, can_edit_meeting, get_meeting_or_404, get_org_context
 from ..models import (
     MeetingSummary,
     Minutes,
@@ -18,6 +18,7 @@ from ..models import (
     Organization,
     OrganizationMember,
 )
+from ..services import acta_entrevista
 from ..services.ai_settings import resolve_llm
 from ..services.audit import audit
 from ..services.llm import get_llm_provider
@@ -30,6 +31,9 @@ router = APIRouter(tags=["minutes"])
 class MinutesVersionOut(BaseModel):
     version: int
     body_markdown: str
+    # Campos del formulario cuando el acta es de entrevista (ver
+    # services/acta_entrevista.py); None para las actas de texto libre.
+    blocks: dict | None = None
     verification: list | None
     note: str | None
     model_used: str | None
@@ -48,6 +52,8 @@ class MinutesOut(BaseModel):
     # para saber si tiene que seguir esperando o mostrar el motivo de la falla.
     generation_status: str
     generation_error: str | None
+    # Quien grabó la reunión confirma su acta aunque no sea admin.
+    can_confirm: bool = False
 
 
 @router.get("/api/meetings/{meeting_id}/minutes", response_model=MinutesOut | None)
@@ -90,6 +96,7 @@ async def get_minutes(
         version=MinutesVersionOut(
             version=row.version,
             body_markdown=row.body_markdown,
+            blocks=row.blocks,
             verification=row.verification,
             note=row.note,
             model_used=row.model_used,
@@ -109,7 +116,13 @@ async def get_minutes(
         ],
         generation_status=minutes.generation_status,
         generation_error=minutes.generation_error,
+        can_confirm=_can_confirm(ctx, meeting),
     )
+
+
+def _can_confirm(ctx: OrgContext, meeting) -> bool:
+    """Confirma el acta un admin o quien grabó la reunión: es quien estuvo."""
+    return meeting.created_by == ctx.user.id or ROLE_ORDER.get(ctx.role, -1) >= ROLE_ORDER["admin"]
 
 
 @router.post("/api/meetings/{meeting_id}/minutes/generate", status_code=202)
@@ -158,7 +171,10 @@ async def regenerate_minutes(
 
 
 class MinutesEditIn(BaseModel):
-    body_markdown: str = Field(min_length=1)
+    # Con `fields` (acta de entrevista) el texto se arma en el servidor a
+    # partir de los campos y body_markdown se ignora.
+    body_markdown: str | None = Field(default=None, min_length=1)
+    fields: dict | None = None
     note: str | None = Field(default=None, max_length=300)
 
 
@@ -181,12 +197,23 @@ async def save_minutes_edit(
         )
         db.add(minutes)
         await db.flush()
+    blocks = None
+    body_markdown = data.body_markdown
+    if data.fields is not None:
+        fields = acta_entrevista.normalize_fields(
+            data.fields, acta_entrevista.meeting_date(meeting.started_at or meeting.created_at)
+        )
+        blocks = acta_entrevista.to_blocks(fields)
+        body_markdown = acta_entrevista.render_markdown(fields)
+    if not body_markdown:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "El acta no puede quedar vacía")
     next_version = minutes.current_version + 1
     db.add(
         MinutesVersion(
             minutes_id=minutes.id,
             version=next_version,
-            body_markdown=data.body_markdown,
+            body_markdown=body_markdown,
+            blocks=blocks,
             note=data.note or f"Editada por {ctx.user.name}",
             created_by=ctx.user.id,
         )
@@ -222,7 +249,10 @@ async def change_minutes_status(
     if not minutes:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No hay acta para esta reunión")
     if data.status == "approved":
-        ctx.require_role("admin")
+        if not _can_confirm(ctx, meeting):
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN, "Confirma el acta quien grabó la reunión o un admin"
+            )
         minutes.approved_by = ctx.user.id
         minutes.approved_at = datetime.now(UTC)
         # Solo se sube la versión aprobada: Drive queda con el acta definitiva
@@ -356,6 +386,9 @@ class LetterheadIn(BaseModel):
     title: str = Field(default="Acta de reunión", max_length=120)
     signatures: list[str] = Field(default_factory=list, max_length=4)
     logo_data_url: str | None = Field(default=None, max_length=LOGO_MAX_CHARS)
+    # Acta de entrevista: cómo se nombra el lugar en el párrafo fijo del
+    # formulario ("A los … días … en las instalaciones de {esto}, se reúnen…").
+    interview_place: str = Field(default="", max_length=400)
 
     @field_validator("lines", "signatures")
     @classmethod
@@ -383,6 +416,7 @@ def _letterhead_out(org: Organization) -> dict:
         "title": data.get("title") or "Acta de reunión",
         "signatures": data.get("signatures") if data.get("signatures") is not None else ["Firma", "Firma"],
         "logo_data_url": data.get("logo_data_url") or None,
+        "interview_place": data.get("interview_place") or "",
     }
 
 

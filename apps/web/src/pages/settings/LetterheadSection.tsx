@@ -117,6 +117,15 @@ export function LetterheadSection() {
           <Input label="Email" value={form.email} onChange={set("email")} />
         </div>
         <Input label="Título del acta" value={form.title} onChange={set("title")} placeholder="Acta de entrevista" />
+        <Input
+          label="Lugar en el acta de entrevista"
+          value={form.interview_place}
+          onChange={set("interview_place")}
+          placeholder="la institución educativa de nivel primario denominada …, registro de DIEGEP Nº …"
+        />
+        <p className="-mt-2 text-xs text-ink-400">
+          Completa el párrafo del formulario: «A los … días del mes de … en las instalaciones de <em>esto</em>, se reúnen…».
+        </p>
 
         <label className="block">
           <span className="mb-1.5 block text-sm font-medium text-ink-700">Firmas al pie (una por renglón)</span>

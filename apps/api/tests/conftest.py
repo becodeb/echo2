@@ -178,6 +178,22 @@ class SmartFakeLLM:
                     "detailed": "## Resumen\nLa reunión trató el presupuesto y la fecha de lanzamiento.",
                 }
             )
+        if "actas de entrevista" in system:
+            return json.dumps(
+                {
+                    "fields": {
+                        "alumno": "PEREZ, Tomás",
+                        "curso": "3N EP",
+                        "solicitada_por": "Colegio",
+                        "motivo": "Actitudinal",
+                        "reunen": "la Directora Ana",
+                        "con": "Marcos, padre del alumno",
+                        "desarrollo": "Se acuerda mover el lanzamiento al viernes.",
+                        "fecha": "1999-01-01",
+                    },
+                    "claims": [{"text": "El lanzamiento se mueve al viernes", "approx_ms": 7000}],
+                }
+            )
         if "generador de actas" in system:
             return json.dumps(
                 {
