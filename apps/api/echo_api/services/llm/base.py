@@ -123,6 +123,12 @@ class OpenAICompatibleProvider(LLMProvider):
             payload["temperature"] = temperature
             if not self.omit_max_tokens and max_tokens is not None:
                 payload["max_tokens"] = max_tokens
+        if self.name == "deepseek":
+            # DeepSeek V4 razona por defecto y el razonamiento sale del mismo
+            # max_tokens: el verificador (400 tokens) volvía vacío y la cadena
+            # caía siempre al modelo de reserva. Sin razonar el acta sale igual
+            # de bien (medido), en ~7s en vez de ~33s y con un cuarto de tokens.
+            payload["thinking"] = {"type": "disabled"}
         started = time.monotonic()
         try:
             async with httpx.AsyncClient(timeout=180) as client:
@@ -243,9 +249,10 @@ class FallbackLLMProvider(LLMProvider):
             except LLMError as exc:
                 last = exc
                 log.warning(
-                    "llm: %s (%s) fallo, %s",
+                    "llm: %s (%s) fallo: %s; %s",
                     getattr(provider, "model", provider.name),
                     provider.name,
+                    str(exc)[:200],
                     "probando el siguiente" if index + 1 < len(self.providers) else "no quedan más",
                 )
         raise LLMError(str(last))
