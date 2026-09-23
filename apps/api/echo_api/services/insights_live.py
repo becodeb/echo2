@@ -17,6 +17,7 @@ from .dates import resolve_relative_date
 from .insights_prompts import LIVE_EXTRACT_SYSTEM, build_live_extract_prompt
 from .live_bus import live_bus
 from .llm import LLMError, get_llm_provider
+from .privacy import protect
 from .transcript_util import load_transcript_lines, transcript_to_text
 
 log = logging.getLogger("echo.insights")
@@ -79,6 +80,8 @@ async def _extract(meeting_id: str) -> None:
         )
 
     provider = get_llm_provider(config.provider, config.api_key, config.model, config.base_url)
+    async with SessionLocal() as db:
+        provider = await protect(db, meeting.organization_id, provider, mid)
     window_text = transcript_to_text(lines)
     prompt = build_live_extract_prompt(window_text, list(existing_decisions), list(existing_tasks))
     try:

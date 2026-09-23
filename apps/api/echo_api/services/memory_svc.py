@@ -59,7 +59,7 @@ async def _get_or_create_entity(
     )
     if embeddings_config:
         try:
-            vectors = await embed_texts(embeddings_config, [f"{kind}: {name}"])
+            vectors = await embed_texts(embeddings_config, [f"{kind}: {name}"], org_id=org_id)
             entity.embedding = vectors[0]
         except Exception:
             pass

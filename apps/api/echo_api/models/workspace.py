@@ -288,3 +288,28 @@ class MemoryRelation(PKMixin, TimestampMixin, Base):
     happened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     evidence_start_ms: Mapped[int | None] = mapped_column(Integer)
     evidence_end_ms: Mapped[int | None] = mapped_column(Integer)
+
+
+class OrgProtectedName(PKMixin, TimestampMixin, Base):
+    """Nombres que nunca le llegan a la IA (ver services/privacy.py).
+
+    Es la nómina de la institución (alumnos, familias, personal) cargada para
+    reconocer nombres en el transcript y reemplazarlos por marcadores antes de
+    mandar texto a un proveedor externo. No se muestra en ninguna pantalla ni
+    sale de la base: existe solo para eso.
+    """
+
+    __tablename__ = "organization_protected_names"
+    __table_args__ = (Index("ix_org_protected_names_org", "organization_id"),)
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    # "MUNAFO, Allegra": apellidos antes de la coma, nombres después.
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    kind: Mapped[str] = mapped_column(String(20), default="persona")  # alumno|madre|padre|tutor|personal|persona
+    # Agrupa a una familia: nombrar a un integrante hace reconocibles al resto.
+    group_key: Mapped[str | None] = mapped_column(String(200))
+    extra: Mapped[dict | None] = mapped_column(JSONB)  # ej. {"curso": "1N EP"}
+    source: Mapped[str | None] = mapped_column(String(60))  # de dónde vino, para poder borrar un lote
+

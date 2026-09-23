@@ -18,6 +18,7 @@ from ..deps import OrgContext, get_meeting_or_404, get_org_context, rate_limit
 from ..models import ActionItem, Decision, Meeting, MeetingSummary, Question, Risk
 from ..services.ai_settings import resolve_embeddings, resolve_llm
 from ..services.llm import LLMError, get_llm_provider
+from ..services.privacy import protect
 from ..services.memory_svc import query_memory_entities
 from ..services.rag import retrieve_context
 from ..services.transcript_util import format_ms
@@ -281,8 +282,11 @@ async def _ask(
         }
     )
 
-    provider = get_llm_provider(
-        llm_config.provider, llm_config.api_key, llm_config.model, llm_config.base_url
+    provider = await protect(
+        db,
+        ctx.org_id,
+        get_llm_provider(llm_config.provider, llm_config.api_key, llm_config.model, llm_config.base_url),
+        meeting_id,
     )
     try:
         answer = await provider.chat(system, messages, temperature=llm_config.temperature)

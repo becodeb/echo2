@@ -6,6 +6,8 @@ preserva exactamente la similitud coseno entre vectores del mismo provider.
 """
 import logging
 
+import uuid
+
 import httpx
 
 from ..models import EMBEDDING_DIM
@@ -26,9 +28,20 @@ def _normalize(vector: list[float]) -> list[float]:
     return vector + [0.0] * (EMBEDDING_DIM - len(vector))
 
 
-async def embed_texts(config: EmbeddingsConfig, texts: list[str]) -> list[list[float]]:
+async def embed_texts(
+    config: EmbeddingsConfig, texts: list[str], *, org_id: uuid.UUID | None
+) -> list[list[float]]:
+    """`org_id` es obligatorio a propósito: con él, los nombres de esa
+    organización se reemplazan antes de salir (services/privacy.py). None solo
+    para texto que no es de nadie."""
     if not texts:
         return []
+    if org_id is not None and config.provider != "fake":
+        from ..db import SessionLocal
+        from .privacy import scrub_for_embeddings
+
+        async with SessionLocal() as db:
+            texts = await scrub_for_embeddings(db, org_id, texts)
     if config.provider == "openai":
         return await _openai_embed(config, texts)
     if config.provider == "ollama":

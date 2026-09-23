@@ -59,6 +59,7 @@ from .insights_prompts import (
 )
 from .live_bus import live_bus
 from .llm import LLMError, get_llm_provider
+from .privacy import protect
 from .memory_svc import update_memory_from_meeting
 from .minutes_gen import generate_minutes
 from .rag import embed_meeting_segments
@@ -147,6 +148,10 @@ async def _run(meeting_id: uuid.UUID) -> None:
         provider = get_llm_provider(
             llm_config.provider, llm_config.api_key, llm_config.model, llm_config.base_url
         )
+        # Todo lo que sigue (insights, acta, resumen, memoria) usa este
+        # provider: con él, ningún nombre le llega a la IA.
+        async with SessionLocal() as db:
+            provider = await protect(db, org_id, provider, meeting_id)
 
     # 2. Extracción estructurada final (+ resolución de fechas al persistir)
     insights: dict = {}

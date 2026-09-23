@@ -41,7 +41,9 @@ async def embed_meeting_segments(meeting_id: uuid.UUID, config: EmbeddingsConfig
         total = 0
         for start in range(0, len(rows), EMBED_BATCH):
             batch = rows[start : start + EMBED_BATCH]
-            vectors = await embed_texts(config, [segment.text for segment in batch])
+            vectors = await embed_texts(
+                config, [segment.text for segment in batch], org_id=batch[0].organization_id
+            )
             for segment, vector in zip(batch, vectors):
                 segment.embedding = vector
             total += len(batch)
@@ -195,7 +197,7 @@ async def retrieve_context(
     seen: set[str] = set()
     if embeddings_config:
         try:
-            vectors = await embed_texts(embeddings_config, [question])
+            vectors = await embed_texts(embeddings_config, [question], org_id=org_id)
             semantic = await semantic_search_segments(
                 db, org_id, vectors[0], limit=limit, meeting_id=meeting_id
             )

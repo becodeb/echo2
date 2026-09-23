@@ -22,6 +22,7 @@ from ..services import acta_entrevista
 from ..services.ai_settings import resolve_llm
 from ..services.audit import audit
 from ..services.llm import get_llm_provider
+from ..services.privacy import protect
 from ..services.drive import upload_minutes
 from ..services.minutes_gen import DEFAULT_TEMPLATE, generate_minutes, get_active_template
 
@@ -140,8 +141,11 @@ async def regenerate_minutes(
         raise HTTPException(
             status.HTTP_409_CONFLICT, "No hay modelo de IA configurado (Ajustes → IA)"
         )
-    provider = get_llm_provider(
-        llm_config.provider, llm_config.api_key, llm_config.model, llm_config.base_url
+    provider = await protect(
+        db,
+        ctx.org_id,
+        get_llm_provider(llm_config.provider, llm_config.api_key, llm_config.model, llm_config.base_url),
+        meeting.id,
     )
 
     # La fila se marca como "generating" acá y no dentro de la tarea: si no,

@@ -49,6 +49,7 @@ from .workspace import (
     Notification,
     OrgAISettings,
     OrgDictionaryEntry,
+    OrgProtectedName,
     Project,
     ProjectMeeting,
     SharedLink,
@@ -66,6 +67,6 @@ __all__ = [
     "MeetingTopic", "Decision", "ActionItem", "Question", "Risk", "MeetingSummary",
     "Minutes", "MinutesVersion", "MinutesTemplate",
     "Project", "ProjectMeeting", "Comment", "SharedLink", "MeetingShare",
-    "Device", "DevicePairCode", "OrgAISettings", "OrgDictionaryEntry",
+    "Device", "DevicePairCode", "OrgAISettings", "OrgDictionaryEntry", "OrgProtectedName",
     "AuditLog", "Notification", "MemoryEntity", "MemoryRelation",
 ]
