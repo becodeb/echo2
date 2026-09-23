@@ -303,7 +303,9 @@ Devolvé JSON:
         student = pseudonymizer.person_for_token_text(fields["alumno"]) if pseudonymizer else None
         if student is not None:
             fields["alumno"] = student.formal or student.display
-            if not fields["curso"] and student.extra.get("curso"):
+            # El curso de la nómina ("1F EP") gana sobre cómo se dijo en voz
+            # alta ("primero F"): es el formato del registro del colegio.
+            if student.extra.get("curso"):
                 fields["curso"] = str(student.extra["curso"])
         await _publish_and_verify(
             meeting_id, org_id, template.id, acta_entrevista.render_markdown(fields),

@@ -115,3 +115,12 @@ def test_meses_no_se_censuran_aunque_sean_nombres():
     assert pseudo.apply("Nos vemos el 3 de Abril.") == "Nos vemos el 3 de Abril."
     # Con apellido sí: ahí es la persona.
     assert pseudo.apply("Vino Abril Garcia.") == "Vino [ALUMNO_1]."
+
+
+def test_nombre_de_pila_compuesto_se_reconoce_entero():
+    madre = Person.parse("Castro, Maria Del Pilar", "madre", "FLIA. ALOISE (Castro)")
+    assert madre.display == "Maria del Pilar Castro"
+    pseudo = Pseudonymizer([madre, Person.parse("PEREZ, Maria", "alumno")])
+    safe = pseudo.apply("Hola, soy Maria del Pilar, la mamá.")
+    assert safe == "Hola, soy [MADRE_1], la mamá."
+    assert pseudo.restore("la Sra. [MADRE_1]") == "la Sra. Maria del Pilar Castro"

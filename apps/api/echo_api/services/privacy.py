@@ -92,6 +92,13 @@ _DATE = re.compile(r"^\d{1,2}[-.]\d{1,2}[-.]\d{2,4}$")
 _TOKEN = re.compile(r"\[?\b(" + "|".join(ALL_LABELS) + r")_(\d+)\b\]?", re.IGNORECASE)
 
 
+def _nice(word: str) -> str:
+    """"MUNAFO" → "Munafo", "Del" → "del": como se escribe en un acta."""
+    if fold(word) in {"de", "del", "la", "las", "los", "y"}:
+        return word.lower()
+    return word.title() if word.isupper() else word
+
+
 def fold(text: str) -> str:
     """minúsculas y sin tildes: "Muñoz" y "munoz" son la misma clave."""
     decomposed = unicodedata.normalize("NFKD", text)
@@ -119,8 +126,7 @@ class Person:
         if "," in name:
             last, _, first = (part.strip() for part in name.partition(","))
             surnames, first_names = last.split(), first.split()
-            display = " ".join([*(w.capitalize() if w.isupper() else w for w in first_names),
-                                *(w.title() if w.isupper() else w for w in surnames)])
+            display = " ".join(_nice(w) for w in [*first_names, *surnames])
             return cls(display=display, kind=kind, group=group, formal=name, extra=extra or {},
                        first_names=first_names, surnames=surnames)
         words = name.split()
@@ -131,6 +137,11 @@ class Person:
         """Secuencias de palabras que nombran a la persona sin ambigüedad."""
         first, last = self.first_names, self.surnames
         variants = [self.display.split()]
+        # Nombre de pila compuesto ("Maria del Pilar", "Feliciano Italo"): se
+        # reconoce entero; si no, "Pilar" se reemplaza solo y queda "Maria del
+        # [MADRE_1]", que al restaurar duplica el nombre.
+        if len(first) >= 2:
+            variants.append(first)
         if first and last:
             variants += [
                 [*first, *last], [*last, *first], [first[0], *last], [*last, first[0]],
