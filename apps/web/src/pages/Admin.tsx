@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { AdminOrgOut, ServerAIOut, ServerAITestOut } from "../api/types";
+import { Select } from "../components/Select";
 import { Badge, Button, Card, EmptyState, Input, Spinner } from "../components/ui";
 
 /**
@@ -13,6 +14,7 @@ import { Badge, Button, Card, EmptyState, Input, Spinner } from "../components/u
  */
 
 const LLM_PROVIDERS = ["openai", "anthropic", "gemini", "groq", "openrouter", "orcarouter", "gmi", "vercel", "deepseek", "ollama"];
+const PROVIDER_OPTIONS = LLM_PROVIDERS.map((provider) => ({ value: provider, label: provider }));
 
 interface AIForm {
   llm_provider: string;
@@ -96,23 +98,12 @@ function OrgRow({ org }: { org: AdminOrgOut }) {
       {open && (
         <div className="space-y-4 border-t border-ink-100 pt-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-ink-700">Proveedor</span>
-              <select
-                value={form.llm_provider}
-                onChange={(event) =>
-                  setForm({ ...form, llm_provider: event.target.value })
-                }
-                className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm"
-              >
-                <option value="">— usar default del servidor —</option>
-                {LLM_PROVIDERS.map((provider) => (
-                  <option key={provider} value={provider}>
-                    {provider}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <Select
+              label="Proveedor"
+              value={form.llm_provider}
+              onChange={(next) => setForm({ ...form, llm_provider: next })}
+              options={[{ value: "", label: "Usar default del servidor" }, ...PROVIDER_OPTIONS]}
+            />
             <Input
               label="Modelo"
               placeholder="ej: gpt-4o-mini, anthropic/claude-sonnet-4.5"
@@ -231,21 +222,12 @@ function ServerDefaultCard() {
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <label className="block">
-          <span className="mb-1.5 block text-sm font-medium text-ink-700">Proveedor</span>
-          <select
-            value={form.llm_provider}
-            onChange={(event) => setForm({ ...form, llm_provider: event.target.value })}
-            className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm"
-          >
-            <option value="">— sin default —</option>
-            {LLM_PROVIDERS.map((provider) => (
-              <option key={provider} value={provider}>
-                {provider}
-              </option>
-            ))}
-          </select>
-        </label>
+        <Select
+          label="Proveedor"
+          value={form.llm_provider}
+          onChange={(next) => setForm({ ...form, llm_provider: next })}
+          options={[{ value: "", label: "Sin default" }, ...PROVIDER_OPTIONS]}
+        />
         <Input
           label="Modelo"
           placeholder="ej: Qwen/Qwen3.8-Max-0902"
@@ -315,20 +297,22 @@ export default function Admin() {
 
   if (isError) {
     return (
-      <Card>
-        <EmptyState title="No se pudo cargar el panel" mood="error">
-          <p>{error instanceof Error ? error.message : "Probá de nuevo en un momento."}</p>
-        </EmptyState>
-      </Card>
+      <div className="mx-auto max-w-4xl px-6 py-10">
+        <Card>
+          <EmptyState title="No se pudo cargar el panel" mood="error">
+            <p>{error instanceof Error ? error.message : "Probá de nuevo en un momento."}</p>
+          </EmptyState>
+        </Card>
+      </div>
     );
   }
 
   const sinIA = (orgs ?? []).filter((org) => !org.llm_provider).length;
 
   return (
-    <div className="space-y-5">
+    <div className="mx-auto max-w-4xl space-y-5 px-6 py-10">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight text-ink-900">Organizaciones</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-ink-900">Organizaciones</h1>
         <p className="mt-1 text-sm text-ink-500">
           Todas las organizaciones de esta instalación y el modelo de IA que usa cada una.
         </p>

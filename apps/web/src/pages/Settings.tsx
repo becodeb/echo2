@@ -3,6 +3,7 @@ import { NavLink, Navigate, Route, Routes, useSearchParams } from "react-router-
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { DriveStatusOut, ReasonOut } from "../api/types";
+import { Select } from "../components/Select";
 import { Badge, Button, Card, Input, Modal, Spinner } from "../components/ui";
 import { useAuth } from "../state/auth";
 import { ACTA_ENTREVISTA_COLEGIO } from "../lib/actaTemplates";
@@ -126,15 +127,17 @@ function OrgSection() {
               required
             />
           </div>
-          <select
+          <Select
+            ariaLabel="Rol"
             value={inviteRole}
-            onChange={(event) => setInviteRole(event.target.value)}
-            className="rounded-lg border border-ink-200 px-3 py-2 text-sm"
-          >
-            <option value="member">Member</option>
-            <option value="admin">Admin</option>
-            <option value="viewer">Viewer</option>
-          </select>
+            onChange={setInviteRole}
+            options={[
+              { value: "member", label: "Member" },
+              { value: "admin", label: "Admin" },
+              { value: "viewer", label: "Viewer" },
+            ]}
+            className="w-32 shrink-0"
+          />
           <Button type="submit" disabled={invite.isPending}>
             {invite.isPending ? <Spinner /> : "Invitar"}
           </Button>
@@ -245,6 +248,11 @@ function AISection() {
 
   const set = (key: string) => (event: { target: { value: string } }) =>
     setForm((current) => ({ ...current, [key]: event.target.value }));
+  const pick = (key: string) => (value: string) => setForm((current) => ({ ...current, [key]: value }));
+  const providerOptions = (providers: string[], label = (provider: string) => provider) => [
+    { value: "", label: "Usar default del servidor" },
+    ...providers.map((provider) => ({ value: provider, label: label(provider) })),
+  ];
 
   if (!settings) return <div className="flex justify-center py-10 text-ink-300"><Spinner /></div>;
 
@@ -263,15 +271,12 @@ function AISection() {
           La API key se guarda cifrada y nunca vuelve completa al navegador.
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-ink-700">Proveedor</span>
-            <select value={form.llm_provider ?? ""} onChange={set("llm_provider")} className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm">
-              <option value="">— usar default del servidor —</option>
-              {settings.available.llm_providers.map((provider) => (
-                <option key={provider} value={provider}>{provider}</option>
-              ))}
-            </select>
-          </label>
+          <Select
+            label="Proveedor"
+            value={form.llm_provider ?? ""}
+            onChange={pick("llm_provider")}
+            options={providerOptions(settings.available.llm_providers)}
+          />
           <Input label="Modelo" placeholder="ej: claude-sonnet-5, gpt-4o-mini" value={form.llm_model ?? ""} onChange={set("llm_model")} />
           <Input
             label={`API key ${settings.llm_api_key_masked ? `(actual: ${settings.llm_api_key_masked})` : ""}`}
@@ -293,15 +298,14 @@ function AISection() {
           temporalmente el audio al proveedor seleccionado y lo descarta al transcribir.
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-ink-700">Proveedor</span>
-            <select value={form.stt_provider ?? ""} onChange={set("stt_provider")} className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm">
-              <option value="">— usar default del servidor —</option>
-              {settings.available.stt_providers.map((provider) => (
-                <option key={provider} value={provider}>{provider === "bridge" ? "bridge (solo local)" : provider}</option>
-              ))}
-            </select>
-          </label>
+          <Select
+            label="Proveedor"
+            value={form.stt_provider ?? ""}
+            onChange={pick("stt_provider")}
+            options={providerOptions(settings.available.stt_providers, (provider) =>
+              provider === "bridge" ? "bridge (solo local)" : provider,
+            )}
+          />
           <Input
             label="Modelo"
             placeholder="whisper-1 · gpt-4o-transcribe-diarize (separa hablantes)"
@@ -323,15 +327,12 @@ function AISection() {
         <h2 className="mb-1 font-semibold text-ink-900">Embeddings (búsqueda semántica y RAG)</h2>
         <ActiveBadge active={settings.effective.embeddings} />
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-ink-700">Proveedor</span>
-            <select value={form.embeddings_provider ?? ""} onChange={set("embeddings_provider")} className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm">
-              <option value="">— usar default del servidor —</option>
-              {settings.available.embedding_providers.map((provider) => (
-                <option key={provider} value={provider}>{provider}</option>
-              ))}
-            </select>
-          </label>
+          <Select
+            label="Proveedor"
+            value={form.embeddings_provider ?? ""}
+            onChange={pick("embeddings_provider")}
+            options={providerOptions(settings.available.embedding_providers)}
+          />
           <Input
             label={`API key ${settings.embeddings_api_key_masked ? `(actual: ${settings.embeddings_api_key_masked})` : ""}`}
             type="password"
@@ -345,11 +346,17 @@ function AISection() {
 
       <Card>
         <h2 className="mb-3 font-semibold text-ink-900">Idioma del acta</h2>
-        <select value={form.minutes_language ?? "es"} onChange={set("minutes_language")} className="rounded-lg border border-ink-200 px-3 py-2 text-sm">
-          <option value="es">Español</option>
-          <option value="en">English</option>
-          <option value="pt">Português</option>
-        </select>
+        <Select
+          ariaLabel="Idioma del acta"
+          value={form.minutes_language ?? "es"}
+          onChange={pick("minutes_language")}
+          options={[
+            { value: "es", label: "Español" },
+            { value: "en", label: "English" },
+            { value: "pt", label: "Português" },
+          ]}
+          className="w-48"
+        />
         <p className="mt-2 text-xs text-ink-400">Puede diferir del idioma hablado en la reunión.</p>
       </Card>
 
@@ -406,21 +413,27 @@ function DictionarySection() {
           event.preventDefault();
           if (term.trim()) add.mutate();
         }}
-        className="mb-4 flex gap-2"
+        className="mb-4 flex flex-wrap gap-2"
       >
         <input
           value={term}
           onChange={(event) => setTerm(event.target.value)}
           placeholder="ej: DOE, Testra, Typely"
-          className="flex-1 rounded-lg border border-ink-200 px-3 py-2 text-sm focus:border-accent-500 focus:outline-none"
+          className="min-w-[180px] flex-1 rounded-lg border border-ink-200 px-3 py-2 text-sm focus:border-accent-500 focus:outline-none"
         />
-        <select value={kind} onChange={(event) => setKind(event.target.value)} className="rounded-lg border border-ink-200 px-2 py-2 text-sm">
-          <option value="term">Término</option>
-          <option value="person">Persona</option>
-          <option value="product">Producto</option>
-          <option value="acronym">Sigla</option>
-          <option value="vendor">Proveedor</option>
-        </select>
+        <Select
+          ariaLabel="Tipo"
+          value={kind}
+          onChange={setKind}
+          options={[
+            { value: "term", label: "Término" },
+            { value: "person", label: "Persona" },
+            { value: "product", label: "Producto" },
+            { value: "acronym", label: "Sigla" },
+            { value: "vendor", label: "Proveedor" },
+          ]}
+          className="w-36 shrink-0"
+        />
         <Button type="submit" disabled={add.isPending}>Agregar</Button>
       </form>
       <div className="flex flex-wrap gap-2">

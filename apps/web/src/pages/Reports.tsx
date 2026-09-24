@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, type ReactNode } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { ReportOut } from "../api/types";
+import { Select } from "../components/Select";
 import { Badge, Card, EmptyState, Spinner } from "../components/ui";
 
 /**
@@ -40,6 +41,18 @@ function Stat({ value, label }: { value: number | string; label: string }) {
   );
 }
 
+const PERIODS = [
+  { value: "3", label: "Últimos 3 meses" },
+  { value: "6", label: "Últimos 6 meses" },
+  { value: "12", label: "Últimos 12 meses" },
+  { value: "36", label: "Últimos 3 años" },
+];
+
+/** Mismo contenedor que el resto de las páginas: ancho acotado y centrado. */
+function Page({ children }: { children: ReactNode }) {
+  return <div className="mx-auto max-w-5xl space-y-5 px-6 py-10">{children}</div>;
+}
+
 function Bar({ value, max, tone }: { value: number; max: number; tone: string }) {
   const width = max > 0 ? Math.max(2, Math.round((value / max) * 100)) : 0;
   return (
@@ -59,30 +72,56 @@ export default function Reports() {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["report", dateFrom],
     queryFn: () => api<ReportOut>(`/api/reports/overview?date_from=${dateFrom}`),
+    // Al cambiar el período se sigue viendo el anterior hasta que llega el nuevo.
+    placeholderData: keepPreviousData,
   });
+
+  const header = (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-ink-900">Reportes</h1>
+        {data && (
+          <p className="mt-1 text-sm text-ink-500">
+            Del {data.range_from} al {data.range_to}
+          </p>
+        )}
+      </div>
+      <Select
+        ariaLabel="Período"
+        value={String(months)}
+        onChange={(next) => setMonths(Number(next))}
+        options={PERIODS}
+        className="w-48"
+      />
+    </div>
+  );
 
   if (isLoading) {
     return (
-      <div className="flex justify-center py-16 text-ink-300">
-        <Spinner className="h-6 w-6" />
-      </div>
+      <Page>
+        <div className="flex justify-center py-16 text-ink-300">
+          <Spinner className="h-6 w-6" />
+        </div>
+      </Page>
     );
   }
 
   if (isError || !data) {
     return (
-      <Card>
-        <EmptyState title="No se pudo armar el reporte" mood="error">
-          <p>{error instanceof Error ? error.message : "Probá de nuevo en un momento."}</p>
-        </EmptyState>
-      </Card>
+      <Page>
+        <Card>
+          <EmptyState title="No se pudo armar el reporte" mood="error">
+            <p>{error instanceof Error ? error.message : "Probá de nuevo en un momento."}</p>
+          </EmptyState>
+        </Card>
+      </Page>
     );
   }
 
   if (data.totals.meetings === 0) {
     return (
-      <div className="space-y-5">
-        <h1 className="text-xl font-semibold tracking-tight text-ink-900">Reportes</h1>
+      <Page>
+        {header}
         <Card>
           <EmptyState title="Todavía no hay reuniones en este período" mood="idle">
             <p>
@@ -91,7 +130,7 @@ export default function Reports() {
             </p>
           </EmptyState>
         </Card>
-      </div>
+      </Page>
     );
   }
 
@@ -102,25 +141,8 @@ export default function Reports() {
     data.attendance.complete + data.attendance.incomplete + data.attendance.unknown;
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-ink-900">Reportes</h1>
-          <p className="mt-1 text-sm text-ink-500">
-            Del {data.range_from} al {data.range_to}
-          </p>
-        </div>
-        <select
-          value={months}
-          onChange={(event) => setMonths(Number(event.target.value))}
-          className="rounded-lg border border-ink-200 px-3 py-2 text-sm"
-        >
-          <option value={3}>Últimos 3 meses</option>
-          <option value={6}>Últimos 6 meses</option>
-          <option value={12}>Últimos 12 meses</option>
-          <option value={36}>Últimos 3 años</option>
-        </select>
-      </div>
+    <Page>
+      {header}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat value={data.totals.meetings} label="Reuniones" />
@@ -304,6 +326,6 @@ export default function Reports() {
           </div>
         )}
       </Card>
-    </div>
+    </Page>
   );
 }

@@ -5,6 +5,7 @@ import { api, getAccessToken, wsUrl } from "../api/client";
 import type { LiveEvent, MeetingOut } from "../api/types";
 import { MicrophoneSource, SystemAudioSource, listMicrophones, type AudioSource } from "../lib/audio";
 import { BridgeSttSession, checkBridge, type BridgeHealth } from "../lib/bridge";
+import { Select } from "../components/Select";
 import { Button, Modal, Spinner, formatMs } from "../components/ui";
 import { EchoFace, type EchoMood } from "../components/EchoFace";
 
@@ -484,21 +485,18 @@ export default function MeetingLive() {
               </div>
 
               <div className="w-full space-y-3 rounded-2xl border border-ink-100 bg-white p-5 text-left shadow-sm">
-                <label className="block">
-                  <span className="mb-1.5 block text-sm font-medium text-ink-700">Micrófono</span>
-                  <select
-                    value={deviceId}
-                    onChange={(event) => setDeviceId(event.target.value)}
-                    className="w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm"
-                  >
-                    <option value="">Micrófono predeterminado</option>
-                    {micDevices.map((device) => (
-                      <option key={device.deviceId} value={device.deviceId}>
-                        {device.label || `Micrófono ${device.deviceId.slice(0, 6)}`}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <Select
+                  label="Micrófono"
+                  value={deviceId}
+                  onChange={setDeviceId}
+                  options={[
+                    { value: "", label: "Micrófono predeterminado" },
+                    ...micDevices.map((device) => ({
+                      value: device.deviceId,
+                      label: device.label || `Micrófono ${device.deviceId.slice(0, 6)}`,
+                    })),
+                  ]}
+                />
 
                 <label className="flex items-center gap-2 text-sm text-ink-600">
                   <input

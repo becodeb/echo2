@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
@@ -10,7 +10,9 @@ import type {
   ReasonOut,
   Severity,
 } from "../api/types";
-import { Badge, Button, Spinner } from "./ui";
+import { useAuth } from "../state/auth";
+import { Select } from "./Select";
+import { Badge, Button, Input, Modal, Spinner } from "./ui";
 
 /**
  * Clasificación de la reunión: familia, motivo, gravedad y quién vino.
@@ -41,7 +43,11 @@ const SEVERITY_TONE: Record<Severity, "green" | "amber" | "red"> = {
 
 export function ClassificationPanel({ meetingId }: { meetingId: string }) {
   const queryClient = useQueryClient();
+  const { activeOrg } = useAuth();
+  const canManageReasons = activeOrg?.role === "owner" || activeOrg?.role === "admin";
   const [editing, setEditing] = useState(false);
+  const [newFamily, setNewFamily] = useState<{ name: string; reference: string } | null>(null);
+  const [newReason, setNewReason] = useState<string | null>(null);
   const [familyId, setFamilyId] = useState("");
   const [reasonId, setReasonId] = useState("");
   const [severity, setSeverity] = useState<Severity | "">("");
@@ -105,6 +111,37 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
       setEditing(false);
       queryClient.invalidateQueries({ queryKey: ["classification", meetingId] });
       queryClient.invalidateQueries({ queryKey: ["families"] });
+    },
+  });
+
+  // Crear desde el mismo desplegable y dejarla elegida. Se agrega a la caché
+  // en el acto para que los integrantes y el nombre aparezcan sin esperar.
+  const createFamily = useMutation({
+    mutationFn: (form: { name: string; reference: string }) =>
+      api<FamilyOut>("/api/families", {
+        method: "POST",
+        body: JSON.stringify({ name: form.name.trim(), reference: form.reference.trim() || null }),
+      }),
+    onSuccess: (family) => {
+      queryClient.setQueryData<FamilyOut[]>(["families"], (current) => [...(current ?? []), family]);
+      queryClient.invalidateQueries({ queryKey: ["families"] });
+      setFamilyId(family.id);
+      setAttended(new Set());
+      setNewFamily(null);
+    },
+  });
+
+  const createReason = useMutation({
+    mutationFn: (name: string) =>
+      api<ReasonOut>("/api/org/meeting-reasons", {
+        method: "POST",
+        body: JSON.stringify({ name: name.trim(), is_active: true, position: (reasons?.length ?? 0) + 1 }),
+      }),
+    onSuccess: (reason) => {
+      queryClient.setQueryData<ReasonOut[]>(["reasons"], (current) => [...(current ?? []), reason]);
+      queryClient.invalidateQueries({ queryKey: ["reasons"] });
+      setReasonId(reason.id);
+      setNewReason(null);
     },
   });
 
@@ -188,73 +225,70 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
 
   return (
     <div className="mt-4 space-y-4 rounded-lg border border-ink-100 bg-white px-4 py-4">
-      <label className="block">
-        <span className="mb-1.5 block text-sm font-medium text-ink-700">¿Con quién fue?</span>
-        <select
-          value={audience}
-          onChange={(event) => setAudience(event.target.value as Audience | "")}
-          className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm sm:max-w-xs"
-        >
-          <option value="">— sin definir —</option>
-          {AUDIENCES.map((item) => (
-            <option key={item.value} value={item.value}>
-              {item.label}
-            </option>
-          ))}
-        </select>
-      </label>
+      <Select
+        label="¿Con quién fue?"
+        value={audience}
+        onChange={(next) => setAudience(next as Audience | "")}
+        options={[{ value: "", label: "Sin definir" }, ...AUDIENCES]}
+        className="sm:max-w-xs"
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <label className="block">
-          <span className="mb-1.5 block text-sm font-medium text-ink-700">Familia</span>
-          <select
-            value={familyId}
-            onChange={(event) => {
-              setFamilyId(event.target.value);
-              setAttended(new Set());
-            }}
-            className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm"
-          >
-            <option value="">— sin familia —</option>
-            {(families ?? []).map((family) => (
-              <option key={family.id} value={family.id}>
-                {family.name}
-              </option>
-            ))}
-          </select>
-          {families?.length === 0 && (
-            <span className="mt-1 block text-xs text-ink-400">
-              Todavía no hay familias cargadas.{" "}
-              <Link to="/families" className="text-accent-600 hover:underline">
-                Crear una
-              </Link>
-            </span>
-          )}
-        </label>
+        <Select
+          label="Familia"
+          value={familyId}
+          onChange={(next) => {
+            setFamilyId(next);
+            setAttended(new Set());
+          }}
+          options={[
+            { value: "", label: "Sin familia" },
+            ...(families ?? []).map((family) => ({
+              value: family.id,
+              label: family.name,
+              hint: family.reference ? `Legajo ${family.reference}` : undefined,
+            })),
+          ]}
+          placeholder={families ? "Sin familia" : "Cargando…"}
+          searchable
+          searchPlaceholder="Buscar por apellido o legajo…"
+          action={{
+            label: "Nueva familia",
+            // Lo buscado suele ser el apellido: se propone "Familia <apellido>".
+            onClick: (query) =>
+              setNewFamily({
+                name: !query || /^familia\b/i.test(query) ? query : `Familia ${query[0].toUpperCase()}${query.slice(1)}`,
+                reference: "",
+              }),
+          }}
+        />
 
-        <label className="block">
-          <span className="mb-1.5 block text-sm font-medium text-ink-700">Motivo</span>
-          <select
+        <div>
+          <Select
+            label="Motivo"
             value={reasonId}
-            onChange={(event) => setReasonId(event.target.value)}
-            className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm"
-          >
-            <option value="">— sin motivo —</option>
-            {(reasons ?? []).map((reason) => (
-              <option key={reason.id} value={reason.id}>
-                {reason.name}
-              </option>
-            ))}
-          </select>
-          {reasons?.length === 0 && (
+            onChange={setReasonId}
+            options={[
+              { value: "", label: "Sin motivo" },
+              ...(reasons ?? []).map((reason) => ({ value: reason.id, label: reason.name })),
+            ]}
+            searchPlaceholder="Buscar motivo…"
+            action={
+              canManageReasons
+                ? { label: "Nuevo motivo", onClick: (query) => setNewReason(query) }
+                : undefined
+            }
+          />
+          {reasons?.length === 0 && !canManageReasons && (
             <span className="mt-1 block text-xs text-ink-400">
-              No hay motivos definidos.{" "}
+              No hay motivos definidos: los carga un administrador en{" "}
               <Link to="/settings" className="text-accent-600 hover:underline">
-                Cargarlos en Ajustes
+                Ajustes
               </Link>
+              .
             </span>
           )}
-        </label>
+        </div>
       </div>
 
       <div>
@@ -369,6 +403,82 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
           </span>
         )}
       </div>
+
+      <Modal open={newFamily !== null} onClose={() => setNewFamily(null)} title="Nueva familia">
+        {newFamily && (
+          <form
+            onSubmit={(event: FormEvent) => {
+              event.preventDefault();
+              if (newFamily.name.trim()) createFamily.mutate(newFamily);
+            }}
+            className="space-y-4"
+          >
+            <Input
+              label="Nombre"
+              placeholder="Familia Gómez"
+              required
+              autoFocus
+              value={newFamily.name}
+              onChange={(event) => setNewFamily({ ...newFamily, name: event.target.value })}
+            />
+            <Input
+              label="Legajo o matrícula (opcional)"
+              value={newFamily.reference}
+              onChange={(event) => setNewFamily({ ...newFamily, reference: event.target.value })}
+            />
+            <p className="text-xs text-ink-400">
+              Queda elegida para esta reunión. Los integrantes se cargan después en Familias.
+            </p>
+            {createFamily.isError && (
+              <p className="text-sm text-red-600">
+                {createFamily.error instanceof Error ? createFamily.error.message : "No se pudo crear"}
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="ghost" onClick={() => setNewFamily(null)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={createFamily.isPending}>
+                {createFamily.isPending ? <Spinner /> : "Crear y elegir"}
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      <Modal open={newReason !== null} onClose={() => setNewReason(null)} title="Nuevo motivo">
+        {newReason !== null && (
+          <form
+            onSubmit={(event: FormEvent) => {
+              event.preventDefault();
+              if (newReason.trim()) createReason.mutate(newReason);
+            }}
+            className="space-y-4"
+          >
+            <Input
+              label="Nombre"
+              placeholder="Conducta, aprendizaje, convivencia…"
+              required
+              autoFocus
+              value={newReason}
+              onChange={(event) => setNewReason(event.target.value)}
+            />
+            {createReason.isError && (
+              <p className="text-sm text-red-600">
+                {createReason.error instanceof Error ? createReason.error.message : "No se pudo crear"}
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="ghost" onClick={() => setNewReason(null)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={createReason.isPending}>
+                {createReason.isPending ? <Spinner /> : "Crear y elegir"}
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </div>
   );
 }

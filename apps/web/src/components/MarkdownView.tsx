@@ -6,7 +6,7 @@ export function MarkdownView({ markdown }: { markdown: string }) {
   const html = useMemo(() => renderMarkdown(markdown), [markdown]);
   return (
     <div
-      className="prose-echo max-w-none text-[15px] leading-relaxed text-ink-800 [&_h1]:mb-3 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:mb-2 [&_h2]:mt-5 [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:mt-4 [&_h3]:font-semibold [&_li]:my-0.5 [&_p]:my-2 [&_table]:my-3 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-ink-200 [&_td]:px-2.5 [&_td]:py-1.5 [&_th]:border [&_th]:border-ink-200 [&_th]:bg-ink-50 [&_th]:px-2.5 [&_th]:py-1.5 [&_th]:text-left [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_blockquote]:border-l-2 [&_blockquote]:border-ink-200 [&_blockquote]:pl-3 [&_blockquote]:text-ink-500 [&_hr]:my-4 [&_hr]:border-ink-100"
+      className="prose-echo max-w-none break-words text-[15px] leading-relaxed text-ink-800 [&_h1]:mb-3 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:mb-2 [&_h2]:mt-5 [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:mt-4 [&_h3]:font-semibold [&_li]:my-0.5 [&_p]:my-2 [&_table]:my-3 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-ink-200 [&_td]:px-2.5 [&_td]:py-1.5 [&_th]:border [&_th]:border-ink-200 [&_th]:bg-ink-50 [&_th]:px-2.5 [&_th]:py-1.5 [&_th]:text-left [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_blockquote]:border-l-2 [&_blockquote]:border-ink-200 [&_blockquote]:pl-3 [&_blockquote]:text-ink-500 [&_hr]:my-4 [&_hr]:border-ink-100"
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
@@ -49,7 +49,9 @@ function renderMarkdown(markdown: string): string {
   const flushTable = () => {
     if (tableRows.length > 0) {
       const [head, ...body] = tableRows;
-      output.push("<table><thead><tr>");
+      // El contenedor con scroll propio evita que una tabla ancha estire la
+      // página en el celular.
+      output.push('<div class="overflow-x-auto"><table><thead><tr>');
       head.forEach((cell) => output.push(`<th>${inline(cell)}</th>`));
       output.push("</tr></thead><tbody>");
       body.forEach((row) => {
@@ -57,7 +59,7 @@ function renderMarkdown(markdown: string): string {
         row.forEach((cell) => output.push(`<td>${inline(cell)}</td>`));
         output.push("</tr>");
       });
-      output.push("</tbody></table>");
+      output.push("</tbody></table></div>");
       tableRows = [];
     }
   };

@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { MeetingListItem, MeetingOut } from "../api/types";
+import { Select } from "../components/Select";
 import { Badge, Button, Card, EmptyState, Input, Modal, Spinner, formatDate, formatDuration } from "../components/ui";
 import { useAuth } from "../state/auth";
 
@@ -152,35 +153,28 @@ function NewMeetingModal({ open, onClose }: { open: boolean; onClose: () => void
           onChange={(event) => setTitle(event.target.value)}
           autoFocus
         />
-        <div className="grid grid-cols-2 gap-4">
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-ink-700">Idioma</span>
-            <select
-              value={language}
-              onChange={(event) => setLanguage(event.target.value)}
-              className="w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm"
-            >
-              <option value="es">Español</option>
-              <option value="en">English</option>
-              <option value="pt">Português</option>
-              <option value="auto">Detectar automáticamente</option>
-            </select>
-          </label>
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-ink-700">Proyecto</span>
-            <select
-              value={projectId}
-              onChange={(event) => setProjectId(event.target.value)}
-              className="w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm"
-            >
-              <option value="">Sin proyecto</option>
-              {projects?.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Select
+            label="Idioma"
+            value={language}
+            onChange={setLanguage}
+            options={[
+              { value: "es", label: "Español" },
+              { value: "en", label: "English" },
+              { value: "pt", label: "Português" },
+              { value: "auto", label: "Detectar automáticamente" },
+            ]}
+          />
+          <Select
+            label="Proyecto"
+            value={projectId}
+            onChange={setProjectId}
+            options={[
+              { value: "", label: "Sin proyecto" },
+              ...(projects ?? []).map((project) => ({ value: project.id, label: project.name })),
+            ]}
+            searchPlaceholder="Buscar proyecto…"
+          />
         </div>
         <Input
           label="Participantes (separados por coma)"

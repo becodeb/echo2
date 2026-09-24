@@ -28,9 +28,27 @@ html, body, #root {
   height: 100%;
 }
 
+html {
+  /* Que iOS no agrande el texto por su cuenta al girar el teléfono. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   @apply bg-[#fafbfc] text-ink-900 antialiased;
   font-feature-settings: "cv02", "cv03", "cv11";
+  /* Si algo se pasa de ancho, que no arrastre la página entera de costado. */
+  overflow-x: clip;
+}
+
+/* En el teléfono, un campo con letra de menos de 16px hace que Safari
+   acerque la pantalla al tocarlo y no la vuelva a alejar. */
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    font-size: 16px;
+  }
 }
 
 /* barra de scroll sutil */

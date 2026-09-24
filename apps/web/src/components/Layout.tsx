@@ -6,6 +6,7 @@ import { useAuth } from "../state/auth";
 import { Avatar } from "./ui";
 import { EchoFace } from "./EchoFace";
 import { CommandPalette } from "./CommandPalette";
+import { Select } from "./Select";
 
 const NAV = [
   { to: "/", label: "Inicio", icon: "M3 10.5 12 3l9 7.5M5 9.5V21h14V9.5" },
@@ -51,7 +52,9 @@ export function Layout({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    // h-dvh y no h-screen: en el celular 100vh incluye la barra del navegador y
+    // el final de la página queda tapado.
+    <div className="flex h-dvh overflow-hidden">
       {/* Sidebar */}
       <aside
         className={`${mobileNav ? "flex" : "hidden"} absolute inset-y-0 left-0 z-40 w-60 flex-col border-r border-ink-100 bg-white md:static md:flex`}
@@ -126,22 +129,20 @@ export function Layout({ children }: { children: ReactNode }) {
           </NavLink>
 
           {organizations.length > 1 && (
-            <select
+            <Select
+              size="sm"
+              ariaLabel="Organización activa"
               value={activeOrg?.id ?? ""}
-              onChange={(event) => {
-                switchOrg(event.target.value);
+              onChange={(orgId) => {
+                if (orgId === activeOrg?.id) return;
+                switchOrg(orgId);
                 navigate("/");
                 window.location.reload();
               }}
-              className="mb-2 w-full rounded-lg border border-ink-200 bg-white px-2 py-1.5 text-xs text-ink-700"
-              aria-label="Organización activa"
-            >
-              {organizations.map((org) => (
-                <option key={org.id} value={org.id}>
-                  {org.name}
-                </option>
-              ))}
-            </select>
+              options={organizations.map((org) => ({ value: org.id, label: org.name }))}
+              searchPlaceholder="Buscar organización…"
+              className="mb-2"
+            />
           )}
 
           <div className="flex items-center gap-2.5 rounded-lg px-3 py-2">

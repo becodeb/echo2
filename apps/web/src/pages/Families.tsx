@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { FamilyMemberOut, FamilyOut, ProfessionalOut } from "../api/types";
+import { Select } from "../components/Select";
 import { Badge, Button, Card, EmptyState, Input, Modal, Spinner } from "../components/ui";
 
 const RELATIONSHIPS: FamilyMemberOut["relationship_type"][] = [
@@ -159,19 +160,16 @@ function FamilyDetail({ family }: { family: FamilyOut }) {
               onChange={(event) => setName(event.target.value)}
             />
           </div>
-          <select
+          <Select
+            ariaLabel="Parentesco"
             value={relationship}
-            onChange={(event) =>
-              setRelationship(event.target.value as FamilyMemberOut["relationship_type"])
-            }
-            className="rounded-lg border border-ink-200 px-3 py-2 text-sm"
-          >
-            {RELATIONSHIPS.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
+            onChange={(next) => setRelationship(next as FamilyMemberOut["relationship_type"])}
+            options={RELATIONSHIPS.map((value) => ({
+              value,
+              label: value[0].toUpperCase() + value.slice(1),
+            }))}
+            className="w-36"
+          />
           <Button type="submit" variant="soft" disabled={addMember.isPending}>
             {addMember.isPending ? <Spinner /> : "Agregar"}
           </Button>
@@ -201,19 +199,19 @@ function FamilyDetail({ family }: { family: FamilyOut }) {
         )}
         {available.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
-            <select
+            <Select
+              ariaLabel="Profesional"
               value={linking}
-              onChange={(event) => setLinking(event.target.value)}
-              className="rounded-lg border border-ink-200 px-3 py-2 text-sm"
-            >
-              <option value="">— elegir profesional —</option>
-              {available.map((pro) => (
-                <option key={pro.id} value={pro.id}>
-                  {pro.name}
-                  {pro.role_label ? ` · ${pro.role_label}` : ""}
-                </option>
-              ))}
-            </select>
+              onChange={setLinking}
+              options={available.map((pro) => ({
+                value: pro.id,
+                label: pro.name,
+                hint: pro.role_label ?? undefined,
+              }))}
+              placeholder="Elegir profesional…"
+              searchPlaceholder="Buscar profesional…"
+              className="min-w-[200px] flex-1 sm:max-w-xs"
+            />
             <Button
               variant="soft"
               onClick={() => linking && linkPro.mutate(linking)}
@@ -408,9 +406,9 @@ export default function Families() {
   );
 
   return (
-    <div className="space-y-5">
+    <div className="mx-auto max-w-4xl space-y-5 px-6 py-10">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold tracking-tight text-ink-900">Familias</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-ink-900">Familias</h1>
         {tab === "familias" && <Button onClick={() => setCreating(true)}>Nueva familia</Button>}
       </div>
 

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { TaskOut } from "../api/types";
+import { Select } from "../components/Select";
 import { Badge, Card, EmptyState, Spinner, formatMs } from "../components/ui";
 import { useAuth } from "../state/auth";
 
@@ -19,6 +20,7 @@ const STATUS_LABEL: Record<string, string> = {
   done: "Completada",
   cancelled: "Cancelada",
 };
+const STATUS_OPTIONS = Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label }));
 
 export default function Tasks() {
   const { activeOrg } = useAuth();
@@ -132,16 +134,14 @@ export default function Tasks() {
                   )}
                 </div>
               </div>
-              <select
+              <Select
+                size="sm"
+                ariaLabel="Estado"
                 value={task.status}
-                onChange={(event) => update.mutate({ taskId: task.id, status: event.target.value })}
-                className="rounded-lg border border-ink-200 px-2 py-1 text-xs text-ink-600"
-                aria-label="Estado"
-              >
-                {Object.entries(STATUS_LABEL).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
+                onChange={(status) => update.mutate({ taskId: task.id, status })}
+                options={STATUS_OPTIONS}
+                className="w-32 shrink-0"
+              />
             </div>
           ))}
         </Card>

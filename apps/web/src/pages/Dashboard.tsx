@@ -66,8 +66,8 @@ export default function Dashboard() {
         </button>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="min-w-0 lg:col-span-2">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-400">
             Reuniones recientes
           </h2>

@@ -10,6 +10,21 @@ import { Attachments } from "../components/Attachments";
 import { AnswerText } from "../components/AnswerText";
 import { MarkdownView } from "../components/MarkdownView";
 import { InterviewReview } from "../components/InterviewReview";
+import { Select } from "../components/Select";
+
+const TASK_STATUS_OPTIONS = [
+  { value: "pending", label: "Pendiente" },
+  { value: "in_progress", label: "En progreso" },
+  { value: "done", label: "Completada" },
+  { value: "cancelled", label: "Cancelada" },
+];
+
+const SHARE_ROLE_OPTIONS = [
+  { value: "viewer", label: "Viewer" },
+  { value: "commenter", label: "Commenter" },
+  { value: "editor", label: "Editor" },
+  { value: "admin", label: "Admin" },
+];
 
 const TABS = [
   { id: "summary", label: "Resumen" },
@@ -53,7 +68,7 @@ export default function MeetingDetail() {
     <div className="mx-auto max-w-4xl px-6 py-8">
       <header className="mb-6">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight text-ink-900">{meeting.title}</h1>
+          <h1 className="min-w-0 break-words text-2xl font-semibold tracking-tight text-ink-900">{meeting.title}</h1>
           {meeting.status === "processing" && (
             <Badge tone="sky">
               <Spinner className="h-3 w-3" /> Procesando
@@ -78,7 +93,7 @@ export default function MeetingDetail() {
         )}
       </header>
 
-      <nav className="mb-6 flex gap-1 border-b border-ink-100" role="tablist">
+      <nav className="-mx-6 mb-6 flex gap-1 overflow-x-auto border-b border-ink-100 px-6 sm:mx-0 sm:px-0" role="tablist">
         {TABS.map((item) => (
           <button
             key={item.id}
@@ -89,7 +104,7 @@ export default function MeetingDetail() {
               params.set("tab", item.id);
               setParams(params, { replace: true });
             }}
-            className={`border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+            className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors sm:px-4 ${
               tab === item.id
                 ? "border-ink-900 text-ink-900"
                 : "border-transparent text-ink-400 hover:text-ink-700"
@@ -775,16 +790,14 @@ function TasksTab({ meetingId }: { meetingId: string }) {
                 {task.due_date ?? task.due_text ?? "—"}
               </td>
               <td className="px-3 py-3">
-                <select
+                <Select
+                  size="sm"
+                  ariaLabel="Estado"
                   value={task.status}
-                  onChange={(event) => update.mutate({ taskId: task.id, status: event.target.value })}
-                  className="rounded-lg border border-ink-200 px-2 py-1 text-xs"
-                >
-                  <option value="pending">Pendiente</option>
-                  <option value="in_progress">En progreso</option>
-                  <option value="done">Completada</option>
-                  <option value="cancelled">Cancelada</option>
-                </select>
+                  onChange={(status) => update.mutate({ taskId: task.id, status })}
+                  options={TASK_STATUS_OPTIONS}
+                  className="w-32"
+                />
               </td>
             </tr>
           ))}
@@ -952,26 +965,22 @@ function ShareButton({ meetingId }: { meetingId: string }) {
           <div>
             <h3 className="mb-2 text-sm font-medium text-ink-700">Personas específicas</h3>
             <div className="flex gap-2">
-              <select
+              <Select
+                ariaLabel="Persona"
                 value={selectedUser}
-                onChange={(event) => setSelectedUser(event.target.value)}
-                className="flex-1 rounded-lg border border-ink-200 px-3 py-2 text-sm"
-              >
-                <option value="">Elegir persona…</option>
-                {members?.map((member) => (
-                  <option key={member.user_id} value={member.user_id}>{member.name}</option>
-                ))}
-              </select>
-              <select
+                onChange={setSelectedUser}
+                options={(members ?? []).map((member) => ({ value: member.user_id, label: member.name }))}
+                placeholder="Elegir persona…"
+                searchPlaceholder="Buscar persona…"
+                className="flex-1"
+              />
+              <Select
+                ariaLabel="Permiso"
                 value={selectedRole}
-                onChange={(event) => setSelectedRole(event.target.value)}
-                className="rounded-lg border border-ink-200 px-2 py-2 text-sm"
-              >
-                <option value="viewer">Viewer</option>
-                <option value="commenter">Commenter</option>
-                <option value="editor">Editor</option>
-                <option value="admin">Admin</option>
-              </select>
+                onChange={setSelectedRole}
+                options={SHARE_ROLE_OPTIONS}
+                className="w-32 shrink-0"
+              />
               <Button onClick={() => shareUser.mutate()} disabled={!selectedUser || shareUser.isPending}>
                 Agregar
               </Button>
