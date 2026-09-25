@@ -11,6 +11,7 @@ import { AnswerText } from "../components/AnswerText";
 import { MarkdownView } from "../components/MarkdownView";
 import { InterviewReview } from "../components/InterviewReview";
 import { Select } from "../components/Select";
+import { LEVEL_LABEL, useMyAccess, type Level } from "../state/access";
 
 const TASK_STATUS_OPTIONS = [
   { value: "pending", label: "Pendiente" },
@@ -79,6 +80,7 @@ export default function MeetingDetail() {
             <ShareButton meetingId={meeting.id} />
           </div>
         </div>
+        <LevelControl meeting={meeting} />
         <p className="mt-1 text-sm text-ink-500">
           {formatDate(meeting.started_at)} · {formatDuration(meeting.duration_seconds)}
           {meeting.participants.length > 0 &&
@@ -125,6 +127,56 @@ export default function MeetingDetail() {
       {tab === "minutes" && <MinutesTab meetingId={meeting.id} />}
       {tab === "tasks" && <TasksTab meetingId={meeting.id} />}
       {tab === "chat" && <ChatTab meetingId={meeting.id} onJump={(ms) => { params.set("t", String(ms)); setParams(params); setTab("transcript"); }} />}
+    </div>
+  );
+}
+
+// ── Nivel ────────────────────────────────────────────────────────
+
+/**
+ * Nivel de la reunión. Moverla de nivel cambia quién la ve, así que solo lo
+ * puede hacer quien dirige el nivel de antes y el nuevo (o un admin); el
+ * resto solo lo ve.
+ */
+function LevelControl({ meeting }: { meeting: MeetingOut }) {
+  const queryClient = useQueryClient();
+  const { data: myAccess } = useMyAccess();
+  const managed = myAccess?.managed_levels ?? [];
+  const canMove = !!myAccess && (meeting.level === null || managed.includes(meeting.level as Level)) && managed.length > 1;
+
+  const move = useMutation({
+    mutationFn: (level: string) =>
+      api<MeetingOut>(`/api/meetings/${meeting.id}`, { method: "PATCH", body: JSON.stringify({ level }) }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["meeting", meeting.id], updated);
+      queryClient.invalidateQueries({ queryKey: ["meetings"] });
+    },
+  });
+
+  if (!canMove) {
+    return meeting.level ? (
+      <div className="mt-2">
+        <Badge tone="indigo">{LEVEL_LABEL[meeting.level] ?? meeting.level}</Badge>
+      </div>
+    ) : null;
+  }
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2">
+      <Select
+        size="sm"
+        ariaLabel="Nivel"
+        value={meeting.level ?? ""}
+        onChange={(level) => level && level !== meeting.level && move.mutate(level)}
+        options={managed.map((level) => ({ value: level, label: LEVEL_LABEL[level] }))}
+        placeholder="Sin nivel"
+        className="w-36"
+      />
+      {move.isPending && <Spinner className="h-3.5 w-3.5 text-ink-400" />}
+      {move.isError && (
+        <span className="text-xs text-red-600">
+          {move.error instanceof Error ? move.error.message : "No se pudo mover"}
+        </span>
+      )}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { AUDIENCES } from "../components/ClassificationPanel";
 import { FamilySelect } from "../components/FamilySelect";
 import { Select } from "../components/Select";
 import { Badge, Button, Card, EmptyState, Input, Modal, Spinner, formatDate, formatDuration } from "../components/ui";
+import { LEVEL_LABEL, useMyAccess, type Level } from "../state/access";
 import { useAuth } from "../state/auth";
 
 const STATUS: Record<string, { label: string; tone: "gray" | "red" | "amber" | "green" | "sky" }> = {
@@ -76,6 +77,7 @@ export default function Meetings() {
                     {meeting.duration_seconds > 0 && ` · ${formatDuration(meeting.duration_seconds)}`}
                     {meeting.participant_count > 0 && ` · ${meeting.participant_count} participantes`}
                     {meeting.project_name && ` · ${meeting.project_name}`}
+                    {meeting.level && ` · ${LEVEL_LABEL[meeting.level] ?? meeting.level}`}
                   </p>
                 </div>
                 <Badge tone={status.tone}>
@@ -111,6 +113,11 @@ function NewMeetingModal({ open, onClose }: { open: boolean; onClose: () => void
   const [visibility, setVisibility] = useState<"org" | "private">("org");
   const [familyId, setFamilyId] = useState("");
   const [audience, setAudience] = useState<Audience | "">("");
+  const { data: myAccess } = useMyAccess();
+  const creatable = myAccess?.creatable_levels ?? [];
+  const [levelChoice, setLevelChoice] = useState<Level | "">("");
+  // Por defecto primaria si puede crear ahí (es donde está casi todo), si no el primero.
+  const level = levelChoice || (creatable.includes("primaria") ? "primaria" : creatable[0] ?? "");
 
   const { data: projects } = useQuery({
     queryKey: ["projects-options", activeOrg?.id],
@@ -135,6 +142,7 @@ function NewMeetingModal({ open, onClose }: { open: boolean; onClose: () => void
           language,
           project_id: projectId || null,
           visibility,
+          level: level || null,
           participants: participants
             .split(",")
             .map((name) => name.trim())
@@ -190,6 +198,14 @@ function NewMeetingModal({ open, onClose }: { open: boolean; onClose: () => void
           onChange={(event) => setTitle(event.target.value)}
         />
         <div className="grid gap-4 sm:grid-cols-2">
+          {creatable.length > 1 && (
+            <Select
+              label="Nivel"
+              value={level}
+              onChange={(next) => setLevelChoice(next as Level)}
+              options={creatable.map((value) => ({ value, label: LEVEL_LABEL[value] }))}
+            />
+          )}
           <Select
             label="Idioma"
             value={language}

@@ -32,6 +32,7 @@ class Meeting(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
         Index("ix_meetings_org_started", "organization_id", "started_at"),
         Index("ix_meetings_org_status", "organization_id", "status"),
         Index("ix_meetings_family", "family_id"),
+        Index("ix_meetings_org_level", "organization_id", "level"),
     )
 
     organization_id: Mapped[uuid.UUID] = mapped_column(
@@ -61,6 +62,10 @@ class Meeting(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
     severity: Mapped[str | None] = mapped_column(String(10))  # verde|amarillo|rojo
     # Con quién fue: familia|profesionales|mixta|docentes|interna
     audience: Mapped[str | None] = mapped_column(String(20))
+    # Nivel educativo (inicial|primaria|secundaria). Decide quién la ve: ver
+    # services/access.py. Sin nivel solo la ven admins, quien la creó y con
+    # quien se compartió.
+    level: Mapped[str | None] = mapped_column(String(20))
 
     participants: Mapped[list["MeetingParticipant"]] = relationship(
         back_populates="meeting", cascade="all, delete-orphan"

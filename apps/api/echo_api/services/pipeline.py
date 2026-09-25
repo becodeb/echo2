@@ -41,12 +41,12 @@ from ..models import (
     MeetingSummary,
     MeetingTopic,
     Notification,
-    OrganizationMember,
     Question,
     Risk,
     Speaker,
     TranscriptSegment,
 )
+from .access import users_who_can_see
 from .ai_settings import resolve_embeddings, resolve_llm
 from .dates import resolve_relative_date
 from .insights_prompts import (
@@ -230,19 +230,9 @@ async def _finish(meeting_id: uuid.UUID, skipped: list[str]) -> None:
             "skipped": skipped,
             "finished_at": datetime.now(UTC).isoformat(),
         }
-        # notificar a los miembros: acta lista
-        members = (
-            (
-                await db.execute(
-                    select(OrganizationMember.user_id).where(
-                        OrganizationMember.organization_id == meeting.organization_id
-                    )
-                )
-            )
-            .scalars()
-            .all()
-        )
-        for user_id in members:
+        # Avisar que está lista solo a quienes la pueden ver: el aviso lleva el
+        # título, y el título ya dice de qué familia o tema fue.
+        for user_id in await users_who_can_see(db, meeting):
             db.add(
                 Notification(
                     user_id=user_id,

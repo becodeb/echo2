@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..db import get_db
 from ..deps import OrgContext, get_org_context
 from ..models import Family, FamilyMember, Meeting, MeetingAttendance, MeetingReason
+from ..services.access import meeting_filter
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
@@ -44,9 +45,11 @@ def _meeting_date(meeting: Meeting) -> datetime:
 async def overview(
     date_from: date | None = None,
     date_to: date | None = None,
+    level: str | None = None,
     ctx: OrgContext = Depends(get_org_context),
     db: AsyncSession = Depends(get_db),
 ):
+    scope = await ctx.scope(db)
     today = datetime.now(UTC).date()
     range_to = date_to or today
     # Por defecto, los últimos doce meses: es el período que hace que la
@@ -66,6 +69,10 @@ async def overview(
                         Meeting.started_at.between(start, end),
                         (Meeting.started_at.is_(None)) & (Meeting.created_at.between(start, end)),
                     ),
+                    # Todo el reporte sale de esta lista: filtrar acá alcanza
+                    # para que nadie vea cifras de un nivel que no ve.
+                    meeting_filter(scope),
+                    *([Meeting.level == level] if level else []),
                 )
             )
         )

@@ -18,9 +18,11 @@ def _join_as_member(client, owner: EchoTestUser) -> EchoTestUser:
     ).json()["token"]
     member = EchoTestUser.__new__(EchoTestUser)
     member.client = client
-    member.token = client.post(
+    registered = client.post(
         "/api/auth/register", json={"email": email, "password": "password123", "name": "Docente"}
-    ).json()["access_token"]
+    ).json()
+    member.token = registered["access_token"]
+    member.user_id = registered["user"]["id"]
     accepted = client.post(
         "/api/auth/invites/accept",
         json={"token": token},
@@ -28,6 +30,13 @@ def _join_as_member(client, owner: EchoTestUser) -> EchoTestUser:
     )
     assert accepted.status_code == 200, accepted.text
     member.org_id = owner.org_id
+    # Docente de primaria con acceso total, como lo dejaría dirección.
+    granted = client.put(
+        "/api/org/access",
+        json={"user_id": member.user_id, "level": "primaria", "access": "total"},
+        headers=owner.headers,
+    )
+    assert granted.status_code == 200, granted.text
     return member
 
 

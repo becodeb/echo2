@@ -175,14 +175,23 @@ def test_private_meeting_ws_closed_for_other_members(client):
 
 
 def test_org_meeting_ws_open_for_other_members(client):
-    """Contraparte: una reunión `org` sigue siendo del equipo, no del creador."""
+    """Contraparte: una reunión `org` es de todo su nivel, no solo del creador."""
     owner = EchoTestUser(client, name="Dueña WS2", org_name="Org Compartida WS")
     created = client.post(
-        "/api/meetings", json={"title": "De todos"}, headers=owner.headers
+        "/api/meetings", json={"title": "De todos", "level": "primaria"}, headers=owner.headers
     )
     meeting_id = created.json()["id"]
 
     colleague_token = _join_org_as_member(client, owner, "colega-ws2@test.echo")
+    colleague_id = client.get(
+        "/api/auth/me", headers={"Authorization": f"Bearer {colleague_token}"}
+    ).json()["user"]["id"]
+    granted = client.put(
+        "/api/org/access",
+        json={"user_id": colleague_id, "level": "primaria", "access": "total"},
+        headers=owner.headers,
+    )
+    assert granted.status_code == 200, granted.text
 
     with client.websocket_connect(
         f"/api/meetings/{meeting_id}/ws?token={colleague_token}"

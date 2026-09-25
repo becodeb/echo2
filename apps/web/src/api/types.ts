@@ -71,6 +71,8 @@ export interface MeetingOut {
     next_steps?: string[];
     mentions?: Record<string, unknown>;
   };
+  /** inicial | primaria | secundaria; null = sin nivel (solo admins y quien la creó). */
+  level: string | null;
   participants: ParticipantOut[];
   speakers: SpeakerOut[];
 }
@@ -84,6 +86,7 @@ export interface MeetingListItem {
   created_at: string;
   participant_count: number;
   project_name: string | null;
+  level: string | null;
 }
 
 export interface SegmentOut {

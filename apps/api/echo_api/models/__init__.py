@@ -12,11 +12,14 @@ from .families import (
     Professional,
 )
 from .core import (
+    LEVEL_ACCESS,
+    LEVELS,
     ROLES,
     ROLE_ADMIN,
     ROLE_MEMBER,
     ROLE_OWNER,
     ROLE_VIEWER,
+    MemberLevelAccess,
     Organization,
     OrganizationInvite,
     OrganizationMember,
@@ -57,6 +60,7 @@ from .workspace import (
 
 __all__ = [
     "Base", "User", "Organization", "OrganizationMember", "OrganizationInvite",
+    "MemberLevelAccess", "LEVELS", "LEVEL_ACCESS",
     "Family", "FamilyMember", "MeetingReason", "MeetingAttendance",
     "Professional", "FamilyProfessional", "MeetingProfessionalAttendance",
     "MeetingAttachment", "OrgGoogleDrive", "ServerAISettings",

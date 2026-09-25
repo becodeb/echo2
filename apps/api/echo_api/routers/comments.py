@@ -5,12 +5,13 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
 from ..deps import OrgContext, get_meeting_or_404, get_org_context
 from ..models import Comment, Notification, OrganizationMember, User
+from ..services.access import meeting_id_filter
 from ..services.audit import audit
 
 router = APIRouter(prefix="/api/comments", tags=["comments"])
@@ -136,19 +137,30 @@ async def list_comments(
     ]
 
 
+async def _visible_comment(db: AsyncSession, ctx: OrgContext, comment_id: uuid.UUID) -> Comment:
+    """El comentario, si es de una reunión que quien pide puede ver (o de ninguna)."""
+    scope = await ctx.scope(db)
+    comment = (
+        await db.execute(
+            select(Comment).where(
+                Comment.id == comment_id,
+                Comment.organization_id == ctx.org_id,
+                or_(Comment.meeting_id.is_(None), meeting_id_filter(scope, Comment.meeting_id)),
+            )
+        )
+    ).scalar_one_or_none()
+    if not comment:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Comentario no encontrado")
+    return comment
+
+
 @router.post("/{comment_id}/resolve", response_model=CommentOut)
 async def resolve_comment(
     comment_id: uuid.UUID,
     ctx: OrgContext = Depends(get_org_context),
     db: AsyncSession = Depends(get_db),
 ):
-    comment = (
-        await db.execute(
-            select(Comment).where(Comment.id == comment_id, Comment.organization_id == ctx.org_id)
-        )
-    ).scalar_one_or_none()
-    if not comment:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Comentario no encontrado")
+    comment = await _visible_comment(db, ctx, comment_id)
     comment.resolved_at = datetime.now(UTC)
     comment.resolved_by = ctx.user.id
     await db.commit()
@@ -167,13 +179,7 @@ async def delete_comment(
     ctx: OrgContext = Depends(get_org_context),
     db: AsyncSession = Depends(get_db),
 ):
-    comment = (
-        await db.execute(
-            select(Comment).where(Comment.id == comment_id, Comment.organization_id == ctx.org_id)
-        )
-    ).scalar_one_or_none()
-    if not comment:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Comentario no encontrado")
+    comment = await _visible_comment(db, ctx, comment_id)
     if comment.author_id != ctx.user.id:
         ctx.require_role("admin")
     comment.deleted_at = datetime.now(UTC)

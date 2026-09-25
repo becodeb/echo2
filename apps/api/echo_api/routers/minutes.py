@@ -19,6 +19,7 @@ from ..models import (
     OrganizationMember,
 )
 from ..services import acta_entrevista, acta_number
+from ..services.access import users_who_can_see
 from ..services.ai_settings import resolve_llm
 from ..services.audit import audit
 from ..services.llm import get_llm_provider
@@ -265,19 +266,8 @@ async def change_minutes_status(
         # Solo se sube la versión aprobada: Drive queda con el acta definitiva
         # y no con los borradores intermedios.
         background.add_task(upload_minutes, meeting.id)
-        # notificar aprobación
-        members = (
-            (
-                await db.execute(
-                    select(OrganizationMember.user_id).where(
-                        OrganizationMember.organization_id == ctx.org_id
-                    )
-                )
-            )
-            .scalars()
-            .all()
-        )
-        for user_id in members:
+        # Avisar la aprobación solo a quienes ven la reunión.
+        for user_id in await users_who_can_see(db, meeting):
             db.add(
                 Notification(
                     user_id=user_id,

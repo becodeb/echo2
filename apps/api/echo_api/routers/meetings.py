@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..db import get_db
 from ..deps import OrgContext, can_edit_meeting, get_meeting_or_404, get_org_context
 from ..models import (
+    LEVELS,
     ActionItem,
     Bookmark,
     Decision,
@@ -21,6 +22,7 @@ from ..models import (
     Speaker,
     TranscriptSegment,
 )
+from ..services.access import meeting_filter
 from ..services.audit import audit
 from ..services.pipeline import run_finalize_pipeline
 from ..services.live_bus import live_bus
@@ -44,6 +46,9 @@ class MeetingCreateIn(BaseModel):
     project_id: uuid.UUID | None = None
     participants: list[ParticipantIn] = []
     visibility: str = Field(default="org")  # org|private
+    # inicial|primaria|secundaria. Sin él se usa el primer nivel en el que
+    # puede crear quien la crea (services/access.py).
+    level: str | None = None
 
 
 class ParticipantOut(BaseModel):
@@ -81,6 +86,7 @@ class MeetingOut(BaseModel):
     created_by: uuid.UUID
     processing_state: dict
     meta: dict
+    level: str | None = None
     participants: list[ParticipantOut] = []
     speakers: list[SpeakerOut] = []
 
@@ -94,6 +100,7 @@ class MeetingListItem(BaseModel):
     created_at: datetime
     participant_count: int
     project_name: str | None = None
+    level: str | None = None
 
 
 def _meeting_out(m: Meeting, participants: list, speakers: list) -> MeetingOut:
@@ -111,6 +118,7 @@ def _meeting_out(m: Meeting, participants: list, speakers: list) -> MeetingOut:
         created_by=m.created_by,
         processing_state=m.processing_state or {},
         meta=m.meta or {},
+        level=m.level,
         participants=[ParticipantOut.model_validate(p) for p in participants],
         speakers=[SpeakerOut.model_validate(s) for s in speakers],
     )
@@ -123,6 +131,22 @@ async def create_meeting(
     db: AsyncSession = Depends(get_db),
 ):
     ctx.require_role("member")
+    scope = await ctx.scope(db)
+    creatable = scope.creatable_levels
+    if data.level is not None:
+        if data.level not in LEVELS:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Nivel desconocido")
+        if data.level not in creatable:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "No tenés acceso a ese nivel")
+        level = data.level
+    elif scope.sees_everything:
+        level = None
+    elif creatable:
+        level = creatable[0]
+    else:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "Todavía no tenés un nivel asignado: elegilo antes de crear reuniones"
+        )
     meeting = Meeting(
         organization_id=ctx.org_id,
         created_by=ctx.user.id,
@@ -132,6 +156,7 @@ async def create_meeting(
         stt_engine=data.stt_engine,
         status="draft",
         meta={"visibility": data.visibility if data.visibility in ("org", "private") else "org"},
+        level=level,
     )
     db.add(meeting)
     await db.flush()
@@ -170,14 +195,21 @@ async def list_meetings(
     offset: int = Query(default=0, ge=0),
     status_filter: str | None = Query(default=None, alias="status"),
     project_id: uuid.UUID | None = None,
+    level: str | None = None,
 ):
+    # La visibilidad va en el WHERE y no filtrando después: filtrar después
+    # del LIMIT devolvía páginas cortas y se salteaba lo compartido.
     q = (
         select(
             Meeting,
             func.count(MeetingParticipant.id).label("pcount"),
         )
         .outerjoin(MeetingParticipant, MeetingParticipant.meeting_id == Meeting.id)
-        .where(Meeting.organization_id == ctx.org_id, Meeting.deleted_at.is_(None))
+        .where(
+            Meeting.organization_id == ctx.org_id,
+            Meeting.deleted_at.is_(None),
+            meeting_filter(await ctx.scope(db)),
+        )
         .group_by(Meeting.id)
         .order_by(Meeting.created_at.desc())
         .limit(limit)
@@ -185,6 +217,8 @@ async def list_meetings(
     )
     if status_filter:
         q = q.where(Meeting.status == status_filter)
+    if level:
+        q = q.where(Meeting.level == level)
     if project_id:
         q = q.join(ProjectMeeting, ProjectMeeting.meeting_id == Meeting.id).where(
             ProjectMeeting.project_id == project_id
@@ -204,24 +238,20 @@ async def list_meetings(
         ).all()
         project_names = {mid: name for mid, name in prows}
 
-    out = []
-    for m, pcount in rows:
-        visibility = (m.meta or {}).get("visibility", "org")
-        if visibility == "private" and m.created_by != ctx.user.id and ctx.role not in ("admin", "owner"):
-            continue
-        out.append(
-            MeetingListItem(
-                id=m.id,
-                title=m.title,
-                status=m.status,
-                started_at=m.started_at,
-                duration_seconds=m.duration_seconds,
-                created_at=m.created_at,
-                participant_count=pcount,
-                project_name=project_names.get(m.id),
-            )
+    return [
+        MeetingListItem(
+            id=m.id,
+            title=m.title,
+            status=m.status,
+            started_at=m.started_at,
+            duration_seconds=m.duration_seconds,
+            created_at=m.created_at,
+            participant_count=pcount,
+            project_name=project_names.get(m.id),
+            level=m.level,
         )
-    return out
+        for m, pcount in rows
+    ]
 
 
 @router.get("/{meeting_id}", response_model=MeetingOut)
@@ -252,6 +282,7 @@ class MeetingUpdateIn(BaseModel):
     title: str | None = Field(default=None, max_length=300)
     language: str | None = None
     visibility: str | None = None
+    level: str | None = None
 
 
 @router.patch("/{meeting_id}", response_model=MeetingOut)
@@ -270,6 +301,17 @@ async def update_meeting(
         meeting.language = data.language
     if data.visibility in ("org", "private"):
         meeting.meta = {**(meeting.meta or {}), "visibility": data.visibility}
+    if data.level is not None and data.level != meeting.level:
+        if data.level not in LEVELS:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Nivel desconocido")
+        # Cambiar de nivel cambia quién la ve: lo decide quien dirige los dos
+        # niveles (el de antes y el nuevo) o un admin de la sede.
+        managed = (await ctx.scope(db)).managed_levels
+        if data.level not in managed or (meeting.level is not None and meeting.level not in managed):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Solo dirección de los dos niveles puede moverla")
+        await audit(db, ctx.org_id, ctx.user.id, "meeting.level", "meeting", str(meeting.id),
+                    detail={"from": meeting.level, "to": data.level})
+        meeting.level = data.level
     await db.commit()
     return await get_meeting(meeting_id, ctx, db)
 

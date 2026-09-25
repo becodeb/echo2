@@ -12,7 +12,7 @@ import unicodedata
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from ..db import SessionLocal
 from ..models import (
@@ -224,9 +224,13 @@ def _topic_from_text(text: str) -> str:
 
 
 async def query_memory_entities(
-    db, org_id: uuid.UUID, question: str, limit: int = 6
+    db, org_id: uuid.UUID, question: str, limit: int = 6, visible_ids: list[uuid.UUID] | None = None
 ) -> list[dict]:
-    """Busca entidades relevantes por coincidencia de nombre en la pregunta."""
+    """Busca entidades relevantes por coincidencia de nombre en la pregunta.
+
+    visible_ids: reuniones que ve quien pregunta (None = todas). Con lista,
+    solo entran hechos de esas reuniones y no el resumen, que se arma con todas.
+    """
     normalized_question = normalize_name(question)
     rows = (
         (
@@ -242,17 +246,20 @@ async def query_memory_entities(
     matched = [e for e in rows if e.normalized_name and e.normalized_name in normalized_question]
     results = []
     for entity in matched[:limit]:
-        relations = (
-            (
-                await db.execute(
-                    select(MemoryRelation, Meeting)
-                    .outerjoin(Meeting, Meeting.id == MemoryRelation.meeting_id)
-                    .where(MemoryRelation.entity_id == entity.id)
-                    .order_by(MemoryRelation.happened_at.asc().nullslast())
-                    .limit(30)
-                )
+        query = (
+            select(MemoryRelation, Meeting)
+            .outerjoin(Meeting, Meeting.id == MemoryRelation.meeting_id)
+            .where(MemoryRelation.entity_id == entity.id)
+        )
+        if visible_ids is not None:
+            query = query.where(
+                or_(MemoryRelation.meeting_id.is_(None), MemoryRelation.meeting_id.in_(visible_ids))
             )
+        relations = (
+            await db.execute(query.order_by(MemoryRelation.happened_at.asc().nullslast()).limit(30))
         ).all()
+        if visible_ids is not None and not relations:
+            continue
         facts = []
         for relation, meeting in relations:
             facts.append(
@@ -265,7 +272,6 @@ async def query_memory_entities(
                     "evidence_start_ms": relation.evidence_start_ms,
                 }
             )
-        results.append(
-            {"kind": entity.kind, "name": entity.name, "summary": entity.summary, "facts": facts}
-        )
+        summary = entity.summary if visible_ids is None else None
+        results.append({"kind": entity.kind, "name": entity.name, "summary": summary, "facts": facts})
     return results

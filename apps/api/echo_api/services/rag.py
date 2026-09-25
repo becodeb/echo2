@@ -51,20 +51,37 @@ async def embed_meeting_segments(meeting_id: uuid.UUID, config: EmbeddingsConfig
         return total
 
 
+def _scope_filters(
+    filters: str, params: dict, meeting_id: uuid.UUID | None, visible_ids: list[uuid.UUID] | None
+) -> str:
+    """Filtros comunes: una reunión puntual, las visibles para quien busca, sin borradas.
+
+    visible_ids None = ve todas (admin); lista vacía = no ve ninguna.
+    """
+    filters += " AND s.meeting_id IN (SELECT m.id FROM meetings m WHERE m.deleted_at IS NULL)"
+    if meeting_id:
+        filters += " AND s.meeting_id = :meeting_id"
+        params["meeting_id"] = str(meeting_id)
+    if visible_ids is not None:
+        filters += " AND s.meeting_id = ANY(CAST(:visible_ids AS uuid[]))"
+        params["visible_ids"] = [str(value) for value in visible_ids]
+    return filters
+
+
 async def semantic_search_segments(
     db: AsyncSession,
     org_id: uuid.UUID,
     query_vector: list[float],
     limit: int = 12,
     meeting_id: uuid.UUID | None = None,
+    visible_ids: list[uuid.UUID] | None = None,
 ) -> list[dict]:
     """Búsqueda por similitud coseno, SIEMPRE aislada por organización."""
     vector_literal = "[" + ",".join(f"{value:.6f}" for value in query_vector) + "]"
-    filters = "s.organization_id = :org_id AND s.embedding IS NOT NULL"
     params: dict = {"org_id": str(org_id), "limit": limit}
-    if meeting_id:
-        filters += " AND s.meeting_id = :meeting_id"
-        params["meeting_id"] = str(meeting_id)
+    filters = _scope_filters(
+        "s.organization_id = :org_id AND s.embedding IS NOT NULL", params, meeting_id, visible_ids
+    )
     query = sql_text(
         f"""
         SELECT s.id, s.meeting_id, s.seq, s.start_ms, s.end_ms, s.text, s.speaker_id,
@@ -137,16 +154,16 @@ async def keyword_search_segments(
     query: str,
     limit: int = 12,
     meeting_id: uuid.UUID | None = None,
+    visible_ids: list[uuid.UUID] | None = None,
 ) -> list[dict]:
     """Full-text search (fallback sin embeddings y complemento del semántico)."""
     tsquery = build_or_tsquery(query)
     if not tsquery:
         return []
-    filters = "s.organization_id = :org_id AND s.tsv @@ to_tsquery('spanish', :q)"
     params: dict = {"org_id": str(org_id), "q": tsquery, "limit": limit}
-    if meeting_id:
-        filters += " AND s.meeting_id = :meeting_id"
-        params["meeting_id"] = str(meeting_id)
+    filters = _scope_filters(
+        "s.organization_id = :org_id AND s.tsv @@ to_tsquery('spanish', :q)", params, meeting_id, visible_ids
+    )
     sql = sql_text(
         f"""
         SELECT s.id, s.meeting_id, s.seq, s.start_ms, s.end_ms, s.text, s.speaker_id,
@@ -191,15 +208,21 @@ async def retrieve_context(
     embeddings_config: EmbeddingsConfig | None,
     meeting_id: uuid.UUID | None = None,
     limit: int = 12,
+    visible_ids: list[uuid.UUID] | None = None,
 ) -> list[dict]:
-    """Retrieval híbrido: semántico si hay embeddings, keyword siempre."""
+    """Retrieval híbrido: semántico si hay embeddings, keyword siempre.
+
+    Sin meeting_id busca en toda la sede: quien llama pasa visible_ids
+    (services/access.visible_meeting_id_list) para no devolver transcript de
+    reuniones que esa persona no puede ver.
+    """
     results: list[dict] = []
     seen: set[str] = set()
     if embeddings_config:
         try:
             vectors = await embed_texts(embeddings_config, [question], org_id=org_id)
             semantic = await semantic_search_segments(
-                db, org_id, vectors[0], limit=limit, meeting_id=meeting_id
+                db, org_id, vectors[0], limit=limit, meeting_id=meeting_id, visible_ids=visible_ids
             )
             for item in semantic:
                 if item["segment_id"] not in seen:
@@ -207,7 +230,9 @@ async def retrieve_context(
                     results.append(item)
         except Exception as exc:
             log.warning("retrieval semantico fallo, uso keyword: %s", exc)
-    keyword = await keyword_search_segments(db, org_id, question, limit=limit, meeting_id=meeting_id)
+    keyword = await keyword_search_segments(
+        db, org_id, question, limit=limit, meeting_id=meeting_id, visible_ids=visible_ids
+    )
     for item in keyword:
         if item["segment_id"] not in seen:
             seen.add(item["segment_id"])

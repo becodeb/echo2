@@ -2,11 +2,12 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
 from ..deps import OrgContext, get_org_context
+from ..services.access import meeting_filter, meeting_id_filter
 from ..models import (
     ActionItem,
     Meeting,
@@ -22,6 +23,9 @@ router = APIRouter(prefix="/api/people", tags=["people"])
 
 @router.get("")
 async def list_people(ctx: OrgContext = Depends(get_org_context), db: AsyncSession = Depends(get_db)):
+    # Los conteos cuentan solo lo que quien mira puede ver: si no, el número
+    # delata reuniones de otros niveles.
+    scope = await ctx.scope(db)
     members = (
         await db.execute(
             select(User, OrganizationMember.role)
@@ -38,6 +42,8 @@ async def list_people(ctx: OrgContext = Depends(get_org_context), db: AsyncSessi
                 .join(Meeting, Meeting.id == MeetingParticipant.meeting_id)
                 .where(
                     Meeting.organization_id == ctx.org_id,
+                    Meeting.deleted_at.is_(None),
+                    meeting_filter(scope),
                     (MeetingParticipant.user_id == user.id)
                     | (MeetingParticipant.name.ilike(user.name)),
                 )
@@ -48,6 +54,7 @@ async def list_people(ctx: OrgContext = Depends(get_org_context), db: AsyncSessi
                 select(func.count(ActionItem.id)).where(
                     ActionItem.organization_id == ctx.org_id,
                     ActionItem.status.in_(["pending", "in_progress"]),
+                    or_(ActionItem.meeting_id.is_(None), meeting_id_filter(scope, ActionItem.meeting_id)),
                     (ActionItem.assignee_user_id == user.id)
                     | (ActionItem.assignee_name.ilike(user.name)),
                 )
@@ -87,6 +94,7 @@ async def person_detail(
     if not member:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Persona no encontrada")
     user, role = member
+    scope = await ctx.scope(db)
 
     meetings = (
         await db.execute(
@@ -95,6 +103,7 @@ async def person_detail(
             .where(
                 Meeting.organization_id == ctx.org_id,
                 Meeting.deleted_at.is_(None),
+                meeting_filter(scope),
                 (MeetingParticipant.user_id == user.id)
                 | (MeetingParticipant.name.ilike(user.name)),
             )
@@ -109,6 +118,7 @@ async def person_detail(
             .outerjoin(Meeting, Meeting.id == ActionItem.meeting_id)
             .where(
                 ActionItem.organization_id == ctx.org_id,
+                or_(ActionItem.meeting_id.is_(None), meeting_id_filter(scope, ActionItem.meeting_id)),
                 (ActionItem.assignee_user_id == user.id)
                 | (ActionItem.assignee_name.ilike(user.name)),
             )
@@ -125,6 +135,8 @@ async def person_detail(
             .join(Meeting, Meeting.id == TranscriptSegment.meeting_id)
             .where(
                 TranscriptSegment.organization_id == ctx.org_id,
+                Meeting.deleted_at.is_(None),
+                meeting_filter(scope),
                 Speaker.display_name.ilike(user.name.split()[0] + "%"),
             )
             .order_by(TranscriptSegment.created_at.desc())

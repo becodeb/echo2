@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { AdminOrgOut, ServerAIOut, ServerAITestOut } from "../api/types";
 import { Select } from "../components/Select";
+import { useAuth } from "../state/auth";
 import { Badge, Button, Card, EmptyState, Input, Spinner } from "../components/ui";
 
 /**
@@ -24,6 +25,7 @@ interface AIForm {
 
 function OrgRow({ org }: { org: AdminOrgOut }) {
   const queryClient = useQueryClient();
+  const { switchOrg } = useAuth();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<AIForm>({
     llm_provider: org.uses_own_key ? org.llm_provider ?? "" : "",
@@ -79,6 +81,15 @@ function OrgRow({ org }: { org: AdminOrgOut }) {
           )}
           <Button variant="soft" onClick={() => setOpen((value) => !value)}>
             {open ? "Cerrar" : "Configurar IA"}
+          </Button>
+          <Button
+            onClick={() => {
+              // Entra a la sede como la ve un admin: reuniones, niveles, personas.
+              switchOrg(org.id);
+              window.location.href = "/settings/access";
+            }}
+          >
+            Entrar
           </Button>
         </div>
       </div>

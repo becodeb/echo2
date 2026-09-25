@@ -3,11 +3,12 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
 from ..deps import OrgContext, get_meeting_or_404, get_org_context
+from ..services.access import Scope, meeting_filter, meeting_id_filter
 from ..models import (
     ActionItem,
     Decision,
@@ -29,10 +30,18 @@ async def list_entities(
     ctx: OrgContext = Depends(get_org_context),
     db: AsyncSession = Depends(get_db),
 ):
+    scope = await ctx.scope(db)
+    # Solo cuentan (y solo aparecen) las entidades con hechos de reuniones que
+    # quien mira puede ver.
+    query = select(MemoryEntity, func.count(MemoryRelation.id))
+    if scope.sees_everything:
+        query = query.outerjoin(MemoryRelation, MemoryRelation.entity_id == MemoryEntity.id)
+    else:
+        query = query.join(MemoryRelation, MemoryRelation.entity_id == MemoryEntity.id).where(
+            _visible_relation(scope)
+        )
     query = (
-        select(MemoryEntity, func.count(MemoryRelation.id))
-        .outerjoin(MemoryRelation, MemoryRelation.entity_id == MemoryEntity.id)
-        .where(
+        query.where(
             MemoryEntity.organization_id == ctx.org_id,
             MemoryEntity.deleted_at.is_(None),
         )
@@ -48,11 +57,16 @@ async def list_entities(
             "id": str(entity.id),
             "kind": entity.kind,
             "name": entity.name,
-            "summary": entity.summary,
+            # El resumen se arma con todas las reuniones: solo lo ve quien ve todo.
+            "summary": entity.summary if scope.sees_everything else None,
             "fact_count": count,
         }
         for entity, count in rows
     ]
+
+
+def _visible_relation(scope: Scope):
+    return or_(MemoryRelation.meeting_id.is_(None), meeting_id_filter(scope, MemoryRelation.meeting_id))
 
 
 @router.get("/api/memory/entities/{entity_id}")
@@ -70,19 +84,22 @@ async def entity_detail(
     ).scalar_one_or_none()
     if not entity:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Entidad no encontrada")
+    scope = await ctx.scope(db)
     relations = (
         await db.execute(
             select(MemoryRelation, Meeting)
             .outerjoin(Meeting, Meeting.id == MemoryRelation.meeting_id)
-            .where(MemoryRelation.entity_id == entity.id)
+            .where(MemoryRelation.entity_id == entity.id, _visible_relation(scope))
             .order_by(MemoryRelation.happened_at.asc().nullslast())
         )
     ).all()
+    if not relations and not scope.sees_everything:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Entidad no encontrada")
     return {
         "id": str(entity.id),
         "kind": entity.kind,
         "name": entity.name,
-        "summary": entity.summary,
+        "summary": entity.summary if scope.sees_everything else None,
         "facts": [
             {
                 "relation": relation.relation,
@@ -111,7 +128,11 @@ async def related_meetings(
         await db.execute(
             select(MeetingLink, Meeting)
             .join(Meeting, Meeting.id == MeetingLink.related_meeting_id)
-            .where(MeetingLink.meeting_id == meeting.id, Meeting.deleted_at.is_(None))
+            .where(
+                MeetingLink.meeting_id == meeting.id,
+                Meeting.deleted_at.is_(None),
+                meeting_filter(await ctx.scope(db)),
+            )
         )
     ).all()
     return [
@@ -177,14 +198,14 @@ async def prepare_meeting(
 ):
     """Desde la reunión anterior: tareas pendientes, preguntas abiertas y
     decisiones recientes → agenda sugerida."""
-    meeting_filter = [Meeting.organization_id == ctx.org_id, Meeting.status == "completed",
-                      Meeting.deleted_at.is_(None)]
-    query = select(Meeting).where(*meeting_filter).order_by(Meeting.started_at.desc()).limit(1)
+    base = [Meeting.organization_id == ctx.org_id, Meeting.status == "completed",
+            Meeting.deleted_at.is_(None), meeting_filter(await ctx.scope(db))]
+    query = select(Meeting).where(*base).order_by(Meeting.started_at.desc()).limit(1)
     if project_id:
         query = (
             select(Meeting)
             .join(ProjectMeeting, ProjectMeeting.meeting_id == Meeting.id)
-            .where(*meeting_filter, ProjectMeeting.project_id == project_id)
+            .where(*base, ProjectMeeting.project_id == project_id)
             .order_by(Meeting.started_at.desc())
             .limit(1)
         )
@@ -245,11 +266,13 @@ async def prepare_meeting(
 async def dashboard(ctx: OrgContext = Depends(get_org_context), db: AsyncSession = Depends(get_db)):
     now = datetime.now(UTC)
     week_ago = now - timedelta(days=7)
+    scope = await ctx.scope(db)
+    visible_task = or_(ActionItem.meeting_id.is_(None), meeting_id_filter(scope, ActionItem.meeting_id))
 
     recent_meetings = (
         await db.execute(
             select(Meeting)
-            .where(Meeting.organization_id == ctx.org_id, Meeting.deleted_at.is_(None))
+            .where(Meeting.organization_id == ctx.org_id, Meeting.deleted_at.is_(None), meeting_filter(scope))
             .order_by(Meeting.created_at.desc())
             .limit(6)
         )
@@ -260,6 +283,7 @@ async def dashboard(ctx: OrgContext = Depends(get_org_context), db: AsyncSession
             select(func.count(ActionItem.id)).where(
                 ActionItem.organization_id == ctx.org_id,
                 ActionItem.status.in_(["pending", "in_progress"]),
+                visible_task,
             )
         )
     ).scalar()
@@ -268,7 +292,12 @@ async def dashboard(ctx: OrgContext = Depends(get_org_context), db: AsyncSession
         await db.execute(
             select(Decision, Meeting.title)
             .join(Meeting, Meeting.id == Decision.meeting_id)
-            .where(Decision.organization_id == ctx.org_id, Decision.created_at >= week_ago)
+            .where(
+                Decision.organization_id == ctx.org_id,
+                Decision.created_at >= week_ago,
+                Meeting.deleted_at.is_(None),
+                meeting_filter(scope),
+            )
             .order_by(Decision.created_at.desc())
             .limit(5)
         )
@@ -293,7 +322,7 @@ async def dashboard(ctx: OrgContext = Depends(get_org_context), db: AsyncSession
                 ActionItem.organization_id == ctx.org_id,
                 ActionItem.status.in_(["pending", "in_progress"]),
                 (ActionItem.assignee_user_id == ctx.user.id)
-                | (ActionItem.assignee_name.ilike(f"%{ctx.user.name.split()[0]}%")),
+                | (ActionItem.assignee_name.ilike(f"%{ctx.user.name.split()[0]}%") & visible_task),
             )
             .order_by(ActionItem.due_date.asc().nullslast())
             .limit(5)

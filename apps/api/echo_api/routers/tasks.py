@@ -4,11 +4,11 @@ from datetime import UTC, date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..deps import OrgContext, get_org_context
+from ..deps import OrgContext, get_meeting_or_404, get_org_context
 from ..models import (
     ActionItem,
     Comment,
@@ -17,6 +17,7 @@ from ..models import (
     OrganizationMember,
     User,
 )
+from ..services.access import Scope, meeting_filter, meeting_id_filter
 from ..services.audit import audit
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
@@ -38,6 +39,27 @@ class TaskOut(BaseModel):
     evidence_start_ms: int | None
     overdue: bool = False
     created_at: datetime
+
+
+def _visible_task(scope: Scope):
+    """Tareas de reuniones que ve, más las sueltas (sin reunión), que ve toda la sede."""
+    return or_(ActionItem.meeting_id.is_(None), meeting_id_filter(scope, ActionItem.meeting_id))
+
+
+async def _task_or_404(db: AsyncSession, ctx: OrgContext, task_id: uuid.UUID) -> ActionItem:
+    scope = await ctx.scope(db)
+    task = (
+        await db.execute(
+            select(ActionItem).where(
+                ActionItem.id == task_id,
+                ActionItem.organization_id == ctx.org_id,
+                or_(_visible_task(scope), ActionItem.assignee_user_id == ctx.user.id),
+            )
+        )
+    ).scalar_one_or_none()
+    if not task:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Tarea no encontrada")
+    return task
 
 
 def _task_out(task: ActionItem, meeting_title: str | None) -> TaskOut:
@@ -75,7 +97,7 @@ async def list_tasks(
     query = (
         select(ActionItem, Meeting.title)
         .outerjoin(Meeting, Meeting.id == ActionItem.meeting_id)
-        .where(ActionItem.organization_id == ctx.org_id)
+        .where(ActionItem.organization_id == ctx.org_id, _visible_task(await ctx.scope(db)))
         .order_by(ActionItem.due_date.asc().nullslast(), ActionItem.created_at.desc())
         .limit(limit)
     )
@@ -107,15 +129,7 @@ async def update_task(
     ctx: OrgContext = Depends(get_org_context),
     db: AsyncSession = Depends(get_db),
 ):
-    task = (
-        await db.execute(
-            select(ActionItem).where(
-                ActionItem.id == task_id, ActionItem.organization_id == ctx.org_id
-            )
-        )
-    ).scalar_one_or_none()
-    if not task:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Tarea no encontrada")
+    task = await _task_or_404(db, ctx, task_id)
 
     if data.status and data.status != task.status:
         task.status = data.status
@@ -179,15 +193,7 @@ async def create_task(
     ctx.require_role("member")
     meeting_title = None
     if data.meeting_id:
-        meeting = (
-            await db.execute(
-                select(Meeting).where(
-                    Meeting.id == data.meeting_id, Meeting.organization_id == ctx.org_id
-                )
-            )
-        ).scalar_one_or_none()
-        if not meeting:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Reunión no encontrada")
+        meeting = await get_meeting_or_404(data.meeting_id, ctx, db)
         meeting_title = meeting.title
     task = ActionItem(
         organization_id=ctx.org_id,
@@ -209,6 +215,7 @@ async def create_task(
 @router.get("/my-work")
 async def my_work(ctx: OrgContext = Depends(get_org_context), db: AsyncSession = Depends(get_db)):
     today = datetime.now(UTC).date()
+    scope = await ctx.scope(db)
 
     tasks_rows = (
         await db.execute(
@@ -217,8 +224,11 @@ async def my_work(ctx: OrgContext = Depends(get_org_context), db: AsyncSession =
             .where(
                 ActionItem.organization_id == ctx.org_id,
                 ActionItem.status.in_(["pending", "in_progress"]),
+                # Asignada con su usuario: es suya aunque no vea la reunión.
+                # Por coincidencia de nombre, solo si ve la reunión: el nombre
+                # puede ser de otra persona.
                 (ActionItem.assignee_user_id == ctx.user.id)
-                | (ActionItem.assignee_name.ilike(f"%{ctx.user.name}%")),
+                | (ActionItem.assignee_name.ilike(f"%{ctx.user.name}%") & _visible_task(scope)),
             )
             .order_by(ActionItem.due_date.asc().nullslast())
             .limit(50)
@@ -233,6 +243,7 @@ async def my_work(ctx: OrgContext = Depends(get_org_context), db: AsyncSession =
                     Meeting.organization_id == ctx.org_id,
                     Meeting.deleted_at.is_(None),
                     Meeting.status == "completed",
+                    meeting_filter(scope),
                 )
                 .order_by(Meeting.created_at.desc())
                 .limit(5)
@@ -251,6 +262,7 @@ async def my_work(ctx: OrgContext = Depends(get_org_context), db: AsyncSession =
                     Comment.deleted_at.is_(None),
                     Comment.mentions.contains([str(ctx.user.id)]),
                     Comment.resolved_at.is_(None),
+                    or_(Comment.meeting_id.is_(None), meeting_id_filter(scope, Comment.meeting_id)),
                 )
                 .order_by(Comment.created_at.desc())
                 .limit(10)

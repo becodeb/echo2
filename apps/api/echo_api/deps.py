@@ -23,6 +23,7 @@ from .models import (
     User,
 )
 from .security import decode_token
+from .services.access import Scope, can_see_by_rule, load_scope
 
 ROLE_ORDER = {"viewer": 0, "commenter": 0, "member": 1, "editor": 1, "admin": 2, "owner": 3}
 
@@ -47,10 +48,16 @@ async def get_current_user(
 
 
 class OrgContext:
-    def __init__(self, org: Organization, member: OrganizationMember, user: User):
+    def __init__(
+        self, org: Organization, member: OrganizationMember, user: User, superadmin_visit: bool = False
+    ):
         self.org = org
         self.member = member
         self.user = user
+        # Superadmin de la instalación mirando una sede de la que no es
+        # miembro: actúa como owner, pero no figura entre los miembros.
+        self.superadmin_visit = superadmin_visit
+        self._scope: Scope | None = None
 
     @property
     def org_id(self) -> uuid.UUID:
@@ -63,6 +70,17 @@ class OrgContext:
     def require_role(self, minimum: str) -> None:
         if ROLE_ORDER.get(self.role, -1) < ROLE_ORDER.get(minimum, 99):
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Permisos insuficientes")
+
+    async def scope(self, db: AsyncSession) -> Scope:
+        """Qué reuniones ve en esta sede (services/access.py). Se calcula una vez por pedido."""
+        if self._scope is None:
+            self._scope = await load_scope(db, self.org_id, self.user.id, self.role)
+        return self._scope
+
+
+# Última vez que se registró la visita de un superadmin a cada sede: se anota
+# una por hora y no una por pedido, que llenaría el log de ruido.
+_superadmin_visits: dict[tuple[uuid.UUID, uuid.UUID], float] = {}
 
 
 async def get_org_context(
@@ -89,10 +107,28 @@ async def get_org_context(
         )
     )
     row = result.first()
-    if not row:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "No pertenecés a esta organización")
-    member, org = row
-    return OrgContext(org=org, member=member, user=user)
+    if row:
+        member, org = row
+        return OrgContext(org=org, member=member, user=user)
+
+    # Los superadmins de la instalación ven todas las sedes. No se los suma
+    # como miembros (no aparecen en la lista de la sede) y queda registrado en
+    # el log de auditoría de esa sede que entraron.
+    if user.is_superadmin:
+        org = await db.get(Organization, org_id)
+        if org is not None and org.deleted_at is None:
+            key = (user.id, org.id)
+            now = time.monotonic()
+            if now - _superadmin_visits.get(key, -3600.0) >= 3600:
+                _superadmin_visits[key] = now
+                from .services.audit import audit
+
+                await audit(db, org.id, user.id, "admin.superadmin_visit", "organization", str(org.id),
+                            detail={"by": user.email})
+                await db.commit()
+            member = OrganizationMember(organization_id=org.id, user_id=user.id, role=ROLE_OWNER)
+            return OrgContext(org=org, member=member, user=user, superadmin_visit=True)
+    raise HTTPException(status.HTTP_403_FORBIDDEN, "No pertenecés a esta organización")
 
 
 # Desenlaces de la regla de visibilidad. Son tres y no dos porque "para vos
@@ -124,14 +160,14 @@ async def check_meeting_access(
     ya fue verificada: acá sólo se decide visibilidad. Quien llama traduce el
     resultado al vocabulario de su transporte (404 en HTTP, 4403 en WebSocket).
 
-    Un `admin` o superior ve todo por definición del rol; el creador siempre ve
-    lo suyo, sin importar `minimum_role`, porque un compartido no puede darle
-    menos permiso del que ya tenía sobre su propia reunión.
+    La regla en sí (admin, creador, nivel) vive en services/access.py, que es
+    la misma que filtran los listados. Lo que agrega esta función es el
+    compartido con su rol mínimo: por nivel o por ser creador se ve sin mirar
+    `minimum_role`, porque un compartido no puede darle menos permiso del que
+    ya tenía.
     """
-    visibility = (meeting.meta or {}).get("visibility", "org")
-    if visibility != "private" or ROLE_ORDER.get(role, -1) >= ROLE_ORDER["admin"]:
-        return MEETING_ACCESS_OK
-    if meeting.created_by == user.id:
+    scope = await load_scope(db, meeting.organization_id, user.id, role)
+    if can_see_by_rule(scope, meeting):
         return MEETING_ACCESS_OK
 
     share = (

@@ -9,13 +9,14 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
 from ..db import get_db
 from ..deps import OrgContext, get_meeting_or_404, get_org_context, rate_limit
 from ..models import ActionItem, Decision, Meeting, MeetingSummary, Question, Risk
+from ..services.access import Scope, meeting_filter, meeting_id_filter, visible_meeting_id_list
 from ..services.ai_settings import resolve_embeddings, resolve_llm
 from ..services.llm import LLMError, get_llm_provider
 from ..services.privacy import protect
@@ -112,16 +113,19 @@ def _context_block(chunks: list[dict], include_meeting: bool) -> str:
 
 
 async def _structured_block(
-    db: AsyncSession, org_id: uuid.UUID, meeting_id: uuid.UUID | None
+    db: AsyncSession, org_id: uuid.UUID, meeting_id: uuid.UUID | None, scope: Scope
 ) -> str:
     """Decisiones, tareas y reuniones como contexto estructurado.
 
     El transcript no alcanza: "¿qué decisiones siguen sin ejecutarse?" o
     "¿cuántas reuniones tuvimos?" se responden con las tablas `decisions`,
     `action_items` y `meetings`, no con los segmentos hablados.
+
+    Todo filtrado por lo que quien pregunta puede ver: lo que entra acá le
+    llega al modelo y el modelo lo puede repetir en la respuesta.
     """
     meetings_q = select(Meeting).where(
-        Meeting.organization_id == org_id, Meeting.deleted_at.is_(None)
+        Meeting.organization_id == org_id, Meeting.deleted_at.is_(None), meeting_filter(scope)
     )
     if meeting_id:
         meetings_q = meetings_q.where(Meeting.id == meeting_id)
@@ -131,18 +135,26 @@ async def _structured_block(
         return ""
 
     decisions_q = select(Decision).where(
-        Decision.organization_id == org_id, Decision.status == "active"
+        Decision.organization_id == org_id,
+        Decision.status == "active",
+        meeting_id_filter(scope, Decision.meeting_id),
     )
     tasks_q = select(ActionItem).where(
-        ActionItem.organization_id == org_id, ActionItem.status.in_(("pending", "in_progress"))
+        ActionItem.organization_id == org_id,
+        ActionItem.status.in_(("pending", "in_progress")),
+        or_(ActionItem.meeting_id.is_(None), meeting_id_filter(scope, ActionItem.meeting_id)),
     )
     if meeting_id:
         decisions_q = decisions_q.where(Decision.meeting_id == meeting_id)
         tasks_q = tasks_q.where(ActionItem.meeting_id == meeting_id)
-    questions_q = select(Question).where(Question.organization_id == org_id)
-    risks_q = select(Risk).where(Risk.organization_id == org_id)
+    questions_q = select(Question).where(
+        Question.organization_id == org_id, meeting_id_filter(scope, Question.meeting_id)
+    )
+    risks_q = select(Risk).where(Risk.organization_id == org_id, meeting_id_filter(scope, Risk.meeting_id))
     summaries_q = select(MeetingSummary).where(
-        MeetingSummary.organization_id == org_id, MeetingSummary.kind == "executive"
+        MeetingSummary.organization_id == org_id,
+        MeetingSummary.kind == "executive",
+        meeting_id_filter(scope, MeetingSummary.meeting_id),
     )
     if meeting_id:
         questions_q = questions_q.where(Question.meeting_id == meeting_id)
@@ -212,7 +224,11 @@ async def _empty_answer(
         await db.execute(
             select(func.count())
             .select_from(Meeting)
-            .where(Meeting.organization_id == ctx.org_id, Meeting.deleted_at.is_(None))
+            .where(
+                Meeting.organization_id == ctx.org_id,
+                Meeting.deleted_at.is_(None),
+                meeting_filter(await ctx.scope(db)),
+            )
         )
     ).scalar_one()
 
@@ -242,19 +258,24 @@ async def _ask(
             "No hay un modelo de IA configurado. Configuralo en Ajustes → IA.",
         )
     embeddings_config = await resolve_embeddings(db, ctx.org_id)
+    scope = await ctx.scope(db)
+    # En el chat de una reunión ya se verificó el acceso a esa reunión; en el
+    # global, el transcript se busca solo entre las que puede ver.
+    visible_ids = None if meeting_id else await visible_meeting_id_list(db, scope)
     chunks = await retrieve_context(
-        db, ctx.org_id, question, embeddings_config, meeting_id=meeting_id, limit=12
+        db, ctx.org_id, question, embeddings_config, meeting_id=meeting_id, limit=12,
+        visible_ids=visible_ids,
     )
 
     memory_block = ""
     if meeting_id is None:
-        entities = await query_memory_entities(db, ctx.org_id, question)
+        entities = await query_memory_entities(db, ctx.org_id, question, visible_ids=visible_ids)
         if entities:
             memory_block = "\n\nHECHOS DE MEMORIA (con reunión de origen):\n" + json.dumps(
                 entities, ensure_ascii=False, indent=1
             )
 
-    structured_block = await _structured_block(db, ctx.org_id, meeting_id)
+    structured_block = await _structured_block(db, ctx.org_id, meeting_id, scope)
 
     if not chunks and not memory_block and not structured_block:
         # Sin contexto no se llama al modelo: dejarlo responder de memoria es

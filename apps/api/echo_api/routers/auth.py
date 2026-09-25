@@ -129,10 +129,24 @@ async def join_domain_organizations(db: AsyncSession, user: User) -> None:
 
 
 async def _session_payload(db: AsyncSession, user: User) -> SessionOut:
+    organizations = await _user_orgs(db, user.id)
+    if user.is_superadmin:
+        # Los superadmins ven todas las sedes (deps.get_org_context los deja
+        # entrar como owner sin ser miembros): se listan todas para poder
+        # elegirlas desde el selector de organización.
+        member_of = {org.id for org in organizations}
+        others = (
+            await db.execute(
+                select(Organization)
+                .where(Organization.deleted_at.is_(None), Organization.id.not_in(member_of or [uuid.uuid4()]))
+                .order_by(Organization.name)
+            )
+        ).scalars().all()
+        organizations += [OrgOut(id=o.id, name=o.name, slug=o.slug, role="owner") for o in others]
     return SessionOut(
         access_token=create_access_token(str(user.id)),
         user=UserOut.model_validate(user),
-        organizations=await _user_orgs(db, user.id),
+        organizations=organizations,
     )
 
 

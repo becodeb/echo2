@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "./state/auth";
+import { useMyAccess } from "./state/access";
 import { Layout } from "./components/Layout";
 import { EchoFace } from "./components/EchoFace";
 import Login from "./pages/Login";
@@ -25,6 +26,7 @@ const Families = lazy(() => import("./pages/Families"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Landing = lazy(() => import("./pages/Landing"));
 const ActaPrint = lazy(() => import("./pages/ActaPrint"));
+const ChooseLevel = lazy(() => import("./pages/ChooseLevel"));
 
 function FullLoader() {
   return (
@@ -37,6 +39,7 @@ function FullLoader() {
 export default function App() {
   const { loading, user, organizations } = useAuth();
   const location = useLocation();
+  const myAccess = useMyAccess();
 
   if (location.pathname.startsWith("/s/")) {
     return (
@@ -79,6 +82,16 @@ export default function App() {
 
   if (organizations.length === 0) {
     return <OnboardingOrg />;
+  }
+
+  // Recién entrado a la sede y sin nivel: primero dice de qué nivel es.
+  if (myAccess.isLoading) return <FullLoader />;
+  if (myAccess.data?.needs_level) {
+    return (
+      <Suspense fallback={<FullLoader />}>
+        <ChooseLevel />
+      </Suspense>
+    );
   }
 
   // La hoja del acta para imprimir va sin el marco de la app.

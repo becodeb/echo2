@@ -27,6 +27,7 @@ from ..models import (
     MeetingReason,
     Professional,
 )
+from ..services.access import meeting_filter
 from ..services.audit import audit
 
 router = APIRouter(tags=["families"])
@@ -190,7 +191,12 @@ async def list_families(
         (
             await db.execute(
                 select(Meeting.family_id, func.count())
-                .where(Meeting.family_id.in_(ids), Meeting.deleted_at.is_(None))
+                .where(
+                    Meeting.family_id.in_(ids),
+                    Meeting.deleted_at.is_(None),
+                    # Cuenta solo las reuniones que quien mira puede ver.
+                    meeting_filter(await ctx.scope(db)),
+                )
                 .group_by(Meeting.family_id)
             )
         ).all()

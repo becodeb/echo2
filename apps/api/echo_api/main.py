@@ -67,6 +67,7 @@ def _include_optional_routers() -> None:
         "drive",
         "reports",
         "orgs",
+        "levels",
         "meetings",
         "live",
         "transcript",

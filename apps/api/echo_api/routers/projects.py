@@ -18,9 +18,29 @@ from ..models import (
     ProjectMeeting,
     Question,
 )
+from ..services.access import Scope, meeting_filter
 from ..services.audit import audit
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
+
+
+async def _visible_project_meeting_ids(db: AsyncSession, scope: Scope, project_id: uuid.UUID) -> list[uuid.UUID]:
+    """Reuniones del proyecto que quien mira puede ver: de acá salen conteos y timeline."""
+    return list(
+        (
+            await db.execute(
+                select(ProjectMeeting.meeting_id)
+                .join(Meeting, Meeting.id == ProjectMeeting.meeting_id)
+                .where(
+                    ProjectMeeting.project_id == project_id,
+                    Meeting.deleted_at.is_(None),
+                    meeting_filter(scope),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
 
 
 class ProjectIn(BaseModel):
@@ -75,17 +95,10 @@ async def list_projects(
         .scalars()
         .all()
     )
+    scope = await ctx.scope(db)
     output = []
     for project in projects:
-        meeting_ids = (
-            (
-                await db.execute(
-                    select(ProjectMeeting.meeting_id).where(ProjectMeeting.project_id == project.id)
-                )
-            )
-            .scalars()
-            .all()
-        )
+        meeting_ids = await _visible_project_meeting_ids(db, scope, project.id)
         meeting_count = len(meeting_ids)
         decision_count = 0
         open_tasks = 0
@@ -138,15 +151,7 @@ async def project_detail(
     if not project:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Proyecto no encontrado")
 
-    meeting_ids = (
-        (
-            await db.execute(
-                select(ProjectMeeting.meeting_id).where(ProjectMeeting.project_id == project.id)
-            )
-        )
-        .scalars()
-        .all()
-    )
+    meeting_ids = await _visible_project_meeting_ids(db, await ctx.scope(db), project.id)
     meetings = []
     if meeting_ids:
         rows = (
@@ -241,6 +246,7 @@ async def project_changes(
                     ProjectMeeting.project_id == project.id,
                     Meeting.status == "completed",
                     Meeting.deleted_at.is_(None),
+                    meeting_filter(await ctx.scope(db)),
                 )
                 .order_by(Meeting.started_at.desc())
                 .limit(2)

@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { useAuth } from "../state/auth";
+import { useMyAccess } from "../state/access";
 import { Avatar } from "./ui";
 import { EchoFace } from "./EchoFace";
 import { CommandPalette } from "./CommandPalette";
@@ -32,6 +33,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const navigate = useNavigate();
+  const { data: myAccess } = useMyAccess();
 
   const { data: notifData } = useQuery({
     queryKey: ["notifications", activeOrg?.id],
@@ -181,6 +183,11 @@ export function Layout({ children }: { children: ReactNode }) {
           <span className="text-ink-900"><EchoFace mood="idle" size={22} /></span>
           <span className="font-semibold text-ink-900">Echo</span>
         </header>
+        {myAccess?.superadmin_visit && (
+          <div className="border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-center text-xs font-medium text-amber-800">
+            Estás viendo {activeOrg?.name} como superadmin. Queda registrado en su historial.
+          </div>
+        )}
         <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
       </div>
 

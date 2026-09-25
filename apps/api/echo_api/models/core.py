@@ -72,6 +72,37 @@ class OrganizationMember(PKMixin, TimestampMixin, Base):
     user: Mapped["User"] = relationship(back_populates="memberships")
 
 
+# Niveles educativos. Fijos para toda la instalación: son los del sistema
+# educativo, no algo que cada colegio invente.
+LEVELS = ("inicial", "primaria", "secundaria")
+
+# Acceso de una persona a un nivel. Sin fila = nulo: no ve nada del nivel
+# salvo lo que creó o le compartieron.
+#   direccion: ve todo el nivel y asigna los accesos de ese nivel.
+#   total:     ve todas las reuniones del nivel.
+#   limitado:  ve solo lo propio y lo compartido, y puede crear reuniones ahí.
+LEVEL_ACCESS = ("direccion", "total", "limitado")
+
+
+class MemberLevelAccess(PKMixin, TimestampMixin, Base):
+    """Qué ve una persona de cada nivel de una organización (sede)."""
+
+    __tablename__ = "member_level_access"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "user_id", "level", name="uq_member_level_access"),
+        Index("ix_member_level_access_org_user", "organization_id", "user_id"),
+    )
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    level: Mapped[str] = mapped_column(String(20), nullable=False)
+    access: Mapped[str] = mapped_column(String(20), nullable=False)
+
+
 class OrganizationInvite(PKMixin, TimestampMixin, Base):
     __tablename__ = "organization_invites"
     __table_args__ = (Index("ix_org_invites_org", "organization_id"),)

@@ -1,7 +1,7 @@
 """Buscador global: reuniones, transcript (keyword + semántico), personas,
 decisiones, tareas y proyectos."""
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
@@ -14,6 +14,7 @@ from ..models import (
     Project,
     User,
 )
+from ..services.access import meeting_filter, meeting_id_filter, visible_meeting_id_list
 from ..services.ai_settings import resolve_embeddings
 from ..services.rag import retrieve_context
 
@@ -27,6 +28,7 @@ async def global_search(
     db: AsyncSession = Depends(get_db),
 ):
     like = f"%{q}%"
+    scope = await ctx.scope(db)
 
     meetings = (
         (
@@ -36,6 +38,7 @@ async def global_search(
                     Meeting.organization_id == ctx.org_id,
                     Meeting.deleted_at.is_(None),
                     Meeting.title.ilike(like),
+                    meeting_filter(scope),
                 )
                 .order_by(Meeting.created_at.desc())
                 .limit(8)
@@ -59,7 +62,12 @@ async def global_search(
             await db.execute(
                 select(Decision, Meeting.title)
                 .join(Meeting, Meeting.id == Decision.meeting_id)
-                .where(Decision.organization_id == ctx.org_id, Decision.text.ilike(like))
+                .where(
+                    Decision.organization_id == ctx.org_id,
+                    Decision.text.ilike(like),
+                    Meeting.deleted_at.is_(None),
+                    meeting_filter(scope),
+                )
                 .order_by(Decision.created_at.desc())
                 .limit(8)
             )
@@ -71,7 +79,12 @@ async def global_search(
             await db.execute(
                 select(ActionItem, Meeting.title)
                 .outerjoin(Meeting, Meeting.id == ActionItem.meeting_id)
-                .where(ActionItem.organization_id == ctx.org_id, ActionItem.text.ilike(like))
+                .where(
+                    ActionItem.organization_id == ctx.org_id,
+                    ActionItem.text.ilike(like),
+                    # Las tareas sueltas (sin reunión) las ve toda la sede.
+                    or_(ActionItem.meeting_id.is_(None), meeting_id_filter(scope, ActionItem.meeting_id)),
+                )
                 .order_by(ActionItem.created_at.desc())
                 .limit(8)
             )
@@ -97,7 +110,10 @@ async def global_search(
     # Transcript: semántico (si hay embeddings) + full-text.
     # «problema impresoras» encuentra «las máquinas no están pudiendo imprimir».
     embeddings_config = await resolve_embeddings(db, ctx.org_id)
-    transcript_hits = await retrieve_context(db, ctx.org_id, q, embeddings_config, limit=10)
+    transcript_hits = await retrieve_context(
+        db, ctx.org_id, q, embeddings_config, limit=10,
+        visible_ids=await visible_meeting_id_list(db, scope),
+    )
 
     return {
         "meetings": [
