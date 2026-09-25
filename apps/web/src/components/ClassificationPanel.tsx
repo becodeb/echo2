@@ -11,6 +11,7 @@ import type {
   Severity,
 } from "../api/types";
 import { useAuth } from "../state/auth";
+import { FamilySelect } from "./FamilySelect";
 import { Select } from "./Select";
 import { Badge, Button, Input, Modal, Spinner } from "./ui";
 
@@ -27,7 +28,7 @@ const SEVERITIES: { value: Severity; label: string; dot: string }[] = [
   { value: "rojo", label: "Rojo", dot: "bg-red-500" },
 ];
 
-const AUDIENCES: { value: Audience; label: string }[] = [
+export const AUDIENCES: { value: Audience; label: string }[] = [
   { value: "familia", label: "Con la familia" },
   { value: "profesionales", label: "Con profesionales" },
   { value: "mixta", label: "Familia y profesionales" },
@@ -46,7 +47,6 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
   const { activeOrg } = useAuth();
   const canManageReasons = activeOrg?.role === "owner" || activeOrg?.role === "admin";
   const [editing, setEditing] = useState(false);
-  const [newFamily, setNewFamily] = useState<{ name: string; reference: string } | null>(null);
   const [newReason, setNewReason] = useState<string | null>(null);
   const [familyId, setFamilyId] = useState("");
   const [reasonId, setReasonId] = useState("");
@@ -111,23 +111,6 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
       setEditing(false);
       queryClient.invalidateQueries({ queryKey: ["classification", meetingId] });
       queryClient.invalidateQueries({ queryKey: ["families"] });
-    },
-  });
-
-  // Crear desde el mismo desplegable y dejarla elegida. Se agrega a la caché
-  // en el acto para que los integrantes y el nombre aparezcan sin esperar.
-  const createFamily = useMutation({
-    mutationFn: (form: { name: string; reference: string }) =>
-      api<FamilyOut>("/api/families", {
-        method: "POST",
-        body: JSON.stringify({ name: form.name.trim(), reference: form.reference.trim() || null }),
-      }),
-    onSuccess: (family) => {
-      queryClient.setQueryData<FamilyOut[]>(["families"], (current) => [...(current ?? []), family]);
-      queryClient.invalidateQueries({ queryKey: ["families"] });
-      setFamilyId(family.id);
-      setAttended(new Set());
-      setNewFamily(null);
     },
   });
 
@@ -234,32 +217,11 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
       />
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Select
-          label="Familia"
+        <FamilySelect
           value={familyId}
           onChange={(next) => {
             setFamilyId(next);
             setAttended(new Set());
-          }}
-          options={[
-            { value: "", label: "Sin familia" },
-            ...(families ?? []).map((family) => ({
-              value: family.id,
-              label: family.name,
-              hint: family.reference ? `Legajo ${family.reference}` : undefined,
-            })),
-          ]}
-          placeholder={families ? "Sin familia" : "Cargando…"}
-          searchable
-          searchPlaceholder="Buscar por apellido o legajo…"
-          action={{
-            label: "Nueva familia",
-            // Lo buscado suele ser el apellido: se propone "Familia <apellido>".
-            onClick: (query) =>
-              setNewFamily({
-                name: !query || /^familia\b/i.test(query) ? query : `Familia ${query[0].toUpperCase()}${query.slice(1)}`,
-                reference: "",
-              }),
           }}
         />
 
@@ -403,48 +365,6 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
           </span>
         )}
       </div>
-
-      <Modal open={newFamily !== null} onClose={() => setNewFamily(null)} title="Nueva familia">
-        {newFamily && (
-          <form
-            onSubmit={(event: FormEvent) => {
-              event.preventDefault();
-              if (newFamily.name.trim()) createFamily.mutate(newFamily);
-            }}
-            className="space-y-4"
-          >
-            <Input
-              label="Nombre"
-              placeholder="Familia Gómez"
-              required
-              autoFocus
-              value={newFamily.name}
-              onChange={(event) => setNewFamily({ ...newFamily, name: event.target.value })}
-            />
-            <Input
-              label="Legajo o matrícula (opcional)"
-              value={newFamily.reference}
-              onChange={(event) => setNewFamily({ ...newFamily, reference: event.target.value })}
-            />
-            <p className="text-xs text-ink-400">
-              Queda elegida para esta reunión. Los integrantes se cargan después en Familias.
-            </p>
-            {createFamily.isError && (
-              <p className="text-sm text-red-600">
-                {createFamily.error instanceof Error ? createFamily.error.message : "No se pudo crear"}
-              </p>
-            )}
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" onClick={() => setNewFamily(null)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={createFamily.isPending}>
-                {createFamily.isPending ? <Spinner /> : "Crear y elegir"}
-              </Button>
-            </div>
-          </form>
-        )}
-      </Modal>
 
       <Modal open={newReason !== null} onClose={() => setNewReason(null)} title="Nuevo motivo">
         {newReason !== null && (

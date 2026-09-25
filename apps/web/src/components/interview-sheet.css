@@ -116,6 +116,19 @@
   font-size: 10pt;
 }
 
+/* En una pantalla más angosta que la hoja (el celular), la hoja se adapta al
+ * ancho en vez de desbordar. Solo en pantalla: al imprimir sigue siendo A4. */
+@media screen and (max-width: 232mm) {
+  .entrevista-hoja {
+    width: auto;
+    max-width: 210mm;
+    min-height: 0;
+    padding: 20px 18px 28px;
+  }
+  .ent-fila { flex-wrap: wrap; row-gap: 6pt; }
+  .ent-checks { justify-content: flex-start; gap: 24pt; }
+}
+
 /* Sin márgenes del navegador: sin ellos tampoco salen la URL ni la fecha en
  * los bordes, que en un acta firmada no van. Los márgenes los pone la hoja. */
 @page entrevista { size: A4; margin: 0; }

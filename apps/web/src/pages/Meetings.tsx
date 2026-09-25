@@ -2,7 +2,9 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
-import type { MeetingListItem, MeetingOut } from "../api/types";
+import type { Audience, FamilyOut, MeetingListItem, MeetingOut } from "../api/types";
+import { AUDIENCES } from "../components/ClassificationPanel";
+import { FamilySelect } from "../components/FamilySelect";
 import { Select } from "../components/Select";
 import { Badge, Button, Card, EmptyState, Input, Modal, Spinner, formatDate, formatDuration } from "../components/ui";
 import { useAuth } from "../state/auth";
@@ -107,19 +109,29 @@ function NewMeetingModal({ open, onClose }: { open: boolean; onClose: () => void
   const [projectId, setProjectId] = useState("");
   const [participants, setParticipants] = useState("");
   const [visibility, setVisibility] = useState<"org" | "private">("org");
+  const [familyId, setFamilyId] = useState("");
+  const [audience, setAudience] = useState<Audience | "">("");
 
   const { data: projects } = useQuery({
     queryKey: ["projects-options", activeOrg?.id],
     queryFn: () => api<ProjectOption[]>("/api/projects"),
     enabled: open && !!activeOrg,
   });
+  const { data: families } = useQuery({
+    queryKey: ["families"],
+    queryFn: () => api<FamilyOut[]>("/api/families"),
+    enabled: open,
+  });
+  const family = families?.find((item) => item.id === familyId);
+  const today = new Date().toLocaleDateString("es");
+  const defaultTitle = family ? `${family.name} · ${today}` : `Reunión ${today}`;
 
   const create = useMutation({
-    mutationFn: () =>
-      api<MeetingOut>("/api/meetings", {
+    mutationFn: async () => {
+      const meeting = await api<MeetingOut>("/api/meetings", {
         method: "POST",
         body: JSON.stringify({
-          title: title.trim() || `Reunión ${new Date().toLocaleDateString("es")}`,
+          title: title.trim() || defaultTitle,
           language,
           project_id: projectId || null,
           visibility,
@@ -129,10 +141,26 @@ function NewMeetingModal({ open, onClose }: { open: boolean; onClose: () => void
             .filter(Boolean)
             .map((name) => ({ name })),
         }),
-      }),
+      });
+      // La familia se guarda antes de grabar: así la seudonimización ya
+      // prioriza sus nombres desde el primer minuto. Si esto falla no se
+      // frena la reunión; se puede clasificar después desde el detalle.
+      if (familyId || audience) {
+        await api(`/api/meetings/${meeting.id}/classification`, {
+          method: "PUT",
+          body: JSON.stringify({ family_id: familyId || null, audience: audience || null }),
+        }).catch(() => undefined);
+      }
+      return meeting;
+    },
     onSuccess: (meeting) => {
       localStorage.setItem("echo_pref_lang", language);
       queryClient.invalidateQueries({ queryKey: ["meetings"] });
+      queryClient.invalidateQueries({ queryKey: ["families"] });
+      // El modal no se desmonta: que la próxima reunión arranque en blanco.
+      setTitle("");
+      setFamilyId("");
+      setAudience("");
       onClose();
       navigate(`/meetings/${meeting.id}/live`);
     },
@@ -146,12 +174,20 @@ function NewMeetingModal({ open, onClose }: { open: boolean; onClose: () => void
   return (
     <Modal open={open} onClose={onClose} title="Nueva reunión">
       <form onSubmit={submit} className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FamilySelect value={familyId} onChange={setFamilyId} enabled={open} />
+          <Select
+            label="¿Con quién es?"
+            value={audience}
+            onChange={(next) => setAudience(next as Audience | "")}
+            options={[{ value: "", label: "Sin definir" }, ...AUDIENCES]}
+          />
+        </div>
         <Input
           label="Nombre"
-          placeholder="Reunión de equipo"
+          placeholder={defaultTitle}
           value={title}
           onChange={(event) => setTitle(event.target.value)}
-          autoFocus
         />
         <div className="grid gap-4 sm:grid-cols-2">
           <Select

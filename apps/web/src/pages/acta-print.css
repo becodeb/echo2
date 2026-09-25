@@ -111,6 +111,16 @@
   text-align: right;
 }
 
+/* Celular: márgenes de la hoja más chicos y el logo baja si no entra al lado
+ * del membrete. Solo en pantalla; lo impreso no cambia. */
+@media screen and (max-width: 640px) {
+  .acta-print { padding: 12px 10px 40px; }
+  .acta-hoja-print { padding: 28px 20px 32px; }
+  .acta-print-membrete { flex-wrap: wrap; gap: 12px; }
+  .acta-print-logo { max-width: 60%; }
+  .acta-print-firmas { gap: 28px; margin-top: 48px; }
+}
+
 @media print {
   .no-print { display: none !important; }
   .acta-print { background: #ffffff; padding: 0; min-height: auto; }
@@ -121,4 +131,7 @@
     box-shadow: none;
   }
   @page { size: A4; margin: 18mm 16mm; }
+  /* El scroll propio de las tablas es para la pantalla del celular: en el
+   * papel recortaría columnas. */
+  .acta-hoja-print .overflow-x-auto { overflow: visible; }
 }
