@@ -20,6 +20,8 @@ export interface AdminOrgOut {
   llm_api_key_masked: string | null;
   /** false = está viviendo del default del servidor, no tiene key propia. */
   uses_own_key: boolean;
+  /** Dominios o emails que se unen sin invitación. */
+  join_rules: string[];
 }
 
 export interface OrgOut {

@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     # queda como miembro de esa organización sin pasar por una invitación.
     # Solo Google: el registro con contraseña no verifica el email, y sin eso
     # cualquiera se inventaría una casilla del colegio para entrar.
+    # El mismo dominio puede repetirse con varias organizaciones (sedes): en
+    # ese caso no entra solo, se le pregunta de cuál es. Lo mismo se puede
+    # configurar sin reiniciar desde el panel de superadmin (join_rules).
     auto_join_domains: str = ""
 
     @property
@@ -110,14 +113,14 @@ class Settings(BaseSettings):
         return [e.strip().lower() for e in self.superadmin_emails.split(",") if e.strip()]
 
     @property
-    def auto_join_domain_map(self) -> dict[str, str]:
-        """{dominio: slug}. Las entradas mal formadas se ignoran."""
-        out: dict[str, str] = {}
+    def auto_join_domain_map(self) -> dict[str, list[str]]:
+        """{dominio: [slugs]}. Las entradas mal formadas se ignoran."""
+        out: dict[str, list[str]] = {}
         for entry in self.auto_join_domains.split(","):
             domain, sep, slug = entry.partition("=")
             domain, slug = domain.strip().lower().lstrip("@"), slug.strip()
-            if sep and domain and slug:
-                out[domain] = slug
+            if sep and domain and slug and slug not in out.get(domain, []):
+                out.setdefault(domain, []).append(slug)
         return out
 
     @model_validator(mode="after")

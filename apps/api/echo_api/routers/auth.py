@@ -27,6 +27,7 @@ from ..security import (
     new_refresh_token,
     verify_password,
 )
+from ..services import org_join
 from ..services.audit import audit
 from ..services.default_reasons import add_default_reasons
 
@@ -120,37 +121,11 @@ async def _issue_refresh(db: AsyncSession, user: User, request: Request) -> str:
 
 
 async def join_domain_organizations(db: AsyncSession, user: User) -> None:
-    """Suma al usuario a la organización de su dominio (AUTO_JOIN_DOMAINS).
+    """Alta sin invitación por dominio o email (ver services/org_join.py).
 
-    Solo para cuentas vinculadas a Google: es la única vía en la que Echo
-    sabe que el email es de quien dice ser. Entra como `member`; subirle el
-    rol sigue siendo decisión de un admin. No hace commit: lo hace quien llama.
+    No hace commit: lo hace quien llama.
     """
-    if not user.google_sub:
-        return
-    domain = user.email.rsplit("@", 1)[-1].lower()
-    slug = get_settings().auto_join_domain_map.get(domain)
-    if not slug:
-        return
-    org = (
-        await db.execute(
-            select(Organization).where(Organization.slug == slug, Organization.deleted_at.is_(None))
-        )
-    ).scalar_one_or_none()
-    if org is None:
-        return
-    already = (
-        await db.execute(
-            select(OrganizationMember).where(
-                OrganizationMember.organization_id == org.id,
-                OrganizationMember.user_id == user.id,
-            )
-        )
-    ).scalar_one_or_none()
-    if already:
-        return
-    db.add(OrganizationMember(organization_id=org.id, user_id=user.id, role="member"))
-    await audit(db, org.id, user.id, "org.domain_joined", "organization", str(org.id))
+    await org_join.auto_join(db, user)
 
 
 async def _session_payload(db: AsyncSession, user: User) -> SessionOut:
@@ -290,6 +265,45 @@ async def create_organization(
     await audit(db, org.id, user.id, "org.create", "organization", str(org.id))
     await db.commit()
     return OrgOut(id=org.id, name=org.name, slug=org.slug, role="owner")
+
+
+class JoinOptionOut(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
+class JoinOptionsOut(BaseModel):
+    # True: hay organizaciones para su dominio pero entró con contraseña; la
+    # pantalla le pide que entre con Google.
+    requires_google: bool
+    organizations: list[JoinOptionOut]
+
+
+@router.get("/join-options", response_model=JoinOptionsOut)
+async def join_options(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Sedes entre las que tiene que elegir quien entra sin organización."""
+    choice = await org_join.pending_choice(db, user)
+    return JoinOptionsOut(
+        requires_google=choice.requires_google,
+        organizations=[JoinOptionOut(id=org.id, name=org.name) for org in choice.organizations],
+    )
+
+
+class JoinIn(BaseModel):
+    organization_id: uuid.UUID
+
+
+@router.post("/join", response_model=OrgOut)
+async def join_organization(
+    data: JoinIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
+    try:
+        org = await org_join.join_chosen(db, user, data.organization_id)
+    except org_join.NotAllowed as error:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(error)) from error
+    await db.commit()
+    role = next(o.role for o in await _user_orgs(db, user.id) if o.id == org.id)
+    return OrgOut(id=org.id, name=org.name, slug=org.slug, role=role)
 
 
 class AcceptInviteIn(BaseModel):

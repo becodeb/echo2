@@ -25,6 +25,7 @@ from ..models import (
     User,
 )
 from ..security import decrypt_secret, encrypt_secret, mask_secret
+from ..services import org_join
 from ..services.ai_settings import resolve_llm
 from ..services.llm import LLMError, get_llm_provider
 from ..services.audit import audit
@@ -54,6 +55,8 @@ class AdminOrgOut(BaseModel):
     llm_model: str | None
     llm_api_key_masked: str | None
     uses_own_key: bool
+    # Dominios o emails que se unen solos (services/org_join.py).
+    join_rules: list[str] = []
 
 
 class AdminOrgAIIn(BaseModel):
@@ -121,9 +124,38 @@ async def list_organizations(
                     mask_secret(decrypt_secret(row.llm_api_key_enc) or "") if own_key else None
                 ),
                 uses_own_key=own_key,
+                join_rules=org.join_rules or [],
             )
         )
     return out
+
+
+class JoinRulesIn(BaseModel):
+    rules: list[str] = Field(max_length=100)
+
+
+@router.put("/organizations/{org_id}/join-rules", response_model=list[str])
+async def set_join_rules(
+    org_id: uuid.UUID,
+    data: JoinRulesIn,
+    admin: User = Depends(get_superadmin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Quién se une sin invitación: dominios del colegio o emails puntuales."""
+    org = await db.get(Organization, org_id)
+    if not org or org.deleted_at is not None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Organización no encontrada")
+    try:
+        rules = org_join.normalize_rules(data.rules)
+    except org_join.InvalidRule as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(error)) from error
+    org.join_rules = rules
+    await audit(
+        db, org_id, admin.id, "admin.org_join_rules", "organization", str(org_id),
+        detail={"by": admin.email, "rules": rules},
+    )
+    await db.commit()
+    return rules
 
 
 @router.put("/organizations/{org_id}/ai", response_model=AdminOrgOut)
@@ -196,6 +228,7 @@ async def set_organization_ai(
         llm_model=resolved.model if resolved else None,
         llm_api_key_masked=mask_secret(plain) if plain else None,
         uses_own_key=bool(row.llm_api_key_enc),
+        join_rules=org.join_rules or [],
     )
 
 

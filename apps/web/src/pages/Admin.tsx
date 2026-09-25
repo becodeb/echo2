@@ -83,6 +83,8 @@ function OrgRow({ org }: { org: AdminOrgOut }) {
         </div>
       </div>
 
+      <JoinRules org={org} />
+
       <p className="text-sm text-ink-500">
         {org.llm_provider ? (
           <>
@@ -149,6 +151,94 @@ function OrgRow({ org }: { org: AdminOrgOut }) {
         </div>
       )}
     </Card>
+  );
+}
+
+/**
+ * Quién entra a esta organización sin invitación: dominios del colegio o
+ * emails puntuales. Si dos organizaciones comparten dominio (dos sedes), a
+ * quien entra se le pregunta de cuál es.
+ */
+function JoinRules({ org }: { org: AdminOrgOut }) {
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  const save = useMutation({
+    mutationFn: (rules: string[]) =>
+      api<string[]>(`/api/admin/organizations/${org.id}/join-rules`, {
+        method: "PUT",
+        skipOrg: true,
+        body: JSON.stringify({ rules }),
+      }),
+    onSuccess: () => {
+      setEditing(false);
+      queryClient.invalidateQueries({ queryKey: ["admin-orgs"] });
+    },
+  });
+
+  if (!editing) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-ink-500">Se unen solos:</span>
+        {org.join_rules.length === 0 ? (
+          <span className="text-ink-400">nadie (solo por invitación)</span>
+        ) : (
+          org.join_rules.map((rule) => (
+            <Badge key={rule} tone={rule.includes("@") ? "sky" : "indigo"}>
+              {rule.includes("@") ? rule : `@${rule}`}
+            </Badge>
+          ))
+        )}
+        <button
+          onClick={() => {
+            setDraft(org.join_rules.join("\n"));
+            save.reset();
+            setEditing(true);
+          }}
+          className="text-sm font-medium text-accent-600 hover:underline"
+        >
+          Editar
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2 rounded-lg border border-ink-100 bg-ink-50 p-3">
+      <label className="block">
+        <span className="mb-1.5 block text-sm font-medium text-ink-700">Quién se une sin invitación</span>
+        <textarea
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          rows={3}
+          placeholder={"northfield.edu.ar\nmariana.gibson@gmail.com"}
+          className="w-full rounded-lg border border-ink-200 bg-white px-3 py-2 font-mono text-sm text-ink-900 placeholder:text-ink-400 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20"
+        />
+      </label>
+      <p className="text-xs text-ink-400">
+        Uno por renglón. Un dominio suma a todo el que entre con Google con un mail de ese dominio;
+        si otra organización tiene el mismo dominio (otra sede), se le pregunta de cuál es. Un email
+        exacto suma a esa persona directo. Correos públicos como gmail.com no se aceptan como
+        dominio.
+      </p>
+      {save.isError && (
+        <p className="text-sm text-red-600">
+          {save.error instanceof Error ? save.error.message : "No se pudo guardar"}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <Button
+          onClick={() => save.mutate(draft.split(/[\n,]/).map((rule) => rule.trim()).filter(Boolean))}
+          disabled={save.isPending}
+        >
+          {save.isPending ? <Spinner /> : "Guardar"}
+        </Button>
+        <Button variant="ghost" onClick={() => setEditing(false)}>
+          Cancelar
+        </Button>
+      </div>
+    </div>
   );
 }
 

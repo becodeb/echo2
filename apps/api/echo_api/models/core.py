@@ -45,6 +45,10 @@ class Organization(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
     # Membrete del acta impresa: institución, líneas de encabezado, dirección,
     # contacto, título y logo como data URL. La forma la define el router.
     letterhead: Mapped[dict | None] = mapped_column(JSONB)
+    # Quién se une solo, sin invitación: dominios ("northfield.edu.ar") o
+    # emails exactos. Lo edita un superadmin, nunca la propia organización
+    # (podría reclamar "gmail.com"). Ver services/org_join.py.
+    join_rules: Mapped[list | None] = mapped_column(JSONB)
 
     members: Mapped[list["OrganizationMember"]] = relationship(back_populates="organization")
 
