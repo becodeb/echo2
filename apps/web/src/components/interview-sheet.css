@@ -26,6 +26,16 @@
 .entrevista-hoja :where(p) { margin: 0; }
 .entrevista-hoja b { font-weight: 700; }
 
+/* El formulario del colegio no tiene lugar para el número: va en un renglón
+ * propio arriba a la derecha y no encima del membrete, que puede ocupar todo
+ * el ancho. */
+.entrevista-hoja .ent-numero {
+  margin: 0 0 2pt;
+  text-align: right;
+  font-size: 10pt;
+  font-weight: 700;
+}
+
 .ent-membrete p {
   font-size: 10.8pt;
   line-height: 14pt;

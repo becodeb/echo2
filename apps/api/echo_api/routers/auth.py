@@ -28,6 +28,7 @@ from ..security import (
     verify_password,
 )
 from ..services.audit import audit
+from ..services.default_reasons import add_default_reasons
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -285,6 +286,7 @@ async def create_organization(
     db.add(org)
     await db.flush()
     db.add(OrganizationMember(organization_id=org.id, user_id=user.id, role="owner"))
+    add_default_reasons(db, org.id)
     await audit(db, org.id, user.id, "org.create", "organization", str(org.id))
     await db.commit()
     return OrgOut(id=org.id, name=org.name, slug=org.slug, role="owner")

@@ -18,7 +18,7 @@ from ..models import (
     Organization,
     OrganizationMember,
 )
-from ..services import acta_entrevista
+from ..services import acta_entrevista, acta_number
 from ..services.ai_settings import resolve_llm
 from ..services.audit import audit
 from ..services.llm import get_llm_provider
@@ -55,6 +55,8 @@ class MinutesOut(BaseModel):
     generation_error: str | None
     # Quien grabó la reunión confirma su acta aunque no sea admin.
     can_confirm: bool = False
+    # Número de acta; None hasta que se genera o se imprime por primera vez.
+    number: int | None = None
 
 
 @router.get("/api/meetings/{meeting_id}/minutes", response_model=MinutesOut | None)
@@ -118,6 +120,7 @@ async def get_minutes(
         generation_status=minutes.generation_status,
         generation_error=minutes.generation_error,
         can_confirm=_can_confirm(ctx, meeting),
+        number=minutes.number,
     )
 
 
@@ -288,6 +291,64 @@ async def change_minutes_status(
     await audit(db, ctx.org_id, ctx.user.id, f"minutes.status.{data.status}", "minutes", str(minutes.id))
     await db.commit()
     return await get_minutes(meeting_id, None, ctx, db)
+
+
+# ── Número de acta ───────────────────────────────────────────────
+
+
+@router.post("/api/meetings/{meeting_id}/minutes/number")
+async def assign_minutes_number(
+    meeting_id: uuid.UUID,
+    ctx: OrgContext = Depends(get_org_context),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lo llama la hoja al imprimir: devuelve el número y, si no tenía, lo asigna.
+
+    Idempotente: reimprimir devuelve siempre el mismo número.
+    """
+    meeting = await get_meeting_or_404(meeting_id, ctx, db)
+    minutes = (
+        await db.execute(select(Minutes).where(Minutes.meeting_id == meeting.id))
+    ).scalar_one_or_none()
+    if not minutes:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No hay acta para esta reunión")
+    had_number = minutes.number is not None
+    number = await acta_number.ensure_number(db, minutes.id)
+    if not had_number:
+        await audit(db, ctx.org_id, ctx.user.id, "minutes.number", "minutes", str(minutes.id))
+    await db.commit()
+    return {"number": number}
+
+
+class NumberingIn(BaseModel):
+    next_number: int = Field(ge=1, le=10_000_000)
+
+
+async def _numbering_out(db: AsyncSession, org_id: uuid.UUID) -> dict:
+    return {
+        "next_number": await acta_number.get_next_number(db, org_id),
+        "last_assigned": await acta_number.last_assigned(db, org_id),
+    }
+
+
+@router.get("/api/org/minutes-numbering")
+async def get_numbering(ctx: OrgContext = Depends(get_org_context), db: AsyncSession = Depends(get_db)):
+    return await _numbering_out(db, ctx.org_id)
+
+
+@router.put("/api/org/minutes-numbering")
+async def update_numbering(
+    data: NumberingIn, ctx: OrgContext = Depends(get_org_context), db: AsyncSession = Depends(get_db)
+):
+    """Fija desde qué número sigue la numeración (para continuar la del sistema anterior)."""
+    ctx.require_role("admin")
+    try:
+        await acta_number.set_next_number(db, ctx.org_id, data.next_number)
+    except acta_number.NumberTooLow as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error
+    await audit(db, ctx.org_id, ctx.user.id, "minutes_numbering.update", "organization", str(ctx.org_id))
+    await db.commit()
+    return await _numbering_out(db, ctx.org_id)
 
 
 # ── Resúmenes ────────────────────────────────────────────────────

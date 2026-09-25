@@ -32,6 +32,23 @@
   cursor: pointer;
 }
 .acta-print-btn:hover { background: #23293a; }
+.acta-print-btn:disabled { opacity: 0.6; cursor: wait; }
+.acta-print-error {
+  max-width: 800px;
+  margin: 0 auto 16px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 14px;
+}
+.acta-print-numero {
+  margin: 0 0 8px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 700;
+  color: #141824;
+}
 
 .acta-hoja-print {
   max-width: 800px;

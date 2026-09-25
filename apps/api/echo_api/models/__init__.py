@@ -37,7 +37,7 @@ from .meetings import (
     SpeakerProfile,
     TranscriptSegment,
 )
-from .minutes import Minutes, MinutesTemplate, MinutesVersion
+from .minutes import Minutes, MinutesCounter, MinutesTemplate, MinutesVersion
 from .workspace import (
     AuditLog,
     Comment,
@@ -65,7 +65,7 @@ __all__ = [
     "EMBEDDING_DIM", "Meeting", "MeetingParticipant", "Speaker", "SpeakerProfile",
     "TranscriptSegment", "SegmentRevision", "Bookmark", "MeetingLink",
     "MeetingTopic", "Decision", "ActionItem", "Question", "Risk", "MeetingSummary",
-    "Minutes", "MinutesVersion", "MinutesTemplate",
+    "Minutes", "MinutesVersion", "MinutesTemplate", "MinutesCounter",
     "Project", "ProjectMeeting", "Comment", "SharedLink", "MeetingShare",
     "Device", "DevicePairCode", "OrgAISettings", "OrgDictionaryEntry", "OrgProtectedName",
     "AuditLog", "Notification", "MemoryEntity", "MemoryRelation",

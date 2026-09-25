@@ -31,6 +31,9 @@ async def _get_minutes_markdown(db: AsyncSession, meeting_id: uuid.UUID) -> str:
     ).scalar_one_or_none()
     if not version:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Acta sin contenido")
+    # El número va también en las exportaciones: un PDF bajado se imprime igual.
+    if minutes.number is not None:
+        return f"**Acta N.º {minutes.number}**\n\n{version.body_markdown}"
     return version.body_markdown
 
 

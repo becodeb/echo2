@@ -167,6 +167,8 @@ export interface MinutesOut {
     created_by: string | null;
   } | null;
   versions: { version: number; note: string | null; created_at: string; model_used: string | null }[];
+  /** Número de acta, correlativo por organización. null hasta que se genera o se imprime. */
+  number: number | null;
   // "verifying": el acta ya se puede leer e imprimir; falta la verificación.
   generation_status: "idle" | "generating" | "verifying" | "ok" | "failed";
   generation_error: string | null;

@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
@@ -33,13 +34,45 @@ export default function ActaPrint() {
   });
 
   const ready = !!meeting && minutes !== undefined && !!letterhead;
+  // El número asignado y el auto-imprimir quedan atados a la reunión: la
+  // página no se remonta al pasar de un acta a otra, y un número de la
+  // anterior no puede terminar impreso en esta.
+  const [assigned, setAssigned] = useState<{ meetingId: string; number: number } | null>(null);
+  const [printing, setPrinting] = useState(false);
+  const [printError, setPrintError] = useState<string | null>(null);
+  const autoPrintedFor = useRef<string | null>(null);
+  const number = minutes?.number ?? (assigned && assigned.meetingId === id ? assigned.number : null);
+
+  // Imprimir = pedir el número (si el acta no tenía) y recién después abrir el
+  // diálogo. Sin número no se imprime: un acta sin numerar es justo lo que
+  // esto tiene que evitar.
+  const printNow = async () => {
+    setPrintError(null);
+    if (minutes?.version && number == null) {
+      setPrinting(true);
+      try {
+        const result = await api<{ number: number }>(`/api/meetings/${id}/minutes/number`, { method: "POST" });
+        // flushSync: el número tiene que estar en la hoja antes de que se abra
+        // el diálogo de impresión, que congela lo que hay pintado.
+        flushSync(() => setAssigned({ meetingId: id!, number: result.number }));
+      } catch (error) {
+        setPrintError(error instanceof Error ? error.message : "No se pudo asignar el número de acta");
+        return;
+      } finally {
+        setPrinting(false);
+      }
+    }
+    window.print();
+  };
 
   useEffect(() => {
-    if (!ready || params.get("print") !== "1") return;
+    if (!ready || params.get("print") !== "1" || autoPrintedFor.current === id) return;
+    autoPrintedFor.current = id ?? null;
     // Un respiro para que el logo (data URL) y las fuentes estén pintados.
-    const timer = window.setTimeout(() => window.print(), 400);
+    const timer = window.setTimeout(() => void printNow(), 400);
     return () => window.clearTimeout(timer);
-  }, [ready, params]);
+    // printNow cambia en cada render; lo que dispara esto es estar listo.
+  }, [ready, params, id]);
 
   if (!ready) {
     return (
@@ -64,16 +97,22 @@ export default function ActaPrint() {
         </Link>
         <div className="flex items-center gap-3">
           {minutes?.status !== "approved" && <span className="text-sm text-ink-500">Borrador</span>}
-          <button type="button" className="acta-print-btn" onClick={() => window.print()}>
-            Imprimir
+          <button type="button" className="acta-print-btn" onClick={() => void printNow()} disabled={printing}>
+            {printing ? <Spinner /> : "Imprimir"}
           </button>
         </div>
       </div>
+      {printError && (
+        <p className="acta-print-error no-print" role="alert">
+          No se imprimió: {printError}. Probá de nuevo.
+        </p>
+      )}
 
       {interview ? (
-        <InterviewSheet fields={interview} letterhead={letterhead} />
+        <InterviewSheet fields={interview} letterhead={letterhead} number={number} />
       ) : (
       <article className="acta-hoja-print">
+        {number != null && <p className="acta-print-numero">Acta N.º {number}</p>}
         <header className="acta-print-membrete">
           <div className="acta-print-lineas">
             {letterhead.lines.map((line, index) => (

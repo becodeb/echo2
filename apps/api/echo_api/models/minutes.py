@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -62,6 +62,43 @@ class Minutes(PKMixin, TimestampMixin, Base):
     )
     approved_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Número de acta: correlativo por organización y serie, asignado una sola
+    # vez (al generarse o al imprimirse, lo que pase primero) y nunca
+    # reutilizado. Ver services/acta_number.py.
+    number: Mapped[int | None] = mapped_column(Integer)
+    number_series: Mapped[str | None] = mapped_column(String(60))
+
+
+# El único que garantiza "nunca el mismo número dos veces" es este índice: el
+# contador puede reconfigurarse, la base no deja duplicar.
+Index(
+    "uq_minutes_number",
+    Minutes.organization_id,
+    Minutes.number_series,
+    Minutes.number,
+    unique=True,
+    postgresql_where=Minutes.number.isnot(None),
+)
+
+
+class MinutesCounter(PKMixin, TimestampMixin, Base):
+    """Próximo número de acta de una organización, por serie.
+
+    Hoy hay una sola serie ("general") por organización, que es la sede. La
+    columna existe para cuando cada nivel (inicial, primaria, secundaria), o
+    secundaria por motivo, lleve su propia numeración.
+    """
+
+    __tablename__ = "minutes_counters"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "series", name="uq_minutes_counter_series"),
+    )
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    series: Mapped[str] = mapped_column(String(60), nullable=False, default="general")
+    next_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
 
 class MinutesVersion(PKMixin, TimestampMixin, Base):

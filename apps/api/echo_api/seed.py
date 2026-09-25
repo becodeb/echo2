@@ -31,6 +31,7 @@ from .models import (
     User,
 )
 from .security import hash_password
+from .services.default_reasons import add_default_reasons
 
 DEMO_EMAIL = "demo@echodemo.dev"
 DEMO_PASSWORD = "demo1234"
@@ -77,6 +78,7 @@ async def seed() -> None:
         db.add(org)
         await db.flush()
         db.add(OrganizationMember(organization_id=org.id, user_id=user.id, role="owner"))
+        add_default_reasons(db, org.id)
 
         project = Project(
             organization_id=org.id, name="DOE", description="Lanzamiento del producto DOE",

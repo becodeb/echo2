@@ -62,7 +62,8 @@ export function InterviewReview({ meetingId, minutes, fields }: {
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-3 rounded-xl bg-emerald-50 px-4 py-3">
           <span className="text-sm font-medium text-emerald-800">
-            Acta confirmada{minutes.approved_at ? ` el ${new Date(minutes.approved_at).toLocaleString("es")}` : ""}.
+            {minutes.number != null ? `Acta N.º ${minutes.number} confirmada` : "Acta confirmada"}
+            {minutes.approved_at ? ` el ${new Date(minutes.approved_at).toLocaleString("es")}` : ""}.
           </span>
           <div className="ml-auto flex gap-2">
             <Button variant="ghost" onClick={() => setEditing(true)}>Corregir</Button>
@@ -73,7 +74,7 @@ export function InterviewReview({ meetingId, minutes, fields }: {
         </div>
         {letterhead && (
           <div className="overflow-x-auto rounded-xl bg-ink-100 p-4">
-            <InterviewSheet fields={fields} letterhead={letterhead} />
+            <InterviewSheet fields={fields} letterhead={letterhead} number={minutes.number} />
           </div>
         )}
       </div>

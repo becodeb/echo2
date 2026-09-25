@@ -32,6 +32,7 @@ from ..models import (
     Question,
 )
 from . import acta_entrevista
+from .acta_number import ensure_number
 from .llm import LLMError, LLMProvider
 from .transcript_util import format_ms, load_transcript_lines, transcript_to_text
 
@@ -442,6 +443,9 @@ async def _store_version(
         minutes.current_version = next_version
         minutes.generation_status = "verifying"
         minutes.generation_error = None
+        # El número sale al generarse (o al imprimir, si se imprime antes).
+        # Si ya tenía, regenerar lo conserva.
+        await ensure_number(db, minutes.id)
         await db.commit()
         return version_id
 

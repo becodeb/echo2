@@ -14,13 +14,23 @@ const MIN_RULED_LINES = 16;
  * membrete gris, logo centrado, campos punteados, casilleros Familia/Colegio,
  * el párrafo fijo y el desarrollo sobre renglones. Es lo que se imprime.
  */
-export function InterviewSheet({ fields, letterhead }: { fields: InterviewFields; letterhead: LetterheadOut }) {
+export function InterviewSheet({
+  fields,
+  letterhead,
+  number = null,
+}: {
+  fields: InterviewFields;
+  letterhead: LetterheadOut;
+  /** Número de acta; sin número (todavía no se imprimió) no se muestra. */
+  number?: number | null;
+}) {
   const [year, month, day] = fields.fecha.split("-").map(Number);
   const place = letterhead.interview_place || `la institución ${letterhead.institution}`;
   const paragraphs = fields.desarrollo.split(/\n\s*\n|\n/).map((text) => text.trim()).filter(Boolean);
 
   return (
     <article className="entrevista-hoja">
+      {number != null && <p className="ent-numero">Acta N.º {number}</p>}
       <header className="ent-membrete">
         {letterhead.lines.map((line, index) => (
           <p key={index}>{line}</p>

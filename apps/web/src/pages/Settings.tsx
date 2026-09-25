@@ -15,6 +15,7 @@ const SECTIONS = [
   { path: "reasons", label: "Motivos de reunión" },
   { path: "dictionary", label: "Diccionario" },
   { path: "template", label: "Formato de acta" },
+  { path: "numbering", label: "Numeración de actas" },
   { path: "letterhead", label: "Membrete" },
   { path: "drive", label: "Google Drive" },
   { path: "devices", label: "Dispositivos" },
@@ -50,6 +51,7 @@ export default function Settings() {
             <Route path="reasons" element={<ReasonsSection />} />
             <Route path="dictionary" element={<DictionarySection />} />
             <Route path="template" element={<TemplateSection />} />
+            <Route path="numbering" element={<NumberingSection />} />
             <Route path="letterhead" element={<LetterheadSection />} />
             <Route path="drive" element={<DriveSection />} />
             <Route path="devices" element={<DevicesSection />} />
@@ -817,6 +819,115 @@ function ReasonsSection() {
         Los motivos se desactivan en vez de borrarse: las reuniones viejas tienen que seguir
         mostrando con qué motivo se cargaron.
       </p>
+    </Card>
+  );
+}
+
+// ── Numeración de actas ──────────────────────────────────────────
+
+interface NumberingOut {
+  next_number: number;
+  last_assigned: number | null;
+}
+
+function NumberingSection() {
+  const queryClient = useQueryClient();
+  const { activeOrg } = useAuth();
+  const isAdmin = activeOrg?.role === "owner" || activeOrg?.role === "admin";
+  const [value, setValue] = useState("");
+
+  const { data: numbering, isLoading } = useQuery({
+    queryKey: ["minutes-numbering"],
+    queryFn: () => api<NumberingOut>("/api/org/minutes-numbering"),
+  });
+
+  const save = useMutation({
+    mutationFn: (nextNumber: number) =>
+      api<NumberingOut>("/api/org/minutes-numbering", {
+        method: "PUT",
+        body: JSON.stringify({ next_number: nextNumber }),
+      }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(["minutes-numbering"], data);
+      setValue("");
+    },
+  });
+
+  if (isLoading || !numbering) {
+    return <div className="flex justify-center py-10 text-ink-300"><Spinner className="h-5 w-5" /></div>;
+  }
+
+  const minimum = (numbering.last_assigned ?? 0) + 1;
+  const parsed = Number(value);
+  const valid = value.trim() !== "" && Number.isInteger(parsed) && parsed >= minimum;
+
+  return (
+    <Card className="space-y-4">
+      <div>
+        <h2 className="text-[15px] font-semibold text-ink-900">Numeración de actas</h2>
+        <p className="mt-1 text-sm text-ink-500">
+          Cada acta recibe un número correlativo de esta sede cuando se genera o se imprime por
+          primera vez, lo que pase antes. Una vez asignado no cambia, y dos actas nunca comparten
+          número, aunque se impriman al mismo tiempo desde reuniones distintas.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+        <div className="rounded-lg bg-ink-50 px-4 py-3">
+          <p className="text-xs text-ink-500">Última asignada</p>
+          <p className="text-xl font-semibold tabular-nums text-ink-900">
+            {numbering.last_assigned != null ? `N.º ${numbering.last_assigned}` : "—"}
+          </p>
+        </div>
+        <div className="rounded-lg bg-ink-50 px-4 py-3">
+          <p className="text-xs text-ink-500">Próxima</p>
+          <p className="text-xl font-semibold tabular-nums text-ink-900">N.º {numbering.next_number}</p>
+        </div>
+      </div>
+
+      {isAdmin ? (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (valid) save.mutate(parsed);
+          }}
+          className="space-y-2"
+        >
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="w-44">
+              <Input
+                label="Seguir desde el número"
+                type="number"
+                inputMode="numeric"
+                min={minimum}
+                step={1}
+                placeholder={String(numbering.next_number)}
+                value={value}
+                onChange={(event) => setValue(event.target.value)}
+              />
+            </div>
+            <Button type="submit" variant="soft" disabled={!valid || save.isPending}>
+              {save.isPending ? <Spinner /> : "Guardar"}
+            </Button>
+          </div>
+          <p className="text-xs text-ink-400">
+            Sirve para continuar la numeración que traían de antes: si el último acta en papel fue la
+            N.º 347, poné 348.
+            {numbering.last_assigned != null &&
+              ` No puede ser menor a ${minimum}: hasta la ${minimum - 1} ya están usadas.`}
+          </p>
+          {value.trim() !== "" && !valid && (
+            <p className="text-sm text-red-600">Tiene que ser un número entero desde {minimum}.</p>
+          )}
+          {save.isError && (
+            <p className="text-sm text-red-600">
+              {save.error instanceof Error ? save.error.message : "No se pudo guardar"}
+            </p>
+          )}
+        </form>
+      ) : (
+        <p className="text-xs text-ink-400">Solo un administrador puede cambiar desde qué número sigue.</p>
+      )}
     </Card>
   );
 }

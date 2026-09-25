@@ -113,6 +113,7 @@ def test_full_meeting_lifecycle(client, fake_ai):
     minutes = client.get(f"/api/meetings/{meeting_id}/minutes", headers=user.headers).json()
     assert minutes is not None
     assert "ACTA" in minutes["version"]["body_markdown"]
+    assert minutes["number"] == 1, "el acta generada recibe su número al generarse"
     assert minutes["version"]["verification"], "el acta debe venir verificada"
     assert all(claim["status"] in ("verified", "weak", "missing") for claim in minutes["version"]["verification"])
 

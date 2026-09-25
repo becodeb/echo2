@@ -651,6 +651,7 @@ function MinutesTab({ meetingId }: { meetingId: string }) {
         </div>
       )}
       <div className="flex flex-wrap items-center gap-2">
+        {minutes.number != null && <Badge tone="indigo">Acta N.º {minutes.number}</Badge>}
         {statusBadge}
         <span className="text-xs text-ink-400">
           v{minutes.version.version} · {minutes.version.note}
