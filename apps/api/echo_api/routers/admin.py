@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..db import get_db
 from ..deps import get_current_user
 from ..models import (
+    LEVELS,
     Meeting,
     OrgAISettings,
     Organization,
@@ -25,7 +26,7 @@ from ..models import (
     User,
 )
 from ..security import decrypt_secret, encrypt_secret, mask_secret
-from ..services import org_join
+from ..services import meeting_move, org_join
 from ..services.ai_settings import resolve_llm
 from ..services.llm import LLMError, get_llm_provider
 from ..services.audit import audit
@@ -230,6 +231,43 @@ async def set_organization_ai(
         uses_own_key=bool(row.llm_api_key_enc),
         join_rules=org.join_rules or [],
     )
+
+
+# ── Mover una reunión de sede ────────────────────────────────────
+
+
+class MoveMeetingIn(BaseModel):
+    organization_id: uuid.UUID
+    level: str | None = "primaria"
+
+
+@router.post("/meetings/{meeting_id}/move")
+async def move_meeting_to_org(
+    meeting_id: uuid.UUID,
+    data: MoveMeetingIn,
+    admin: User = Depends(get_superadmin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Pasa una reunión grabada en la organización equivocada a la correcta."""
+    meeting = await db.get(Meeting, meeting_id)
+    if not meeting or meeting.deleted_at is not None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Reunión no encontrada")
+    target = await db.get(Organization, data.organization_id)
+    if not target or target.deleted_at is not None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Organización no encontrada")
+    if data.level is not None and data.level not in LEVELS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Nivel desconocido")
+    if target.id == meeting.organization_id:
+        raise HTTPException(status.HTTP_409_CONFLICT, "La reunión ya está en esa organización")
+
+    source_id = meeting.organization_id
+    await meeting_move.move_meeting(db, meeting, target.id, data.level)
+    # Queda en el historial de las dos: una sede perdió la reunión y otra la ganó.
+    detail = {"by": admin.email, "from": str(source_id), "to": str(target.id), "title": meeting.title}
+    await audit(db, source_id, admin.id, "admin.meeting_moved_out", "meeting", str(meeting.id), detail=detail)
+    await audit(db, target.id, admin.id, "admin.meeting_moved_in", "meeting", str(meeting.id), detail=detail)
+    await db.commit()
+    return {"meeting_id": str(meeting.id), "organization_id": str(target.id), "level": meeting.level}
 
 
 # ── Default de IA de toda la instalación ─────────────────────────

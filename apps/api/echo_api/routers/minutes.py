@@ -54,6 +54,9 @@ class MinutesOut(BaseModel):
     # para saber si tiene que seguir esperando o mostrar el motivo de la falla.
     generation_status: str
     generation_error: str | None
+    # Cuándo arrancó la generación en curso: si pasa mucho, la pantalla ofrece
+    # reintentar (el proceso pudo morir en un reinicio y nadie lo va a cerrar).
+    generation_started_at: datetime | None = None
     # Quien grabó la reunión confirma su acta aunque no sea admin.
     can_confirm: bool = False
     # Número de acta; None hasta que se genera o se imprime por primera vez.
@@ -120,6 +123,7 @@ async def get_minutes(
         ],
         generation_status=minutes.generation_status,
         generation_error=minutes.generation_error,
+        generation_started_at=minutes.generation_started_at,
         can_confirm=_can_confirm(ctx, meeting),
         number=minutes.number,
     )

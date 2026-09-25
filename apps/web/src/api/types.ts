@@ -177,6 +177,7 @@ export interface MinutesOut {
   // "verifying": el acta ya se puede leer e imprimir; falta la verificación.
   generation_status: "idle" | "generating" | "verifying" | "ok" | "failed";
   generation_error: string | null;
+  generation_started_at: string | null;
   /** Quien grabó la reunión (o un admin) puede confirmar el acta. */
   can_confirm: boolean;
 }

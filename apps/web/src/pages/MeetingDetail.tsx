@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
-import type { ChatOut, InsightsOut, MeetingOut, MinutesOut, SegmentOut } from "../api/types";
+import type { AdminOrgOut, ChatOut, InsightsOut, MeetingOut, MinutesOut, SegmentOut } from "../api/types";
+import { useAuth } from "../state/auth";
 import { Badge, Button, Card, EmptyState, Input, Modal, Spinner, formatDate, formatDuration, formatMs } from "../components/ui";
 import { EchoFace } from "../components/EchoFace";
 import { ClassificationPanel } from "../components/ClassificationPanel";
@@ -11,7 +12,7 @@ import { AnswerText } from "../components/AnswerText";
 import { MarkdownView } from "../components/MarkdownView";
 import { InterviewReview } from "../components/InterviewReview";
 import { Select } from "../components/Select";
-import { LEVEL_LABEL, useMyAccess, type Level } from "../state/access";
+import { LEVELS, LEVEL_LABEL, useMyAccess, type Level } from "../state/access";
 
 const TASK_STATUS_OPTIONS = [
   { value: "pending", label: "Pendiente" },
@@ -39,6 +40,7 @@ type TabId = (typeof TABS)[number]["id"];
 
 export default function MeetingDetail() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
   const [params, setParams] = useSearchParams();
   const [tab, setTab] = useState<TabId>((params.get("tab") as TabId) || "summary");
   const jumpMs = params.get("t");
@@ -76,7 +78,8 @@ export default function MeetingDetail() {
             </Badge>
           )}
           {meeting.status === "failed" && <Badge tone="red">Falló</Badge>}
-          <div className="ml-auto">
+          <div className="ml-auto flex gap-2">
+            {user?.is_superadmin && <MoveMeetingButton meeting={meeting} />}
             <ShareButton meetingId={meeting.id} />
           </div>
         </div>
@@ -128,6 +131,84 @@ export default function MeetingDetail() {
       {tab === "tasks" && <TasksTab meetingId={meeting.id} />}
       {tab === "chat" && <ChatTab meetingId={meeting.id} onJump={(ms) => { params.set("t", String(ms)); setParams(params); setTab("transcript"); }} />}
     </div>
+  );
+}
+
+// ── Mover de sede (superadmin) ───────────────────────────────────
+
+/**
+ * Para reuniones grabadas en la organización equivocada. Se mueve todo lo de
+ * la reunión; el acta se regenera después en la sede nueva para que salga
+ * con su formato (services/meeting_move.py).
+ */
+function MoveMeetingButton({ meeting }: { meeting: MeetingOut }) {
+  const { activeOrg, switchOrg } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [target, setTarget] = useState("");
+  const [level, setLevel] = useState<Level>("primaria");
+
+  const { data: orgs } = useQuery({
+    queryKey: ["admin-orgs"],
+    queryFn: () => api<AdminOrgOut[]>("/api/admin/organizations", { skipOrg: true }),
+    enabled: open,
+  });
+
+  const move = useMutation({
+    mutationFn: () =>
+      api(`/api/admin/meetings/${meeting.id}/move`, {
+        method: "POST",
+        skipOrg: true,
+        body: JSON.stringify({ organization_id: target, level }),
+      }),
+    onSuccess: () => {
+      // La reunión ahora vive en la otra sede: se entra ahí, al acta.
+      switchOrg(target);
+      window.location.href = `/meetings/${meeting.id}?tab=minutes`;
+    },
+  });
+
+  const options = (orgs ?? [])
+    .filter((org) => org.id !== activeOrg?.id)
+    .map((org) => ({ value: org.id, label: org.name }));
+
+  return (
+    <>
+      <Button variant="ghost" onClick={() => setOpen(true)}>Mover de sede</Button>
+      <Modal open={open} onClose={() => setOpen(false)} title="Mover a otra sede">
+        <div className="space-y-4">
+          <p className="text-sm text-ink-600">
+            Pasa «{meeting.title}» con su transcripción, acta y tareas a otra organización. Se sueltan la
+            familia, el motivo y los proyectos, que son de la sede actual. Después regenerá el acta para que
+            salga con el formato de la sede nueva.
+          </p>
+          <Select
+            label="Sede"
+            value={target}
+            onChange={setTarget}
+            options={options}
+            placeholder={orgs ? "Elegir sede…" : "Cargando…"}
+            searchPlaceholder="Buscar sede…"
+          />
+          <Select
+            label="Nivel"
+            value={level}
+            onChange={(next) => setLevel(next as Level)}
+            options={LEVELS.map((item) => ({ value: item.value, label: item.label }))}
+          />
+          {move.isError && (
+            <p className="text-sm text-red-600">
+              {move.error instanceof Error ? move.error.message : "No se pudo mover"}
+            </p>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button onClick={() => move.mutate()} disabled={!target || move.isPending}>
+              {move.isPending ? <Spinner /> : "Mover"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </>
   );
 }
 
@@ -590,6 +671,19 @@ function MinutesTab({ meetingId }: { meetingId: string }) {
     minutes?.generation_status === "generating" || regenerate.isPending || regenerate.isSuccess;
   const generationFailed = minutes?.generation_status === "failed";
   const verifying = minutes?.generation_status === "verifying";
+  // Un acta normal sale en 1 a 3 minutos. Si "genera" hace más de 10, lo más
+  // probable es que el proceso haya muerto en un reinicio: se ofrece reintentar.
+  const stuck =
+    minutes?.generation_status === "generating" &&
+    !!minutes.generation_started_at &&
+    Date.now() - new Date(minutes.generation_started_at).getTime() > 10 * 60_000 &&
+    !regenerate.isPending;
+  const retryStuck = stuck && (
+    <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-sm">
+      <span className="text-ink-500">Está tardando más de lo normal.</span>
+      <Button variant="soft" onClick={() => regenerate.mutate()}>Reintentar</Button>
+    </div>
+  );
 
   if (!minutes || !minutes.version) {
     if (generating && !generationFailed) {
@@ -597,6 +691,7 @@ function MinutesTab({ meetingId }: { meetingId: string }) {
         <Card>
           <EmptyState title="Echo está redactando el acta…" mood="thinking">
             <p>Lee el transcript y arma el acta con el modelo de tu organización. Suele estar en menos de un minuto.</p>
+            {retryStuck}
           </EmptyState>
         </Card>
       );
