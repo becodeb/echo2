@@ -124,13 +124,21 @@
 @media print {
   .no-print { display: none !important; }
   .acta-print { background: #ffffff; padding: 0; min-height: auto; }
+  /* Los márgenes los pone la hoja y no @page: con margen de página, el
+   * navegador escribe ahí la URL, la fecha y el título, que en un acta no
+   * van. clone repite el margen en cada hoja si el acta pasa de una. */
   .acta-hoja-print {
     max-width: none;
     margin: 0;
-    padding: 0;
+    padding: 18mm 16mm;
     box-shadow: none;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
   }
-  @page { size: A4; margin: 18mm 16mm; }
+  /* Sin nombre a propósito: Safari (iPhone) no soporta páginas con nombre,
+   * así que el "@page entrevista" de la hoja de entrevista no le llega. Esta
+   * regla cubre las dos hojas en todos los navegadores. */
+  @page { size: A4; margin: 0; }
   /* El scroll propio de las tablas es para la pantalla del celular: en el
    * papel recortaría columnas. */
   .acta-hoja-print .overflow-x-auto { overflow: visible; }
