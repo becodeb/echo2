@@ -266,6 +266,29 @@ export interface ReasonOut {
 
 export type Severity = "verde" | "amarillo" | "rojo";
 
+/** Una reunión en el panel de la familia (GET /api/families/{id}/meetings). */
+export interface FamilyMeetingOut {
+  id: string;
+  title: string;
+  status: string;
+  started_at: string | null;
+  created_at: string;
+  duration_seconds: number;
+  level: string | null;
+  reason_id: string | null;
+  reason_name: string | null;
+  severity: Severity | null;
+  audience: Audience | null;
+  minutes_status: "draft" | "in_review" | "approved" | null;
+  minutes_number: number | null;
+  /** null = no se registró asistencia, que no es lo mismo que "faltaron". */
+  all_guardians_present: boolean | null;
+  attended: string[];
+  professionals: string[];
+  /** Primeros puntos del resumen ejecutivo. */
+  summary: string[];
+}
+
 export interface AttendanceRow {
   member_id: string;
   name: string;

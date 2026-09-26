@@ -1,7 +1,8 @@
-import { useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { FamilyMemberOut, FamilyOut, ProfessionalOut } from "../api/types";
+import { FamilyMeetingsPanel } from "../components/FamilyMeetingsPanel";
 import { Select } from "../components/Select";
 import { Badge, Button, Card, EmptyState, Input, Modal, Spinner } from "../components/ui";
 
@@ -371,6 +372,8 @@ export default function Families() {
   const [tab, setTab] = useState<"familias" | "profesionales">("familias");
   const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [panelId, setPanelId] = useState<string | null>(null);
+  const closePanel = useCallback(() => setPanelId(null), []);
   const [form, setForm] = useState({ name: "", reference: "", drive_url: "" });
   const [search, setSearch] = useState("");
 
@@ -396,6 +399,8 @@ export default function Families() {
       queryClient.invalidateQueries({ queryKey: ["families"] });
     },
   });
+
+  const panelFamily = (families ?? []).find((family) => family.id === panelId);
 
   const term = search.trim().toLowerCase();
   const visible = (families ?? []).filter(
@@ -458,16 +463,25 @@ export default function Families() {
               return (
                 <Card key={family.id} className="space-y-3">
                   <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-[15px] font-semibold text-ink-900">{family.name}</h3>
+                    {/* Tocar la familia abre sus reuniones; "Detalle" edita integrantes y demás. */}
+                    <button
+                      type="button"
+                      onClick={() => setPanelId(family.id)}
+                      className="group min-w-0 flex-1 text-left"
+                    >
+                      <h3 className="text-[15px] font-semibold text-ink-900 group-hover:text-accent-600">
+                        {family.name}
+                      </h3>
                       <p className="mt-0.5 text-sm text-ink-500">
                         {family.reference && <>Legajo {family.reference} · </>}
                         {guardians} {guardians === 1 ? "responsable" : "responsables"} ·{" "}
-                        {family.meetings} {family.meetings === 1 ? "reunión" : "reuniones"}
+                        <span className="font-medium text-accent-600 group-hover:underline">
+                          {family.meetings} {family.meetings === 1 ? "reunión" : "reuniones"}
+                        </span>
                         {family.professionals.length > 0 &&
                           ` · ${family.professionals.length} prof.`}
                       </p>
-                    </div>
+                    </button>
                     <div className="flex items-center gap-2">
                       {family.drive_url && (
                         <a
@@ -479,7 +493,10 @@ export default function Families() {
                           Drive ↗
                         </a>
                       )}
-                      <Button variant="soft" onClick={() => setOpenId(open ? null : family.id)}>
+                      <Button variant="soft" onClick={() => setPanelId(family.id)}>
+                        Reuniones
+                      </Button>
+                      <Button variant="ghost" onClick={() => setOpenId(open ? null : family.id)}>
                         {open ? "Cerrar" : "Detalle"}
                       </Button>
                     </div>
@@ -496,6 +513,8 @@ export default function Families() {
           </div>
         </>
       )}
+
+      {panelFamily && <FamilyMeetingsPanel family={panelFamily} onClose={closePanel} />}
 
       <Modal open={creating} onClose={() => setCreating(false)} title="Nueva familia">
         <form

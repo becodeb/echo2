@@ -5,6 +5,7 @@ gravedad y quién de la familia vino. Va todo junto en un solo PUT porque en la
 práctica se completa de una sola sentada, al terminar la reunión.
 """
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -25,6 +26,8 @@ from ..models import (
     MeetingAttendance,
     MeetingProfessionalAttendance,
     MeetingReason,
+    MeetingSummary,
+    Minutes,
     Professional,
 )
 from ..services.access import meeting_filter
@@ -561,6 +564,143 @@ async def update_reason(
         await db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, "Ya existe un motivo con ese nombre") from None
     return ReasonOut.model_validate(reason)
+
+
+# ── Reuniones de una familia ─────────────────────────────────────
+
+
+class FamilyMeetingOut(BaseModel):
+    id: uuid.UUID
+    title: str
+    status: str
+    started_at: datetime | None
+    created_at: datetime
+    duration_seconds: int
+    level: str | None
+    reason_id: uuid.UUID | None
+    reason_name: str | None
+    severity: str | None
+    audience: str | None
+    minutes_status: str | None
+    minutes_number: int | None
+    # None = no se registró asistencia (no es lo mismo que "no vinieron").
+    all_guardians_present: bool | None
+    attended: list[str]
+    professionals: list[str]
+    # Los primeros puntos del resumen ejecutivo, para reconocer la reunión.
+    summary: list[str]
+
+
+@router.get("/api/families/{family_id}/meetings", response_model=list[FamilyMeetingOut])
+async def list_family_meetings(
+    family_id: uuid.UUID,
+    ctx: OrgContext = Depends(get_org_context),
+    db: AsyncSession = Depends(get_db),
+):
+    """Todas las reuniones de la familia que quien mira puede ver.
+
+    Sin paginar: una familia tiene decenas de reuniones, no miles, y los
+    filtros (fecha, gravedad, motivo) se aplican en la pantalla.
+    """
+    family = await _get_family(family_id, ctx, db)
+    meetings = (
+        (
+            await db.execute(
+                select(Meeting)
+                .where(
+                    Meeting.organization_id == ctx.org_id,
+                    Meeting.family_id == family.id,
+                    Meeting.deleted_at.is_(None),
+                    meeting_filter(await ctx.scope(db)),
+                )
+                .order_by(func.coalesce(Meeting.started_at, Meeting.created_at).desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if not meetings:
+        return []
+    ids = [m.id for m in meetings]
+
+    reason_ids = {m.reason_id for m in meetings if m.reason_id}
+    reasons = {}
+    if reason_ids:
+        reasons = dict(
+            (await db.execute(select(MeetingReason.id, MeetingReason.name).where(MeetingReason.id.in_(reason_ids)))).all()
+        )
+
+    minutes = {
+        row.meeting_id: row
+        for row in (await db.execute(select(Minutes).where(Minutes.meeting_id.in_(ids)))).scalars()
+    }
+
+    members = (
+        (await db.execute(select(FamilyMember).where(FamilyMember.family_id == family.id).order_by(FamilyMember.name)))
+        .scalars()
+        .all()
+    )
+    guardians = [m for m in members if m.is_guardian]
+    attendance: dict[uuid.UUID, dict[uuid.UUID, bool]] = {}
+    for row in (await db.execute(select(MeetingAttendance).where(MeetingAttendance.meeting_id.in_(ids)))).scalars():
+        attendance.setdefault(row.meeting_id, {})[row.family_member_id] = row.attended
+
+    pros: dict[uuid.UUID, list[str]] = {}
+    for meeting_id, name in (
+        await db.execute(
+            select(MeetingProfessionalAttendance.meeting_id, Professional.name)
+            .join(Professional, Professional.id == MeetingProfessionalAttendance.professional_id)
+            .where(
+                MeetingProfessionalAttendance.meeting_id.in_(ids),
+                MeetingProfessionalAttendance.attended.is_(True),
+            )
+            .order_by(Professional.name)
+        )
+    ).all():
+        pros.setdefault(meeting_id, []).append(name)
+
+    summaries = {
+        row.meeting_id: row.content
+        for row in (
+            await db.execute(
+                select(MeetingSummary).where(
+                    MeetingSummary.meeting_id.in_(ids), MeetingSummary.kind == "executive"
+                )
+            )
+        ).scalars()
+    }
+
+    out = []
+    for m in meetings:
+        rows = attendance.get(m.id, {})
+        all_present = None
+        # Mismo criterio que la clasificación: sin registro es "no se sabe".
+        if guardians and any(g.id in rows for g in guardians):
+            all_present = all(rows.get(g.id, False) for g in guardians)
+        points = (summaries.get(m.id) or {}).get("points") or []
+        acta = minutes.get(m.id)
+        out.append(
+            FamilyMeetingOut(
+                id=m.id,
+                title=m.title,
+                status=m.status,
+                started_at=m.started_at,
+                created_at=m.created_at,
+                duration_seconds=m.duration_seconds,
+                level=m.level,
+                reason_id=m.reason_id,
+                reason_name=reasons.get(m.reason_id),
+                severity=m.severity,
+                audience=m.audience,
+                minutes_status=acta.status if acta else None,
+                minutes_number=acta.number if acta else None,
+                all_guardians_present=all_present,
+                attended=[mem.name for mem in members if rows.get(mem.id)],
+                professionals=pros.get(m.id, []),
+                summary=[str(p) for p in points[:3]],
+            )
+        )
+    return out
 
 
 # ── Clasificación de una reunión ─────────────────────────────────
