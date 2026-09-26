@@ -77,17 +77,25 @@ def pcm16_to_wav(pcm16: bytes, sample_rate: int, channels: int = 1) -> bytes:
     return buffer.getvalue()
 
 
+OPENAI_LIVE_MODEL = "gpt-4o-transcribe"
+OPENAI_FILE_MODEL = "gpt-4o-transcribe-diarize"
+
+
 def get_stt_provider(provider: str, api_key: str, model: str | None = None) -> TranscriptionProvider:
     from .fake import FakeSttProvider
     from .whisper_api import WhisperApiProvider
 
     provider = (provider or "").lower()
     if provider == "openai":
+        # Sin modelo elegido por la sede: en vivo el que mejor transcribe y
+        # respeta el diccionario; un archivo entero, el que separa hablantes
+        # (ver whisper_api.py). Un modelo elegido a mano se usa para los dos.
         return WhisperApiProvider(
             name="openai",
             base_url="https://api.openai.com/v1",
             api_key=api_key,
-            model=model or "whisper-1",
+            model=model or OPENAI_LIVE_MODEL,
+            file_model=model or OPENAI_FILE_MODEL,
         )
     if provider == "groq":
         return WhisperApiProvider(

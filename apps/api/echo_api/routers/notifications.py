@@ -12,6 +12,10 @@ from ..models import Notification
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
 
+# Avisos de la plataforma a toda la gente (ej. una mejora). La web los muestra
+# emergentes una sola vez; se cargan con una migración.
+ANNOUNCEMENT_PREFIX = "announcement:"
+
 
 @router.get("")
 async def list_notifications(
@@ -71,9 +75,17 @@ async def mark_read(
     ctx: OrgContext = Depends(get_org_context),
     db: AsyncSession = Depends(get_db),
 ):
+    notification = await db.get(Notification, notification_id)
+    if notification is None or notification.user_id != ctx.user.id:
+        return
+    condition = Notification.id == notification.id
+    # Un anuncio se ve una vez por persona, no una por sede: cerrarlo en una
+    # lo cierra en todas.
+    if notification.kind.startswith(ANNOUNCEMENT_PREFIX):
+        condition = Notification.kind == notification.kind
     await db.execute(
         update(Notification)
-        .where(Notification.id == notification_id, Notification.user_id == ctx.user.id)
+        .where(condition, Notification.user_id == ctx.user.id, Notification.read_at.is_(None))
         .values(read_at=datetime.now(UTC))
     )
     await db.commit()

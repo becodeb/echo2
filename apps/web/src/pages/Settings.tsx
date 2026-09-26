@@ -320,7 +320,7 @@ function AISection() {
           />
           <Input
             label="Modelo"
-            placeholder="whisper-1 · gpt-4o-transcribe-diarize (separa hablantes)"
+            placeholder="gpt-4o-transcribe (default) · gpt-4o-transcribe-diarize (separa hablantes, sin diccionario)"
             value={form.stt_model ?? ""}
             onChange={set("stt_model")}
           />

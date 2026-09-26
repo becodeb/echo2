@@ -61,6 +61,13 @@ class AISettingsIn(BaseModel):
     minutes_language: str | None = None
 
 
+def _default_stt_model(provider: str) -> str | None:
+    """El modelo que usa un proveedor cuando la sede no eligió ninguno."""
+    from ..services.stt.base import OPENAI_LIVE_MODEL
+
+    return {"openai": OPENAI_LIVE_MODEL, "groq": "whisper-large-v3-turbo", "deepgram": "nova-2"}.get(provider)
+
+
 def _masked(encrypted: str | None) -> str | None:
     if not encrypted:
         return None
@@ -75,7 +82,7 @@ async def _effective(db: AsyncSession, org_id) -> dict:
     embeddings = await resolve_embeddings(db, org_id)
     return {
         "llm": {"provider": llm.provider, "model": llm.model} if llm else None,
-        "stt": {"provider": stt.provider, "model": stt.model or "whisper-1"} if stt else None,
+        "stt": {"provider": stt.provider, "model": stt.model or _default_stt_model(stt.provider)} if stt else None,
         "embeddings": (
             {"provider": embeddings.provider, "model": embeddings.model} if embeddings else None
         ),

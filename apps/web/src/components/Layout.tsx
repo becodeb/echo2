@@ -8,6 +8,7 @@ import { useMyAccess } from "../state/access";
 import { useSeesInternal } from "../state/internalGroups";
 import { Avatar } from "./ui";
 import { EchoFace } from "./EchoFace";
+import { AnnouncementPopup } from "./AnnouncementPopup";
 import { CommandPalette } from "./CommandPalette";
 import { Select } from "./Select";
 
@@ -211,6 +212,7 @@ export function Layout({ children }: { children: ReactNode }) {
       </div>
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      <AnnouncementPopup />
     </div>
   );
 }
