@@ -70,6 +70,11 @@ jobs:
         # requirements-dev.txt arrastra requirements.txt con un -r.
         run: pip install -r requirements-dev.txt
 
+      - name: Instalar ffmpeg
+        # La imagen del API lo trae (Dockerfile): la grabación pasa el audio a
+        # mp3 con él y los tests de grabación lo usan de verdad.
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
+
       - name: Lint con ruff
         # Las reglas y las excepciones por archivo están en
         # apps/api/pyproject.toml, con el motivo de cada una anotado.
