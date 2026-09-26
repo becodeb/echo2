@@ -14,6 +14,11 @@ export interface AudioSource {
   readonly sampleRate: number;
   /** 1 = mono. 2 = intercalado L=micrófono, R=audio del sistema. */
   readonly channels: number;
+  /** false si el sistema cortó la captura: iOS al bloquear la pantalla en la
+   *  app instalada, una llamada entrante, Siri. */
+  isAlive?(): boolean;
+  /** Intenta retomar sin volver a pedir el micrófono. */
+  revive?(): Promise<boolean>;
 }
 
 const WORKLET_CODE = `
@@ -140,6 +145,21 @@ export class MicrophoneSource implements AudioSource {
 
     source.connect(this.node);
     // no conectar a destination: no queremos reproducir el micrófono
+  }
+
+  isAlive(): boolean {
+    const track = this.stream?.getAudioTracks()[0];
+    // iOS deja el AudioContext en "interrupted" (no estándar) y el track en
+    // muted cuando corta el micrófono; cualquier cosa distinta de "running"
+    // significa que no están llegando frames.
+    return !!track && track.readyState === "live" && !track.muted && this.context?.state === "running";
+  }
+
+  async revive(): Promise<boolean> {
+    if (this.context && this.context.state !== "running" && this.context.state !== "closed") {
+      await this.context.resume().catch(() => {});
+    }
+    return this.isAlive();
   }
 
   async stop(): Promise<void> {

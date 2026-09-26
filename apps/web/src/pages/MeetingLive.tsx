@@ -20,6 +20,35 @@ interface LiveLine {
 
 type EngineMode = "bridge" | "cloud";
 
+// Sin frames durante este tiempo = el sistema cortó el micrófono. El worklet
+// manda frames también en silencio, así que un silencio de la sala no cuenta.
+const STALL_MS = 4000;
+
+/** Web app agregada a la pantalla de inicio del iPhone/iPad. Ahí iOS corta el
+ *  micrófono al bloquear la pantalla o cambiar de app (en Safari no): la web
+ *  app no tiene el modo de fondo "audio" que sí tiene Safari. WebKit 226620. */
+function isIOSHomeScreenApp(): boolean {
+  const ios =
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const standalone =
+    (navigator as Navigator & { standalone?: boolean }).standalone === true ||
+    window.matchMedia("(display-mode: standalone)").matches;
+  return ios && standalone;
+}
+
+const clock = (ms: number) =>
+  new Date(ms).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
+
+const gapLabel = (ms: number) =>
+  ms < 60_000 ? `${Math.max(1, Math.round(ms / 1000))} s` : `${Math.round(ms / 60_000)} min`;
+
+interface Interruption {
+  from: number;
+  /** null mientras sigue cortado. */
+  to: number | null;
+}
+
 export default function MeetingLive() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -61,6 +90,16 @@ export default function MeetingLive() {
   const startedAtMs = useRef<number>(0);
   const recordingRef = useRef(false);
   const reconnectTimer = useRef<number | null>(null);
+
+  // ── cortes del micrófono ───────────────────────────────────────
+  const frameHandlerRef = useRef<((frame: Int16Array) => void) | null>(null);
+  const lastFrameAt = useRef(0);
+  const interruptedAt = useRef<number | null>(null);
+  const [interruption, setInterruption] = useState<Interruption | null>(null);
+  const [blackout, setBlackout] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const lastTapAt = useRef(0);
+  const homeScreenApp = useMemo(isIOSHomeScreenApp, []);
 
   // dispositivos + bridge al montar
   useEffect(() => {
@@ -225,8 +264,41 @@ export default function MeetingLive() {
       if (deviceId) localStorage.setItem("echo_pref_mic", deviceId);
 
       let streamMs = lines.length ? Math.max(...lines.map((line) => line.start_ms)) : 0;
+      const useBridge = engine === "bridge" && bridge && bridge !== "checking" && bridge.engine.available;
 
-      if (engine === "bridge" && bridge && bridge !== "checking" && bridge.engine.available) {
+      // Cada frame que llega marca que el micrófono sigue vivo. Si venía de un
+      // corte, el corte termina acá.
+      const onFrame = (frame: Int16Array) => {
+        const now = Date.now();
+        if (interruptedAt.current != null) {
+          const from = interruptedAt.current;
+          interruptedAt.current = null;
+          setInterruption({ from, to: now });
+          // Queda marcado en la reunión para quien revise el acta.
+          void api(`/api/meetings/${id}/bookmarks`, {
+            method: "POST",
+            body: JSON.stringify({
+              kind: "note",
+              at_ms: Math.max(0, Math.round(from - startedAtMs.current)),
+              note: `Sin audio entre las ${clock(from)} y las ${clock(now)}: se cortó el micrófono.`,
+            }),
+          }).catch(() => {});
+        }
+        lastFrameAt.current = now;
+        if (useBridge) {
+          bridgeRef.current?.sendPcm(frame);
+          return;
+        }
+        // MODO CLOUD: audio → servidor (RAM) → provider STT → texto
+        const socket = wsRef.current;
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(frame.buffer);
+        }
+      };
+      frameHandlerRef.current = onFrame;
+      lastFrameAt.current = Date.now();
+
+      if (useBridge) {
         // MODO LOCAL: audio → bridge (127.0.0.1) → texto → servidor
         const session = new BridgeSttSession();
         bridgeRef.current = session;
@@ -263,18 +335,9 @@ export default function MeetingLive() {
             if (recordingRef.current) setWarning("Echo Bridge se desconectó; reintentando…");
           },
         );
-        await source.start((frame) => {
-          bridgeRef.current?.sendPcm(frame);
-        }, setLevel);
-      } else {
-        // MODO CLOUD: audio → servidor (RAM) → provider STT → texto
-        await source.start((frame) => {
-          const socket = wsRef.current;
-          if (socket && socket.readyState === WebSocket.OPEN) {
-            socket.send(frame.buffer);
-          }
-        }, setLevel);
       }
+      await source.start(onFrame, setLevel);
+      lastFrameAt.current = Date.now();
 
       startedAtMs.current = Date.now() - streamMs;
       recordingRef.current = true;
@@ -291,6 +354,11 @@ export default function MeetingLive() {
     if (!id) return;
     await audioRef.current?.stop().catch(() => {});
     audioRef.current = null;
+    // Un corte que seguía abierto termina en la pausa, no al reanudar.
+    if (interruptedAt.current != null) {
+      setInterruption({ from: interruptedAt.current, to: Date.now() });
+      interruptedAt.current = null;
+    }
     bridgeRef.current?.flush();
     wsRef.current?.send(JSON.stringify({ type: "flush" }));
     await api(`/api/meetings/${id}/pause`, { method: "POST" }).catch(() => {});
@@ -300,6 +368,95 @@ export default function MeetingLive() {
   const resume = useCallback(async () => {
     await start();
   }, [start]);
+
+  /** Vuelve a abrir el micrófono con el mismo destino de frames. Llamado desde
+   *  un toque sirve siempre; solo, iOS a veces deja el AudioContext suspendido
+   *  hasta que haya un gesto, y ahí queda el botón del aviso. */
+  const restartAudio = useCallback(async () => {
+    const handler = frameHandlerRef.current;
+    if (!handler || captureSystem) return;
+    await audioRef.current?.stop().catch(() => {});
+    const source = new MicrophoneSource(deviceId || undefined);
+    audioRef.current = source;
+    await source.start(handler, setLevel);
+  }, [captureSystem, deviceId]);
+
+  // Detecta cortes del micrófono y los retoma. Corre también al volver a la
+  // app, que es cuando iOS devuelve el control después de bloquear la pantalla.
+  useEffect(() => {
+    if (!recording || paused) return;
+    let busy = false;
+    let lastRestart = 0;
+    const check = async () => {
+      if (busy || document.visibilityState !== "visible" || !audioRef.current) return;
+      const silentFor = Date.now() - lastFrameAt.current;
+      if (silentFor < STALL_MS) return;
+      if (interruptedAt.current == null) {
+        interruptedAt.current = lastFrameAt.current;
+        setInterruption({ from: lastFrameAt.current, to: null });
+      }
+      busy = true;
+      try {
+        const alive = await audioRef.current.revive?.();
+        // Vivo según el sistema pero sin frames hace rato: se reabre igual.
+        if (alive && silentFor < STALL_MS * 3) return;
+        if (Date.now() - lastRestart < 8000) return;
+        lastRestart = Date.now();
+        await restartAudio();
+      } catch {
+        /* queda el botón del aviso para retomar con un toque */
+      } finally {
+        busy = false;
+      }
+    };
+    const interval = window.setInterval(() => void check(), 2000);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void check();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [recording, paused, restartAudio]);
+
+  // Pantalla encendida mientras se graba: que el celular no se bloquee solo es
+  // lo que evita el corte en la app instalada del iPhone. El sistema suelta el
+  // bloqueo al ocultarse la página; se vuelve a pedir al volver.
+  useEffect(() => {
+    if (!recording || paused || !("wakeLock" in navigator)) return;
+    let lock: WakeLockSentinel | null = null;
+    let active = true;
+    const acquire = async () => {
+      try {
+        const next = await navigator.wakeLock.request("screen");
+        if (active) lock = next;
+        else await next.release();
+      } catch {
+        /* sin permiso o sin soporte: seguimos sin bloqueo */
+      }
+    };
+    void acquire();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void acquire();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      active = false;
+      document.removeEventListener("visibilitychange", onVisibility);
+      lock?.release().catch(() => {});
+    };
+  }, [recording, paused]);
+
+  const copyLiveLink = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setLinkCopied(true);
+      window.setTimeout(() => setLinkCopied(false), 2500);
+    } catch {
+      /* sin portapapeles: el link sigue visible en el aviso */
+    }
+  }, []);
 
   const finish = useCallback(async () => {
     if (!id) return;
@@ -432,7 +589,12 @@ export default function MeetingLive() {
           </p>
         </div>
         <div className="font-mono text-lg tabular-nums text-ink-700">{formatMs(elapsedMs)}</div>
-        {recording && !paused && (
+        {recording && !paused && interruption && interruption.to === null && (
+          <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold text-white">
+            Micrófono cortado
+          </span>
+        )}
+        {recording && !paused && !(interruption && interruption.to === null) && (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600">
             <span className="recording-dot h-2 w-2 rounded-full bg-red-500" />
             Grabando
@@ -450,6 +612,48 @@ export default function MeetingLive() {
       {error && recording && (
         <p className="border-b border-red-100 bg-red-50 px-6 py-2.5 text-sm text-red-700">
           {error}
+        </p>
+      )}
+
+      {/* Cortes del micrófono. Van acá arriba y no en el panel lateral porque
+          el panel no existe en el celular, que es donde pasan. */}
+      {recording && interruption && interruption.to === null && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-red-100 bg-red-50 px-6 py-2.5 text-sm text-red-700">
+          <p className="min-w-0 flex-1">
+            <strong>El micrófono se cortó</strong> a las {clock(interruption.from)}.
+            {homeScreenApp && " En la app instalada pasa al bloquear el iPhone o cambiar de app."}
+          </p>
+          <Button
+            variant="danger"
+            onClick={() => {
+              setBlackout(false);
+              void restartAudio().catch((err) =>
+                setError(err instanceof Error ? err.message : "No se pudo retomar el micrófono"),
+              );
+            }}
+          >
+            Retomar grabación
+          </Button>
+        </div>
+      )}
+      {interruption && interruption.to !== null && (
+        <div className="flex items-start gap-3 border-b border-amber-100 bg-amber-50 px-6 py-2.5 text-sm text-amber-800">
+          <p className="min-w-0 flex-1">
+            No se grabó entre las {clock(interruption.from)} y las {clock(interruption.to)} (
+            {gapLabel(interruption.to - interruption.from)}): el micrófono estuvo cortado. Ya se retomó
+            y quedó una nota en la reunión en ese momento.
+          </p>
+          <button
+            onClick={() => setInterruption(null)}
+            className="shrink-0 text-xs font-medium text-amber-700 hover:underline"
+          >
+            Entendido
+          </button>
+        </div>
+      )}
+      {recording && warning && (
+        <p className="border-b border-amber-100 bg-amber-50 px-6 py-2.5 text-sm text-amber-800 lg:hidden">
+          {warning}
         </p>
       )}
 
@@ -544,6 +748,23 @@ export default function MeetingLive() {
                 </div>
               </div>
 
+              {homeScreenApp && (
+                <div className="w-full space-y-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left text-sm text-amber-900">
+                  <p>
+                    <strong>Estás en la app instalada.</strong> Acá el iPhone corta el micrófono si
+                    bloqueás la pantalla o cambiás de app (desde Safari no pasa).
+                  </p>
+                  <p>
+                    Mientras grabás, Echo deja la pantalla encendida; para que no se vea, usá{" "}
+                    <strong>Pantalla negra</strong>. Si necesitás bloquear el teléfono, abrí esta
+                    reunión en Safari.
+                  </p>
+                  <Button variant="soft" onClick={copyLiveLink} className="w-full">
+                    {linkCopied ? "Link copiado: pegalo en Safari" : "Copiar link para abrir en Safari"}
+                  </Button>
+                </div>
+              )}
+
               {error && <p className="text-sm text-red-600">{error}</p>}
               <Button onClick={start} className="w-full max-w-xs !py-3 text-base">
                 Iniciar reunión
@@ -629,7 +850,7 @@ export default function MeetingLive() {
 
       {/* Barra de acciones */}
       {(recording || lines.length > 0) && (
-        <footer className="flex items-center justify-center gap-2 border-t border-ink-100 bg-white px-6 py-3">
+        <footer className="flex flex-wrap items-center justify-center gap-2 border-t border-ink-100 bg-white px-4 py-3 sm:px-6">
           {/* vúmetro */}
           <div className="mr-3 flex h-6 items-end gap-0.5" aria-hidden>
             {[0.3, 0.6, 1, 0.75, 0.45].map((weight, index) => (
@@ -647,12 +868,47 @@ export default function MeetingLive() {
           {!recording && lines.length > 0 && (
             <Button variant="soft" onClick={start}>Reanudar grabación</Button>
           )}
+          {recording && !paused && (
+            <Button variant="ghost" onClick={() => setBlackout(true)} title="La pantalla queda negra y sigue grabando">
+              Pantalla negra
+            </Button>
+          )}
           <Button variant="ghost" onClick={() => addBookmark("moment")}>⭐ Momento</Button>
           <Button variant="ghost" onClick={() => setNoteModal({ kind: "note", label: "Agregar nota" })}>
             Nota
           </Button>
           <Button variant="danger" onClick={finish}>Finalizar</Button>
         </footer>
+      )}
+
+      {/* Pantalla negra: sigue grabando con la pantalla encendida pero sin
+          mostrar nada. En pantallas OLED el negro casi no gasta batería. */}
+      {blackout && recording && !paused && (
+        <div
+          className="fixed inset-0 z-[70] flex select-none flex-col items-center justify-end bg-black pb-16"
+          onClick={() => {
+            const now = Date.now();
+            if (now - lastTapAt.current < 400) {
+              setBlackout(false);
+              // El toque es el gesto que iOS pide para volver a abrir el audio.
+              if (interruptedAt.current != null) void restartAudio().catch(() => {});
+            }
+            lastTapAt.current = now;
+          }}
+          role="button"
+          aria-label="Tocá dos veces para volver"
+        >
+          {interruption && interruption.to === null ? (
+            <p className="px-6 text-center text-sm font-medium text-red-500">
+              El micrófono se cortó. Tocá dos veces para retomar.
+            </p>
+          ) : (
+            <p className="flex items-center gap-2 text-xs text-neutral-600">
+              <span className="recording-dot h-1.5 w-1.5 rounded-full bg-red-700" />
+              {formatMs(elapsedMs)} · tocá dos veces para volver
+            </p>
+          )}
+        </div>
       )}
 
       <Modal
