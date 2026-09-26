@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, getAccessToken, wsUrl } from "../api/client";
-import type { LiveEvent, MeetingOut } from "../api/types";
+import type { LiveEvent, MeetingOut, RecordingState } from "../api/types";
 import { MicrophoneSource, SystemAudioSource, listMicrophones, type AudioSource } from "../lib/audio";
 import { BridgeSttSession, checkBridge, type BridgeHealth } from "../lib/bridge";
+import { RecordToggle } from "../components/RecordToggle";
 import { Select } from "../components/Select";
 import { Button, Modal, Spinner, formatMs } from "../components/ui";
 import { EchoFace, type EchoMood } from "../components/EchoFace";
@@ -101,6 +102,33 @@ export default function MeetingLive() {
   const lastTapAt = useRef(0);
   const homeScreenApp = useMemo(isIOSHomeScreenApp, []);
 
+  // Grabación del audio completo: la decide la reunión (se elige al crearla o
+  // acá antes de empezar). El servidor escribe el audio mientras llega.
+  const recordingOn = !!meeting?.recording?.enabled;
+  const recordingOnRef = useRef(recordingOn);
+  recordingOnRef.current = recordingOn;
+  const [recordingBusy, setRecordingBusy] = useState(false);
+  const setRecordAudio = useCallback(
+    async (enabled: boolean) => {
+      if (!id) return;
+      setRecordingBusy(true);
+      try {
+        const state = await api<RecordingState>(`/api/meetings/${id}/recording`, {
+          method: "PUT",
+          body: JSON.stringify({ enabled }),
+        });
+        queryClient.setQueryData<MeetingOut>(["meeting", id], (current) =>
+          current ? { ...current, recording: state } : current,
+        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "No se pudo cambiar la grabación");
+      } finally {
+        setRecordingBusy(false);
+      }
+    },
+    [id, queryClient],
+  );
+
   // dispositivos + bridge al montar
   useEffect(() => {
     listMicrophones().then(setMicDevices).catch(() => {});
@@ -153,6 +181,9 @@ export default function MeetingLive() {
     }
   }, [lines, partial]);
 
+  const kindRef = useRef(meeting?.kind);
+  kindRef.current = meeting?.kind;
+
   const handleLiveEvent = useCallback(
     (event: LiveEvent) => {
       switch (event.type) {
@@ -185,8 +216,9 @@ export default function MeetingLive() {
         case "status":
           if (event.status === "completed") {
             queryClient.invalidateQueries({ queryKey: ["meeting", id] });
-            // Al terminar, lo que sigue es revisar y confirmar el acta.
-            navigate(`/meetings/${id}?tab=minutes`);
+            // Al terminar, lo que sigue es revisar y confirmar el acta. Las
+            // internas no tienen acta: van al resumen.
+            navigate(`/meetings/${id}?tab=${kindRef.current === "interna" ? "summary" : "minutes"}`);
           } else if (event.status === "failed") {
             setProcessing(null);
             setError("El procesamiento falló. Podés reintentar desde la página de la reunión.");
@@ -203,6 +235,8 @@ export default function MeetingLive() {
     [id, navigate, queryClient],
   );
 
+  const bridgeMode = engine === "bridge" && !!bridge && bridge !== "checking" && bridge.engine.available;
+
   const openWs = useCallback((): Promise<WebSocket> => {
     return new Promise((resolve, reject) => {
       const token = getAccessToken();
@@ -218,6 +252,9 @@ export default function MeetingLive() {
             role: "recorder",
             sample_rate: 16000,
             channels: captureSystem ? 2 : 1,
+            // Con el bridge el texto viene de la máquina: si llega audio es
+            // solo para grabarlo.
+            transcribe: !bridgeMode,
           }),
         );
         setWsConnected(true);
@@ -247,7 +284,7 @@ export default function MeetingLive() {
         }
       };
     });
-  }, [id, handleLiveEvent, captureSystem]);
+  }, [id, handleLiveEvent, captureSystem, bridgeMode]);
 
   const start = useCallback(async () => {
     if (!id) return;
@@ -287,7 +324,9 @@ export default function MeetingLive() {
         lastFrameAt.current = now;
         if (useBridge) {
           bridgeRef.current?.sendPcm(frame);
-          return;
+          // El bridge transcribe en la máquina; al servidor el audio va solo
+          // si la reunión se graba.
+          if (!recordingOnRef.current) return;
         }
         // MODO CLOUD: audio → servidor (RAM) → provider STT → texto
         const socket = wsRef.current;
@@ -605,6 +644,14 @@ export default function MeetingLive() {
             En pausa
           </span>
         )}
+        {recording && recordingOn && (
+          <span
+            className="rounded-full bg-ink-900 px-2.5 py-1 text-xs font-semibold text-white"
+            title="Se guarda el audio completo de la reunión"
+          >
+            Audio guardándose
+          </span>
+        )}
       </header>
 
       {/* Errores del servidor durante la grabación (ej. stt_not_configured).
@@ -701,6 +748,8 @@ export default function MeetingLive() {
                     })),
                   ]}
                 />
+
+                <RecordToggle checked={recordingOn} onChange={setRecordAudio} disabled={recordingBusy} />
 
                 <label className="flex items-center gap-2 text-sm text-ink-600">
                   <input

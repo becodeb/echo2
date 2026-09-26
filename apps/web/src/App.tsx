@@ -12,6 +12,7 @@ import Dashboard from "./pages/Dashboard";
 const MeetingLive = lazy(() => import("./pages/MeetingLive"));
 const MeetingDetail = lazy(() => import("./pages/MeetingDetail"));
 const Meetings = lazy(() => import("./pages/Meetings"));
+const InternalMeetings = lazy(() => import("./pages/InternalMeetings"));
 const Projects = lazy(() => import("./pages/Projects"));
 const ProjectDetail = lazy(() => import("./pages/ProjectDetail"));
 const People = lazy(() => import("./pages/People"));
@@ -111,6 +112,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/meetings" element={<Meetings />} />
+          <Route path="/internal" element={<InternalMeetings />} />
           <Route path="/meetings/:id/live" element={<MeetingLive />} />
           <Route path="/meetings/:id" element={<MeetingDetail />} />
           <Route path="/projects" element={<Projects />} />

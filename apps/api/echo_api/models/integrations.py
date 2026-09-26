@@ -46,6 +46,28 @@ class OrgGoogleDrive(PKMixin, TimestampMixin, Base):
     last_error: Mapped[str | None] = mapped_column(String(400))
 
 
+class UserGoogleDrive(PKMixin, TimestampMixin, Base):
+    """Drive personal de una persona, para las grabaciones que hace ella.
+
+    Separado del de la organización a propósito: la grabación de una reunión
+    de directivos va al Drive de quien grabó, no a la carpeta institucional
+    donde van las actas. Mismo alcance `drive.file`: Echo solo ve lo que creó.
+    """
+
+    __tablename__ = "user_google_drive"
+    __table_args__ = (UniqueConstraint("user_id", name="uq_user_google_drive"),)
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    refresh_token_enc: Mapped[str] = mapped_column(Text, nullable=False)
+    connected_email: Mapped[str | None] = mapped_column(String(320))
+    connected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    folder_id: Mapped[str | None] = mapped_column(String(120))
+    folder_url: Mapped[str | None] = mapped_column(String(600))
+    last_error: Mapped[str | None] = mapped_column(String(400))
+
+
 class ServerAISettings(PKMixin, TimestampMixin, Base):
     """Default de IA de toda la instalación, editable por el superadmin.
 

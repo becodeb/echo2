@@ -126,8 +126,8 @@ def _decode_id_token(id_token: str) -> dict:
         return {}
 
 
-def _back(reason: str | None = None) -> RedirectResponse:
-    path = "/settings/drive" + (f"?error={reason}" if reason else "?connected=1")
+def _back(reason: str | None = None, section: str = "drive") -> RedirectResponse:
+    path = f"/settings/{section}" + (f"?error={reason}" if reason else "?connected=1")
     response = RedirectResponse(_web(path), status_code=303)
     response.delete_cookie(STATE_COOKIE, path=STATE_PATH)
     return response
@@ -135,7 +135,6 @@ def _back(reason: str | None = None) -> RedirectResponse:
 
 @router.get("/callback")
 async def drive_callback(request: Request, db: AsyncSession = Depends(get_db)):
-    settings = get_settings()
     if request.query_params.get("error"):
         return _back("cancelado")
 
@@ -146,8 +145,12 @@ async def drive_callback(request: Request, db: AsyncSession = Depends(get_db)):
         return _back("estado")
 
     payload = decode_token(state)
-    if not payload or payload.get("purpose") != "drive":
+    if not payload or payload.get("purpose") not in ("drive", "drive_user"):
         return _back("estado")
+    # El mismo callback sirve para el Drive personal (routers/my_drive.py):
+    # así no hace falta registrar otra URL de retorno en Google.
+    if payload["purpose"] == "drive_user":
+        return await _personal_callback(payload, code, db)
 
     try:
         user_id = uuid.UUID(payload["sub"])
@@ -169,30 +172,10 @@ async def drive_callback(request: Request, db: AsyncSession = Depends(get_db)):
     if not member:
         return _back("permisos")
 
-    try:
-        async with httpx.AsyncClient(timeout=20) as client:
-            token_response = await client.post(
-                TOKEN_URL,
-                data={
-                    "code": code,
-                    "client_id": settings.google_client_id,
-                    "client_secret": settings.google_client_secret,
-                    "redirect_uri": _callback_url(),
-                    "grant_type": "authorization_code",
-                },
-            )
-    except httpx.HTTPError:
-        return _back("google")
-
-    if token_response.status_code != 200:
-        log.warning("drive: canje de code fallido (%s)", token_response.status_code)
-        return _back("google")
-
-    data = token_response.json()
-    refresh_token = data.get("refresh_token")
-    if not refresh_token:
-        # Pasa cuando la cuenta ya había autorizado antes sin prompt=consent.
-        return _back("sin_refresh")
+    data, reason = await _exchange_code(code)
+    if reason:
+        return _back(reason)
+    refresh_token = data["refresh_token"]
 
     claims = _decode_id_token(data.get("id_token") or "")
 
@@ -209,6 +192,52 @@ async def drive_callback(request: Request, db: AsyncSession = Depends(get_db)):
     await audit(db, org_id, user_id, "drive.connect", "organization", str(org_id))
     await db.commit()
     return _back()
+
+
+async def _exchange_code(code: str) -> tuple[dict, str | None]:
+    """Canjea el code de Google. Devuelve (datos, motivo de error o None)."""
+    settings = get_settings()
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            token_response = await client.post(
+                TOKEN_URL,
+                data={
+                    "code": code,
+                    "client_id": settings.google_client_id,
+                    "client_secret": settings.google_client_secret,
+                    "redirect_uri": _callback_url(),
+                    "grant_type": "authorization_code",
+                },
+            )
+    except httpx.HTTPError:
+        return {}, "google"
+    if token_response.status_code != 200:
+        log.warning("drive: canje de code fallido (%s)", token_response.status_code)
+        return {}, "google"
+    data = token_response.json()
+    if not data.get("refresh_token"):
+        # Pasa cuando la cuenta ya había autorizado antes sin prompt=consent.
+        return {}, "sin_refresh"
+    return data, None
+
+
+async def _personal_callback(payload: dict, code: str, db: AsyncSession) -> RedirectResponse:
+    from ..models import User
+    from ..services.drive import save_user_connection
+
+    try:
+        user_id = uuid.UUID(payload["sub"])
+    except (KeyError, ValueError):
+        return _back("estado", "my-drive")
+    user = await db.get(User, user_id)
+    if user is None or not user.is_active:
+        return _back("permisos", "my-drive")
+    data, reason = await _exchange_code(code)
+    if reason:
+        return _back(reason, "my-drive")
+    claims = _decode_id_token(data.get("id_token") or "")
+    await save_user_connection(db, user_id, encrypt_secret(data["refresh_token"]), claims.get("email"))
+    return _back(None, "my-drive")
 
 
 @router.delete("", status_code=204)

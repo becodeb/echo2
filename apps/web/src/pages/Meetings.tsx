@@ -1,23 +1,16 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { Audience, FamilyOut, MeetingListItem, MeetingOut } from "../api/types";
 import { AUDIENCES } from "../components/ClassificationPanel";
 import { FamilySelect } from "../components/FamilySelect";
+import { MeetingList } from "../components/MeetingList";
+import { RecordToggle } from "../components/RecordToggle";
 import { Select } from "../components/Select";
-import { Badge, Button, Card, EmptyState, Input, Modal, Spinner, formatDate, formatDuration } from "../components/ui";
+import { Button, Card, EmptyState, Input, Modal, Spinner } from "../components/ui";
 import { LEVEL_LABEL, useMyAccess, type Level } from "../state/access";
 import { useAuth } from "../state/auth";
-
-const STATUS: Record<string, { label: string; tone: "gray" | "red" | "amber" | "green" | "sky" }> = {
-  draft: { label: "Borrador", tone: "gray" },
-  live: { label: "En vivo", tone: "red" },
-  paused: { label: "Pausada", tone: "amber" },
-  processing: { label: "Procesando", tone: "sky" },
-  completed: { label: "Completada", tone: "green" },
-  failed: { label: "Falló", tone: "red" },
-};
 
 interface ProjectOption {
   id: string;
@@ -34,8 +27,9 @@ export default function Meetings() {
   }, [params]);
 
   const { data: meetings, isLoading } = useQuery({
-    queryKey: ["meetings", activeOrg?.id],
-    queryFn: () => api<MeetingListItem[]>("/api/meetings"),
+    queryKey: ["meetings", activeOrg?.id, "familia"],
+    // Las internas tienen su sección (pages/InternalMeetings.tsx).
+    queryFn: () => api<MeetingListItem[]>("/api/meetings?kind=familia"),
     enabled: !!activeOrg,
   });
 
@@ -60,35 +54,7 @@ export default function Meetings() {
         </Card>
       )}
 
-      {meetings && meetings.length > 0 && (
-        <Card className="divide-y divide-ink-100 p-0">
-          {meetings.map((meeting) => {
-            const status = STATUS[meeting.status] ?? STATUS.draft;
-            const target =
-              meeting.status === "completed" || meeting.status === "processing" || meeting.status === "failed"
-                ? `/meetings/${meeting.id}`
-                : `/meetings/${meeting.id}/live`;
-            return (
-              <Link key={meeting.id} to={target} className="flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-ink-50">
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-ink-900">{meeting.title}</p>
-                  <p className="mt-0.5 text-xs text-ink-400">
-                    {formatDate(meeting.started_at ?? meeting.created_at)}
-                    {meeting.duration_seconds > 0 && ` · ${formatDuration(meeting.duration_seconds)}`}
-                    {meeting.participant_count > 0 && ` · ${meeting.participant_count} participantes`}
-                    {meeting.project_name && ` · ${meeting.project_name}`}
-                    {meeting.level && ` · ${LEVEL_LABEL[meeting.level] ?? meeting.level}`}
-                  </p>
-                </div>
-                <Badge tone={status.tone}>
-                  {meeting.status === "live" && <span className="recording-dot h-1.5 w-1.5 rounded-full bg-red-500" />}
-                  {status.label}
-                </Badge>
-              </Link>
-            );
-          })}
-        </Card>
-      )}
+      {meetings && meetings.length > 0 && <MeetingList meetings={meetings} />}
 
       <NewMeetingModal
         open={showNew}
@@ -113,6 +79,7 @@ function NewMeetingModal({ open, onClose }: { open: boolean; onClose: () => void
   const [visibility, setVisibility] = useState<"org" | "private">("org");
   const [familyId, setFamilyId] = useState("");
   const [audience, setAudience] = useState<Audience | "">("");
+  const [recordAudio, setRecordAudio] = useState(false);
   const { data: myAccess } = useMyAccess();
   const creatable = myAccess?.creatable_levels ?? [];
   const [levelChoice, setLevelChoice] = useState<Level | "">("");
@@ -143,6 +110,7 @@ function NewMeetingModal({ open, onClose }: { open: boolean; onClose: () => void
           project_id: projectId || null,
           visibility,
           level: level || null,
+          record_audio: recordAudio,
           participants: participants
             .split(",")
             .map((name) => name.trim())
@@ -169,6 +137,7 @@ function NewMeetingModal({ open, onClose }: { open: boolean; onClose: () => void
       setTitle("");
       setFamilyId("");
       setAudience("");
+      setRecordAudio(false);
       onClose();
       navigate(`/meetings/${meeting.id}/live`);
     },
@@ -243,6 +212,7 @@ function NewMeetingModal({ open, onClose }: { open: boolean; onClose: () => void
           />
           Reunión privada (solo vos y con quien la compartas)
         </label>
+        <RecordToggle checked={recordAudio} onChange={setRecordAudio} />
         {create.isError && (
           <p className="text-sm text-red-600">
             {create.error instanceof Error ? create.error.message : "Error al crear"}

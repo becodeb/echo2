@@ -87,6 +87,9 @@ def _include_optional_routers() -> None:
         "imports",
         "exports",
         "memory",
+        "internal_groups",
+        "my_drive",
+        "recordings",
     ):
         try:
             module = import_module(f".routers.{name}", package="echo_api")
@@ -96,6 +99,20 @@ def _include_optional_routers() -> None:
 
 
 _include_optional_routers()
+
+
+@app.on_event("startup")
+async def _start_recordings_cleanup() -> None:
+    """Borra cada media hora las grabaciones vencidas (services/recording.py).
+
+    Las grabaciones están de paso: se suben al Drive de quien grabó o quedan
+    para descargar un rato. Sin esta limpieza el disco de la VM se llenaría.
+    """
+    from .services.background import spawn
+    from .services.recording import cleanup_loop
+
+    if settings.echo_env != "test":
+        spawn(cleanup_loop(), name="recordings-cleanup")
 
 
 @app.on_event("startup")

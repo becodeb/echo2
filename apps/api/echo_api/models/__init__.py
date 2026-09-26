@@ -26,10 +26,12 @@ from .core import (
     RefreshToken,
     User,
 )
-from .integrations import OrgGoogleDrive, ServerAISettings
+from .groups import DEFAULT_GROUPS, InternalGroup, InternalGroupMember
+from .integrations import OrgGoogleDrive, ServerAISettings, UserGoogleDrive
 from .insights import ActionItem, Decision, MeetingSummary, MeetingTopic, Question, Risk
 from .meetings import (
     EMBEDDING_DIM,
+    MEETING_KINDS,
     Bookmark,
     Meeting,
     MeetingAttachment,
@@ -63,7 +65,8 @@ __all__ = [
     "MemberLevelAccess", "LEVELS", "LEVEL_ACCESS",
     "Family", "FamilyMember", "MeetingReason", "MeetingAttendance",
     "Professional", "FamilyProfessional", "MeetingProfessionalAttendance",
-    "MeetingAttachment", "OrgGoogleDrive", "ServerAISettings",
+    "MeetingAttachment", "OrgGoogleDrive", "ServerAISettings", "UserGoogleDrive",
+    "InternalGroup", "InternalGroupMember", "DEFAULT_GROUPS", "MEETING_KINDS",
     "RELATIONSHIPS", "SEVERITIES", "AUDIENCES",
     "RefreshToken", "ROLES", "ROLE_OWNER", "ROLE_ADMIN", "ROLE_MEMBER", "ROLE_VIEWER",
     "EMBEDDING_DIM", "Meeting", "MeetingParticipant", "Speaker", "SpeakerProfile",

@@ -24,6 +24,7 @@ from .base import Base, PKMixin, SoftDeleteMixin, TimestampMixin
 EMBEDDING_DIM = 1536
 
 MEETING_STATUS = ("draft", "live", "paused", "processing", "completed", "failed")
+MEETING_KINDS = ("familia", "interna")
 
 
 class Meeting(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
@@ -33,6 +34,7 @@ class Meeting(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
         Index("ix_meetings_org_status", "organization_id", "status"),
         Index("ix_meetings_family", "family_id"),
         Index("ix_meetings_org_level", "organization_id", "level"),
+        Index("ix_meetings_org_kind", "organization_id", "kind"),
     )
 
     organization_id: Mapped[uuid.UUID] = mapped_column(
@@ -66,6 +68,17 @@ class Meeting(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
     # services/access.py. Sin nivel solo la ven admins, quien la creó y con
     # quien se compartió.
     level: Mapped[str | None] = mapped_column(String(20))
+    # familia: la de siempre (con alumno, acta, nivel). interna: entre
+    # directivos, coordinadores, etc.; sin familia ni acta, la ve su grupo.
+    kind: Mapped[str] = mapped_column(String(20), default="familia", server_default="familia", nullable=False)
+    group_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("internal_groups.id", ondelete="SET NULL")
+    )
+    # Grabación del audio completo, opcional (services/recording.py). None =
+    # no se graba. {"enabled", "status", "user_id", "drive_url", "expires_at",
+    # "size_bytes", "duration_seconds", "error"}. Columna aparte de `meta`
+    # porque la escribe una tarea de fondo mientras el pipeline escribe meta.
+    recording: Mapped[dict | None] = mapped_column(JSONB)
 
     participants: Mapped[list["MeetingParticipant"]] = relationship(
         back_populates="meeting", cascade="all, delete-orphan"

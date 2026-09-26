@@ -8,6 +8,7 @@ import { Badge, Button, Card, EmptyState, Input, Modal, Spinner, formatDate, for
 import { EchoFace } from "../components/EchoFace";
 import { ClassificationPanel } from "../components/ClassificationPanel";
 import { Attachments } from "../components/Attachments";
+import { RecordingCard } from "../components/RecordingCard";
 import { AnswerText } from "../components/AnswerText";
 import { MarkdownView } from "../components/MarkdownView";
 import { InterviewReview } from "../components/InterviewReview";
@@ -49,7 +50,10 @@ export default function MeetingDetail() {
     queryKey: ["meeting", id],
     queryFn: () => api<MeetingOut>(`/api/meetings/${id}`),
     enabled: !!id,
-    refetchInterval: (query) => (query.state.data?.status === "processing" ? 3000 : false),
+    refetchInterval: (query) =>
+      query.state.data?.status === "processing" || query.state.data?.recording?.status === "processing"
+        ? 3000
+        : false,
   });
 
   useEffect(() => {
@@ -64,6 +68,10 @@ export default function MeetingDetail() {
     );
   }
 
+  const internal = meeting.kind === "interna";
+  // Las internas no tienen acta: resumen, transcript, tareas y chat.
+  const tabs = internal ? TABS.filter((item) => item.id !== "minutes") : TABS;
+  const activeTab: TabId = internal && tab === "minutes" ? "summary" : tab;
   const skipped = (meeting.processing_state?.skipped as string[] | undefined) ?? [];
   const aiSkipped = skipped.some((entry) => entry.includes("llm_no_configurado"));
 
@@ -83,13 +91,20 @@ export default function MeetingDetail() {
             <ShareButton meetingId={meeting.id} />
           </div>
         </div>
-        <LevelControl meeting={meeting} />
+        {internal ? (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <Badge tone="indigo">Reunión interna</Badge>
+            {meeting.group_name && <Badge tone="gray">{meeting.group_name}</Badge>}
+          </div>
+        ) : (
+          <LevelControl meeting={meeting} />
+        )}
         <p className="mt-1 text-sm text-ink-500">
           {formatDate(meeting.started_at)} · {formatDuration(meeting.duration_seconds)}
           {meeting.participants.length > 0 &&
             ` · ${meeting.participants.map((participant) => participant.name).join(", ")}`}
         </p>
-        <ClassificationPanel meetingId={meeting.id} />
+        {!internal && <ClassificationPanel meetingId={meeting.id} />}
         {aiSkipped && (
           <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
             El análisis con IA se salteó porque no hay un modelo configurado.{" "}
@@ -99,18 +114,18 @@ export default function MeetingDetail() {
       </header>
 
       <nav className="-mx-6 mb-6 flex gap-1 overflow-x-auto border-b border-ink-100 px-6 sm:mx-0 sm:px-0" role="tablist">
-        {TABS.map((item) => (
+        {tabs.map((item) => (
           <button
             key={item.id}
             role="tab"
-            aria-selected={tab === item.id}
+            aria-selected={activeTab === item.id}
             onClick={() => {
               setTab(item.id);
               params.set("tab", item.id);
               setParams(params, { replace: true });
             }}
             className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors sm:px-4 ${
-              tab === item.id
+              activeTab === item.id
                 ? "border-ink-900 text-ink-900"
                 : "border-transparent text-ink-400 hover:text-ink-700"
             }`}
@@ -120,16 +135,17 @@ export default function MeetingDetail() {
         ))}
       </nav>
 
-      {tab === "summary" && (
+      {activeTab === "summary" && (
         <div className="space-y-4">
+          <RecordingCard meeting={meeting} />
           <SummaryTab meeting={meeting} onJump={(ms) => { params.set("t", String(ms)); setParams(params); }} />
           <Card><Attachments meetingId={meeting.id} /></Card>
         </div>
       )}
-      {tab === "transcript" && <TranscriptTab meeting={meeting} jumpMs={jumpMs ? Number(jumpMs) : null} onRefetch={refetch} />}
-      {tab === "minutes" && <MinutesTab meetingId={meeting.id} />}
-      {tab === "tasks" && <TasksTab meetingId={meeting.id} />}
-      {tab === "chat" && <ChatTab meetingId={meeting.id} onJump={(ms) => { params.set("t", String(ms)); setParams(params); setTab("transcript"); }} />}
+      {activeTab === "transcript" && <TranscriptTab meeting={meeting} jumpMs={jumpMs ? Number(jumpMs) : null} onRefetch={refetch} />}
+      {activeTab === "minutes" && <MinutesTab meetingId={meeting.id} />}
+      {activeTab === "tasks" && <TasksTab meetingId={meeting.id} />}
+      {activeTab === "chat" && <ChatTab meetingId={meeting.id} onJump={(ms) => { params.set("t", String(ms)); setParams(params); setTab("transcript"); }} />}
     </div>
   );
 }

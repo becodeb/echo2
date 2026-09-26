@@ -73,8 +73,59 @@ export interface MeetingOut {
   };
   /** inicial | primaria | secundaria; null = sin nivel (solo admins y quien la creó). */
   level: string | null;
+  /** familia: con alumno, acta y nivel. interna: de un grupo (directivos, coordinadores). */
+  kind: MeetingKind;
+  group_id: string | null;
+  group_name: string | null;
+  /** null = no se graba el audio completo. */
+  recording: RecordingState | null;
   participants: ParticipantOut[];
   speakers: SpeakerOut[];
+}
+
+export type MeetingKind = "familia" | "interna";
+
+/** Grabación del audio completo (services/recording.py en el API). */
+export interface RecordingState {
+  enabled: boolean;
+  status:
+    | "pending"
+    | "recording"
+    | "processing"
+    | "uploaded"
+    | "download"
+    | "expired"
+    | "discarded"
+    | "empty"
+    | "failed";
+  user_id: string | null;
+  drive_url: string | null;
+  /** Hasta cuándo se puede descargar del servidor (después se borra). */
+  expires_at: string | null;
+  size_bytes: number | null;
+  duration_seconds: number | null;
+  error: string | null;
+}
+
+export interface InternalGroupOut {
+  id: string;
+  name: string;
+  is_member: boolean;
+  meetings: number;
+  members: { user_id: string; name: string; email: string }[];
+}
+
+export interface InternalGroupsOut {
+  can_manage: boolean;
+  groups: InternalGroupOut[];
+}
+
+export interface MyDriveOut {
+  enabled: boolean;
+  connected: boolean;
+  connected_email: string | null;
+  folder_url: string | null;
+  last_error: string | null;
 }
 
 export interface MeetingListItem {
@@ -87,6 +138,10 @@ export interface MeetingListItem {
   participant_count: number;
   project_name: string | null;
   level: string | null;
+  kind: MeetingKind;
+  group_id: string | null;
+  group_name: string | null;
+  recorded: boolean;
 }
 
 export interface SegmentOut {

@@ -9,6 +9,12 @@ Roles de conexión:
         configurado y descarta el audio inmediatamente.
   - viewer: recibe transcript/insights en tiempo real.
 
+Grabación (opcional, services/recording.py): si la reunión se graba, el mismo
+audio que llega para transcribir se agrega a un archivo temporal que al
+finalizar se sube al Drive de quien grabó. Con el bridge (que transcribe en la
+máquina) el navegador manda el audio con `transcribe: false` en el hello:
+solo se graba, no se transcribe dos veces.
+
 Autenticación: access token JWT por query param (el WS del browser no puede
 mandar headers). El token es de corta duración y viaja por wss en producción.
 """
@@ -29,6 +35,7 @@ from ..services.ai_settings import get_vocabulary, resolve_stt
 from ..services.background import spawn
 from ..services.insights_live import maybe_extract_live_insights
 from ..services.live_bus import live_bus
+from ..services.recording import PcmWriter, is_enabled, update_state
 from ..services.stt import get_stt_provider
 from ..services.stt.channels import (
     attribute_speaker,
@@ -158,6 +165,11 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
     vocabulary: list[str] = []
     stt_error_sent = False
     segments_since_insights = 0
+    # Grabación del audio completo: abierto solo si la reunión se graba.
+    writer: PcmWriter | None = None
+    # False = el recorder transcribe en su máquina (bridge) y manda audio solo
+    # para grabar.
+    transcribe = True
 
     async def forward_bus():
         try:
@@ -243,6 +255,10 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
                 # Audio PCM16 (modo cloud). Solo el recorder puede mandarlo.
                 if role != "recorder":
                     continue
+                if writer is not None:
+                    writer.write(message["bytes"], channels)
+                if not transcribe:
+                    continue
                 if stt_provider is None:
                     async with SessionLocal() as db:
                         config = await resolve_stt(db, meeting.organization_id)
@@ -284,6 +300,16 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
                 if role == "recorder" and data.get("sample_rate"):
                     with contextlib.suppress(ValueError, TypeError):
                         sample_rate = max(8000, min(48000, int(data["sample_rate"])))
+                if role == "recorder":
+                    transcribe = data.get("transcribe", True) is not False
+                    # Se relee: la grabación se pudo activar después de abrir el WS.
+                    async with SessionLocal() as db:
+                        fresh = await db.get(Meeting, meeting.id)
+                        recording = fresh.recording if fresh else None
+                    if is_enabled(recording) and writer is None and sample_rate == 16000:
+                        writer = PcmWriter(meeting.id)
+                        if recording.get("status") != "recording":
+                            await update_state(meeting.id, status="recording")
                 await websocket.send_text(
                     json.dumps({"type": "hello_ack", "role": role, "meeting_status": meeting.status})
                 )
@@ -333,5 +359,7 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
         # flush final de audio pendiente para no perder los últimos segundos
         with contextlib.suppress(Exception):
             await flush_audio(final=True)
+        if writer is not None:
+            writer.close()
         forward_task.cancel()
         await live_bus.unsubscribe(channel, queue)

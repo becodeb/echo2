@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { useAuth } from "../state/auth";
 import { useMyAccess } from "../state/access";
+import { useSeesInternal } from "../state/internalGroups";
 import { Avatar } from "./ui";
 import { EchoFace } from "./EchoFace";
 import { CommandPalette } from "./CommandPalette";
@@ -12,6 +13,7 @@ import { Select } from "./Select";
 const NAV = [
   { to: "/", label: "Inicio", icon: "M3 10.5 12 3l9 7.5M5 9.5V21h14V9.5" },
   { to: "/meetings", label: "Reuniones", icon: "M4 5h16v12H8l-4 4V5z" },
+  { to: "/internal", label: "Reuniones internas", icon: "M12 3l8 4v5c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V7l8-4zM9 12l2 2 4-4" },
   { to: "/tasks", label: "Mi trabajo", icon: "M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2" },
   { to: "/projects", label: "Proyectos", icon: "M3 7h6l2 2h10v10H3V7z" },
   { to: "/people", label: "Personas", icon: "M16 11a4 4 0 1 0-8 0M4 21c0-4 3.5-6 8-6s8 2 8 6" },
@@ -34,6 +36,9 @@ export function Layout({ children }: { children: ReactNode }) {
   const [mobileNav, setMobileNav] = useState(false);
   const navigate = useNavigate();
   const { data: myAccess } = useMyAccess();
+  const seesInternal = useSeesInternal();
+  // Reuniones internas solo para quien es de algún grupo o los administra.
+  const nav = NAV.filter((item) => item.to !== "/internal" || seesInternal);
 
   const { data: notifData } = useQuery({
     queryKey: ["notifications", activeOrg?.id],
@@ -79,7 +84,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-3">
-          {NAV.map((item) => (
+          {nav.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

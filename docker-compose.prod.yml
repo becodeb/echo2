@@ -51,6 +51,12 @@ services:
       DEEPSEEK_API_KEY: '${DEEPSEEK_API_KEY:-}'
       GMI_API_KEY: '${GMI_API_KEY:-}'
       OLLAMA_BASE_URL: '${OLLAMA_BASE_URL:-}'
+      # Grabaciones de paso (services/recording.py): se suben al Drive de quien
+      # grabó y se borran. En un volumen para que un deploy no se lleve un
+      # audio que todavía estaba esperando que lo descarguen.
+      RECORDINGS_DIR: /data/recordings
+    volumes:
+      - 'echo_recordings:/data/recordings'
     depends_on:
       db:
         condition: service_healthy
@@ -79,3 +85,4 @@ services:
 
 volumes:
   echo_pgdata: null
+  echo_recordings: null

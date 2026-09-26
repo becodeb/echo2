@@ -72,6 +72,8 @@ async def overview(
                     # Todo el reporte sale de esta lista: filtrar acá alcanza
                     # para que nadie vea cifras de un nivel que no ve.
                     meeting_filter(scope),
+                    # Los reportes son de la atención a familias: las internas no cuentan.
+                    Meeting.kind != "interna",
                     *([Meeting.level == level] if level else []),
                 )
             )

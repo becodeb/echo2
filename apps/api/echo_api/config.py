@@ -99,6 +99,12 @@ class Settings(BaseSettings):
     deepseek_api_key: str = ""
     ollama_base_url: str = ""
 
+    # Grabaciones (services/recording.py). Es espacio de paso: el audio se
+    # sube al Drive de quien grabó y se borra; sin Drive queda para descargar
+    # estas horas y después se borra solo.
+    recordings_dir: str = "/tmp/echo-recordings"
+    recording_ttl_hours: int = 48
+
     # Límites
     max_upload_mb: int = 500
     rate_limit_auth_per_minute: int = 10

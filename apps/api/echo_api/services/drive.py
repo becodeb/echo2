@@ -20,7 +20,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
-from ..models import Family, Meeting, Minutes, MinutesVersion, OrgGoogleDrive, Organization
+from ..models import (
+    Family,
+    Meeting,
+    Minutes,
+    MinutesVersion,
+    OrgGoogleDrive,
+    Organization,
+    UserGoogleDrive,
+)
 from ..security import decrypt_secret
 
 log = logging.getLogger("echo.drive")
@@ -240,3 +248,93 @@ async def save_connection(
     connection.last_error = None
     await db.commit()
     return connection
+
+
+# ── Drive personal (grabaciones) ─────────────────────────────────
+
+RECORDINGS_FOLDER = "Echo — Grabaciones"
+# Trozos de la subida reanudable: múltiplos de 256 KiB, como pide Google.
+UPLOAD_CHUNK = 8 * 256 * 1024
+
+
+async def get_user_connection(db: AsyncSession, user_id: uuid.UUID) -> UserGoogleDrive | None:
+    return (
+        await db.execute(select(UserGoogleDrive).where(UserGoogleDrive.user_id == user_id))
+    ).scalar_one_or_none()
+
+
+async def save_user_connection(
+    db: AsyncSession, user_id: uuid.UUID, refresh_token_enc: str, email: str | None
+) -> UserGoogleDrive:
+    connection = await get_user_connection(db, user_id)
+    if connection is None:
+        connection = UserGoogleDrive(user_id=user_id, refresh_token_enc=refresh_token_enc)
+        db.add(connection)
+    else:
+        connection.refresh_token_enc = refresh_token_enc
+        # Otra cuenta puede no ver la carpeta vieja: se crea una nueva.
+        if email != connection.connected_email:
+            connection.folder_id = None
+            connection.folder_url = None
+    connection.connected_email = email
+    connection.connected_at = datetime.now(UTC)
+    connection.last_error = None
+    await db.commit()
+    return connection
+
+
+async def _ensure_user_folder(db: AsyncSession, connection: UserGoogleDrive, token: str) -> str:
+    if connection.folder_id:
+        return connection.folder_id
+    created = await _create_folder(token, RECORDINGS_FOLDER)
+    connection.folder_id = created["id"]
+    connection.folder_url = created.get("webViewLink")
+    await db.commit()
+    return connection.folder_id
+
+
+async def _upload_resumable(token: str, name: str, parent: str, path, mime: str) -> dict:
+    """Subida reanudable leyendo el archivo de a trozos: nunca entero en memoria."""
+    size = path.stat().st_size
+    async with httpx.AsyncClient(timeout=120) as client:
+        start = await client.post(
+            UPLOAD_URL,
+            params={"uploadType": "resumable", "supportsAllDrives": "true", "fields": "id,webViewLink"},
+            headers={
+                "Authorization": f"Bearer {token}",
+                "X-Upload-Content-Type": mime,
+                "X-Upload-Content-Length": str(size),
+            },
+            json={"name": name, "parents": [parent]},
+        )
+        if start.status_code != 200 or "location" not in start.headers:
+            raise DriveError(_friendly(start.status_code, start.text))
+        session_url = start.headers["location"]
+
+        offset = 0
+        with open(path, "rb") as handle:
+            while True:
+                chunk = handle.read(UPLOAD_CHUNK)
+                end = offset + len(chunk) - 1
+                response = await client.put(
+                    session_url,
+                    content=chunk,
+                    headers={"Content-Range": f"bytes {offset}-{end}/{size}" if chunk else f"bytes */{size}"},
+                )
+                offset += len(chunk)
+                if response.status_code in (200, 201):
+                    return response.json()
+                if response.status_code != 308:
+                    raise DriveError(_friendly(response.status_code, response.text))
+                if not chunk:
+                    raise DriveError("Drive no confirmó la subida del audio.")
+
+
+async def upload_recording(db: AsyncSession, connection: UserGoogleDrive, meeting: Meeting, path) -> str:
+    """Sube el mp3 de la reunión a la carpeta de grabaciones de la persona."""
+    token = await _access_token(decrypt_secret(connection.refresh_token_enc) or "")
+    parent = await _ensure_user_folder(db, connection, token)
+    fecha = (meeting.started_at or meeting.created_at).strftime("%Y-%m-%d")
+    safe_title = meeting.title[:80].replace("/", "-")
+    created = await _upload_resumable(token, f"{fecha} — {safe_title}.mp3", parent, path, "audio/mpeg")
+    return created.get("webViewLink") or f"https://drive.google.com/file/d/{created['id']}/view"

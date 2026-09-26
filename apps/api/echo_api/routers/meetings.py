@@ -11,7 +11,9 @@ from ..db import get_db
 from ..deps import OrgContext, can_edit_meeting, get_meeting_or_404, get_org_context
 from ..models import (
     LEVELS,
+    MEETING_KINDS,
     ActionItem,
+    InternalGroup,
     Bookmark,
     Decision,
     Meeting,
@@ -24,7 +26,9 @@ from ..models import (
 )
 from ..services.access import meeting_filter
 from ..services.audit import audit
+from ..services.background import spawn
 from ..services.pipeline import run_finalize_pipeline
+from ..services.recording import finalize_recording
 from ..services.live_bus import live_bus
 
 router = APIRouter(prefix="/api/meetings", tags=["meetings"])
@@ -49,6 +53,11 @@ class MeetingCreateIn(BaseModel):
     # inicial|primaria|secundaria. Sin él se usa el primer nivel en el que
     # puede crear quien la crea (services/access.py).
     level: str | None = None
+    # familia (la de siempre) o interna (de un grupo: directivos, coordinadores...).
+    kind: str = "familia"
+    group_id: uuid.UUID | None = None
+    # Grabar también el audio completo (services/recording.py).
+    record_audio: bool = False
 
 
 class ParticipantOut(BaseModel):
@@ -87,6 +96,10 @@ class MeetingOut(BaseModel):
     processing_state: dict
     meta: dict
     level: str | None = None
+    kind: str = "familia"
+    group_id: uuid.UUID | None = None
+    group_name: str | None = None
+    recording: dict | None = None
     participants: list[ParticipantOut] = []
     speakers: list[SpeakerOut] = []
 
@@ -101,9 +114,23 @@ class MeetingListItem(BaseModel):
     participant_count: int
     project_name: str | None = None
     level: str | None = None
+    kind: str = "familia"
+    group_id: uuid.UUID | None = None
+    group_name: str | None = None
+    recorded: bool = False
 
 
-def _meeting_out(m: Meeting, participants: list, speakers: list) -> MeetingOut:
+RECORDING_FIELDS = ("enabled", "status", "user_id", "drive_url", "expires_at", "size_bytes", "duration_seconds", "error")
+
+
+def public_recording(recording: dict | None) -> dict | None:
+    """El estado de la grabación que ve la pantalla."""
+    if not recording:
+        return None
+    return {key: recording.get(key) for key in RECORDING_FIELDS}
+
+
+def _meeting_out(m: Meeting, participants: list, speakers: list, group_name: str | None = None) -> MeetingOut:
     return MeetingOut(
         id=m.id,
         title=m.title,
@@ -119,6 +146,10 @@ def _meeting_out(m: Meeting, participants: list, speakers: list) -> MeetingOut:
         processing_state=m.processing_state or {},
         meta=m.meta or {},
         level=m.level,
+        kind=m.kind,
+        group_id=m.group_id,
+        group_name=group_name,
+        recording=public_recording(m.recording),
         participants=[ParticipantOut.model_validate(p) for p in participants],
         speakers=[SpeakerOut.model_validate(s) for s in speakers],
     )
@@ -132,8 +163,23 @@ async def create_meeting(
 ):
     ctx.require_role("member")
     scope = await ctx.scope(db)
+    if data.kind not in MEETING_KINDS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Tipo de reunión desconocido")
+    group: InternalGroup | None = None
+    if data.kind == "interna":
+        # Una interna es de un grupo y solo la crea alguien del grupo.
+        if data.group_id is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Elegí de qué grupo es la reunión")
+        group = await db.get(InternalGroup, data.group_id)
+        if group is None or group.organization_id != ctx.org_id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Grupo no encontrado")
+        if group.id not in scope.groups:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "No sos parte de ese grupo")
     creatable = scope.creatable_levels
-    if data.level is not None:
+    if data.kind == "interna":
+        # Las internas no son de un nivel: quién las ve lo decide el grupo.
+        level = None
+    elif data.level is not None:
         if data.level not in LEVELS:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Nivel desconocido")
         if data.level not in creatable:
@@ -157,6 +203,12 @@ async def create_meeting(
         status="draft",
         meta={"visibility": data.visibility if data.visibility in ("org", "private") else "org"},
         level=level,
+        kind=data.kind,
+        group_id=group.id if group else None,
+        audience="interna" if data.kind == "interna" else None,
+        recording=(
+            {"enabled": True, "status": "pending", "user_id": str(ctx.user.id)} if data.record_audio else None
+        ),
     )
     db.add(meeting)
     await db.flush()
@@ -184,7 +236,7 @@ async def create_meeting(
     await audit(db, ctx.org_id, ctx.user.id, "meeting.create", "meeting", str(meeting.id))
     await db.commit()
     await db.refresh(meeting)
-    return _meeting_out(meeting, participants, [])
+    return _meeting_out(meeting, participants, [], group.name if group else None)
 
 
 @router.get("", response_model=list[MeetingListItem])
@@ -196,6 +248,8 @@ async def list_meetings(
     status_filter: str | None = Query(default=None, alias="status"),
     project_id: uuid.UUID | None = None,
     level: str | None = None,
+    kind: str | None = None,
+    group_id: uuid.UUID | None = None,
 ):
     # La visibilidad va en el WHERE y no filtrando después: filtrar después
     # del LIMIT devolvía páginas cortas y se salteaba lo compartido.
@@ -219,6 +273,10 @@ async def list_meetings(
         q = q.where(Meeting.status == status_filter)
     if level:
         q = q.where(Meeting.level == level)
+    if kind:
+        q = q.where(Meeting.kind == kind)
+    if group_id:
+        q = q.where(Meeting.group_id == group_id)
     if project_id:
         q = q.join(ProjectMeeting, ProjectMeeting.meeting_id == Meeting.id).where(
             ProjectMeeting.project_id == project_id
@@ -237,6 +295,12 @@ async def list_meetings(
             )
         ).all()
         project_names = {mid: name for mid, name in prows}
+    group_ids = {m.group_id for m, _ in rows if m.group_id}
+    group_names: dict[uuid.UUID, str] = {}
+    if group_ids:
+        group_names = dict(
+            (await db.execute(select(InternalGroup.id, InternalGroup.name).where(InternalGroup.id.in_(group_ids)))).all()
+        )
 
     return [
         MeetingListItem(
@@ -249,6 +313,10 @@ async def list_meetings(
             participant_count=pcount,
             project_name=project_names.get(m.id),
             level=m.level,
+            kind=m.kind,
+            group_id=m.group_id,
+            group_name=group_names.get(m.group_id) if m.group_id else None,
+            recorded=bool(m.recording and m.recording.get("enabled")),
         )
         for m, pcount in rows
     ]
@@ -275,7 +343,8 @@ async def get_meeting(
         .scalars()
         .all()
     )
-    return _meeting_out(meeting, participants, speakers)
+    group = await db.get(InternalGroup, meeting.group_id) if meeting.group_id else None
+    return _meeting_out(meeting, participants, speakers, group.name if group else None)
 
 
 class MeetingUpdateIn(BaseModel):
@@ -302,6 +371,8 @@ async def update_meeting(
     if data.visibility in ("org", "private"):
         meeting.meta = {**(meeting.meta or {}), "visibility": data.visibility}
     if data.level is not None and data.level != meeting.level:
+        if meeting.kind == "interna":
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Las reuniones internas no tienen nivel")
         if data.level not in LEVELS:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Nivel desconocido")
         # Cambiar de nivel cambia quién la ve: lo decide quien dirige los dos
@@ -403,6 +474,9 @@ async def finish_meeting(
 
     await live_bus.publish(str(meeting.id), {"type": "status", "status": "processing"})
     background.add_task(run_finalize_pipeline, str(meeting.id))
+    # La grabación va aparte del pipeline: se cierra aunque no haya transcript ni IA.
+    if meeting.recording and meeting.recording.get("enabled"):
+        spawn(finalize_recording(meeting.id), name=f"recording:{meeting.id}")
     return await get_meeting(meeting_id, ctx, db)
 
 

@@ -13,6 +13,10 @@ Al tocar "Finalizar" corre en background:
   9. sugerencia de reuniones relacionadas (dentro del paso 8)
  10. notificaciones «tu acta está lista» (en _finish)
 
+Las reuniones internas (kind="interna": directivos, coordinadores) no tienen
+acta ni alimentan la memoria organizacional: son de un grupo, y la memoria la
+lee toda la sede. Tienen transcript, resumen, decisiones, tareas y chat.
+
 NO hay paso de identificación de hablantes por voice profile. El modelo
 `SpeakerProfile` existe en `models/meetings.py` con su columna de embedding y
 su `consent_at`, pero NADIE lo lee ni lo escribe: es schema preparado, no una
@@ -120,6 +124,7 @@ async def _run(meeting_id: uuid.UUID) -> None:
         if not meeting:
             return
         org_id = meeting.organization_id
+        internal = meeting.kind == "interna"
         language = meeting.language
         reference_date = (meeting.started_at or meeting.created_at).date()
         llm_config = await resolve_llm(db, org_id)
@@ -170,7 +175,9 @@ async def _run(meeting_id: uuid.UUID) -> None:
     #    resúmenes. Es lo primero que la persona quiere ver al terminar, así
     #    que no espera a nada más. generate_minutes registra sus propias fallas.
     minutes_task: asyncio.Task | None = None
-    if provider:
+    if internal:
+        pass  # sin acta: lo que se quiere es el resumen y poder preguntarle
+    elif provider:
         await _set_stage(meeting_id, "minutes", 30)
         minutes_task = asyncio.create_task(generate_minutes(meeting_id, provider))
     else:
@@ -206,8 +213,9 @@ async def _run(meeting_id: uuid.UUID) -> None:
             log.warning("acta fallo: %s", exc)
             skipped.append(f"minutes:{exc}")
 
-    # 8. Memoria organizacional (+ sugerencia de reuniones relacionadas)
-    if provider:
+    # 8. Memoria organizacional (+ sugerencia de reuniones relacionadas). Las
+    #    internas no: la memoria la ve toda la sede y la reunión es de un grupo.
+    if provider and not internal:
         await _set_stage(meeting_id, "memory", 88)
         try:
             await update_memory_from_meeting(meeting_id, insights, embeddings_config)
@@ -239,7 +247,11 @@ async def _finish(meeting_id: uuid.UUID, skipped: list[str]) -> None:
                     organization_id=meeting.organization_id,
                     kind="minutes_ready",
                     title=f"La reunión «{meeting.title}» está lista",
-                    body="Resumen, decisiones, tareas y acta disponibles.",
+                    body=(
+                        "Resumen, decisiones y chat disponibles."
+                        if meeting.kind == "interna"
+                        else "Resumen, decisiones, tareas y acta disponibles."
+                    ),
                     link=f"/meetings/{meeting.id}",
                 )
             )

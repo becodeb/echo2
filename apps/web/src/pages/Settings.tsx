@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { NavLink, Navigate, Route, Routes, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
-import type { DriveStatusOut, ReasonOut } from "../api/types";
+import type { DriveStatusOut, MyDriveOut, ReasonOut } from "../api/types";
 import { Select } from "../components/Select";
 import { Badge, Button, Card, Input, Modal, Spinner } from "../components/ui";
 import { useAuth } from "../state/auth";
@@ -18,7 +18,8 @@ const SECTIONS = [
   { path: "template", label: "Formato de acta" },
   { path: "numbering", label: "Numeración de actas" },
   { path: "letterhead", label: "Membrete" },
-  { path: "drive", label: "Google Drive" },
+  { path: "drive", label: "Drive de la sede" },
+  { path: "my-drive", label: "Mi Google Drive" },
   { path: "devices", label: "Dispositivos" },
   { path: "notifications", label: "Notificaciones" },
   { path: "privacy", label: "Privacidad" },
@@ -62,6 +63,7 @@ export default function Settings() {
             <Route path="numbering" element={<NumberingSection />} />
             <Route path="letterhead" element={<LetterheadSection />} />
             <Route path="drive" element={<DriveSection />} />
+            <Route path="my-drive" element={<MyDriveSection />} />
             <Route path="devices" element={<DevicesSection />} />
             <Route path="notifications" element={<NotificationsSection />} />
             <Route path="privacy" element={<PrivacySection />} />
@@ -1200,6 +1202,113 @@ function DriveSection() {
           <p className="text-xs text-ink-400">
             Echo pide el permiso mínimo de Drive: solo puede ver y tocar lo que él mismo crea. No
             accede al resto de tus archivos.
+          </p>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/**
+ * Drive personal: adonde van las grabaciones que hace cada persona. Separado
+ * del de la sede (donde van las actas): la grabación es de quien grabó.
+ */
+function MyDriveSection() {
+  const queryClient = useQueryClient();
+  const [params, setParams] = useSearchParams();
+
+  const { data: drive, isLoading } = useQuery({
+    queryKey: ["my-drive"],
+    queryFn: () => api<MyDriveOut>("/api/me/drive", { skipOrg: true }),
+  });
+  const connect = useMutation({
+    mutationFn: () => api<{ url: string }>("/api/me/drive/connect-url", { method: "POST", skipOrg: true }),
+    onSuccess: (data) => {
+      window.location.href = data.url;
+    },
+  });
+  const disconnect = useMutation({
+    mutationFn: () => api("/api/me/drive", { method: "DELETE", skipOrg: true }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["my-drive"] }),
+  });
+
+  const oauthError = DRIVE_ERRORS[params.get("error") ?? ""] ?? null;
+  const justConnected = params.get("connected") === "1";
+
+  if (isLoading) {
+    return <div className="flex justify-center py-10 text-ink-300"><Spinner className="h-5 w-5" /></div>;
+  }
+
+  return (
+    <Card className="space-y-4">
+      <div>
+        <h2 className="text-[15px] font-semibold text-ink-900">Mi Google Drive</h2>
+        <p className="mt-1 text-sm text-ink-500">
+          Cuando grabás una reunión, al terminar Echo sube el audio a la carpeta «Echo — Grabaciones»
+          de tu Drive y lo borra de sus servidores. Sin Drive conectado, el audio queda para
+          descargar 48 horas y después se borra.
+        </p>
+      </div>
+
+      {oauthError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{oauthError}</p>}
+      {justConnected && drive?.connected && (
+        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">Drive conectado.</p>
+      )}
+      {drive?.last_error && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Última subida fallida: {drive.last_error}
+        </p>
+      )}
+
+      {!drive?.enabled ? (
+        <p className="text-sm text-ink-500">
+          El servidor no tiene credenciales de Google configuradas, así que esta integración no está
+          disponible.
+        </p>
+      ) : drive.connected ? (
+        <div className="space-y-3">
+          <p className="text-sm text-ink-700">
+            Conectado con <span className="font-medium">{drive.connected_email}</span>.
+            {drive.folder_url && (
+              <>
+                {" "}
+                <a
+                  href={drive.folder_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-accent-600 hover:underline"
+                >
+                  Abrir la carpeta de grabaciones ↗
+                </a>
+              </>
+            )}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="soft"
+              onClick={() => {
+                setParams({});
+                disconnect.mutate();
+              }}
+              disabled={disconnect.isPending}
+            >
+              {disconnect.isPending ? <Spinner /> : "Desconectar"}
+            </Button>
+            <span className="text-xs text-ink-400">Tus grabaciones que ya están en Drive quedan ahí.</span>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <Button onClick={() => connect.mutate()} disabled={connect.isPending}>
+            {connect.isPending ? <Spinner /> : "Conectar mi Google Drive"}
+          </Button>
+          {connect.isError && (
+            <p className="text-sm text-red-600">
+              {connect.error instanceof Error ? connect.error.message : "No se pudo iniciar"}
+            </p>
+          )}
+          <p className="text-xs text-ink-400">
+            Permiso mínimo: Echo solo ve y toca los archivos que él mismo crea en tu Drive.
           </p>
         </div>
       )}

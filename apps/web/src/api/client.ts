@@ -100,3 +100,34 @@ export function wsUrl(path: string): string {
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
   return `${protocol}//${location.host}${path}`;
 }
+
+/** Descarga autenticada de un archivo (un link directo no lleva el token). */
+export async function apiDownload(path: string, fallbackName: string, retry = true): Promise<void> {
+  const headers: Record<string, string> = { "x-echo-client": "web" };
+  if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+  if (activeOrgId) headers["X-Organization-Id"] = activeOrgId;
+  const response = await fetch(path, { headers, credentials: "include" });
+  if (response.status === 401 && retry && (await tryRefresh())) {
+    return apiDownload(path, fallbackName, false);
+  }
+  if (!response.ok) {
+    let message = `Error ${response.status}`;
+    try {
+      message = (await response.json()).detail || message;
+    } catch {
+      /* sin body json */
+    }
+    throw new ApiError(response.status, message);
+  }
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const match = /filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i.exec(disposition);
+  const name = match ? decodeURIComponent(match[1] ?? match[2]) : fallbackName;
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
