@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
+import type { MeetingOut } from "../api/types";
 import { useAuth } from "../state/auth";
 import { useMyAccess } from "../state/access";
 import { useSeesInternal } from "../state/internalGroups";
@@ -39,6 +40,15 @@ export function Layout({ children }: { children: ReactNode }) {
   const seesInternal = useSeesInternal();
   // Reuniones internas solo para quien es de algún grupo o los administra.
   const nav = NAV.filter((item) => item.to !== "/internal" || seesInternal);
+  // Dentro de una reunión interna se marca su sección y no "Reuniones". Lee la
+  // reunión que la página ya cargó: no la vuelve a pedir.
+  const location = useLocation();
+  const openMeetingId = /^\/meetings\/([^/]+)/.exec(location.pathname)?.[1];
+  const { data: openMeeting } = useQuery<MeetingOut>({
+    queryKey: ["meeting", openMeetingId],
+    enabled: false,
+  });
+  const inInternal = openMeeting?.kind === "interna";
 
   const { data: notifData } = useQuery({
     queryKey: ["notifications", activeOrg?.id],
@@ -90,11 +100,13 @@ export function Layout({ children }: { children: ReactNode }) {
               to={item.to}
               end={item.to === "/"}
               onClick={() => setMobileNav(false)}
-              className={({ isActive }) =>
-                `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                  isActive ? "bg-ink-100 text-ink-900" : "text-ink-500 hover:bg-ink-50 hover:text-ink-800"
-                }`
-              }
+              className={({ isActive }) => {
+                const active =
+                  item.to === "/internal" ? isActive || inInternal : item.to === "/meetings" ? isActive && !inInternal : isActive;
+                return `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  active ? "bg-ink-100 text-ink-900" : "text-ink-500 hover:bg-ink-50 hover:text-ink-800"
+                }`;
+              }}
             >
               <NavIcon d={item.icon} />
               {item.label}

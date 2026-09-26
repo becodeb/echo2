@@ -42,7 +42,11 @@ export function RecordingCard({ meeting }: { meeting: MeetingOut }) {
   if (!recording || (!recording.enabled && recording.status !== "discarded")) return null;
 
   const details = [
-    recording.duration_seconds ? formatDuration(recording.duration_seconds) : null,
+    recording.duration_seconds
+      ? recording.duration_seconds < 60
+        ? `${recording.duration_seconds} s`
+        : formatDuration(recording.duration_seconds)
+      : null,
     size(recording.size_bytes),
   ]
     .filter(Boolean)
