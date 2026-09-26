@@ -46,6 +46,8 @@ export function Layout({ children }: { children: ReactNode }) {
   const openMeetingId = /^\/meetings\/([^/]+)/.exec(location.pathname)?.[1];
   const { data: openMeeting } = useQuery<MeetingOut>({
     queryKey: ["meeting", openMeetingId],
+    // La misma consulta que la página de la reunión; apagada: solo lee el caché.
+    queryFn: () => api<MeetingOut>(`/api/meetings/${openMeetingId}`),
     enabled: false,
   });
   const inInternal = openMeeting?.kind === "interna";
