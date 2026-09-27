@@ -16,7 +16,7 @@ class FakeSttProvider(TranscriptionProvider):
         self._index = 0
 
     async def transcribe_chunk(
-        self, pcm16, sample_rate, language, vocabulary=None, offset_ms=0
+        self, pcm16, sample_rate, language, vocabulary=None, offset_ms=0, context=None
     ) -> SttResult:
         duration_ms = int(len(pcm16) / 2 / sample_rate * 1000)
         if self._index < len(self.script):

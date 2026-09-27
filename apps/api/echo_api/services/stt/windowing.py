@@ -10,8 +10,8 @@ persona, que es lo que después permite asignarle hablante.
 import numpy as np
 
 FRAME_MS = 100
-MIN_MS = 2500  # un tramo más corto transcribe peor (poco contexto)
-MAX_MS = 10000  # más largo demora el texto en vivo
+MIN_MS = 4000  # un tramo más corto transcribe peor: el modelo inventa para completar
+MAX_MS = 12000  # más largo demora el texto en vivo
 PAUSE_MS = 500  # silencio que cuenta como pausa
 SEARCH_MS = 3000  # al llegar al máximo, se busca el corte en los últimos 3 s
 MIN_SPEECH_MS = 700  # sin esto de habla no hay nada que mandar todavía
@@ -32,11 +32,12 @@ def _frame_rms(buffer: bytes, sample_rate: int, channels: int) -> np.ndarray:
 
 def silence_threshold(rms: np.ndarray) -> float:
     """Por debajo de esto es silencio: un poco sobre el ruido de fondo, pero
-    nunca más de la mitad del volumen típico de la voz (si no, con alguien que
-    habla parejo todo contaría como silencio)."""
+    muy por debajo del volumen típico de la voz: con la mitad, una persona que
+    habla más bajo o más lejos del micrófono contaba como silencio y se le
+    cortaba en medio de la frase (pasó en una reunión real)."""
     floor = float(np.percentile(rms, 20))
     loud = float(np.percentile(rms, 90))
-    return max(ABS_SILENCE_RMS, min(floor * 1.8, loud * 0.5))
+    return max(ABS_SILENCE_RMS, min(floor * 1.8, loud * 0.25))
 
 
 def find_cut(buffer: bytes, sample_rate: int = 16000, channels: int = 1) -> int | None:

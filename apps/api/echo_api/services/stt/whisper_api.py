@@ -28,6 +28,16 @@ log = logging.getLogger("echo.stt")
 _TEXT_ONLY_PREFIXES = ("gpt-4o-transcribe", "gpt-4o-mini-transcribe", "gpt-transcribe")
 
 
+def build_prompt(vocabulary: list[str] | None, context: str | None = None) -> str | None:
+    """Prompt de transcripción: términos del diccionario y lo último que se dijo."""
+    parts = []
+    if vocabulary:
+        parts.append(", ".join(vocabulary[:80]) + ".")
+    if context:
+        parts.append(context.strip()[-300:])
+    return " ".join(parts) or None
+
+
 def is_diarize_model(model: str) -> bool:
     return "diarize" in model
 
@@ -62,6 +72,7 @@ class WhisperApiProvider(TranscriptionProvider):
         language: str | None,
         vocabulary: list[str] | None,
         model: str,
+        context: str | None = None,
     ) -> dict:
         form: dict = {"model": model, "response_format": response_format_for(model)}
         if is_diarize_model(model):
@@ -71,9 +82,12 @@ class WhisperApiProvider(TranscriptionProvider):
         else:
             if language and language != "auto":
                 form["language"] = language
-            if vocabulary:
-                # El diccionario de la sede (apellidos, programas) va como prompt.
-                form["prompt"] = ", ".join(vocabulary[:80])
+            # El diccionario de la sede (apellidos, programas) y lo último que
+            # se dijo van como prompt: con tramos cortos, sin ese contexto el
+            # modelo "completa" con frases inventadas.
+            prompt = build_prompt(vocabulary, context)
+            if prompt:
+                form["prompt"] = prompt
         started = time.monotonic()
         async with httpx.AsyncClient(timeout=300) as client:
             response = await client.post(
@@ -126,9 +140,10 @@ class WhisperApiProvider(TranscriptionProvider):
         language: str | None,
         vocabulary: list[str] | None = None,
         offset_ms: int = 0,
+        context: str | None = None,
     ) -> SttResult:
         wav = pcm16_to_wav(pcm16, sample_rate)
-        payload = await self._request(wav, "chunk.wav", language, vocabulary, self.model)
+        payload = await self._request(wav, "chunk.wav", language, vocabulary, self.model, context)
         duration_ms = int(len(pcm16) / 2 / sample_rate * 1000)
         return self._parse(payload, offset_ms, duration_ms)
 

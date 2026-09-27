@@ -10,9 +10,14 @@ trabajo de la reunión (services/recording.py):
    encontradas ("persona_1", "persona_2"...), así sigue llamándolas igual.
 2. Las personas del colegio que grabaron su voz en Ajustes → Mi voz van como
    voces conocidas desde el principio: salen con su nombre.
-3. Las voces se asignan al transcript que ya existe (el de gpt-4o-transcribe,
-   que escribe mejor y respeta el diccionario) por coincidencia de tiempos. Si
-   un tramo tiene dos personas, se parte por oraciones.
+3. Cada parte se vuelve a transcribir entera con gpt-4o-transcribe, con el
+   diccionario y los nombres de la reunión. Ese texto reemplaza al de en vivo:
+   en tramos de pocos segundos el modelo tiene tan poco contexto que inventa
+   para completar (en una reunión real "soy Vanina" salió "Ogei, iokinzos"), y
+   con la parte entera lo transcribió perfecto. Cada frase del texto final
+   toma hablante y tiempo alineándola palabra por palabra con la separación.
+   Si esa transcripción falla, las voces se asignan al transcript en vivo por
+   coincidencia de tiempos (partiendo por oraciones los tramos con dos personas).
 4. `name_speakers` le pide a la IA que deduzca de la conversación quién es
    cada persona sin nombre ("Mamá de Pedro"). Si no está segura, queda como
    sugerencia que la persona confirma en el transcript.
@@ -29,6 +34,7 @@ from dataclasses import dataclass
 from difflib import SequenceMatcher
 
 import httpx
+import numpy as np
 from sqlalchemy import delete, select, update
 
 from ..db import SessionLocal
@@ -44,9 +50,10 @@ from ..models import (
     User,
     UserVoiceSample,
 )
-from .ai_settings import resolve_stt
+from .ai_settings import get_vocabulary, resolve_stt
 from .recording import pcm_path
-from .stt.base import OPENAI_FILE_MODEL, pcm16_to_wav
+from .stt.base import OPENAI_FILE_MODEL, OPENAI_LIVE_MODEL, pcm16_to_wav
+from .stt.whisper_api import build_prompt
 
 log = logging.getLogger("echo.diarization")
 
@@ -228,7 +235,12 @@ async def _known_voices(db, meeting: Meeting) -> list[KnownVoice]:
 
 
 async def diarize_meeting(meeting_id: uuid.UUID) -> bool:
-    """Separa hablantes con el audio completo. False = no se pudo (sigue lo de siempre)."""
+    """Transcripción final y quién habló, con el audio completo.
+
+    False = no se pudo (sigue la consolidación de siempre sobre el transcript
+    en vivo). Si la transcripción final falla pero la separación no, las
+    voces se asignan al transcript en vivo.
+    """
     path = pcm_path(meeting_id)
     if not path.exists() or path.stat().st_size < MIN_AUDIO_MS * BYTES_PER_MS:
         return False
@@ -240,26 +252,28 @@ async def diarize_meeting(meeting_id: uuid.UUID) -> bool:
         if config is None or config.provider != "openai":
             return False
         known = await _known_voices(db, meeting)
+        vocabulary = await _vocabulary(db, meeting)
+        language = meeting.language
 
     known_labels = {voice.label for voice in known}
     diarized: list[DiarSegment] = []
+    final: list[tuple[str | None, str, int, int]] = []
+    final_ok = True
     person_clips: dict[str, bytes] = {}
     people = 0
-    part_bytes = PART_MS * BYTES_PER_MS
     with open(path, "rb") as handle:
-        offset = 0
-        while True:
-            pcm = handle.read(part_bytes)
-            if len(pcm) < MIN_PART_MS * BYTES_PER_MS:
-                break
-            part_offset_ms = offset // BYTES_PER_MS
+        for start, end in _part_ranges(handle, path.stat().st_size):
+            handle.seek(start)
+            pcm = handle.read(end - start)
+            part_offset_ms = start // BYTES_PER_MS
             references = [(voice.label, voice.wav) for voice in known]
             for label, clip in person_clips.items():
                 if len(references) >= MAX_REFERENCES:
                     break
                 references.append((label, clip))
             names = {name for name, _ in references}
-            raw = await _diarize_part(config.api_key, pcm16_to_wav(pcm, 16000), references)
+            wav = pcm16_to_wav(pcm, 16000)
+            raw = await _diarize_part(config.api_key, wav, references)
 
             local: dict[str, str] = {}
             part: list[DiarSegment] = []
@@ -287,12 +301,221 @@ async def diarize_meeting(meeting_id: uuid.UUID) -> bool:
                     if clip:
                         person_clips[label] = clip
             diarized += part
-            offset += len(pcm)
+
+            # El texto final de esta parte, escuchándola entera.
+            if final_ok:
+                try:
+                    text = await _transcribe_full(config.api_key, wav, language, vocabulary)
+                except Exception as exc:  # noqa: BLE001 - queda el transcript en vivo
+                    log.warning("transcripción final falló en %s: %s", meeting_id, exc)
+                    text = None
+                if text and part:
+                    final += merge_text_with_voices(text, part, part_offset_ms, end // BYTES_PER_MS)
+                elif text:
+                    final.append((None, text, part_offset_ms, end // BYTES_PER_MS))
+                else:
+                    final_ok = False
 
     if not diarized:
         return False
-    await _apply(meeting_id, diarized, {voice.label: voice for voice in known if voice.label in known_labels})
+    voices = {voice.label: voice for voice in known if voice.label in known_labels}
+    if final_ok and final:
+        await _replace_transcript(meeting_id, final, voices)
+    else:
+        await _apply(meeting_id, diarized, voices)
     return True
+
+
+def _part_ranges(handle, size: int) -> list[tuple[int, int]]:
+    """Partes de ~10 min cortadas en el momento más callado cerca del límite."""
+    ranges = []
+    start = 0
+    part_bytes = PART_MS * BYTES_PER_MS
+    search = 8000 * BYTES_PER_MS
+    while start < size:
+        end = min(size, start + part_bytes)
+        if size - end < MIN_PART_MS * BYTES_PER_MS:
+            end = size
+        elif end < size:
+            handle.seek(end - search)
+            window = handle.read(search)
+            samples = np.frombuffer(window[: len(window) // 2 * 2], dtype=np.int16).astype(np.float32)
+            frames = len(samples) // 1600
+            if frames:
+                rms = np.sqrt((samples[: frames * 1600].reshape(frames, 1600) ** 2).mean(axis=1))
+                end = end - search + int(np.argmin(rms)) * 1600 * 2
+        if end - start >= MIN_PART_MS * BYTES_PER_MS:
+            ranges.append((start, end))
+        start = end
+    return ranges
+
+
+async def _vocabulary(db, meeting: Meeting) -> list[str]:
+    """Diccionario de la sede + nombres de quienes están en la reunión."""
+    terms = list(await get_vocabulary(db, meeting.organization_id))
+    participants = (
+        (await db.execute(select(MeetingParticipant.name).where(MeetingParticipant.meeting_id == meeting.id)))
+        .scalars()
+        .all()
+    )
+    terms += [name for name in participants if name]
+    creator = await db.get(User, meeting.created_by)
+    if creator and creator.name:
+        terms.append(creator.name)
+    if meeting.family_id:
+        family = await db.get(Family, meeting.family_id)
+        if family:
+            terms.append(family.name)
+        terms += (
+            (await db.execute(select(FamilyMember.name).where(FamilyMember.family_id == meeting.family_id)))
+            .scalars()
+            .all()
+        )
+    return list(dict.fromkeys(term.strip() for term in terms if term and term.strip()))
+
+
+async def _transcribe_full(api_key: str, wav: bytes, language: str | None, vocabulary: list[str]) -> str | None:
+    """Texto de una parte entera con el mejor modelo, con diccionario e idioma."""
+    form: dict = {"model": OPENAI_LIVE_MODEL, "response_format": "json"}
+    if language and language != "auto":
+        form["language"] = language
+    prompt = build_prompt(vocabulary)
+    if prompt:
+        form["prompt"] = prompt
+    async with httpx.AsyncClient(timeout=600) as client:
+        response = await client.post(
+            TRANSCRIPTIONS_URL,
+            headers={"Authorization": f"Bearer {api_key}"},
+            data=form,
+            files={"file": ("reunion.wav", wav, "audio/wav")},
+        )
+    response.raise_for_status()
+    text = (response.json().get("text") or "").strip()
+    return text or None
+
+
+def merge_text_with_voices(
+    text: str, diarized: list[DiarSegment], part_start_ms: int, part_end_ms: int
+) -> list[tuple[str | None, str, int, int]]:
+    """Le pone hablante y tiempos al texto final, alineándolo palabra por palabra.
+
+    El texto final (escuchado entero, con diccionario) es el que mejor está
+    escrito pero no trae tiempos ni hablantes; la separación de voces trae las
+    dos cosas con un texto un poco peor. Las palabras de los dos textos se
+    alinean y cada palabra del final hereda hablante y momento de su par.
+    """
+    words = text.split()
+    if not words:
+        return []
+    voice_words: list[tuple[str, str, int]] = []  # (palabra normalizada, hablante, ms)
+    for seg in diarized:
+        tokens = [_normalize(token) for token in seg.text.split()]
+        tokens = [token for token in tokens if token]
+        span = max(seg.end_ms - seg.start_ms, 1)
+        for index, token in enumerate(tokens):
+            voice_words.append((token, seg.label, seg.start_ms + span * index // max(len(tokens), 1)))
+
+    normalized = [_normalize(word) for word in words]
+    owner: list[int | None] = [None] * len(words)
+    if voice_words:
+        matcher = SequenceMatcher(None, normalized, [w for w, _, _ in voice_words], autojunk=False)
+        for block in matcher.get_matching_blocks():
+            for offset in range(block.size):
+                owner[block.a + offset] = block.b + offset
+        # Palabras sin par: heredan de la anterior con par (o de la siguiente).
+        last = next((value for value in owner if value is not None), None)
+        for index, value in enumerate(owner):
+            if value is None:
+                owner[index] = last
+            else:
+                last = value
+
+    def speaker_and_time(index: int) -> tuple[str | None, int | None]:
+        match = owner[index]
+        if match is None:
+            return None, None
+        _, label, when = voice_words[match]
+        return label, when
+
+    # Oraciones del texto final.
+    sentences: list[list[int]] = [[]]
+    for index, word in enumerate(words):
+        sentences[-1].append(index)
+        if word.endswith((".", "?", "!", "…")) and index < len(words) - 1:
+            sentences.append([])
+
+    pieces: list[list] = []
+    for sentence in sentences:
+        if not sentence:
+            continue
+        votes: dict[str | None, int] = defaultdict(int)
+        times = []
+        for index in sentence:
+            label, when = speaker_and_time(index)
+            votes[label] += 1
+            if when is not None:
+                times.append(when)
+        label = max(votes, key=votes.get)
+        start = min(times) if times else (pieces[-1][3] if pieces else part_start_ms)
+        piece_text = " ".join(words[index] for index in sentence)
+        if pieces and pieces[-1][0] == label and len(pieces[-1][1]) + len(piece_text) < 400:
+            pieces[-1][1] += " " + piece_text
+            pieces[-1][3] = max(pieces[-1][3], start)
+        else:
+            pieces.append([label, piece_text, start, start])
+    # Cada tramo termina donde empieza el siguiente; el último, al final de la parte.
+    for index, piece in enumerate(pieces):
+        piece[2] = max(piece[2], pieces[index - 1][2] + 1 if index else part_start_ms)
+    for index, piece in enumerate(pieces):
+        piece[3] = pieces[index + 1][2] if index + 1 < len(pieces) else part_end_ms
+        piece[3] = max(piece[3], piece[2] + 1)
+    return [tuple(piece) for piece in pieces]
+
+
+async def _replace_transcript(
+    meeting_id: uuid.UUID, final: list[tuple[str | None, str, int, int]], known: dict[str, KnownVoice]
+) -> None:
+    """Reemplaza el transcript en vivo por el final, con sus hablantes."""
+    async with SessionLocal() as db:
+        meeting = await db.get(Meeting, meeting_id)
+        if meeting is None:
+            return
+        await db.execute(delete(TranscriptSegment).where(TranscriptSegment.meeting_id == meeting_id))
+        await db.execute(delete(Speaker).where(Speaker.meeting_id == meeting_id))
+
+        speakers: dict[str, Speaker] = {}
+        unnamed = 0
+        for label, *_ in final:
+            if label is None or label in speakers:
+                continue
+            voice = known.get(label)
+            if voice is None:
+                unnamed += 1
+            speakers[label] = Speaker(
+                meeting_id=meeting_id,
+                label=(voice.name if voice else f"Persona {unnamed}")[:60],
+                display_name=voice.name if voice else None,
+                color=SPEAKER_COLORS[len(speakers) % len(SPEAKER_COLORS)],
+            )
+            db.add(speakers[label])
+        await db.flush()
+
+        for seq, (label, text, start, end) in enumerate(final, start=1):
+            db.add(
+                TranscriptSegment(
+                    meeting_id=meeting_id,
+                    organization_id=meeting.organization_id,
+                    seq=seq,
+                    start_ms=start,
+                    end_ms=end,
+                    text=text,
+                    is_final=True,
+                    speaker_hint=label,
+                    speaker_id=speakers[label].id if label is not None else None,
+                )
+            )
+        await db.commit()
+        log.info("transcripción final: %s → %s tramos, %s personas", meeting_id, len(final), len(speakers))
 
 
 async def _apply(meeting_id: uuid.UUID, diarized: list[DiarSegment], known: dict[str, KnownVoice]) -> None:

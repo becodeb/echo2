@@ -49,6 +49,7 @@ class TranscriptionProvider:
         language: str | None,
         vocabulary: list[str] | None = None,
         offset_ms: int = 0,
+        context: str | None = None,
     ) -> SttResult:
         raise NotImplementedError
 

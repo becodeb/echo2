@@ -72,7 +72,7 @@ class DeepgramProvider(TranscriptionProvider):
         return result
 
     async def transcribe_chunk(
-        self, pcm16, sample_rate, language, vocabulary=None, offset_ms=0
+        self, pcm16, sample_rate, language, vocabulary=None, offset_ms=0, context=None
     ) -> SttResult:
         wav = pcm16_to_wav(pcm16, sample_rate)
         payload = await self._request(wav, "audio/wav", language, vocabulary)

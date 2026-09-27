@@ -37,10 +37,17 @@ def test_short_audio_waits():
 
 
 def test_cut_in_the_middle_of_a_pause():
-    audio = _tone(3.0) + _silence(0.6)
+    audio = _tone(4.5) + _silence(0.6)
     cut = find_cut(audio)
     assert cut is not None
-    assert 3.0 * RATE * 2 <= cut <= 3.6 * RATE * 2
+    assert 4.5 * RATE * 2 <= cut <= 5.1 * RATE * 2
+
+
+def test_a_quieter_voice_is_not_a_pause():
+    # Reunión real 99b4b81c: Vanina hablaba más bajo que Bautista y se le
+    # cortaba en medio de la frase como si fuera silencio.
+    audio = _tone(3.0, amplitude=8000) + _tone(1.5, amplitude=2500)
+    assert find_cut(audio) is None
 
 
 def test_no_cut_while_still_speaking():
@@ -48,18 +55,18 @@ def test_no_cut_while_still_speaking():
 
 
 def test_continuous_speech_is_cut_at_the_quietest_moment():
-    # Habla de corrido 10 s con un bajón de volumen a los 8,5 s.
-    audio = _tone(8.5) + _tone(0.2, amplitude=900) + _tone(1.5)
+    # Habla de corrido 12 s con un bajón de volumen a los 10,5 s.
+    audio = _tone(10.5) + _tone(0.2, amplitude=900) + _tone(1.5)
     cut = find_cut(audio)
     assert cut is not None
-    assert 8.4 * RATE * 2 <= cut <= 8.8 * RATE * 2
+    assert 10.4 * RATE * 2 <= cut <= 10.8 * RATE * 2
 
 
 def test_noisy_room_still_finds_the_pause():
     noise = _tone(0.6, amplitude=500, freq=50)
-    audio = _tone(3.0, amplitude=6000) + noise
+    audio = _tone(4.5, amplitude=6000) + noise
     cut = find_cut(audio)
-    assert cut is not None and cut > 3.0 * RATE * 2
+    assert cut is not None and cut > 4.5 * RATE * 2
 
 
 # ── Asignación de voces al transcript ────────────────────────────
@@ -302,3 +309,60 @@ def test_second_recorder_takes_over_and_the_first_is_closed(client):
                 first.receive_text()
             assert closed.value.code == 4409
     rec.pcm_path(uuid.UUID(meeting["id"])).unlink(missing_ok=True)
+
+
+# ── Transcripción final con la reunión entera ────────────────────
+
+
+def test_final_text_takes_speakers_and_times_from_the_voices():
+    from echo_api.services.diarization import merge_text_with_voices
+
+    # El texto final (bien escrito) y la separación (con errores) de la reunión real 99b4b81c.
+    text = "Hola, yo soy Bautista Goñi. Hola, hola, hola. Soy Vanina. Ok, ¿y vos quién sos? El Choto."
+    voices = [
+        DiarSegment(3000, 5500, "voz_1", "Hola, yo soy Bautista Goñi."),
+        DiarSegment(5600, 7200, "persona_1", "hola, hola, hola, soy Vanina,"),
+        DiarSegment(8000, 10300, "voz_1", "Ok, ¿y vos quién sos?"),
+        DiarSegment(10800, 11500, "persona_1", "El Choto."),
+    ]
+    pieces = merge_text_with_voices(text, voices, 3000, 12000)
+    assert [(label, piece) for label, piece, _, _ in pieces] == [
+        ("voz_1", "Hola, yo soy Bautista Goñi."),
+        ("persona_1", "Hola, hola, hola. Soy Vanina."),
+        ("voz_1", "Ok, ¿y vos quién sos?"),
+        ("persona_1", "El Choto."),
+    ]
+    starts = [start for _, _, start, _ in pieces]
+    assert starts == sorted(starts) and starts[0] == 3000
+    assert pieces[-1][3] == 12000
+    assert all(pieces[i][3] == pieces[i + 1][2] for i in range(len(pieces) - 1))
+
+
+def test_meeting_is_retranscribed_whole_and_replaces_live_text(client, monkeypatch):
+    user, meeting_id = _meeting_with_audio(client)
+
+    class FakeBoth(_FakeOpenAI):
+        async def post(self, url, headers=None, data=None, files=None):
+            _FakeOpenAI.requests.append(dict(data or {}))
+            if data["model"] == "gpt-4o-transcribe":
+                body = {"text": "Buenos días, soy la directora. Queríamos hablar de Pedro. Está muy callado."}
+            else:
+                body = {"segments": [
+                    {"speaker": "A", "start": 0.0, "end": 2.5, "text": "Buenos días soy la directora"},
+                    {"speaker": "B", "start": 2.6, "end": 11.5, "text": "queríamos hablar de Pedro está muy callado"},
+                ]}
+            return httpx.Response(200, json=body, request=httpx.Request("POST", url))
+
+    _FakeOpenAI.requests = []
+    monkeypatch.setattr(httpx, "AsyncClient", FakeBoth)
+    assert asyncio.run(diarize_meeting(meeting_id)) is True
+    monkeypatch.undo()
+
+    full = next(form for form in _FakeOpenAI.requests if form["model"] == "gpt-4o-transcribe")
+    assert full["language"] == "es"
+    assert "Mariana Gibson" in full["prompt"]  # quien grabó va como pista de nombres
+    assert _speakers(client, user, meeting_id) == [
+        ("Persona 1", "Buenos días, soy la directora."),
+        ("Persona 2", "Queríamos hablar de Pedro. Está muy callado."),
+    ]
+

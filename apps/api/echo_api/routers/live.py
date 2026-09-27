@@ -182,6 +182,8 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
     vocabulary: list[str] = []
     stt_error_sent = False
     segments_since_insights = 0
+    # Lo último transcripto: contexto para el tramo siguiente.
+    recent_text = ""
     # Control de ritmo: cuánto audio llegó desde que empezó a llegar.
     audio_started_at: float | None = None
     audio_received_ms = 0
@@ -203,7 +205,7 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
     forward_task = asyncio.create_task(forward_bus())
 
     async def flush_audio(final: bool = False, upto: int | None = None):
-        nonlocal audio_buffer, stream_offset_ms, stt_error_sent, segments_since_insights
+        nonlocal audio_buffer, stream_offset_ms, stt_error_sent, segments_since_insights, recent_text
         if not audio_buffer or stt_provider is None:
             audio_buffer = bytearray()
             return
@@ -228,7 +230,7 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
             return
         try:
             result = await stt_provider.transcribe_chunk(
-                chunk, sample_rate, meeting.language, vocabulary, offset_ms=offset
+                chunk, sample_rate, meeting.language, vocabulary, offset_ms=offset, context=recent_text
             )
         except Exception as exc:  # provider caído: avisar sin matar la reunión
             log.warning("stt cloud error: %s", exc)
@@ -267,6 +269,7 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
                 meeting, seg.text.strip(), seg.start_ms, seg.end_ms, seg.confidence, speaker
             )
             await live_bus.publish(channel, event)
+            recent_text = (recent_text + " " + seg.text.strip())[-300:]
             segments_since_insights += 1
         if segments_since_insights >= 8 or (final and segments_since_insights > 0):
             segments_since_insights = 0
