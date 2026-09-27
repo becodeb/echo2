@@ -394,6 +394,10 @@ async def _transcribe_full(api_key: str, wav: bytes, language: str | None, vocab
     return text or None
 
 
+def _someone_else_between(diarized: list[DiarSegment], label: str | None, after_ms: int, before_ms: int) -> bool:
+    return any(seg.label != label and after_ms < seg.start_ms < before_ms for seg in diarized)
+
+
 def merge_text_with_voices(
     text: str, diarized: list[DiarSegment], part_start_ms: int, part_end_ms: int
 ) -> list[tuple[str | None, str, int, int]]:
@@ -458,9 +462,23 @@ def merge_text_with_voices(
             if when is not None:
                 times.append(when)
         label = max(votes, key=votes.get)
-        start = min(times) if times else (pieces[-1][3] if pieces else part_start_ms)
+        if times:
+            # El inicio es el de la mayoría de sus palabras: una palabra que la
+            # separación pegó a la frase anterior ("ok") no la adelanta.
+            middle = sorted(times)[len(times) // 2]
+            start = min(when for when in times if when >= middle - 1500)
+        else:
+            start = pieces[-1][3] if pieces else part_start_ms
         piece_text = " ".join(words[index] for index in sentence)
-        if pieces and pieces[-1][0] == label and len(pieces[-1][1]) + len(piece_text) < 400:
+        # Se junta con el tramo anterior de la misma persona salvo que otra
+        # haya empezado a hablar en el medio (aunque el texto final no la haya
+        # registrado: la red de seguridad de abajo la agrega ahí).
+        if (
+            pieces
+            and pieces[-1][0] == label
+            and len(pieces[-1][1]) + len(piece_text) < 400
+            and not _someone_else_between(diarized, label, pieces[-1][3], start)
+        ):
             pieces[-1][1] += " " + piece_text
             pieces[-1][3] = max(pieces[-1][3], start)
         else:
@@ -480,7 +498,8 @@ def merge_text_with_voices(
             continue
         if sum(1 for index in indexes if index in matched_voice) / len(tokens) >= 0.3:
             continue
-        pieces.append([seg.label, seg.text.strip(), max(seg.start_ms, part_start_ms), seg.start_ms])
+        rescued = seg.text.strip()
+        pieces.append([seg.label, rescued[:1].upper() + rescued[1:], max(seg.start_ms, part_start_ms), seg.start_ms])
     pieces.sort(key=lambda piece: piece[2])
 
     # Cada tramo termina donde empieza el siguiente; el último, al final de la parte.

@@ -392,3 +392,23 @@ def test_a_phrase_only_the_voices_heard_is_added_back():
     assert starts == sorted(starts)
     vanina = next(p for p in pieces if "Vanina" in p[1])
     assert vanina[2] == 5100
+
+
+def test_same_person_after_a_long_gap_is_a_new_turn():
+    from echo_api.services.diarization import merge_text_with_voices
+
+    # Corrida real: "Ok, ¿y vos quién sos?" (9 s) quedaba pegado al saludo de 1 s,
+    # antes de la frase de Vanina de los 5 s.
+    text = "Hola, ¿sí? ¿Quién es? Hola, yo soy Bautista Goñi. Ok, ¿y vos quién sos?"
+    voices = [
+        DiarSegment(1100, 3000, "voz_1", "hola si quien es yo"),
+        DiarSegment(3900, 5100, "voz_1", "yo soy bautista goñi ok"),
+        DiarSegment(5100, 6800, "persona_1", "hola, hola, soy Vanina."),
+        DiarSegment(8900, 11200, "voz_1", "y vos quién sos"),
+    ]
+    pieces = merge_text_with_voices(text, voices, 0, 12000)
+    assert [piece for _, piece, _, _ in pieces] == [
+        "Hola, ¿sí? ¿Quién es? Hola, yo soy Bautista Goñi.",
+        "Hola, hola, soy Vanina.",
+        "Ok, ¿y vos quién sos?",
+    ]
