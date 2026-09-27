@@ -110,3 +110,20 @@ def is_hallucination(text: str) -> bool:
     if not normalized:
         return True
     return any(marker in normalized for marker in HALLUCINATION_MARKERS)
+
+
+def is_prompt_echo(text: str, vocabulary: list[str] | None) -> bool:
+    """El modelo "leyó" el diccionario en vez de transcribir.
+
+    Con el diccionario de la sede como prompt, sobre un tramo casi mudo el
+    modelo a veces devuelve una palabra del diccionario sola (en una prueba
+    real, "Gibson" en el último segundo de silencio). Unas pocas palabras que
+    son todas del diccionario no es habla.
+    """
+    if not vocabulary:
+        return False
+    words = [w for w in "".join(c.lower() if c.isalnum() else " " for c in text).split() if w]
+    if not words or len(words) > 4:
+        return False
+    known = {w for term in vocabulary for w in "".join(c.lower() if c.isalnum() else " " for c in term).split()}
+    return all(word in known for word in words)

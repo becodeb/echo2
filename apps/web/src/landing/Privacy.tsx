@@ -23,11 +23,11 @@ export function Privacy() {
         <div className="md:col-span-7">
           <h2 className="text-4xl font-semibold tracking-tighter md:text-6xl">El audio no se guarda.</h2>
           <p className="mt-6 max-w-md text-lg leading-relaxed text-ink-300">
-            Se transcribe en memoria y se destruye. Lo único que persiste es texto. Importa cuando en
-            la reunión hay familias y alumnos.
+            Se usa mientras se procesa la reunión y se borra al terminar. Lo único que persiste es
+            texto. Importa cuando en la reunión hay familias y alumnos.
           </p>
           <p className="mt-10 font-mono text-sm text-ink-400 md:text-base">
-            micrófono → memoria → motor de voz → texto → audio destruido
+            micrófono → motor de voz → texto → audio borrado
           </p>
         </div>
         <ul className="space-y-8 md:col-span-5">

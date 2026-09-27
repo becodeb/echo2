@@ -90,6 +90,7 @@ def _include_optional_routers() -> None:
         "internal_groups",
         "my_drive",
         "recordings",
+        "my_voice",
     ):
         try:
             module = import_module(f".routers.{name}", package="echo_api")

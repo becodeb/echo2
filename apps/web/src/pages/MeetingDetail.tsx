@@ -588,7 +588,7 @@ function SpeakerEditor({ meeting, onChanged }: { meeting: MeetingOut; onChanged:
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-xs font-medium text-ink-400">Hablantes:</span>
+      <span className="text-xs font-medium text-ink-400">Quién habló (tocá para corregir):</span>
       {meeting.speakers.map((speaker) => (
         <span key={speaker.id}>
           {renaming === speaker.id ? (
@@ -603,7 +603,7 @@ function SpeakerEditor({ meeting, onChanged }: { meeting: MeetingOut; onChanged:
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 autoFocus
-                className="w-28 rounded border border-ink-200 px-2 py-0.5 text-xs"
+                className="w-44 max-w-full rounded border border-ink-200 px-2 py-0.5 text-base sm:text-xs"
               />
               <button type="submit" className="text-xs text-accent-600">OK</button>
             </form>
@@ -611,10 +611,11 @@ function SpeakerEditor({ meeting, onChanged }: { meeting: MeetingOut; onChanged:
             <button
               onClick={() => {
                 setRenaming(speaker.id);
-                setName(speaker.display_name || "");
+                // Con una sugerencia de la IA, aceptarla es tocar y confirmar.
+                setName(speaker.display_name || speaker.identity_suggestion?.person_name || "");
               }}
               className="inline-flex items-center gap-1.5 rounded-full border border-ink-200 px-2.5 py-1 text-xs font-medium text-ink-700 hover:border-ink-300"
-              title="Renombrar hablante"
+              title="Ponerle nombre"
             >
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: speaker.color }} />
               {speaker.display_name || speaker.label}

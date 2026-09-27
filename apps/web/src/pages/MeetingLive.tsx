@@ -587,7 +587,7 @@ export default function MeetingLive() {
   if (processing || meeting.status === "processing") {
     const stageLabels: Record<string, string> = {
       queued: "Preparando la reunión…",
-      speakers: "Consolidando hablantes…",
+      speakers: "Identificando quién habló…",
       insights: "Extrayendo decisiones y tareas…",
       embeddings: "Indexando el transcript…",
       summary: "Escribiendo el resumen…",

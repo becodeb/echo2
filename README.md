@@ -47,11 +47,11 @@ estás construyendo.
 
 ## Principio fundamental: el audio no se guarda
 
-Echo es **privacy-first**. El audio existe solo en RAM el tiempo necesario para
-transcribirlo:
+Echo es **privacy-first**. El audio existe solo mientras dura la reunión y su
+procesamiento (para transcribir y separar quién habló) y después se borra:
 
 ```
-captura → memoria RAM → STT → texto → destruir audio
+captura → STT → texto → separación de hablantes → borrar audio
 ```
 
 - Con **Echo Bridge** (recomendado): el audio nunca sale de tu computadora;
@@ -59,7 +59,8 @@ captura → memoria RAM → STT → texto → destruir audio
 - En **modo cloud**: el audio viaja cifrado al proveedor STT configurado y se
   descarta al transcribir. La UI siempre avisa qué modo está activo.
 - Lo que persiste: transcript, timestamps, hablantes, decisiones, tareas,
-  resúmenes, acta, embeddings y metadata. Nunca WAV/MP3/WebM.
+  resúmenes, acta, embeddings y metadata. El audio solo se conserva si la reunión
+  se graba (opción explícita), y va al Google Drive de quien grabó.
 - Cuando hay captura activa, la web y el dispositivo muestran **● Grabando**.
 
 ## Arquitectura

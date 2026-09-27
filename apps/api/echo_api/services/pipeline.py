@@ -64,7 +64,9 @@ from .insights_prompts import (
 from .live_bus import live_bus
 from .llm import LLMError, get_llm_provider
 from .privacy import protect
+from .diarization import diarize_meeting, name_speakers
 from .memory_svc import update_memory_from_meeting
+from .recording import finalize_recording
 from .minutes_gen import generate_minutes
 from .rag import embed_meeting_segments
 from .transcript_util import format_ms, load_transcript_lines, transcript_to_text
@@ -110,14 +112,28 @@ async def run_finalize_pipeline(meeting_id_str: str) -> None:
                 }
                 await db.commit()
         await live_bus.publish(meeting_id_str, {"type": "status", "status": "failed"})
+    finally:
+        # El audio de trabajo se cierra siempre: se borra, o si la reunión se
+        # grababa, va al Drive de quien grabó (services/recording.py).
+        try:
+            await finalize_recording(meeting_id)
+        except Exception:  # noqa: BLE001 - la limpieza tiene su propio respaldo
+            log.exception("no se pudo cerrar el audio de %s", meeting_id)
 
 
 async def _run(meeting_id: uuid.UUID) -> None:
     skipped: list[str] = []
 
-    # 1. Consolidar hablantes
+    # 1. Quién habló: con el audio completo si se puede; si no, lo de siempre.
     await _set_stage(meeting_id, "speakers", 5)
-    await consolidate_speakers(meeting_id)
+    diarized = False
+    try:
+        diarized = await diarize_meeting(meeting_id)
+    except Exception as exc:  # noqa: BLE001 - sin separación la reunión sigue igual
+        log.warning("separación de hablantes falló meeting=%s: %s", meeting_id, exc)
+        skipped.append("speakers:separacion_fallida")
+    if not diarized:
+        await consolidate_speakers(meeting_id)
 
     async with SessionLocal() as db:
         meeting = await db.get(Meeting, meeting_id)
@@ -157,6 +173,16 @@ async def _run(meeting_id: uuid.UUID) -> None:
         # provider: con él, ningún nombre le llega a la IA.
         async with SessionLocal() as db:
             provider = await protect(db, org_id, provider, meeting_id)
+        # Nombres para las personas que la voz no reconoció, deducidos de la
+        # conversación. Va antes de todo lo demás para que el acta y el
+        # resumen ya digan quién dijo qué.
+        if diarized:
+            try:
+                if await name_speakers(meeting_id, provider):
+                    async with SessionLocal() as db:
+                        lines = await load_transcript_lines(db, meeting_id)
+            except Exception as exc:  # noqa: BLE001 - sin nombres queda "Persona 1"
+                log.warning("nombres de hablantes fallaron meeting=%s: %s", meeting_id, exc)
 
     # 2. Extracción estructurada final (+ resolución de fechas al persistir)
     insights: dict = {}

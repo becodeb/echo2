@@ -1,13 +1,15 @@
 """Grabación del audio completo de una reunión: temporal en la VM, final en Drive.
 
-Por defecto Echo NO guarda audio: lo transcribe y lo descarta. Grabar es una
-opción explícita por reunión, y aun así el audio no se queda en el servidor:
+Echo no se queda con el audio. Mientras dura la reunión, el WebSocket en vivo
+(routers/live.py) agrega el PCM16 mono 16 kHz que recibe a `<id>.pcm`: es el
+audio de trabajo, que al finalizar sirve para separar quién habló escuchando
+la reunión entera (services/diarization.py). Cuando termina el procesamiento,
+`finalize_recording` lo cierra:
 
-1. Mientras se graba, el WebSocket en vivo (routers/live.py) agrega el mismo
-   PCM16 mono 16 kHz que ya recibe para transcribir a `<id>.pcm`.
-2. Al finalizar, `finalize_recording` lo pasa a mp3 (≈14 MB por hora de
-   reunión), borra el PCM y lo sube al Drive personal de quien grabó. Subido,
-   se borra el mp3.
+1. Si la reunión NO se graba, lo borra y listo.
+2. Si se graba (opción explícita por reunión), lo pasa a mp3 (≈14 MB por hora
+   de reunión), borra el PCM y lo sube al Drive personal de quien grabó.
+   Subido, se borra el mp3.
 3. Si esa persona no tiene Drive conectado (o Drive falla), el mp3 queda para
    descargar `recording_ttl_hours` y después `cleanup_recordings` lo borra.
 
@@ -110,17 +112,19 @@ def _expires_at() -> str:
 
 
 async def finalize_recording(meeting_id: uuid.UUID) -> None:
-    """Cierra la grabación: mp3, Drive de quien grabó o descarga temporal.
+    """Cierra el audio de la reunión: se borra, o (si se graba) mp3 a Drive o descarga.
 
-    Corre en segundo plano al finalizar la reunión, aparte del pipeline: tiene
-    que andar aunque no haya transcript ni IA configurada.
+    La llama el pipeline al terminar, pase lo que pase (services/pipeline.py):
+    tiene que andar aunque no haya transcript ni IA configurada.
     """
+    source = pcm_path(meeting_id)
     async with SessionLocal() as db:
         meeting = await db.get(Meeting, meeting_id)
         if meeting is None or not is_enabled(meeting.recording):
+            # Solo era audio de trabajo: ya se usó, se borra.
+            source.unlink(missing_ok=True)
             return
 
-    source = pcm_path(meeting_id)
     if not source.exists() or source.stat().st_size == 0:
         source.unlink(missing_ok=True)
         await update_state(meeting_id, status="empty")

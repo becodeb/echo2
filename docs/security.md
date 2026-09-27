@@ -4,7 +4,7 @@
 
 | Dato | Tratamiento |
 |---|---|
-| Audio | **Nunca persiste.** RAM → STT → descarte. Temporales de CLI/ffmpeg borrados en `finally`. Sin localStorage/IndexedDB de audio. |
+| Audio | **No queda guardado.** Copia de trabajo temporal por reunión (`RECORDINGS_DIR/<id>.pcm`) para separar hablantes con el audio completo; se borra al terminar el pipeline (`services/recording.finalize_recording`) y la limpieza periódica borra cualquier resto a las 24 h. Solo si la reunión se graba (opción explícita) se sube al Drive de quien grabó. Sin localStorage/IndexedDB de audio. |
 | Transcript y derivados | PostgreSQL, aislados por organización |
 | API keys de providers | Cifradas en reposo (Fernet/AES128-CBC+HMAC) con `ENCRYPTION_KEY`; al frontend solo vuelven enmascaradas (`sk-a…xyz`); excluidas de logs |
 | Contraseñas | Argon2id |

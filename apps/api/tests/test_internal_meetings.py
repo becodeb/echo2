@@ -164,12 +164,18 @@ def test_expired_recordings_are_cleaned(client):
     assert state["status"] == "expired"
 
 
-def test_without_recording_nothing_is_written(client):
+def test_without_recording_the_work_audio_is_deleted_when_closing(client):
+    """Sin grabar, el audio solo vive mientras se procesa la reunión."""
     _, director, _, meeting = _school_with_internal_meeting(client)
-    with client.websocket_connect(f"/api/meetings/{meeting['id']}/ws?token={director.token}") as websocket:
+    meeting_id = uuid.UUID(meeting["id"])
+    with client.websocket_connect(f"/api/meetings/{meeting_id}/ws?token={director.token}") as websocket:
         websocket.send_text(json.dumps({"type": "hello", "role": "recorder", "sample_rate": 16000, "transcribe": False}))
         websocket.receive_text()
         websocket.send_bytes(bytes(3200))
         websocket.send_text(json.dumps({"type": "ping"}))
         websocket.receive_text()
-    assert not rec.pcm_path(uuid.UUID(meeting["id"])).exists()
+    assert rec.pcm_path(meeting_id).exists()
+    asyncio.run(rec.finalize_recording(meeting_id))
+    assert not rec.pcm_path(meeting_id).exists()
+    assert not rec.mp3_path(meeting_id).exists()
+    assert client.get(f"/api/meetings/{meeting_id}", headers=director.headers).json()["recording"] is None

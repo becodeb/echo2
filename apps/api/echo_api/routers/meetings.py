@@ -26,9 +26,7 @@ from ..models import (
 )
 from ..services.access import meeting_filter
 from ..services.audit import audit
-from ..services.background import spawn
 from ..services.pipeline import run_finalize_pipeline
-from ..services.recording import finalize_recording
 from ..services.live_bus import live_bus
 
 router = APIRouter(prefix="/api/meetings", tags=["meetings"])
@@ -473,10 +471,8 @@ async def finish_meeting(
     await db.commit()
 
     await live_bus.publish(str(meeting.id), {"type": "status", "status": "processing"})
+    # El pipeline también cierra el audio de trabajo (y la grabación, si hay).
     background.add_task(run_finalize_pipeline, str(meeting.id))
-    # La grabación va aparte del pipeline: se cierra aunque no haya transcript ni IA.
-    if meeting.recording and meeting.recording.get("enabled"):
-        spawn(finalize_recording(meeting.id), name=f"recording:{meeting.id}")
     return await get_meeting(meeting_id, ctx, db)
 
 

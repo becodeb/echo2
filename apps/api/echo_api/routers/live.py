@@ -9,11 +9,16 @@ Roles de conexión:
         configurado y descarta el audio inmediatamente.
   - viewer: recibe transcript/insights en tiempo real.
 
-Grabación (opcional, services/recording.py): si la reunión se graba, el mismo
-audio que llega para transcribir se agrega a un archivo temporal que al
-finalizar se sube al Drive de quien grabó. Con el bridge (que transcribe en la
-máquina) el navegador manda el audio con `transcribe: false` en el hello:
-solo se graba, no se transcribe dos veces.
+Audio de trabajo (services/recording.py): el audio que llega se agrega a un
+archivo temporal de la reunión. Al finalizar se usa para separar quién habló
+escuchando la reunión entera (services/diarization.py) y, si la reunión se
+graba, para subirla al Drive de quien grabó; después se borra. Con el bridge
+(que transcribe en la máquina) el navegador manda audio solo si se graba, con
+`transcribe: false` en el hello: no se transcribe dos veces.
+
+Los tramos en vivo se cortan en las pausas (services/stt/windowing.py) y sus
+tiempos se miden sobre ese archivo, así coinciden con los de la separación de
+hablantes aunque el WebSocket se haya reconectado en el medio.
 
 Autenticación: access token JWT por query param (el WS del browser no puede
 mandar headers). El token es de corta duración y viaja por wss en producción.
@@ -35,12 +40,14 @@ from ..services.ai_settings import get_vocabulary, resolve_stt
 from ..services.background import spawn
 from ..services.insights_live import maybe_extract_live_insights
 from ..services.live_bus import live_bus
-from ..services.recording import PcmWriter, is_enabled, update_state
+from ..services.recording import PcmWriter, is_enabled, pcm_path, update_state
 from ..services.stt import get_stt_provider
+from ..services.stt.windowing import find_cut
 from ..services.stt.channels import (
     attribute_speaker,
     downmix,
     is_hallucination,
+    is_prompt_echo,
     is_silent,
     split_channels,
 )
@@ -49,8 +56,6 @@ log = logging.getLogger("echo.live")
 
 router = APIRouter(tags=["live"])
 
-# Ventana de audio para STT cloud incremental (en RAM, luego se descarta)
-CLOUD_WINDOW_SECONDS = 6
 MAX_SEGMENT_CHARS = 2000
 
 
@@ -165,7 +170,7 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
     vocabulary: list[str] = []
     stt_error_sent = False
     segments_since_insights = 0
-    # Grabación del audio completo: abierto solo si la reunión se graba.
+    # Audio de trabajo de la reunión: se abre con el primer audio que llega.
     writer: PcmWriter | None = None
     # False = el recorder transcribe en su máquina (bridge) y manda audio solo
     # para grabar.
@@ -181,13 +186,15 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
 
     forward_task = asyncio.create_task(forward_bus())
 
-    async def flush_audio(final: bool = False):
+    async def flush_audio(final: bool = False, upto: int | None = None):
         nonlocal audio_buffer, stream_offset_ms, stt_error_sent, segments_since_insights
         if not audio_buffer or stt_provider is None:
             audio_buffer = bytearray()
             return
-        chunk = bytes(audio_buffer)
-        audio_buffer = bytearray()  # el audio saliente ya no se retiene
+        # Hasta el corte elegido; lo que sigue queda para el próximo tramo.
+        cut = len(audio_buffer) if upto is None else upto
+        chunk = bytes(audio_buffer[:cut])
+        audio_buffer = audio_buffer[cut:]
         duration_ms = int(len(chunk) / 2 / channels / sample_rate * 1000)
         offset = stream_offset_ms
         stream_offset_ms += duration_ms
@@ -220,7 +227,7 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
             del chunk  # descartar el audio explícitamente
         stt_error_sent = False
         for seg in result.segments:
-            if is_hallucination(seg.text):
+            if is_hallucination(seg.text) or is_prompt_echo(seg.text, vocabulary):
                 continue
             speaker = seg.speaker
             if mic_track is not None and system_track is not None:
@@ -255,6 +262,12 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
                 # Audio PCM16 (modo cloud). Solo el recorder puede mandarlo.
                 if role != "recorder":
                     continue
+                if writer is None and sample_rate == 16000:
+                    # Los tiempos arrancan donde termina el audio ya guardado
+                    # de esta reunión (reconexión, pausa y reanudar).
+                    existing = pcm_path(meeting.id)
+                    stream_offset_ms = existing.stat().st_size // 32 if existing.exists() else 0
+                    writer = PcmWriter(meeting.id)
                 if writer is not None:
                     writer.write(message["bytes"], channels)
                 if not transcribe:
@@ -276,8 +289,9 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
                         continue
                     stt_provider = get_stt_provider(config.provider, config.api_key, config.model)
                 audio_buffer.extend(message["bytes"])
-                if len(audio_buffer) >= sample_rate * 2 * channels * CLOUD_WINDOW_SECONDS:
-                    await flush_audio()
+                cut = find_cut(bytes(audio_buffer), sample_rate, channels)
+                if cut:
+                    await flush_audio(upto=cut)
                 continue
 
             raw = message.get("text")
@@ -306,10 +320,8 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
                     async with SessionLocal() as db:
                         fresh = await db.get(Meeting, meeting.id)
                         recording = fresh.recording if fresh else None
-                    if is_enabled(recording) and writer is None and sample_rate == 16000:
-                        writer = PcmWriter(meeting.id)
-                        if recording.get("status") != "recording":
-                            await update_state(meeting.id, status="recording")
+                    if is_enabled(recording) and recording.get("status") != "recording":
+                        await update_state(meeting.id, status="recording")
                 await websocket.send_text(
                     json.dumps({"type": "hello_ack", "role": role, "meeting_status": meeting.status})
                 )
