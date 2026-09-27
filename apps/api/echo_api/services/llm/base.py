@@ -80,11 +80,11 @@ REASONING_TOKEN_MARGIN = 8000
 
 
 def is_reasoning_model(model: str) -> bool:
-    """GPT-5.x y serie o de OpenAI, también detrás de un gateway (`openai/gpt-5.5`)."""
+    """GPT-5.x, GPT-6.x y serie o de OpenAI, también detrás de un gateway (`openai/gpt-5.5`)."""
     name = (model or "").lower().rsplit("/", 1)[-1]
     if "-chat" in name:
         return False
-    return name.startswith("gpt-5") or bool(re.match(r"o\d", name))
+    return name.startswith(("gpt-5", "gpt-6")) or bool(re.match(r"o\d", name))
 
 
 class OpenAICompatibleProvider(LLMProvider):

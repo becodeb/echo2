@@ -215,7 +215,7 @@ def _env_default_model(provider: str) -> str:
 
 def _default_model(provider: str) -> str:
     return {
-        "openai": "gpt-5.5",
+        "openai": "gpt-6-luna",
         "anthropic": "claude-sonnet-5",
         "gemini": "gemini-2.0-flash",
         "groq": "llama-3.3-70b-versatile",

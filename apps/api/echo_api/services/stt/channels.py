@@ -127,3 +127,33 @@ def is_prompt_echo(text: str, vocabulary: list[str] | None) -> bool:
         return False
     known = {w for term in vocabulary for w in "".join(c.lower() if c.isalnum() else " " for c in term).split()}
     return all(word in known for word in words)
+
+
+# Lo que los modelos devuelven sobre ruido en vez de habla: descripciones de
+# sonidos en inglés (vistas en producción: "click", "crackling", "reverberations").
+_SOUND_WORDS = {
+    "click", "clicks", "crackling", "reverberations", "reverberation", "static", "noise",
+    "music", "applause", "laughter", "silence", "beep", "beeping", "breathing", "hum", "buzzing",
+}
+_LATIN_LANGUAGES = {"es", "en", "pt", "it", "fr", "de"}
+
+
+def is_noise_transcript(text: str, language: str | None) -> bool:
+    """Texto que no puede ser lo que se dijo en una reunión en ese idioma.
+
+    En una reunión en castellano, un tramo escrito en otro alfabeto (árabe,
+    chino, hebreo, cirílico, cingalés...) es el modelo adivinando sobre ruido,
+    no alguien que habló. Lo mismo una sola palabra que describe un sonido.
+    """
+    stripped = text.strip().strip(".,;:!?¡¿。、…").strip()
+    if not stripped:
+        return True
+    if stripped.lower() in _SOUND_WORDS:
+        return True
+    if (language or "es") not in _LATIN_LANGUAGES:
+        return False
+    letters = [char for char in stripped if char.isalpha()]
+    if not letters:
+        return True
+    latin = sum(1 for char in letters if ord(char) < 0x250)
+    return latin / len(letters) < 0.5

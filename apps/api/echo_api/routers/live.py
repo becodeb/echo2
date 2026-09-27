@@ -16,6 +16,11 @@ graba, para subirla al Drive de quien grabó; después se borra. Con el bridge
 (que transcribe en la máquina) el navegador manda audio solo si se graba, con
 `transcribe: false` en el hello: no se transcribe dos veces.
 
+Una sola grabadora por reunión: si se conecta otra (otra pestaña, otro
+dispositivo, un "Iniciar" tocado dos veces), la anterior se cierra con 4409.
+Dos grabadoras mandando a la vez mezclaban el audio en pedacitos de 100 ms:
+sonaba cortado y lento, y el modelo transcribía idiomas inventados.
+
 Los tramos en vivo se cortan en las pausas (services/stt/windowing.py) y sus
 tiempos se miden sobre ese archivo, así coinciden con los de la separación de
 hablantes aunque el WebSocket se haya reconectado en el medio.
@@ -47,12 +52,19 @@ from ..services.stt.channels import (
     attribute_speaker,
     downmix,
     is_hallucination,
+    is_noise_transcript,
     is_prompt_echo,
     is_silent,
     split_channels,
 )
 
 log = logging.getLogger("echo.live")
+
+# Grabadora activa de cada reunión (id de reunión → WebSocket).
+_recorders: dict[str, WebSocket] = {}
+# Audio que llega más rápido que esto respecto del tiempo real = hay más de
+# una fuente mandando por la misma conexión.
+MAX_REALTIME_RATIO = 1.5
 
 router = APIRouter(tags=["live"])
 
@@ -170,6 +182,10 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
     vocabulary: list[str] = []
     stt_error_sent = False
     segments_since_insights = 0
+    # Control de ritmo: cuánto audio llegó desde que empezó a llegar.
+    audio_started_at: float | None = None
+    audio_received_ms = 0
+    rate_warned = False
     # Audio de trabajo de la reunión: se abre con el primer audio que llega.
     writer: PcmWriter | None = None
     # False = el recorder transcribe en su máquina (bridge) y manda audio solo
@@ -227,7 +243,11 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
             del chunk  # descartar el audio explícitamente
         stt_error_sent = False
         for seg in result.segments:
-            if is_hallucination(seg.text) or is_prompt_echo(seg.text, vocabulary):
+            if (
+                is_hallucination(seg.text)
+                or is_prompt_echo(seg.text, vocabulary)
+                or is_noise_transcript(seg.text, meeting.language)
+            ):
                 continue
             speaker = seg.speaker
             if mic_track is not None and system_track is not None:
@@ -262,6 +282,17 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
                 # Audio PCM16 (modo cloud). Solo el recorder puede mandarlo.
                 if role != "recorder":
                     continue
+                now = asyncio.get_running_loop().time()
+                if audio_started_at is None:
+                    audio_started_at = now
+                audio_received_ms += int(len(message["bytes"]) / 2 / channels / sample_rate * 1000)
+                elapsed_ms = (now - audio_started_at) * 1000
+                if not rate_warned and elapsed_ms > 5000 and audio_received_ms > elapsed_ms * MAX_REALTIME_RATIO:
+                    rate_warned = True
+                    log.warning(
+                        "live %s: llega %.1fx más audio que el tiempo real (¿dos micrófonos?)",
+                        meeting.id, audio_received_ms / elapsed_ms,
+                    )
                 if writer is None and sample_rate == 16000:
                     # Los tiempos arrancan donde termina el audio ya guardado
                     # de esta reunión (reconexión, pausa y reanudar).
@@ -315,6 +346,11 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
                     with contextlib.suppress(ValueError, TypeError):
                         sample_rate = max(8000, min(48000, int(data["sample_rate"])))
                 if role == "recorder":
+                    previous = _recorders.get(channel)
+                    if previous is not None and previous is not websocket:
+                        with contextlib.suppress(Exception):
+                            await previous.close(code=4409, reason="Otra grabadora tomó la reunión")
+                    _recorders[channel] = websocket
                     transcribe = data.get("transcribe", True) is not False
                     # Se relee: la grabación se pudo activar después de abrir el WS.
                     async with SessionLocal() as db:
@@ -373,5 +409,7 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
             await flush_audio(final=True)
         if writer is not None:
             writer.close()
+        if _recorders.get(channel) is websocket:
+            _recorders.pop(channel, None)
         forward_task.cancel()
         await live_bus.unsubscribe(channel, queue)

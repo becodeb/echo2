@@ -1,6 +1,7 @@
 """Quién habló: cortes en las pausas, separación con la reunión entera y nombres."""
 import asyncio
 import io
+import json
 import math
 import struct
 import uuid
@@ -258,3 +259,46 @@ def test_dictionary_echo_is_not_speech():
     assert is_prompt_echo("Glifing, Trinity.", vocabulary)
     assert not is_prompt_echo("Sigue con Glifing", vocabulary)
     assert not is_prompt_echo("Gibson", [])
+
+
+# ── Basura sobre ruido y una sola grabadora ──────────────────────
+
+
+def test_noise_transcripts_are_dropped():
+    from echo_api.services.stt.channels import is_noise_transcript
+
+    # Salidas reales del modelo sobre audio mezclado (reunión 6282254e).
+    for text in ("مردمیت", "වඳලා.", "可是。", "תודה רבה.", "はい。", "выпадков.", "click", "crackling", "。"):
+        assert is_noise_transcript(text, "es"), text
+    for text in ("Hola.", "Hola, ¿cómo estás?", "Sí, mi nombre es Bautista.", "Pedro está en quinto grado."):
+        assert not is_noise_transcript(text, "es"), text
+    # En una reunión en japonés el japonés es habla.
+    assert not is_noise_transcript("はい。", "ja")
+
+
+def test_gpt6_is_treated_like_gpt5():
+    from echo_api.services.llm.base import is_reasoning_model
+
+    assert is_reasoning_model("gpt-6-luna")
+    assert is_reasoning_model("gpt-5.6-luna")
+    assert not is_reasoning_model("gpt-4o-mini")
+
+
+def test_second_recorder_takes_over_and_the_first_is_closed(client):
+    import pytest
+    from starlette.websockets import WebSocketDisconnect
+
+    user = EchoTestUser(client, org_name="Colegio dos pestañas")
+    meeting = client.post("/api/meetings", json={"title": "x", "level": "primaria"}, headers=user.headers).json()
+    url = f"/api/meetings/{meeting['id']}/ws?token={user.token}"
+    hello = json.dumps({"type": "hello", "role": "recorder", "sample_rate": 16000, "transcribe": False})
+    with client.websocket_connect(url) as first:
+        first.send_text(hello)
+        first.receive_text()
+        with client.websocket_connect(url) as second:
+            second.send_text(hello)
+            assert json.loads(second.receive_text())["type"] == "hello_ack"
+            with pytest.raises(WebSocketDisconnect) as closed:
+                first.receive_text()
+            assert closed.value.code == 4409
+    rec.pcm_path(uuid.UUID(meeting["id"])).unlink(missing_ok=True)

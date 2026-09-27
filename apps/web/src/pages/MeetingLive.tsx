@@ -91,6 +91,10 @@ export default function MeetingLive() {
   const startedAtMs = useRef<number>(0);
   const recordingRef = useRef(false);
   const reconnectTimer = useRef<number | null>(null);
+  // Mientras arranca (pedir el micrófono puede tardar) no se puede arrancar
+  // otra vez: cada arranque abría otro micrófono y el audio se mezclaba.
+  const startingRef = useRef(false);
+  const [starting, setStarting] = useState(false);
 
   // ── cortes del micrófono ───────────────────────────────────────
   const frameHandlerRef = useRef<((frame: Int16Array) => void) | null>(null);
@@ -268,9 +272,21 @@ export default function MeetingLive() {
         }
       };
       socket.onerror = () => reject(new Error("No se pudo conectar al servidor"));
-      socket.onclose = () => {
+      socket.onclose = (event) => {
+        // Una conexión vieja que se cierra no toca a la actual.
+        if (wsRef.current !== socket) return;
         setWsConnected(false);
         wsRef.current = null;
+        if (event.code === 4409) {
+          // El servidor acepta una sola grabadora por reunión: siguió en otra
+          // pestaña o dispositivo. Esta deja de grabar y no reconecta.
+          recordingRef.current = false;
+          void audioRef.current?.stop().catch(() => {});
+          audioRef.current = null;
+          setRecording(false);
+          setError("La grabación siguió en otra pestaña o dispositivo; esta pantalla dejó de grabar.");
+          return;
+        }
         // reconexión con backoff mientras se graba (transcript confirmado nunca se pierde)
         if (recordingRef.current && reconnectTimer.current == null) {
           reconnectTimer.current = window.setTimeout(() => {
@@ -287,11 +303,18 @@ export default function MeetingLive() {
   }, [id, handleLiveEvent, captureSystem, bridgeMode]);
 
   const start = useCallback(async () => {
-    if (!id) return;
+    if (!id || startingRef.current) return;
+    startingRef.current = true;
+    setStarting(true);
     setError(null);
     try {
       await api(`/api/meetings/${id}/start`, { method: "POST" });
-      const ws = await openWs();
+      // Nunca dos micrófonos a la vez: si quedó uno (reanudar), se cierra.
+      await audioRef.current?.stop().catch(() => {});
+      audioRef.current = null;
+      // Al reanudar la conexión sigue abierta: se reusa en vez de abrir otra.
+      const current = wsRef.current;
+      const ws = current && current.readyState === WebSocket.OPEN ? current : await openWs();
       wsRef.current = ws;
 
       const source: AudioSource = captureSystem
@@ -385,7 +408,11 @@ export default function MeetingLive() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo iniciar la captura");
       await audioRef.current?.stop().catch(() => {});
+      audioRef.current = null;
       bridgeRef.current?.close();
+    } finally {
+      startingRef.current = false;
+      setStarting(false);
     }
   }, [id, engine, bridge, deviceId, captureSystem, meeting?.language, lines, openWs]);
 
@@ -514,6 +541,27 @@ export default function MeetingLive() {
       setError(err instanceof Error ? err.message : "No se pudo finalizar");
     }
   }, [id]);
+
+  // Mientras procesa, además del aviso en vivo se pregunta al servidor: si la
+  // conexión se cortó justo, la pantalla se quedaba esperando para siempre.
+  useEffect(() => {
+    if (!id || !processing) return;
+    const interval = window.setInterval(async () => {
+      try {
+        const current = await api<MeetingOut>(`/api/meetings/${id}`);
+        if (current.status === "completed") {
+          queryClient.setQueryData(["meeting", id], current);
+          navigate(`/meetings/${id}?tab=${current.kind === "interna" ? "summary" : "minutes"}`);
+        } else if (current.status === "failed") {
+          setProcessing(null);
+          setError("El procesamiento falló. Podés reintentar desde la página de la reunión.");
+        }
+      } catch {
+        /* se reintenta en la próxima vuelta */
+      }
+    }, 4000);
+    return () => window.clearInterval(interval);
+  }, [id, processing, navigate, queryClient]);
 
   // cleanup al desmontar
   useEffect(() => {
@@ -815,8 +863,8 @@ export default function MeetingLive() {
               )}
 
               {error && <p className="text-sm text-red-600">{error}</p>}
-              <Button onClick={start} className="w-full max-w-xs !py-3 text-base">
-                Iniciar reunión
+              <Button onClick={start} disabled={starting} className="w-full max-w-xs !py-3 text-base">
+                {starting ? "Iniciando…" : "Iniciar reunión"}
               </Button>
             </div>
           )}
@@ -913,9 +961,9 @@ export default function MeetingLive() {
           {recording && !paused && (
             <Button variant="soft" onClick={pause}>Pausar</Button>
           )}
-          {paused && <Button variant="soft" onClick={resume}>Reanudar</Button>}
+          {paused && <Button variant="soft" onClick={resume} disabled={starting}>Reanudar</Button>}
           {!recording && lines.length > 0 && (
-            <Button variant="soft" onClick={start}>Reanudar grabación</Button>
+            <Button variant="soft" onClick={start} disabled={starting}>Reanudar grabación</Button>
           )}
           {recording && !paused && (
             <Button variant="ghost" onClick={() => setBlackout(true)} title="La pantalla queda negra y sigue grabando">
