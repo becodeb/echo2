@@ -11,6 +11,16 @@ const elegirFuente = () =>
   typeof window !== "undefined" && window.matchMedia("(max-aspect-ratio: 1/1)").matches ? VERTICAL : HORIZONTAL;
 const LIT_AT = 4.95; // último pestañeo: entra la navbar
 const READY_AT = 5.15; // terminó el segundo pestañeo: entra el texto
+// El video dura 5,65 s: pasado esto la página se muestra sí o sí.
+const MAX_WAIT_MS = 7000;
+
+/** iPhone/iPad (en iOS todos los navegadores son Safari por dentro). Ahí el
+ *  video puede quedar en negro sin dar error (modo bajo consumo, ahorro de
+ *  datos) y la página parece rota: se muestran directo los ojos vivos. */
+const esIOS = () =>
+  typeof navigator !== "undefined" &&
+  (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
 
 /**
  * El hero es el video: todo negro, el blanco cae desde arriba y destapa los
@@ -25,13 +35,17 @@ const READY_AT = 5.15; // terminó el segundo pestañeo: entra el texto
  *
  * El video corre aunque el sistema pida "menos movimiento": es la apertura de
  * la marca y dura cinco segundos. El resto de la página sí lo respeta.
+ *
+ * En iPhone/iPad no se usa: Safari a veces "reproduce" sin pintar los cuadros
+ * y el video tapa todo de negro. Y en cualquier navegador, a los 7 s la página
+ * se muestra aunque el video no haya avanzado.
  */
 export function Hero() {
   const host = useRef<HTMLElement>(null);
   const video = useRef<HTMLVideoElement>(null);
-  const [still, setStill] = useState(false); // sin video: ojos vivos y todo visible
-  const [lit, setLit] = useState(false); // la pantalla ya es blanca: navbar
-  const [ready, setReady] = useState(false); // ya pestañeó: entra el texto
+  const [still, setStill] = useState(esIOS); // sin video: ojos vivos y todo visible
+  const [lit, setLit] = useState(still); // la pantalla ya es blanca: navbar
+  const [ready, setReady] = useState(still); // ya pestañeó: entra el texto
   const [done, setDone] = useState(false); // terminó el video: ojos vivos
   const [fuente] = useState(elegirFuente); // se decide una vez, al montar
 
@@ -57,18 +71,29 @@ export function Hero() {
         sinVideo();
       });
     };
+    // Tope de seguridad: pasado el largo del video, si la página todavía no se
+    // mostró (video trabado o en negro), se saca el video y se muestra todo.
+    // Se rearma cada vez que la pestaña vuelve a verse.
+    let tope = 0;
+    const armarTope = () => {
+      window.clearTimeout(tope);
+      tope = window.setTimeout(() => {
+        if (!cancelado && document.visibilityState === "visible" && el.currentTime < READY_AT) sinVideo();
+      }, MAX_WAIT_MS);
+    };
     const alVolver = () => {
-      if (document.visibilityState === "visible") intentar();
+      if (document.visibilityState !== "visible") return;
+      intentar();
+      armarTope();
     };
     intentar();
+    armarTope();
     document.addEventListener("visibilitychange", alVolver);
-    // Tope de seguridad: si en 8 s visibles el video no arrancó, mostramos todo igual.
-    const tope = window.setTimeout(() => {
-      if (!cancelado && el.currentTime === 0 && document.visibilityState === "visible") sinVideo();
-    }, 8000);
+    el.addEventListener("error", sinVideo);
     return () => {
       cancelado = true;
       document.removeEventListener("visibilitychange", alVolver);
+      el.removeEventListener("error", sinVideo);
       window.clearTimeout(tope);
     };
   }, [still]);
@@ -134,7 +159,7 @@ export function Hero() {
         </h1>
         <p className="mt-4 max-w-md text-base leading-relaxed text-ink-600 md:text-lg">
           Reuniones con familias, docentes o clientes: transcribe en vivo, saca acuerdos y tareas, y
-          deja el acta lista para imprimir. El audio nunca se guarda.
+          deja el acta lista para imprimir. El audio no queda guardado en Echo.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link to="/register" className="btn btn-ink">
