@@ -417,11 +417,13 @@ def merge_text_with_voices(
 
     normalized = [_normalize(word) for word in words]
     owner: list[int | None] = [None] * len(words)
+    matched_voice: set[int] = set()
     if voice_words:
         matcher = SequenceMatcher(None, normalized, [w for w, _, _ in voice_words], autojunk=False)
         for block in matcher.get_matching_blocks():
             for offset in range(block.size):
                 owner[block.a + offset] = block.b + offset
+                matched_voice.add(block.b + offset)
         # Palabras sin par: heredan de la anterior con par (o de la siguiente).
         last = next((value for value in owner if value is not None), None)
         for index, value in enumerate(owner):
@@ -463,6 +465,24 @@ def merge_text_with_voices(
             pieces[-1][3] = max(pieces[-1][3], start)
         else:
             pieces.append([label, piece_text, start, start])
+    # Red de seguridad: el texto final a veces omite a quien habla más bajo
+    # (reunión 99b4b81c: "Hola, hola, hola, soy Vanina" faltó en 2 de 8
+    # corridas), y la separación de voces sí lo escuchó. Una frase de la
+    # separación que no aparece en el texto final se agrega en su lugar. Solo
+    # frases de verdad (3+ palabras, 1+ s): los pedacitos sueltos son donde la
+    # separación inventa ("Perdón por interrumpir" en una corrida).
+    cursor = 0
+    for seg in diarized:
+        tokens = [token for token in (_normalize(t) for t in seg.text.split()) if token]
+        indexes = range(cursor, cursor + len(tokens))
+        cursor += len(tokens)
+        if len(tokens) < 3 or seg.end_ms - seg.start_ms < 1000:
+            continue
+        if sum(1 for index in indexes if index in matched_voice) / len(tokens) >= 0.3:
+            continue
+        pieces.append([seg.label, seg.text.strip(), max(seg.start_ms, part_start_ms), seg.start_ms])
+    pieces.sort(key=lambda piece: piece[2])
+
     # Cada tramo termina donde empieza el siguiente; el último, al final de la parte.
     for index, piece in enumerate(pieces):
         piece[2] = max(piece[2], pieces[index - 1][2] + 1 if index else part_start_ms)

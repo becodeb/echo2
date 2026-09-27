@@ -366,3 +366,29 @@ def test_meeting_is_retranscribed_whole_and_replaces_live_text(client, monkeypat
         ("Persona 2", "Queríamos hablar de Pedro. Está muy callado."),
     ]
 
+
+
+def test_a_phrase_only_the_voices_heard_is_added_back():
+    from echo_api.services.diarization import merge_text_with_voices
+
+    # Corrida real: el texto final omitió la frase de Vanina; la separación la tenía,
+    # y además había inventado "Perdón por interrumpir" en pedacitos sueltos.
+    text = "Hola, sí, ¿quién es? Hola, yo soy Bautista Goñi. Ok, ¿y vos quién sos? El choto."
+    voices = [
+        DiarSegment(1100, 3000, "voz_1", "hola si quien es yo"),
+        DiarSegment(3000, 3400, "persona_1", "Perdón"),
+        DiarSegment(3500, 3600, "persona_1", "por"),
+        DiarSegment(3600, 3900, "persona_1", "interrumpir."),
+        DiarSegment(3900, 5100, "voz_1", "yo soy bautista goñi ok"),
+        DiarSegment(5100, 6800, "persona_1", "Hola, hola, hola. Soy Vanina."),
+        DiarSegment(8900, 11200, "voz_1", "y vos quién sos"),
+        DiarSegment(12200, 13000, "persona_1", "el choto"),
+    ]
+    pieces = merge_text_with_voices(text, voices, 0, 14000)
+    texts = [(label, piece) for label, piece, _, _ in pieces]
+    assert ("persona_1", "Hola, hola, hola. Soy Vanina.") in texts
+    assert not any("Perdón" in piece for _, piece in texts)
+    starts = [start for _, _, start, _ in pieces]
+    assert starts == sorted(starts)
+    vanina = next(p for p in pieces if "Vanina" in p[1])
+    assert vanina[2] == 5100
