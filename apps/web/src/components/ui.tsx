@@ -111,13 +111,21 @@ export function Modal({
       if (event.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    // La página de atrás no se mueve mientras la ventana está abierta.
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previous;
+    };
   }, [open, onClose]);
 
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-ink-950/40 p-4 pt-[8vh] backdrop-blur-[2px]"
+      // El fondo scrollea: si la ventana es más alta que la pantalla (celular,
+      // teclado abierto), el botón de abajo tiene que poder alcanzarse.
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain bg-ink-950/40 p-3 pt-4 backdrop-blur-[2px] sm:p-4 sm:pt-[8vh]"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -126,7 +134,7 @@ export function Modal({
       aria-label={title}
     >
       <div
-        className={`animate-fade-up w-full ${wide ? "max-w-3xl" : "max-w-lg"} rounded-2xl border border-ink-100 bg-white p-6 shadow-xl`}
+        className={`animate-fade-up mb-4 w-full ${wide ? "max-w-3xl" : "max-w-lg"} rounded-2xl border border-ink-100 bg-white p-5 shadow-xl sm:p-6`}
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-ink-900">{title}</h2>
