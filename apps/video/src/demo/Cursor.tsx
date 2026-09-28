@@ -29,6 +29,8 @@ const pdf = actaButtons("approved").find((b) => b.id === "pdf")!;
 const TARGETS: Target[] = [
   { f: B(5) - 8, space: "screen", x: 1560, y: 1130 },
   { f: CLICK.comenzar, space: "modal", x: MODAL_COMENZAR.x, y: MODAL_COMENZAR.y, click: true },
+  // Pasa por "Grabar el audio completo" y lo deja sin tildar: es una opción.
+  { f: B(9), space: "app", x: 640, y: 381 },
   { f: CLICK.iniciar, space: "app", x: INICIAR.x + 18, y: INICIAR.y + 4, click: true },
   { f: B(11.2), space: "app", x: 1010, y: 560 },
   { f: CLICK.momento, space: "app", ...footerCenter("momento"), click: true },

@@ -92,7 +92,9 @@ export type CaptionWord = { text: string; accent?: boolean };
 export const CAPTIONS: { from: number; to: number; words: CaptionWord[] }[] = [
   { from: B(0), to: B(5), words: [{ text: "Alguien" }, { text: "siempre" }, { text: "toma", accent: true }, { text: "notas.", accent: true }] },
   { from: B(10), to: B(17.5), words: [{ text: "Echo", accent: true }, { text: "escucha." }] },
-  { from: B(18.5), to: B(21.8), words: [{ text: "El" }, { text: "audio" }, { text: "no", accent: true }, { text: "se", accent: true }, { text: "guarda.", accent: true }] },
+  // Guardar el audio completo es una opción ("Grabar el audio completo",
+  // apagada por defecto): no se promete que nunca se guarde.
+  { from: B(18.5), to: B(21.8), words: [{ text: "Guardar" }, { text: "el" }, { text: "audio:" }, { text: "opcional.", accent: true }] },
   { from: B(22.3), to: B(25.6), words: [{ text: "Sabe" }, { text: "quién", accent: true }, { text: "habló.", accent: true }] },
   { from: B(25.8), to: B(29.8), words: [{ text: "Por" }, { text: "familia" }, { text: "y", accent: true }, { text: "gravedad.", accent: true }] },
   { from: B(30.4), to: B(35.3), words: [{ text: "Acta" }, { text: "verificada.", accent: true }] },
