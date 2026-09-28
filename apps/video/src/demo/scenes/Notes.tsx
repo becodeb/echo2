@@ -2,7 +2,7 @@ import { B } from "../timeline";
 import { ramp, typed } from "../anim";
 
 /** El problema: alguien escribe apurado mientras los demás hablan. 293×360. */
-const LINES: { text: string; from: number; to: number; strike?: [number, number] }[] = [
+export const LINES: { text: string; from: number; to: number; strike?: [number, number] }[] = [
   { text: "Reunión flia. Romero — 28/9", from: 10, to: 44 },
   { text: "• Pedro: problemas en recreos", from: 48, to: 80 },
   { text: "• mamá: “no quiere venir”", from: 84, to: 112 },

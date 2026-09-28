@@ -1,13 +1,27 @@
 # Echo — demo de producto (30 s)
 
+> Los tiempos de la grilla son de la demo (frame 0 = la libreta); en el video
+> final van corridos 5,5 s por el intro.
+
 **Concepto.** Una reunión con la familia Romero, de punta a punta, sobre una
 sola superficie que se transforma: Echo escucha, redacta el acta, la verifica,
 la institución la aprueba, y meses después Echo la recuerda con la fuente.
 Nadie tuvo que tomar notas.
 
-- 1920×1080, 60 fps, 1800 frames (30,0 s). Composición `EchoDemo`.
+- 1920×1080, 60 fps, 2130 frames (35,5 s). Composición `EchoDemo`: primero el
+  hero de la landing y después 30 s de demo.
+- **Intro (0–5,5 s):** el video con el que abre la landing (`Variantes.tsx`,
+  variante "lee", el mismo que `apps/web/public/hero/echo-ojos.mp4`), renderizado
+  acá a 60 fps: negro, sube la luz, los ojos leen dos renglones, te miran y
+  pestañean. A los 5,5 s los ojos se achican y se van mientras entra la libreta.
+  La demo arranca en el frame 330 = 11 golpes: la grilla no se corre.
 - Música: `public/music.mp3` (la pista del video de Testra, para que los tres
-  videos de BeCode suenen igual). Medida: **120 BPM exactos, primer golpe en
+  videos de BeCode suenen igual). Entra a los 1,5 s, cuando sube la luz, y
+  termina con el video: su final natural.
+- Efectos (`public/sfx`, sintetizados con `scripts/sfx.py`, `src/demo/Sound.tsx`):
+  click de mouse en cada click, una tecla por letra al escribir, un tic por
+  afirmación verificada y un soplo suave en cada transformación de la
+  superficie. Cada uno en el frame exacto de lo que se ve. Medida: **120 BPM exactos, primer golpe en
   el frame 17**. Grilla: `beat(n) = 17 + 30·n`. Los clicks y los cambios de
   estado caen en golpes.
 - Lenguaje heredado del video de Testra (`reference/`): fondo claro de la app,
@@ -48,7 +62,7 @@ Nadie tuvo que tomar notas.
 | 8 | 19,78–21,28 s | 1187–1277 | B39 tab **Tareas**: "Coordinar reunión con la psicopedagoga · Directora · 2026-10-02 · Pendiente" | click en la tab | B40 zoom a la fila | B39 "Tareas **con fecha.**" |
 | 9 | 21,28–25,28 s | 1277–1517 | B42 **Preguntale a Echo** (barra lateral). Se escribe "¿Qué acordamos con la familia Romero?" letra por letra; B45 **Enviar**; "Buscando en la memoria de reuniones…"; B46 respuesta con **FUENTES** «Familia Romero · 28 sept» — 00:13 · Orientadora (DOE). B48 click → la reunión con el fragmento de 00:13 resaltado | escribe, envía, toca la fuente | B49 paneo al fragmento resaltado | B43 "**Echo** recuerda." |
 | 10 | 25,28–27,28 s | 1517–1637 | B50 **Familias** → B51 **Reuniones** → panel **Reuniones de la familia**: 4 reuniones, barra verde/amarillo/rojo, filas con su color | dos clicks | quieta | B51 "Todo **en orden.**" |
-| 11 | 27,28–30,00 s | 1637–1800 | B54 la app se encoge al ícono de Echo (cuadrado negro con dos ojos, el favicon); B55 "Echo" y "La reunión termina. Echo recuerda."; B58 el ícono se vuelve la libreta vacía del frame 0 (loop) | sale | quieta | tagline |
+| 11 | 27,28–30,00 s | 1637–1800 | B54 la app se encoge al ícono de Echo (cuadrado negro con dos ojos, el favicon); B55 "Echo" y "La reunión termina. Echo recuerda."; B58 el ícono crece hasta llenar la pantalla de negro: el mismo negro con el que abre el hero (loop) | sale | quieta | tagline |
 
 ## Aha moment
 

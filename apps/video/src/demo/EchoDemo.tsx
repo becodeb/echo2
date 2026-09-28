@@ -2,8 +2,9 @@ import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
 import "./demo.css";
 import { useEffect, useState } from "react";
-import { AbsoluteFill, Audio, continueRender, delayRender, interpolate, staticFile, useCurrentFrame } from "remotion";
-import { presence } from "./anim";
+import { AbsoluteFill, Audio, Sequence, continueRender, delayRender, interpolate, staticFile, useCurrentFrame } from "remotion";
+import { Variante } from "../Variantes";
+import { presence, settle } from "./anim";
 import { AppViewport, Fill, NOTES_VIRTUAL, Surface } from "./camera";
 import { Captions } from "./Caption";
 import { Cursor } from "./Cursor";
@@ -16,7 +17,8 @@ import { LogoLockup } from "./scenes/Logo";
 import { NewMeeting } from "./scenes/NewMeeting";
 import { Notes } from "./scenes/Notes";
 import { Processing } from "./scenes/Processing";
-import { ACT, B, CLICK, DURATION } from "./timeline";
+import { SoundEffects } from "./Sound";
+import { ACT, B, CLICK, DURATION, INTRO, MUSIC_START, TOTAL } from "./timeline";
 import { Face } from "./ui/Face";
 import { Sidebar } from "./ui/Sidebar";
 
@@ -42,23 +44,63 @@ const MAIN = [
   { from: CLICK.navFamilias, to: Infinity, render: (f: number) => <Families frame={f} />, nav: "Familias" as const },
 ];
 
+/**
+ * El video completo: el hero de la landing (variante "lee"), la demo y el
+ * sonido. La demo corre en su propio tiempo (frame 0 = primer frame de la
+ * libreta); acá solo se ubica en el total.
+ */
 export const EchoDemo = () => {
   useFonts();
   const frame = useCurrentFrame();
-  const nav = MAIN.find((m) => frame >= m.from && frame < m.to)?.nav ?? "Reuniones";
-
+  // Los ojos del hero se achican y se van mientras entra la libreta.
+  const out = interpolate(frame, [INTRO - 14, INTRO + 10], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   return (
     <AbsoluteFill className="echo-demo" style={{ backgroundColor: "#fafbfc" }}>
-      <Audio
-        src={staticFile("music.mp3")}
-        volume={(f) => interpolate(f, [0, 8, DURATION - 70, DURATION - 2], [0, 1, 1, 0], { extrapolateRight: "clamp" })}
-      />
+      <Sequence durationInFrames={INTRO + 12} layout="none">
+        <AbsoluteFill
+          style={{
+            opacity: 1 - out,
+            transform: `scale(${1 - 0.55 * out})`,
+            filter: out > 0.01 ? `blur(${(out * 6).toFixed(2)}px)` : undefined,
+          }}
+        >
+          <Variante variant="lee" />
+        </AbsoluteFill>
+      </Sequence>
+      <Sequence from={INTRO} durationInFrames={DURATION} layout="none">
+        <Demo />
+        <SoundEffects />
+      </Sequence>
+      <Sequence from={MUSIC_START} layout="none">
+        <Audio
+          src={staticFile("music.mp3")}
+          volume={(f) =>
+            interpolate(f, [0, 20, TOTAL - MUSIC_START - 45, TOTAL - MUSIC_START - 1], [0, 0.9, 0.9, 0], {
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+            })
+          }
+        />
+      </Sequence>
+    </AbsoluteFill>
+  );
+};
+
+/** La demo de producto, en su propio tiempo. */
+function Demo() {
+  const frame = useCurrentFrame();
+  const nav = MAIN.find((m) => frame >= m.from && frame < m.to)?.nav ?? "Reuniones";
+  // La libreta entra cuando se van los ojos del hero.
+  const enter = settle(frame, 0, 150);
+
+  return (
+    <AbsoluteFill>
       <Captions frame={frame} />
 
+      <div className="absolute inset-0" style={{ opacity: enter, transform: `translateY(${(1 - enter) * 24}px)` }}>
       <Surface frame={frame}>
         {(surface) => {
           const notes = presence(frame, -30, ACT.modal, 1, 10);
-          const loopNotes = presence(frame, ACT.loop + 8, Infinity, 16);
           const modal = presence(frame, ACT.modal + 8, ACT.live, 12, 10);
           const app = presence(frame, ACT.live + 8, ACT.logo, 14, 10);
           const tile = presence(frame, ACT.logo + 6, ACT.loop, 12, 10);
@@ -67,11 +109,6 @@ export const EchoDemo = () => {
               {notes.visible && (
                 <Fill width={NOTES_VIRTUAL.w} height={NOTES_VIRTUAL.h} surface={surface} style={notes.style}>
                   <Notes frame={frame} />
-                </Fill>
-              )}
-              {loopNotes.visible && (
-                <Fill width={NOTES_VIRTUAL.w} height={NOTES_VIRTUAL.h} surface={surface} style={loopNotes.style}>
-                  <Notes frame={0} />
                 </Fill>
               )}
               {modal.visible && (
@@ -104,9 +141,10 @@ export const EchoDemo = () => {
           );
         }}
       </Surface>
+      </div>
 
       <LogoLockup frame={frame} />
       <Cursor frame={frame} />
     </AbsoluteFill>
   );
-};
+}

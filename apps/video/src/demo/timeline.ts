@@ -5,7 +5,17 @@
  * cae en un golpe; el resto se deriva de estos números.
  */
 export const FPS = 60;
-export const DURATION = 1800; // 30 s
+/** La demo en sí (30 s); todos los frames de este archivo son relativos a ella. */
+export const DURATION = 1800;
+/**
+ * Antes de la demo va el video del hero de la landing (variante "lee",
+ * 5,6 s). La demo arranca a los 5,5 s: 330 frames = 11 golpes, así cada click
+ * sigue cayendo en su golpe. La música entra a los 1,5 s, cuando sube la luz,
+ * y termina justo con el video (su final natural: 34 s).
+ */
+export const INTRO = 330;
+export const MUSIC_START = 90;
+export const TOTAL = INTRO + DURATION; // 2130 = 35,5 s
 export const WIDTH = 1920;
 export const HEIGHT = 1080;
 

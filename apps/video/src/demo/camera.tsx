@@ -13,6 +13,8 @@ type Rect = [x: number, y: number, w: number, h: number, radius: number, dark: n
 const NOTES: Rect = [740, 300, 440, 540, 18, 0];
 const MODAL: Rect = [576, 138, MODAL_W * 1.5, MODAL_H * 1.5, 24, 0];
 const APP: Rect = [192, 196, APP_W * 1.2, APP_H * 1.2, 18, 0];
+/** Cierre: el ícono crece hasta ser la pantalla negra con la que abre el hero. */
+const BLACK: Rect = [-40, -40, 2000, 1160, 0, 1];
 export const TILE: Rect = [793, 404, 112, 112, 26, 1];
 
 export const NOTES_VIRTUAL = { w: 440 / 1.5, h: 540 / 1.5 };
@@ -25,7 +27,7 @@ export function surfaceAt(frame: number) {
       { f: ACT.modal, v: MODAL },
       { f: ACT.live, v: APP },
       { f: ACT.logo, v: TILE },
-      { f: ACT.loop, v: NOTES },
+      { f: ACT.loop, v: BLACK },
     ],
     120,
   );
@@ -156,7 +158,7 @@ export function Surface({ frame, children }: { frame: number; children: (surface
         height: surface.h,
         borderRadius: surface.radius,
         backgroundColor: `rgb(${color.join(",")})`,
-        border: `1px solid rgba(236,238,242,${1 - surface.dark})`,
+        border: surface.dark > 0.99 ? "none" : `1px solid rgba(236,238,242,${1 - surface.dark})`,
         boxShadow: `0 1px 2px rgba(16,24,40,${0.05 * (1 - surface.dark)}), 0 32px 64px -32px rgba(16,24,40,${0.22 * (1 - surface.dark)})`,
       }}
     >
