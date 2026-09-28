@@ -280,7 +280,7 @@ function Minutes({ frame }: { frame: number }) {
         <span className="text-xs text-ink-400">v1 · Generada automáticamente</span>
       </div>
       {actaButtons(status).map((button) => {
-        const click = button.id === "estado" ? (status === "draft" ? CLICK.enviarRevision : CLICK.aprobar) : button.id === "pdf" ? CLICK.pdf : -99;
+        const click = button.id === "estado" ? (status === "draft" ? CLICK.enviarRevision : CLICK.aprobar) : button.id === "imprimir" ? CLICK.imprimir : -99;
         return (
           <Button
             key={button.id + button.label}

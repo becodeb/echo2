@@ -9,6 +9,7 @@ import { AppViewport, Fill, NOTES_VIRTUAL, Surface } from "./camera";
 import { Captions } from "./Caption";
 import { Cursor } from "./Cursor";
 import { APP_H, APP_W, MODAL_H, MODAL_W } from "./layout";
+import { ActaPrint } from "./scenes/ActaPrint";
 import { Ask } from "./scenes/Ask";
 import { Detail } from "./scenes/Detail";
 import { Families } from "./scenes/Families";
@@ -38,7 +39,10 @@ function useFonts() {
 const MAIN = [
   { from: ACT.live, to: CLICK.finalizar + 4, render: (f: number) => <Live frame={f} />, nav: "Reuniones" as const },
   { from: CLICK.finalizar + 4, to: ACT.detail, render: (f: number) => <Processing frame={f} />, nav: "Reuniones" as const },
-  { from: ACT.detail, to: CLICK.navAsk, render: (f: number) => <Detail frame={f} />, nav: "Reuniones" as const },
+  { from: ACT.detail, to: CLICK.imprimir + 2, render: (f: number) => <Detail frame={f} />, nav: "Reuniones" as const },
+  // "Imprimir" abre la hoja del acta: otra página, sin barra lateral.
+  { from: CLICK.imprimir + 2, to: CLICK.volver + 2, render: (f: number) => <ActaPrint frame={f} />, nav: "Reuniones" as const },
+  { from: CLICK.volver + 2, to: CLICK.navAsk, render: (f: number) => <Detail frame={f} />, nav: "Reuniones" as const },
   { from: CLICK.navAsk, to: CLICK.fuente, render: (f: number) => <Ask frame={f} />, nav: "Preguntale a Echo" as const },
   { from: CLICK.fuente, to: CLICK.navFamilias, render: (f: number) => <Detail frame={f} sourceJump />, nav: "Reuniones" as const },
   { from: CLICK.navFamilias, to: Infinity, render: (f: number) => <Families frame={f} />, nav: "Familias" as const },

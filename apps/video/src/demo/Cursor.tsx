@@ -17,13 +17,14 @@ import {
   severityCenter,
   tabCenter,
 } from "./layout";
+import { PRINT_VOLVER } from "./scenes/ActaPrint";
 import { SOURCE_LINK } from "./scenes/Ask";
 import { ACT, B, CLICK } from "./timeline";
 
 type Target = { f: number; space: Space; x: number; y: number; click?: boolean };
 
 const estado = (status: "draft" | "in_review") => actaButtons(status).find((b) => b.id === "estado")!;
-const pdf = actaButtons("approved").find((b) => b.id === "pdf")!;
+const imprimir = actaButtons("approved").find((b) => b.id === "imprimir")!;
 
 /** Adónde va el cursor y cuándo llega. Los clicks llegan justo en su golpe. */
 const TARGETS: Target[] = [
@@ -45,16 +46,18 @@ const TARGETS: Target[] = [
   { f: B(32), space: "app", x: DETAIL_X + 420, y: claimY(1) + 4 },
   { f: CLICK.enviarRevision, space: "detail", x: estado("draft").cx, y: estado("draft").cy, click: true },
   { f: CLICK.aprobar, space: "detail", x: estado("in_review").cx, y: estado("in_review").cy, click: true },
-  { f: CLICK.pdf, space: "detail", x: pdf.cx, y: pdf.cy, click: true },
+  { f: CLICK.imprimir, space: "detail", x: imprimir.cx, y: imprimir.cy, click: true },
+  { f: B(39), space: "app", x: 760, y: 470 },
+  { f: CLICK.volver, space: "app", ...PRINT_VOLVER, click: true },
   { f: CLICK.tabTareas, space: "app", ...tabCenter("tasks"), click: true },
-  { f: B(40.6), space: "app", x: 900, y: 360 },
+  { f: B(42.5), space: "app", x: 900, y: 360 },
   { f: CLICK.navAsk, space: "app", ...navCenter("Preguntale a Echo"), click: true },
   { f: CLICK.input, space: "app", x: ASK_INPUT.x + 260, y: ASK_INPUT.y + ASK_INPUT.h / 2, click: true },
   { f: CLICK.enviar, space: "app", x: ASK_SEND.x, y: ASK_SEND.y, click: true },
   { f: CLICK.fuente, space: "app", ...SOURCE_LINK, click: true },
   { f: CLICK.navFamilias, space: "app", ...navCenter("Familias"), click: true },
   { f: CLICK.reuniones, space: "app", ...FAM_REUNIONES, click: true },
-  { f: B(52.6), space: "app", x: 560, y: 560 },
+  { f: B(53.2), space: "app", x: 560, y: 560 },
   { f: ACT.logo + 26, space: "screen", x: 1560, y: 1130 },
 ];
 

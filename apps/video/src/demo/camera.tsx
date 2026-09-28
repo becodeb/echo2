@@ -47,11 +47,15 @@ const CAMERA_KEYS = [
   { f: B(25), v: [640, 360, 1] },
   { f: B(30.3), v: [720, 430, 1.7] }, // la verificación
   { f: B(34), v: [640, 360, 1] }, // el acta entera (la página scrollea) + la barra
-  { f: B(39.3), v: [760, 330, 1.45] }, // la tarea con su fecha
-  { f: B(41.3), v: [640, 360, 1] },
-  { f: B(46.3), v: [760, 280, 1.28] }, // la respuesta con fuentes
-  { f: B(48.3), v: [760, 520, 1.4] }, // el fragmento resaltado
-  { f: B(49.5), v: [640, 360, 1] },
+  { f: B(35.2), v: [752, 190, 1.55] }, // estado y botones juntos: se ve cada cambio
+  { f: B(37.4), v: [640, 360, 1] },
+  { f: B(38.9), v: [640, 560, 1.6] }, // la hoja: firmas y "Acta aprobada"
+  { f: B(39.7), v: [640, 360, 1] },
+  { f: B(41.3), v: [760, 330, 1.45] }, // la tarea con su fecha
+  { f: B(42.6), v: [640, 360, 1] },
+  { f: B(47.3), v: [760, 280, 1.28] }, // la respuesta con fuentes
+  { f: B(49.3), v: [760, 520, 1.4] }, // el fragmento resaltado
+  { f: B(50.5), v: [640, 360, 1] },
 ];
 export const cameraAt = (frame: number): [number, number, number] => {
   const [fx, fy, zoom] = keyed(frame, CAMERA_KEYS, 170);

@@ -32,10 +32,11 @@ export const ACT = {
   processing: B(18),
   detail: B(22),
   acta: B(30),
-  tasks: B(39),
-  ask: B(42),
-  source: B(48),
-  families: B(50),
+  print: B(38),
+  tasks: B(41),
+  ask: B(43),
+  source: B(49),
+  families: B(51),
   logo: B(54),
   loop: B(58),
 } as const;
@@ -53,14 +54,17 @@ export const CLICK = {
   tabActa: B(30),
   enviarRevision: B(36),
   aprobar: B(37),
-  pdf: B(38),
-  tabTareas: B(39),
-  navAsk: B(42),
-  input: B(43),
-  enviar: B(45),
-  fuente: B(48),
-  navFamilias: B(50),
-  reuniones: B(51),
+  // "Imprimir" abre la hoja del acta (ActaPrint): un click con resultado a la
+  // vista. "PDF" descarga un archivo y en pantalla no pasaba nada.
+  imprimir: B(38),
+  volver: B(40),
+  tabTareas: B(41),
+  navAsk: B(43),
+  input: B(44),
+  enviar: B(46),
+  fuente: B(49),
+  navFamilias: B(51),
+  reuniones: B(52),
 } as const;
 
 /** Estado del vivo: cada línea entra parcial (gris) y se confirma un golpe después. */
@@ -83,23 +87,25 @@ export const CLAIMS_AT = [B(31), B(32), B(33)] as const;
 
 /** Escritura en Preguntale a Echo. */
 export const QUESTION = "¿Qué acordamos con la familia Romero?";
-export const TYPE_START = B(43) + 6;
-export const TYPE_END = B(45) - 8;
-export const ANSWER_AT = B(46);
+export const TYPE_START = B(44) + 6;
+export const TYPE_END = B(46) - 8;
+export const ANSWER_AT = B(47);
 
 /** Copy de dos tonos arriba de la superficie (1 a 4 palabras). */
 export type CaptionWord = { text: string; accent?: boolean };
 export const CAPTIONS: { from: number; to: number; words: CaptionWord[] }[] = [
-  { from: B(0), to: B(5), words: [{ text: "Alguien" }, { text: "siempre" }, { text: "toma", accent: true }, { text: "notas.", accent: true }] },
-  { from: B(10), to: B(17.5), words: [{ text: "Echo", accent: true }, { text: "escucha." }] },
+  // El problema y, enseguida, que con Echo se termina: las notas se tachan.
+  { from: B(0), to: B(3.1), words: [{ text: "Alguien" }, { text: "siempre" }, { text: "toma", accent: true }, { text: "notas.", accent: true }] },
+  { from: B(3.4), to: B(7.6), words: [{ text: "Con" }, { text: "Echo," }, { text: "nadie", accent: true }, { text: "más.", accent: true }] },
+  { from: B(10), to: B(17.5), words: [{ text: "Vos" }, { text: "escuchás." }, { text: "Echo", accent: true }, { text: "anota.", accent: true }] },
   // Guardar el audio completo es una opción ("Grabar el audio completo",
   // apagada por defecto): no se promete que nunca se guarde.
   { from: B(18.5), to: B(21.8), words: [{ text: "Guardar" }, { text: "el" }, { text: "audio:" }, { text: "opcional.", accent: true }] },
   { from: B(22.3), to: B(25.6), words: [{ text: "Sabe" }, { text: "quién", accent: true }, { text: "habló.", accent: true }] },
   { from: B(25.8), to: B(29.8), words: [{ text: "Por" }, { text: "familia" }, { text: "y", accent: true }, { text: "gravedad.", accent: true }] },
   { from: B(30.4), to: B(35.3), words: [{ text: "Acta" }, { text: "verificada.", accent: true }] },
-  { from: B(35.5), to: B(38.8), words: [{ text: "La" }, { text: "institución" }, { text: "decide.", accent: true }] },
-  { from: B(39.2), to: B(41.8), words: [{ text: "Tareas" }, { text: "con", accent: true }, { text: "fecha.", accent: true }] },
-  { from: B(42.4), to: B(49.8), words: [{ text: "Echo", accent: true }, { text: "recuerda." }] },
-  { from: B(50.4), to: B(53.6), words: [{ text: "Todo" }, { text: "en", accent: true }, { text: "orden.", accent: true }] },
+  { from: B(35.5), to: B(40.6), words: [{ text: "La" }, { text: "institución" }, { text: "decide.", accent: true }] },
+  { from: B(41.1), to: B(42.8), words: [{ text: "Tareas" }, { text: "con", accent: true }, { text: "fecha.", accent: true }] },
+  { from: B(43.4), to: B(50.8), words: [{ text: "Echo", accent: true }, { text: "recuerda." }] },
+  { from: B(51.4), to: B(53.6), words: [{ text: "Todo" }, { text: "en", accent: true }, { text: "orden.", accent: true }] },
 ];
