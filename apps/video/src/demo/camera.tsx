@@ -44,18 +44,21 @@ const CAMERA_KEYS = [
   { f: B(10.4), v: [660, 240, 1.5] }, // el transcript en vivo
   { f: B(15.2), v: [640, 360, 1] },
   { f: B(22.8), v: [760, 420, 1.35] }, // quién habló
-  { f: B(25), v: [640, 360, 1] },
-  { f: B(30.3), v: [720, 430, 1.7] }, // la verificación
-  { f: B(34), v: [640, 360, 1] }, // el acta entera (la página scrollea) + la barra
-  { f: B(35.2), v: [752, 190, 1.55] }, // estado y botones juntos: se ve cada cambio
-  { f: B(37.4), v: [640, 360, 1] },
-  { f: B(38.9), v: [640, 560, 1.6] }, // la hoja: firmas y "Acta aprobada"
-  { f: B(39.7), v: [640, 360, 1] },
-  { f: B(41.3), v: [760, 330, 1.45] }, // la tarea con su fecha
-  { f: B(42.6), v: [640, 360, 1] },
-  { f: B(47.3), v: [760, 280, 1.28] }, // la respuesta con fuentes
-  { f: B(49.3), v: [760, 520, 1.4] }, // el fragmento resaltado
-  { f: B(50.5), v: [640, 360, 1] },
+  { f: B(25.5), v: [640, 360, 1] },
+  { f: B(32.3), v: [720, 430, 1.7] }, // la verificación, una afirmación por golpe
+  { f: B(36.8), v: [700, 480, 1.45] }, // el acta: Motivo, Acuerdos, Compromisos
+  { f: B(40.3), v: [752, 190, 1.55] }, // estado y botones juntos: se ve cada cambio
+  { f: B(43.8), v: [640, 360, 1] },
+  { f: B(45.4), v: [640, 250, 1.5] }, // la hoja: membrete, título y el acta
+  { f: B(47.2), v: [640, 560, 1.6] }, // firmas y "Acta aprobada"
+  { f: B(49.2), v: [640, 360, 1] },
+  { f: B(51.3), v: [760, 330, 1.5] }, // las tareas con responsable y fecha
+  { f: B(55.2), v: [640, 360, 1] },
+  { f: B(60.3), v: [760, 280, 1.28] }, // la respuesta con fuentes
+  { f: B(64.3), v: [760, 520, 1.4] }, // el fragmento resaltado
+  { f: B(65.6), v: [640, 360, 1] },
+  { f: B(67.8), v: [944, 330, 1.3] }, // el historial de la familia
+  { f: B(71.6), v: [640, 360, 1] },
 ];
 export const cameraAt = (frame: number): [number, number, number] => {
   const [fx, fy, zoom] = keyed(frame, CAMERA_KEYS, 170);
@@ -69,7 +72,7 @@ export const cameraAt = (frame: number): [number, number, number] => {
 export const detailScroll = (frame: number) =>
   keyed(frame, [
     { f: 0, v: [0] },
-    { f: B(34), v: [118] },
+    { f: B(36.3), v: [118] },
     { f: CLICK.tabTareas, v: [0] },
   ], 150)[0];
 

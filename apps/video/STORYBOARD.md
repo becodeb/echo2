@@ -8,15 +8,17 @@ sola superficie que se transforma: Echo escucha, redacta el acta, la verifica,
 la institución la aprueba, y meses después Echo la recuerda con la fuente.
 Nadie tuvo que tomar notas.
 
-- 1920×1080, 60 fps, 2130 frames (35,5 s). Composición `EchoDemo`: primero el
-  hero de la landing y después 30 s de demo.
+- 1920×1080, 60 fps, 2730 frames (45,5 s). Composición `EchoDemo`: primero el
+  hero de la landing y después 40 s de demo.
 - **Intro (0–5,5 s):** el video con el que abre la landing (`Variantes.tsx`,
   variante "lee", el mismo que `apps/web/public/hero/echo-ojos.mp4`), renderizado
   acá a 60 fps: negro, sube la luz, los ojos leen dos renglones, te miran y
   pestañean. A los 5,5 s los ojos se achican y se van mientras entra la libreta.
   La demo arranca en el frame 330 = 11 golpes: la grilla no se corre.
-- Música: `public/music.mp3` (la pista del video de Testra, para que los tres
-  videos de BeCode suenen igual). Entra a los 1,5 s, cuando sube la luz, y
+- Música: `public/music.mp3`, la pista del video de Testra
+  (`public/music-testra.mp3`, para que los tres videos de BeCode suenen igual)
+  extendida a 44 s con `scripts/music.py`: repite cinco compases con los cortes
+  en golpe, así la grilla no se corre. Entra a los 1,5 s, cuando sube la luz, y
   termina con el video: su final natural.
 - Efectos (`public/sfx`, sintetizados con `scripts/sfx.py`, `src/demo/Sound.tsx`):
   click de mouse en cada click, una tecla por letra al escribir, un tic por
@@ -48,25 +50,28 @@ Nadie tuvo que tomar notas.
 
 ## Grilla
 
-`B(n)` = frame del golpe n. Superficie = la única forma que se transforma.
+`B(n)` = frame del golpe n de la demo (en el video: + 5,5 s). Superficie = la
+única forma que se transforma.
 
-| # | Tiempo | Frames | Superficie / UI | Cursor | Cámara | Copy |
+| # | Video | Golpes | Superficie / UI | Cursor | Cámara | Copy |
 |---|---|---|---|---|---|---|
-| 1 | 0,00–2,78 s | 0–167 | Bloque de notas: alguien escribe apurado ("Reunión flia. Romero", "psicopedag… ¿viernes?"). B3.4 cada renglón se tacha: ya no hace falta | — | quieta | B0 "Alguien siempre **toma notas.**" · B3.4 "Con Echo, **nadie más.**" |
-| 2 | 2,78–4,28 s | 167–257 | B5: la libreta se estira y se vuelve el modal **Nueva reunión** (Familia Romero · Familia y profesionales · participantes) | entra B5, click **Comenzar reunión** en B7 | quieta | — |
-| 3 | 4,28–9,28 s | 257–557 | B8: el modal crece a la app (barra lateral + **Todo listo para empezar**, "Grabar el audio completo" apagado; B9 el cursor pasa por esa opción y la deja así). B10 click **Iniciar reunión** → header con cara roja, **Grabando**, timer. Líneas: parcial gris → definitiva (B11/B12, B12/B13, B14/B15 "Acordamos una reunión con la psicopedagoga el viernes."). Panel "Echo está detectando" suma una decisión y una tarea | B10 Iniciar; B16 **⭐ Momento**; B18 **Finalizar** | B10.4 zoom al transcript (×1,5); B15.2 vuelve | B10 "Vos escuchás. **Echo anota.**" |
-| 4 | 9,28–11,28 s | 557–677 | B18: el contenido se vuelve la pantalla de proceso: cara pensando, **Identificando quién habló…** (B19), **Extrayendo decisiones y tareas…** (B20), **Generando el acta…** (B21), barra | reposa | quieta | B18.5 "Guardar el audio: **opcional.**" |
-| 5 | 11,28–12,78 s | 677–767 | B22: la reunión: título, "Primaria", meta, **Esta reunión no está clasificada.**, tabs; Transcript con **Quién habló (tocá para corregir):** Directora · Mamá de Pedro · Orientadora (DOE) | se acerca a "Clasificar" | B23 zoom a hablantes; B25 vuelve | B22 "Sabe **quién habló.**" |
-| 6 | 12,78–15,28 s | 767–917 | B26 **Clasificar** → el panel se despliega (¿Con quién fue?, Familia, Motivo "Seguimiento de convivencia", Gravedad, ¿Quiénes vinieron?). B27 **Amarillo**. B28 ✓ Laura Romero (madre). B29 **Guardar** → chips: Familia Romero · Familia y profesionales · Seguimiento de convivencia · Amarillo · Faltó alguno | los cuatro clicks | leve zoom al panel | B26 "Por familia **y gravedad.**" |
-| 7 | 15,28–20,78 s | 917–1247 | **AHA.** B30 tab **Acta**: "Acta N.º 14", **Borrador**, "v1 · Generada automáticamente", Imprimir · Editar · Enviar a revisión · Regenerar · PDF · DOCX · MD. Verificación: ✓ B31, ✓ B32 (psicopedagoga · 00:13), ⚠ B33. B34 la página scrollea al acta entera: Motivo / Acuerdos / Compromisos. B36 **Enviar a revisión** → En revisión; B37 **Aprobar** → Aprobada; B38 **Imprimir** abre la hoja del acta (ActaPrint: membrete, firmas, "Acta aprobada · versión 1 · Generada con Echo"); B40 **Volver a la reunión** | B32 se posa en la afirmación de 00:13; los clicks de la revisión | B30.3 zoom a la verificación; B35.2 zoom a la barra (estado y botones juntos); B38.9 zoom a firmas y pie | B30.4 "Acta **verificada.**" · B35.5 "La institución **decide.**" |
-| 8 | 20,78–21,78 s | 1247–1307 | B41 tab **Tareas**: "Coordinar reunión con la psicopedagoga · Directora · 2026-10-02 · Pendiente" | click en la tab | B41.3 zoom a la fila | B41.1 "Tareas **con fecha.**" |
-| 9 | 21,28–25,28 s | 1277–1517 | B43 **Preguntale a Echo** (barra lateral). Se escribe "¿Qué acordamos con la familia Romero?" letra por letra; B46 **Enviar**; "Buscando en la memoria de reuniones…"; B47 respuesta con **FUENTES** «Familia Romero · 28 sept» — 00:13 · Orientadora (DOE). B49 click → la reunión con el fragmento de 00:13 resaltado | escribe, envía, toca la fuente | B50 paneo al fragmento resaltado | B43.4 "**Echo** recuerda." |
-| 10 | 25,28–27,28 s | 1517–1637 | B51 **Familias** → B52 **Reuniones** → panel **Reuniones de la familia**: 4 reuniones, barra verde/amarillo/rojo, filas con su color | dos clicks | quieta | B51.4 "Todo **en orden.**" |
-| 11 | 27,28–30,00 s | 1637–1800 | B54 la app se encoge al ícono de Echo (cuadrado negro con dos ojos, el favicon); B55 "Echo" y "La reunión termina. Echo recuerda."; B58 el ícono crece hasta llenar la pantalla de negro: el mismo negro con el que abre el hero (loop) | sale | quieta | tagline |
+| 0 | 0,0–5,5 s | — | Hero de la landing ("lee"): negro, sube la luz, los ojos leen, miran y pestañean | — | — | — |
+| 1 | 5,5–8,3 s | B0–B5 | Libreta: alguien escribe apurado; B3.4 cada renglón se tacha | — | quieta | "Alguien siempre **toma notas.**" → "Con Echo, **nadie más.**" |
+| 2 | 8,3–9,8 s | B5–B8 | La libreta se vuelve el modal **Nueva reunión** (Familia Romero, Familia y profesionales, participantes, "Grabar el audio completo" sin tildar) | click **Comenzar reunión** B7 | quieta | — |
+| 3 | 9,8–14,8 s | B8–B18 | **Todo listo para empezar**; B9 el cursor pasa por "Grabar el audio completo" y lo deja; B10 **Iniciar reunión** → Grabando, timer, líneas parcial → definitiva, "Echo está detectando" | B10, B16 **⭐ Momento**, B18 **Finalizar** | B10.4 zoom al transcript; B15.2 vuelve | "Vos escuchás. **Echo anota.**" |
+| 4 | 14,8–16,8 s | B18–B22 | Proceso: Identificando quién habló… → Extrayendo decisiones y tareas… → Generando el acta… | reposa | quieta | "Guardar el audio: **opcional.**" |
+| 5 | 16,8–19,3 s | B22–B27 | Transcript con **Quién habló (tocá para corregir):** Directora · Mamá de Pedro · Orientadora (DOE) | — | B22.8 zoom a hablantes; B25.5 vuelve | "Sabe **quién habló.**" |
+| 6 | 19,3–21,8 s | B27–B32 | **Clasificar** → Amarillo → ✓ Laura Romero (madre) → **Guardar** → chips: Familia Romero · Familia y profesionales · Seguimiento de convivencia · Amarillo · Faltó alguno | B27, B28, B29, B30 | quieta | "Por familia **y gravedad.**" |
+| 7 | 21,8–28,3 s | B32–B45 | **AHA.** Tab **Acta**; verificación ✓ B33, ✓ B34 (00:13), ⚠ B35; B36.3 la página scrollea y se lee el acta entera (Motivo, Acuerdos, Compromisos); **Enviar a revisión** B41 → En revisión; **Aprobar** B43 → Aprobada | B32 tab, B34 sobre la afirmación de 00:13, B41, B43 | B32.3 verificación (×1,7); B36.8 el acta (×1,45); B40.3 la barra con el estado (×1,55) | "Acta **verificada.**" → "La institución **decide.**" |
+| 8 | 28,3–30,8 s | B45–B50 | **Imprimir** → la hoja del acta (membrete, título, acta, firmas, "Acta aprobada · versión 1 · Generada con Echo"); B50 **Volver a la reunión** | B45, B50 | B45.4 la hoja arriba; B47.2 firmas y pie | "La institución **decide.**" |
+| 9 | 30,8–33,3 s | B51–B56 | Tab **Tareas**: Coordinar reunión con la psicopedagoga · Directora · 2026-10-02; Seguimiento con la familia Romero · Orientadora (DOE) · 2026-10-09 | B51 tab, B53 sobre la fecha | B51.3 zoom a la tabla (×1,5) | "Tareas **con fecha.**" |
+| 10 | 33,3–38,3 s | B56–B66 | **Preguntale a Echo**: se escribe "¿Qué acordamos con la familia Romero?", **Enviar**, la respuesta con **FUENTES**; B64 la fuente → el fragmento de 00:13 resaltado | B56, B57, B59, B64 | B60.3 la respuesta; B64.3 el fragmento | "**Echo** recuerda." |
+| 11 | 38,3–41,8 s | B66–B73 | **Familias** → **Reuniones** → panel **Reuniones de la familia** (4 reuniones, barra verde/amarillo/rojo, filas con su color) | B66, B67 | B67.8 zoom al panel | "Todo **en orden.**" |
+| 12 | 41,8–45,5 s | B73–B80 | La app se encoge al ícono de Echo; "Echo" y "La reunión termina. Echo recuerda."; B78 el ícono crece hasta el negro del primer frame (loop) | sale | quieta | tagline |
 
 ## Aha moment
 
-B31–B33: sobre la verificación, las afirmaciones del acta se van tildando
+B33–B35: sobre la verificación, las afirmaciones del acta se van tildando
 contra el transcript, una por golpe, con su minuto. La que no está clara queda
 en ⚠: la IA no decide por la institución. Dos golpes después la institución
 la envía a revisión y la aprueba.

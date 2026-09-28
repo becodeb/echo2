@@ -6,7 +6,7 @@ import { ACT, B } from "../timeline";
 export function LogoLockup({ frame }: { frame: number }) {
   // Entra cuando el ícono ya llegó a su lugar: nunca se pisan.
   const word = presence(frame, ACT.logo + 32, ACT.loop - 4, 14, 12);
-  const tagline = presence(frame, B(55.5), ACT.loop - 8, 14, 12);
+  const tagline = presence(frame, B(74.5), ACT.loop - 8, 14, 12);
   if (!word.visible && !tagline.visible) return null;
   const [x, y, w, h] = TILE;
   return (

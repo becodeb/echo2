@@ -5,17 +5,18 @@
  * cae en un golpe; el resto se deriva de estos números.
  */
 export const FPS = 60;
-/** La demo en sí (30 s); todos los frames de este archivo son relativos a ella. */
-export const DURATION = 1800;
+/** La demo en sí (40 s); todos los frames de este archivo son relativos a ella. */
+export const DURATION = 2400;
 /**
  * Antes de la demo va el video del hero de la landing (variante "lee",
  * 5,6 s). La demo arranca a los 5,5 s: 330 frames = 11 golpes, así cada click
  * sigue cayendo en su golpe. La música entra a los 1,5 s, cuando sube la luz,
- * y termina justo con el video (su final natural: 34 s).
+ * y termina justo con el video: public/music.mp3 es la pista de Testra
+ * extendida a 44 s (scripts/music.py), con su final natural.
  */
 export const INTRO = 330;
 export const MUSIC_START = 90;
-export const TOTAL = INTRO + DURATION; // 2130 = 35,5 s
+export const TOTAL = INTRO + DURATION; // 2730 = 45,5 s
 export const WIDTH = 1920;
 export const HEIGHT = 1080;
 
@@ -31,14 +32,14 @@ export const ACT = {
   live: B(8),
   processing: B(18),
   detail: B(22),
-  acta: B(30),
-  print: B(38),
-  tasks: B(41),
-  ask: B(43),
-  source: B(49),
-  families: B(51),
-  logo: B(54),
-  loop: B(58),
+  acta: B(32),
+  print: B(45),
+  tasks: B(51),
+  ask: B(56),
+  source: B(64),
+  families: B(66),
+  logo: B(73),
+  loop: B(78),
 } as const;
 
 /** Clicks: el cursor llega y el botón se hunde en ese frame exacto. */
@@ -47,24 +48,25 @@ export const CLICK = {
   iniciar: B(10),
   momento: B(16),
   finalizar: B(18),
-  clasificar: B(26),
-  amarillo: B(27),
-  madre: B(28),
-  guardar: B(29),
-  tabActa: B(30),
-  enviarRevision: B(36),
-  aprobar: B(37),
+  clasificar: B(27),
+  amarillo: B(28),
+  madre: B(29),
+  guardar: B(30),
+  tabActa: B(32),
+  // Un segundo entre estado y estado: se lee "En revisión" y "Aprobada".
+  enviarRevision: B(41),
+  aprobar: B(43),
   // "Imprimir" abre la hoja del acta (ActaPrint): un click con resultado a la
   // vista. "PDF" descarga un archivo y en pantalla no pasaba nada.
-  imprimir: B(38),
-  volver: B(40),
-  tabTareas: B(41),
-  navAsk: B(43),
-  input: B(44),
-  enviar: B(46),
-  fuente: B(49),
-  navFamilias: B(51),
-  reuniones: B(52),
+  imprimir: B(45),
+  volver: B(50),
+  tabTareas: B(51),
+  navAsk: B(56),
+  input: B(57),
+  enviar: B(59),
+  fuente: B(64),
+  navFamilias: B(66),
+  reuniones: B(67),
 } as const;
 
 /** Estado del vivo: cada línea entra parcial (gris) y se confirma un golpe después. */
@@ -83,13 +85,13 @@ export const STAGES = [
 ] as const;
 
 /** Verificación del acta: una afirmación por golpe. */
-export const CLAIMS_AT = [B(31), B(32), B(33)] as const;
+export const CLAIMS_AT = [B(33), B(34), B(35)] as const;
 
 /** Escritura en Preguntale a Echo. */
 export const QUESTION = "¿Qué acordamos con la familia Romero?";
-export const TYPE_START = B(44) + 6;
-export const TYPE_END = B(46) - 8;
-export const ANSWER_AT = B(47);
+export const TYPE_START = B(57) + 6;
+export const TYPE_END = B(59) - 8;
+export const ANSWER_AT = B(60);
 
 /** Copy de dos tonos arriba de la superficie (1 a 4 palabras). */
 export type CaptionWord = { text: string; accent?: boolean };
@@ -101,11 +103,11 @@ export const CAPTIONS: { from: number; to: number; words: CaptionWord[] }[] = [
   // Guardar el audio completo es una opción ("Grabar el audio completo",
   // apagada por defecto): no se promete que nunca se guarde.
   { from: B(18.5), to: B(21.8), words: [{ text: "Guardar" }, { text: "el" }, { text: "audio:" }, { text: "opcional.", accent: true }] },
-  { from: B(22.3), to: B(25.6), words: [{ text: "Sabe" }, { text: "quién", accent: true }, { text: "habló.", accent: true }] },
-  { from: B(25.8), to: B(29.8), words: [{ text: "Por" }, { text: "familia" }, { text: "y", accent: true }, { text: "gravedad.", accent: true }] },
-  { from: B(30.4), to: B(35.3), words: [{ text: "Acta" }, { text: "verificada.", accent: true }] },
-  { from: B(35.5), to: B(40.6), words: [{ text: "La" }, { text: "institución" }, { text: "decide.", accent: true }] },
-  { from: B(41.1), to: B(42.8), words: [{ text: "Tareas" }, { text: "con", accent: true }, { text: "fecha.", accent: true }] },
-  { from: B(43.4), to: B(50.8), words: [{ text: "Echo", accent: true }, { text: "recuerda." }] },
-  { from: B(51.4), to: B(53.6), words: [{ text: "Todo" }, { text: "en", accent: true }, { text: "orden.", accent: true }] },
+  { from: B(22.3), to: B(26.6), words: [{ text: "Sabe" }, { text: "quién", accent: true }, { text: "habló.", accent: true }] },
+  { from: B(26.8), to: B(31.6), words: [{ text: "Por" }, { text: "familia" }, { text: "y", accent: true }, { text: "gravedad.", accent: true }] },
+  { from: B(32.4), to: B(40), words: [{ text: "Acta" }, { text: "verificada.", accent: true }] },
+  { from: B(40.2), to: B(49.8), words: [{ text: "La" }, { text: "institución" }, { text: "decide.", accent: true }] },
+  { from: B(51.1), to: B(55.6), words: [{ text: "Tareas" }, { text: "con", accent: true }, { text: "fecha.", accent: true }] },
+  { from: B(56.4), to: B(65.8), words: [{ text: "Echo", accent: true }, { text: "recuerda." }] },
+  { from: B(66.4), to: B(72.6), words: [{ text: "Todo" }, { text: "en", accent: true }, { text: "orden.", accent: true }] },
 ];

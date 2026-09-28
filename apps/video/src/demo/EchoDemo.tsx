@@ -138,7 +138,7 @@ function Demo() {
               )}
               {tile.visible && (
                 <div className="absolute inset-0 flex items-center justify-center" style={tile.style}>
-                  <Face size={surface.w} frame={frame} color="#fafbfc" blinkAt={[B(56.4)]} />
+                  <Face size={surface.w} frame={frame} color="#fafbfc" blinkAt={[B(75.4)]} />
                 </div>
               )}
             </>
