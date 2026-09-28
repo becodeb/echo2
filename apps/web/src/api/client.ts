@@ -58,6 +58,13 @@ async function tryRefresh(): Promise<boolean> {
   return refreshPromise;
 }
 
+/** Renueva el access token con la cookie de refresh. El WebSocket no pasa por
+ *  `api()`, así que nadie lo renovaba durante una reunión: a los 15 minutos
+ *  cualquier reconexión fallaba con el token vencido. */
+export function refreshAccessToken(): Promise<boolean> {
+  return tryRefresh();
+}
+
 export async function api<T = unknown>(
   path: string,
   options: RequestInit & { skipOrg?: boolean; retry?: boolean } = {},

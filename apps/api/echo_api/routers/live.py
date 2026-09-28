@@ -51,11 +51,11 @@ from ..services.stt.windowing import find_cut
 from ..services.stt.channels import (
     attribute_speaker,
     downmix,
-    is_hallucination,
     is_noise_transcript,
     is_prompt_echo,
     is_silent,
     split_channels,
+    strip_hallucinations,
 )
 
 log = logging.getLogger("echo.live")
@@ -204,8 +204,14 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
 
     forward_task = asyncio.create_task(forward_bus())
 
-    async def flush_audio(final: bool = False, upto: int | None = None):
-        nonlocal audio_buffer, stream_offset_ms, stt_error_sent, segments_since_insights, recent_text
+    # Los tramos se transcriben en orden en una tarea aparte: si el loop que
+    # recibe el audio esperaba cada llamada al STT, mientras tanto no leía nada
+    # (ni los pings del WebSocket) y una llamada lenta cortaba la conexión.
+    jobs: asyncio.Queue[tuple[bytes, int, bool]] = asyncio.Queue()
+
+    def take_chunk(final: bool = False, upto: int | None = None) -> None:
+        """Saca el tramo del buffer (hasta el corte) y lo encola para transcribir."""
+        nonlocal audio_buffer, stream_offset_ms
         if not audio_buffer or stt_provider is None:
             audio_buffer = bytearray()
             return
@@ -216,24 +222,40 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
         duration_ms = int(len(chunk) / 2 / channels / sample_rate * 1000)
         offset = stream_offset_ms
         stream_offset_ms += duration_ms
+        jobs.put_nowait((chunk, offset, final))
 
+    async def transcribe_chunk(chunk: bytes, offset: int, final: bool) -> None:
+        nonlocal stt_error_sent, segments_since_insights, recent_text
         mic_track: bytes | None = None
         system_track: bytes | None = None
+        tracks = [chunk]
         if channels == 2:
             mic_track, system_track = split_channels(chunk)
             chunk = downmix(mic_track, system_track)
+            # Cada canal por separado: al mezclar, una voz que está en uno
+            # solo queda a la mitad de volumen.
+            tracks = [mic_track, system_track]
 
         # Whisper alucina créditos de subtitulado sobre silencio; además una
         # llamada por ventana muda es gasto puro.
-        if is_silent(chunk, sample_rate):
+        if all(is_silent(track, sample_rate) for track in tracks):
             del chunk
             return
-        try:
-            result = await stt_provider.transcribe_chunk(
-                chunk, sample_rate, meeting.language, vocabulary, offset_ms=offset, context=recent_text
-            )
-        except Exception as exc:  # provider caído: avisar sin matar la reunión
-            log.warning("stt cloud error: %s", exc)
+        # Un error suelto (timeout, 5xx, rate limit) se reintenta una vez: sin
+        # eso el tramo se perdía entero.
+        result = None
+        for attempt in range(2):
+            try:
+                result = await stt_provider.transcribe_chunk(
+                    chunk, sample_rate, meeting.language, vocabulary, offset_ms=offset, context=recent_text
+                )
+                break
+            except Exception as exc:  # provider caído: avisar sin matar la reunión
+                log.warning("stt cloud error (intento %d): %s", attempt + 1, exc)
+                if attempt == 0:
+                    await asyncio.sleep(1)
+        del chunk  # descartar el audio explícitamente
+        if result is None:
             if not stt_error_sent:
                 stt_error_sent = True
                 await live_bus.publish(
@@ -241,15 +263,10 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
                     {"type": "warning", "code": "stt_error", "message": "El motor de transcripción falló; reintentando"},
                 )
             return
-        finally:
-            del chunk  # descartar el audio explícitamente
         stt_error_sent = False
         for seg in result.segments:
-            if (
-                is_hallucination(seg.text)
-                or is_prompt_echo(seg.text, vocabulary)
-                or is_noise_transcript(seg.text, meeting.language)
-            ):
+            text = strip_hallucinations(seg.text)
+            if not text or is_prompt_echo(text, vocabulary) or is_noise_transcript(text, meeting.language):
                 continue
             speaker = seg.speaker
             if mic_track is not None and system_track is not None:
@@ -265,15 +282,25 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
                     )
                     or speaker
                 )
-            event = await _store_segment(
-                meeting, seg.text.strip(), seg.start_ms, seg.end_ms, seg.confidence, speaker
-            )
+            event = await _store_segment(meeting, text, seg.start_ms, seg.end_ms, seg.confidence, speaker)
             await live_bus.publish(channel, event)
-            recent_text = (recent_text + " " + seg.text.strip())[-300:]
+            recent_text = (recent_text + " " + text)[-300:]
             segments_since_insights += 1
         if segments_since_insights >= 8 or (final and segments_since_insights > 0):
             segments_since_insights = 0
             spawn(maybe_extract_live_insights(str(meeting.id)), name=f"insights:{meeting.id}")
+
+    async def transcriber() -> None:
+        while True:
+            chunk, offset, final = await jobs.get()
+            try:
+                await transcribe_chunk(chunk, offset, final)
+            except Exception as exc:  # noqa: BLE001 - un tramo no corta la reunión
+                log.warning("live %s: tramo sin transcribir: %s", meeting.id, exc)
+            finally:
+                jobs.task_done()
+
+    transcriber_task = asyncio.create_task(transcriber())
 
     try:
         while True:
@@ -325,7 +352,7 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
                 audio_buffer.extend(message["bytes"])
                 cut = find_cut(bytes(audio_buffer), sample_rate, channels)
                 if cut:
-                    await flush_audio(upto=cut)
+                    take_chunk(upto=cut)
                 continue
 
             raw = message.get("text")
@@ -397,7 +424,15 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
                     spawn(maybe_extract_live_insights(str(meeting.id)), name=f"insights:{meeting.id}")
 
             elif msg_type == "flush" and role == "recorder":
-                await flush_audio(final=True)
+                # Pausa o fin: se transcribe lo que quedaba y recién entonces se
+                # avisa. Al finalizar, el navegador espera este aviso antes de
+                # pedir el procesamiento; si no, el acta arrancaba sin el
+                # último tramo.
+                take_chunk(final=True)
+                await jobs.join()
+                if writer is not None:
+                    writer.flush()
+                await websocket.send_text(json.dumps({"type": "flushed"}))
 
             elif msg_type == "ping":
                 await websocket.send_text(json.dumps({"type": "pong"}))
@@ -409,7 +444,9 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
     finally:
         # flush final de audio pendiente para no perder los últimos segundos
         with contextlib.suppress(Exception):
-            await flush_audio(final=True)
+            take_chunk(final=True)
+            await jobs.join()
+        transcriber_task.cancel()
         if writer is not None:
             writer.close()
         if _recorders.get(channel) is websocket:

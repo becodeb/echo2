@@ -3,10 +3,12 @@
 //! Recibe frames PCM16 (16 kHz mono), corta el stream en utterances por
 //! detección de silencio (VAD por energía con histéresis) y manda cada
 //! utterance al motor local. Devuelve JSON:
-//!   {type:"partial"|"final", text, start_ms, end_ms, confidence?, speaker?}
+//!   {type:"final", text, start_ms, end_ms, confidence?, speaker?}
+//!   {type:"flushed"} después de un {type:"flush"}
 //!
 //! El buffer vive SOLO en RAM y se vacía apenas se transcribe.
 
+use std::collections::VecDeque;
 use std::sync::Arc;
 
 use axum::extract::ws::{Message, WebSocket};
@@ -21,8 +23,13 @@ const SILENCE_CLOSE_MS: u64 = 700;
 const MAX_UTTERANCE_MS: u64 = 10_000;
 /// mínimo para molestarse en transcribir (ms)
 const MIN_UTTERANCE_MS: u64 = 400;
-/// umbral RMS de voz (sobre i16 normalizado)
-const VOICE_RMS: f32 = 0.010;
+/// umbral RMS de voz (sobre i16 normalizado). Con 0.010 (~330 en PCM16) una
+/// voz baja o lejana no llegaba a abrir una utterance y no se transcribía; el
+/// navegador ya le saca el ruido de fondo (queda muy por debajo de esto).
+const VOICE_RMS: f32 = 0.006;
+/// audio previo que se agrega al abrir una utterance: las primeras sílabas
+/// suelen estar bajo el umbral y se perdían ("Yo tengo…" → "tengo…").
+const PREROLL_MS: u64 = 300;
 
 pub async fn handle_session(mut socket: WebSocket, state: Arc<AppState>, language: String) {
     let _ = socket
@@ -36,6 +43,8 @@ pub async fn handle_session(mut socket: WebSocket, state: Arc<AppState>, languag
     let mut utterance_start_ms: u64 = 0;
     let mut silence_ms: u64 = 0;
     let mut in_voice = false;
+    let preroll_samples = (SAMPLE_RATE as u64 * PREROLL_MS / 1000) as usize;
+    let mut preroll: VecDeque<i16> = VecDeque::with_capacity(preroll_samples + 1600);
 
     while let Some(Ok(message)) = socket.recv().await {
         match message {
@@ -61,7 +70,9 @@ pub async fn handle_session(mut socket: WebSocket, state: Arc<AppState>, languag
                 let is_voice = rms >= VOICE_RMS;
                 if is_voice {
                     if !in_voice && buffer.is_empty() {
-                        utterance_start_ms = stream_ms;
+                        let lead_ms = preroll.len() as u64 * 1000 / SAMPLE_RATE as u64;
+                        buffer.extend(preroll.drain(..));
+                        utterance_start_ms = stream_ms.saturating_sub(lead_ms);
                     }
                     in_voice = true;
                     silence_ms = 0;
@@ -72,6 +83,11 @@ pub async fn handle_session(mut socket: WebSocket, state: Arc<AppState>, languag
                 // acumular solo si hay una utterance abierta (con algo de cola de silencio)
                 if in_voice {
                     buffer.extend_from_slice(&samples);
+                } else {
+                    preroll.extend(samples.iter().copied());
+                    while preroll.len() > preroll_samples {
+                        preroll.pop_front();
+                    }
                 }
                 stream_ms += frame_ms;
 
@@ -81,17 +97,19 @@ pub async fn handle_session(mut socket: WebSocket, state: Arc<AppState>, languag
                         || utterance_ms >= MAX_UTTERANCE_MS);
 
                 if should_close {
-                    let is_final = silence_ms >= SILENCE_CLOSE_MS;
+                    let ended_on_pause = silence_ms >= SILENCE_CLOSE_MS;
+                    // La ventana forzada de 10 s también es texto definitivo:
+                    // antes salía como "partial", el servidor no lo guarda, y
+                    // de alguien que hablaba de corrido quedaba solo el final.
                     flush_buffer(
                         &mut socket,
                         &state,
                         &mut buffer,
                         utterance_start_ms,
                         &language,
-                        is_final,
                     )
                     .await;
-                    if is_final {
+                    if ended_on_pause {
                         in_voice = false;
                         silence_ms = 0;
                     } else {
@@ -110,11 +128,15 @@ pub async fn handle_session(mut socket: WebSocket, state: Arc<AppState>, languag
                                 &mut buffer,
                                 utterance_start_ms,
                                 &language,
-                                true,
                             )
                             .await;
                             in_voice = false;
                             silence_ms = 0;
+                            // Aviso de que lo último ya se mandó: la web lo
+                            // espera antes de cerrar la sesión al finalizar.
+                            let _ = socket
+                                .send(Message::Text(json!({"type": "flushed"}).to_string()))
+                                .await;
                         }
                         Some("ping") => {
                             let _ = socket
@@ -140,7 +162,6 @@ async fn flush_buffer(
     buffer: &mut Vec<i16>,
     utterance_start_ms: u64,
     language: &str,
-    is_final: bool,
 ) {
     if buffer.len() < (SAMPLE_RATE as usize * MIN_UTTERANCE_MS as usize) / 1000 {
         buffer.clear();
@@ -157,7 +178,7 @@ async fn flush_buffer(
         Ok(segments) => {
             for segment in segments {
                 let event = json!({
-                    "type": if is_final { "final" } else { "partial" },
+                    "type": "final",
                     "text": segment.text,
                     "start_ms": segment.start_ms,
                     "end_ms": segment.end_ms,

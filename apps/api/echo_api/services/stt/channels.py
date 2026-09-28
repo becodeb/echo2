@@ -10,6 +10,9 @@ no hay forma de recuperarla.
 from __future__ import annotations
 
 import array
+import re
+
+import numpy as np
 
 # Etiquetas que consume el pipeline: "speaker_N" → "Speaker N".
 MIC_SPEAKER = "speaker_1"
@@ -18,6 +21,13 @@ SYSTEM_SPEAKER = "speaker_2"
 # Debajo de esto un canal se considera en silencio. PCM16 va de 0 a 32767;
 # 300 deja pasar habla suave y corta el ruido de fondo de un micrófono abierto.
 SILENCE_RMS = 300.0
+
+# Un tramo es silencio si tiene menos habla que esto, contada en ventanas de
+# 100 ms que superan SILENCE_RMS. Antes se promediaba el tramo entero: un "Sí,
+# de acuerdo" de 1 s en un tramo de 4 s bajaba el promedio a menos de la
+# mitad, y el tramo se tiraba sin llegar a transcribirse.
+FRAME_MS = 100
+MIN_VOICED_MS = 300
 
 # Un canal gana solo si domina claramente; con ambos parecidos (diafonía del
 # parlante entrando al micrófono) no se arriesga una atribución.
@@ -100,8 +110,15 @@ def attribute_speaker(
 
 
 def is_silent(pcm16: bytes, sample_rate: int = 16000) -> bool:
-    """Ventana sin habla: no tiene sentido gastar una llamada de STT."""
-    return rms(pcm16, sample_rate=sample_rate) < SILENCE_RMS
+    """Tramo sin habla: no tiene sentido gastar una llamada de STT."""
+    samples = np.frombuffer(pcm16[: len(pcm16) // 2 * 2], dtype=np.int16).astype(np.float32)
+    frame = max(1, sample_rate * FRAME_MS // 1000)
+    count = len(samples) // frame
+    if count == 0:
+        return rms(pcm16, sample_rate=sample_rate) < SILENCE_RMS
+    frames = samples[: count * frame].reshape(count, frame)
+    voiced = np.sqrt((frames * frames).mean(axis=1)) >= SILENCE_RMS
+    return int(voiced.sum()) * FRAME_MS < min(MIN_VOICED_MS, count * FRAME_MS)
 
 
 def is_hallucination(text: str) -> bool:
@@ -110,6 +127,17 @@ def is_hallucination(text: str) -> bool:
     if not normalized:
         return True
     return any(marker in normalized for marker in HALLUCINATION_MARKERS)
+
+
+def strip_hallucinations(text: str) -> str:
+    """El texto sin las oraciones inventadas.
+
+    Los modelos de solo texto devuelven UN texto por tramo de 4-12 s: si al
+    final le pegan "Subtítulos realizados por la comunidad de Amara.org",
+    descartarlo entero se llevaba también lo que alguien dijo de verdad.
+    """
+    sentences = re.split(r"(?<=[.!?…])\s+", (text or "").strip())
+    return " ".join(sentence for sentence in sentences if sentence and not is_hallucination(sentence)).strip()
 
 
 def is_prompt_echo(text: str, vocabulary: list[str] | None) -> bool:

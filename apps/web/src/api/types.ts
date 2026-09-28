@@ -425,6 +425,7 @@ export interface DriveStatusOut {
 
 export type LiveEvent =
   | { type: "hello_ack"; role: string; meeting_status: string }
+  | { type: "flushed" }
   | { type: "segment"; id: string; seq: number; start_ms: number; end_ms: number; text: string; confidence: number | null; speaker_hint: string | null }
   | { type: "partial"; text: string; start_ms: number; speaker_hint?: string | null }
   | { type: "status"; status: string }

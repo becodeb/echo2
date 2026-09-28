@@ -107,12 +107,14 @@ sigue en modo cloud. Nada se simula.
 ## Pipeline interno
 
 ```
-PCM16 16k → VAD por energía (histéresis 700 ms) → utterance
+PCM16 16k → VAD por energía (histéresis 700 ms, 300 ms de audio previo) → utterance
    → (CLI: WAV temporal efímero | HTTP: multipart en memoria)
    → segmentos {texto, start_ms, end_ms, speaker?}
-   → {type:"final"|"partial"} al navegador
+   → {type:"final"} al navegador
 ```
 
-Utterances de máx. 10 s (se fuerza ventana con `partial`); el buffer se vacía
+Utterances de máx. 10 s (la ventana forzada también sale como `final`: antes era
+`partial`, el servidor no la guardaba y se perdía); el buffer se vacía
 en cada transcripción. `{"type":"flush"}` fuerza el cierre (pausa/fin de
-reunión).
+reunión) y el bridge contesta `{"type":"flushed"}` cuando ya mandó el texto: la
+web lo espera antes de cerrar la sesión al finalizar.

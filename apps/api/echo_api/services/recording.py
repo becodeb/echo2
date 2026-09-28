@@ -73,6 +73,16 @@ class PcmWriter:
             left, right = split_channels(pcm16)
             pcm16 = downmix(left, right)
         self._file.write(pcm16)
+        # Al disco en cada frame (100 ms): la transcripción final lee este
+        # archivo apenas se toca "Finalizar", con el WebSocket todavía abierto,
+        # y con el buffer de Python le faltaban los últimos frames.
+        self.flush()
+
+    def flush(self) -> None:
+        try:
+            self._file.flush()
+        except OSError:
+            pass
 
     def close(self) -> None:
         try:

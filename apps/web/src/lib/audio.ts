@@ -82,6 +82,10 @@ export class MicrophoneSource implements AudioSource {
       },
     });
     this.context = new AudioContext();
+    // Creado después de un await, Safari lo deja suspendido: sin esto los
+    // primeros segundos no llegaban frames hasta que el detector de cortes lo
+    // reanudaba.
+    if (this.context.state !== "running") await this.context.resume().catch(() => {});
     const workletUrl = URL.createObjectURL(new Blob([WORKLET_CODE], { type: "application/javascript" }));
     try {
       await this.context.audioWorklet.addModule(workletUrl);
@@ -191,7 +195,12 @@ export class SystemAudioSource implements AudioSource {
   private context: AudioContext | null = null;
   private node: AudioWorkletNode | null = null;
 
-  constructor(deviceId?: string) {
+  /** `onSystemAudioEnded`: se dejó de compartir la pestaña. El micrófono sigue
+   *  mandando frames, así que el detector de cortes no se entera solo. */
+  constructor(
+    deviceId?: string,
+    private onSystemAudioEnded?: () => void,
+  ) {
     this.mic = new MicrophoneSource(deviceId);
   }
 
@@ -211,8 +220,10 @@ export class SystemAudioSource implements AudioSource {
     }
     // detener el video: solo interesa el audio
     this.displayStream.getVideoTracks().forEach((track) => (track.enabled = false));
+    audioTracks[0].addEventListener("ended", () => this.onSystemAudioEnded?.());
 
     this.context = new AudioContext();
+    if (this.context.state !== "running") await this.context.resume().catch(() => {});
     const workletUrl = URL.createObjectURL(
       new Blob([WORKLET_CODE_STEREO], { type: "application/javascript" }),
     );

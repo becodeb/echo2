@@ -31,7 +31,7 @@ export async function checkBridge(timeoutMs = 1500): Promise<BridgeHealth | null
 }
 
 export interface BridgeSttEvent {
-  type: "partial" | "final" | "error" | "ready";
+  type: "partial" | "final" | "error" | "ready" | "flushed";
   text?: string;
   start_ms?: number;
   end_ms?: number;
@@ -43,6 +43,7 @@ export interface BridgeSttEvent {
 export class BridgeSttSession {
   private ws: WebSocket | null = null;
   private sessionToken: string | null = null;
+  private flushWaiter: (() => void) | null = null;
 
   async open(
     language: string,
@@ -66,11 +67,17 @@ export class BridgeSttSession {
       };
       ws.onerror = () => reject(new Error("No se pudo conectar a Echo Bridge"));
       ws.onmessage = (message) => {
+        let event: BridgeSttEvent;
         try {
-          onEvent(JSON.parse(message.data as string) as BridgeSttEvent);
+          event = JSON.parse(message.data as string) as BridgeSttEvent;
         } catch {
-          /* frame no-json */
+          return; /* frame no-json */
         }
+        if (event.type === "flushed") {
+          this.flushWaiter?.();
+          return;
+        }
+        onEvent(event);
       };
       ws.onclose = (event) => {
         this.ws = null;
@@ -89,6 +96,24 @@ export class BridgeSttSession {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ type: "flush" }));
     }
+  }
+
+  /** Manda lo que quedaba al motor y espera el texto antes de volver. Cerrar
+   *  apenas después del flush perdía la última frase (el motor tarda ~2 s). */
+  flushAndWait(timeoutMs = 8000): Promise<void> {
+    const ws = this.ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return Promise.resolve();
+    return new Promise((resolve) => {
+      const done = () => {
+        window.clearTimeout(timer);
+        this.flushWaiter = null;
+        resolve();
+      };
+      // Un bridge viejo no avisa: se espera hasta el tope.
+      const timer = window.setTimeout(done, timeoutMs);
+      this.flushWaiter = done;
+      ws.send(JSON.stringify({ type: "flush" }));
+    });
   }
 
   close(): void {

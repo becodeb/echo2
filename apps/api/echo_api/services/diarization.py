@@ -16,8 +16,14 @@ trabajo de la reunión (services/recording.py):
    para completar (en una reunión real "soy Vanina" salió "Ogei, iokinzos"), y
    con la parte entera lo transcribió perfecto. Cada frase del texto final
    toma hablante y tiempo alineándola palabra por palabra con la separación.
-   Si esa transcripción falla, las voces se asignan al transcript en vivo por
-   coincidencia de tiempos (partiendo por oraciones los tramos con dos personas).
+   Ese texto se controla antes de usarlo: a veces el modelo devuelve la pista
+   en vez de la reunión (en la reunión 89ddbc9d devolvió solo "Bau, Delfi,
+   Bautista Goñi, Prueba.", los nombres del prompt). Las oraciones que son el
+   diccionario repetido se sacan, y si lo que queda no coincide con lo que
+   escuchó la separación de voces se pide otra vez sin pista. Si tampoco sirve,
+   esa parte (y solo esa) se queda con el transcript en vivo, con las voces
+   asignadas por coincidencia de tiempos (partiendo por oraciones los tramos
+   con dos personas); sin transcript en vivo, con el texto de la separación.
 4. `name_speakers` le pide a la IA que deduzca de la conversación quién es
    cada persona sin nombre ("Mamá de Pedro"). Si no está segura, queda como
    sugerencia que la persona confirma en el transcript.
@@ -67,6 +73,13 @@ REF_MIN_MS = 2000
 REF_MAX_MS = 8000
 # Si una voz ocupa al menos esto del tramo, el tramo es de esa persona.
 DOMINANT_SHARE = 0.65
+# El texto final tiene que traer al menos esta parte de las palabras que
+# escuchó la separación de voces; si no, no es la reunión (repitió el prompt o
+# se salteó pedazos). Los dos modelos oyen el mismo audio: en una parte sana
+# coinciden bastante más que esto.
+MIN_AGREEMENT = 0.4
+# Con menos palabras separadas no hay con qué comparar.
+MIN_WORDS_TO_JUDGE = 6
 SPEAKER_COLORS = ["#6366f1", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6"]
 
 
@@ -105,6 +118,63 @@ def _coverage(sentence: str, candidate: str) -> float:
         return 0.0
     matcher = SequenceMatcher(None, a, b, autojunk=False)
     return sum(block.size for block in matcher.get_matching_blocks()) / len(a)
+
+
+def _voice_words(diarized: list[DiarSegment]) -> list[tuple[str, str, int]]:
+    """(palabra normalizada, hablante, ms) de cada palabra de la separación."""
+    out: list[tuple[str, str, int]] = []
+    for seg in diarized:
+        tokens = [token for token in (_normalize(t) for t in seg.text.split()) if token]
+        span = max(seg.end_ms - seg.start_ms, 1)
+        for index, token in enumerate(tokens):
+            out.append((token, seg.label, seg.start_ms + span * index // max(len(tokens), 1)))
+    return out
+
+
+def strip_prompt_echo(text: str, vocabulary: list[str] | None) -> str:
+    """Saca las oraciones que son el diccionario repetido, no algo que se dijo.
+
+    Con los nombres de la reunión como pista, gpt-4o-transcribe a veces
+    devuelve la pista ("Bau, Delfi, Bautista Goñi, Prueba.") en vez de la
+    reunión, o pegada adelante del texto.
+    """
+    known = {word for term in vocabulary or [] for word in _normalize(term).split()}
+    if not known:
+        return (text or "").strip()
+    kept = []
+    for sentence in _sentences(text or ""):
+        words = _normalize(sentence).split()
+        if words and all(word in known for word in words):
+            continue
+        kept.append(sentence)
+    return " ".join(kept).strip()
+
+
+def agreement(text: str, diarized: list[DiarSegment]) -> float:
+    """Qué parte de las palabras de la separación aparece en el texto final."""
+    voice = [word for word, _, _ in _voice_words(diarized)]
+    if len(voice) < MIN_WORDS_TO_JUDGE:
+        return 1.0
+    words = [word for word in (_normalize(token) for token in (text or "").split()) if word]
+    matcher = SequenceMatcher(None, words, voice, autojunk=False)
+    return sum(block.size for block in matcher.get_matching_blocks()) / len(voice)
+
+
+def fallback_pieces(
+    live: list[tuple[int, int, str]], diarized: list[DiarSegment], start_ms: int, end_ms: int
+) -> list[tuple[str | None, str, int, int]]:
+    """Una parte sin texto final confiable: el transcript en vivo con sus voces.
+
+    Sin transcript en vivo en esa parte, queda lo que escuchó la separación.
+    """
+    rows = [row for row in live if start_ms <= row[0] < end_ms]
+    if rows:
+        return [piece for pieces in assign_speakers(rows, diarized) for piece in pieces]
+    return [
+        (seg.label, seg.text.strip()[:1].upper() + seg.text.strip()[1:], seg.start_ms, max(seg.end_ms, seg.start_ms + 1))
+        for seg in diarized
+        if seg.text.strip()
+    ]
 
 
 def assign_speakers(
@@ -255,10 +325,13 @@ async def diarize_meeting(meeting_id: uuid.UUID) -> bool:
         vocabulary = await _vocabulary(db, meeting)
         language = meeting.language
 
+    live = await _live_rows(meeting_id)
+    total_ms = path.stat().st_size // BYTES_PER_MS
     known_labels = {voice.label for voice in known}
     diarized: list[DiarSegment] = []
     final: list[tuple[str | None, str, int, int]] = []
-    final_ok = True
+    any_final = False
+    errors: list[Exception] = []
     person_clips: dict[str, bytes] = {}
     people = 0
     with open(path, "rb") as handle:
@@ -266,6 +339,7 @@ async def diarize_meeting(meeting_id: uuid.UUID) -> bool:
             handle.seek(start)
             pcm = handle.read(end - start)
             part_offset_ms = start // BYTES_PER_MS
+            part_end_ms = end // BYTES_PER_MS
             references = [(voice.label, voice.wav) for voice in known]
             for label, clip in person_clips.items():
                 if len(references) >= MAX_REFERENCES:
@@ -273,7 +347,13 @@ async def diarize_meeting(meeting_id: uuid.UUID) -> bool:
                 references.append((label, clip))
             names = {name for name, _ in references}
             wav = pcm16_to_wav(pcm, 16000)
-            raw = await _diarize_part(config.api_key, wav, references)
+            # Una parte que falla no se lleva puestas a las demás.
+            try:
+                raw = await _diarize_part(config.api_key, wav, references)
+            except Exception as exc:  # noqa: BLE001 - esa parte queda sin voces
+                log.warning("separación de voces falló en una parte de %s: %s", meeting_id, exc)
+                errors.append(exc)
+                raw = []
 
             local: dict[str, str] = {}
             part: list[DiarSegment] = []
@@ -303,27 +383,68 @@ async def diarize_meeting(meeting_id: uuid.UUID) -> bool:
             diarized += part
 
             # El texto final de esta parte, escuchándola entera.
-            if final_ok:
-                try:
-                    text = await _transcribe_full(config.api_key, wav, language, vocabulary)
-                except Exception as exc:  # noqa: BLE001 - queda el transcript en vivo
-                    log.warning("transcripción final falló en %s: %s", meeting_id, exc)
-                    text = None
-                if text and part:
-                    final += merge_text_with_voices(text, part, part_offset_ms, end // BYTES_PER_MS)
-                elif text:
-                    final.append((None, text, part_offset_ms, end // BYTES_PER_MS))
-                else:
-                    final_ok = False
+            text = await _final_text(config.api_key, wav, language, vocabulary, part)
+            if text and part:
+                any_final = True
+                final += merge_text_with_voices(text, part, part_offset_ms, part_end_ms)
+            elif text:
+                any_final = True
+                final.append((None, text, part_offset_ms, part_end_ms))
+            else:
+                final += fallback_pieces(live, part, part_offset_ms, part_end_ms)
 
     if not diarized:
+        if errors:
+            raise errors[-1]
         return False
     voices = {voice.label: voice for voice in known if voice.label in known_labels}
-    if final_ok and final:
+    if (any_final or not live) and final:
+        # Lo dicho después del audio de trabajo (se grabó solo una parte con
+        # el bridge, o se retomó otro día) no está en el audio: se conserva.
+        final += [(None, text, start, end) for start, end, text in live if start >= total_ms]
         await _replace_transcript(meeting_id, final, voices)
     else:
         await _apply(meeting_id, diarized, voices)
     return True
+
+
+async def _live_rows(meeting_id: uuid.UUID) -> list[tuple[int, int, str]]:
+    """El transcript en vivo, para las partes sin texto final confiable."""
+    async with SessionLocal() as db:
+        rows = (
+            await db.execute(
+                select(TranscriptSegment.start_ms, TranscriptSegment.end_ms, TranscriptSegment.text)
+                .where(TranscriptSegment.meeting_id == meeting_id)
+                .order_by(TranscriptSegment.seq)
+            )
+        ).all()
+    return [(start, end, text) for start, end, text in rows if (text or "").strip()]
+
+
+async def _final_text(
+    api_key: str, wav: bytes, language: str | None, vocabulary: list[str], part: list[DiarSegment]
+) -> str | None:
+    """El texto final de una parte, o None si no se puede confiar en él.
+
+    Primero con el diccionario como pista. Si lo que vuelve no se parece a lo
+    que escuchó la separación (repitió la pista, se salteó pedazos) se pide
+    otra vez sin pista, que es cuando el modelo no tiene nada para repetir.
+    """
+    for terms in ([vocabulary, []] if vocabulary else [[]]):
+        try:
+            text = await _transcribe_full(api_key, wav, language, terms)
+        except Exception as exc:  # noqa: BLE001 - queda el transcript en vivo
+            log.warning("transcripción final falló: %s", exc)
+            continue
+        text = strip_prompt_echo(text or "", vocabulary)
+        if not text:
+            log.warning("transcripción final vacía o igual a la pista (pista=%s)", bool(terms))
+            continue
+        score = agreement(text, part)
+        if score >= MIN_AGREEMENT:
+            return text
+        log.warning("transcripción final descartada: coincide %.0f%% con la separación", score * 100)
+    return None
 
 
 def _part_ranges(handle, size: int) -> list[tuple[int, int]]:
@@ -411,13 +532,7 @@ def merge_text_with_voices(
     words = text.split()
     if not words:
         return []
-    voice_words: list[tuple[str, str, int]] = []  # (palabra normalizada, hablante, ms)
-    for seg in diarized:
-        tokens = [_normalize(token) for token in seg.text.split()]
-        tokens = [token for token in tokens if token]
-        span = max(seg.end_ms - seg.start_ms, 1)
-        for index, token in enumerate(tokens):
-            voice_words.append((token, seg.label, seg.start_ms + span * index // max(len(tokens), 1)))
+    voice_words = _voice_words(diarized)
 
     normalized = [_normalize(word) for word in words]
     owner: list[int | None] = [None] * len(words)
@@ -489,6 +604,14 @@ def merge_text_with_voices(
     # separación que no aparece en el texto final se agrega en su lugar. Solo
     # frases de verdad (3+ palabras, 1+ s): los pedacitos sueltos son donde la
     # separación inventa ("Perdón por interrumpir" en una corrida).
+    # Tampoco se agrega si el texto final ya dijo algo en ese momento, aunque
+    # con otras palabras: la separación oye peor, y en la reunión 89ddbc9d
+    # "Yo tengo que tener la compu ahí, prendida" quedaba duplicado con su
+    # versión mal oída, "Se supone que lo tengo apagado y prendida".
+    covered: dict[int, int] = defaultdict(int)
+    for value in owner:
+        if value is not None:
+            covered[value] += 1
     cursor = 0
     for seg in diarized:
         tokens = [token for token in (_normalize(t) for t in seg.text.split()) if token]
@@ -497,6 +620,8 @@ def merge_text_with_voices(
         if len(tokens) < 3 or seg.end_ms - seg.start_ms < 1000:
             continue
         if sum(1 for index in indexes if index in matched_voice) / len(tokens) >= 0.3:
+            continue
+        if sum(covered[index] for index in indexes) / len(tokens) >= 0.5:
             continue
         rescued = seg.text.strip()
         pieces.append([seg.label, rescued[:1].upper() + rescued[1:], max(seg.start_ms, part_start_ms), seg.start_ms])
@@ -631,6 +756,11 @@ async def _apply(meeting_id: uuid.UUID, diarized: list[DiarSegment], known: dict
 
 # ── Nombres con la IA ────────────────────────────────────────────
 
+
+def _mentioned(name: str, heard: set[str]) -> bool:
+    """Alguna palabra del nombre (de 3+ letras) se dijo en la reunión."""
+    return any(len(word) >= 3 and word in heard for word in _normalize(name).split())
+
 NAMING_SYSTEM = """Identificás a las personas que hablan en la transcripción de una reunión de un colegio.
 Usá solo lo que surge de la conversación y del contexto. Nunca inventes nombres: si nadie dice
 cómo se llama una persona y no es inequívoco por el contexto, dejá "name" en null.
@@ -693,6 +823,8 @@ async def name_speakers(meeting_id: uuid.UUID, provider) -> int:
         if named:
             context.append("; ".join(named))
 
+        heard = set(_normalize(" ".join(seg.text for seg in segments)).split())
+
         blocks = []
         for speaker in pending:
             lines = [seg.text for seg in segments if seg.speaker_id == speaker.id][:14]
@@ -728,6 +860,12 @@ async def name_speakers(meeting_id: uuid.UUID, provider) -> int:
             shown = f"{name} ({role})" if name and role else (name or role)
             if not shown:
                 continue
+            if name and not _mentioned(name, heard):
+                # Nadie dijo ese nombre: la IA lo sacó de la lista de
+                # participantes, y adivinar quién es quién sale cruzado (reunión
+                # 89ddbc9d: puso "Bau" a la voz de Delfi). Queda como sugerencia
+                # para que la persona lo confirme con un toque.
+                confidence = min(confidence, 0.74)
             if confidence >= 0.75:
                 speaker.display_name = shown[:200]
                 count += 1

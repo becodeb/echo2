@@ -11,7 +11,7 @@ Cada familia de modelos pide cosas distintas (verificado contra la API):
 - *-transcribe-diarize: `diarized_json`, con frases, tiempos y hablante. NO
   aceptan prompt (400) ni idioma, así que el diccionario no llega.
 
-Por eso el default de OpenAI usa dos modelos: en vivo (tramos de ~6 s) el que
+Por eso el default de OpenAI usa dos modelos: en vivo (tramos de 4 a 12 s, cortados en las pausas) el que
 mejor transcribe y respeta el diccionario, y para un archivo entero el que
 separa hablantes, que solo es consistente cuando ve todo el audio junto.
 """

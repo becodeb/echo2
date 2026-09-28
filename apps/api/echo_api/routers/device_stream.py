@@ -27,6 +27,8 @@ from ..services.background import spawn
 from ..services.insights_live import maybe_extract_live_insights
 from ..services.live_bus import live_bus
 from ..services.stt import get_stt_provider
+from ..services.stt.channels import is_noise_transcript, is_prompt_echo, is_silent, strip_hallucinations
+from ..services.stt.windowing import find_cut
 
 log = logging.getLogger("echo.device")
 
@@ -153,15 +155,19 @@ async def device_stream(websocket: WebSocket):
     channel = str(meeting.id)
     segments_since_insights = 0
 
-    async def flush():
+    async def flush(upto: int | None = None):
         nonlocal audio_buffer, stream_offset_ms, segments_since_insights
         if not audio_buffer:
             return
-        chunk = bytes(audio_buffer)
-        audio_buffer = bytearray()
+        cut = len(audio_buffer) if upto is None else upto
+        chunk = bytes(audio_buffer[:cut])
+        audio_buffer = audio_buffer[cut:]
         duration_ms = int(len(chunk) / 2 / sample_rate * 1000)
         offset = stream_offset_ms
         stream_offset_ms += duration_ms
+        if is_silent(chunk, sample_rate):
+            del chunk
+            return
         try:
             result = await provider.transcribe_chunk(
                 chunk, sample_rate, meeting.language, vocabulary, offset_ms=offset
@@ -172,11 +178,11 @@ async def device_stream(websocket: WebSocket):
         finally:
             del chunk
         for seg in result.segments:
-            if not seg.text.strip():
+            # Los mismos filtros que el vivo de la web.
+            text = strip_hallucinations(seg.text)
+            if not text or is_prompt_echo(text, vocabulary) or is_noise_transcript(text, meeting.language):
                 continue
-            event = await _store_segment(
-                meeting, seg.text.strip(), seg.start_ms, seg.end_ms, seg.confidence, "device"
-            )
+            event = await _store_segment(meeting, text, seg.start_ms, seg.end_ms, seg.confidence, "device")
             await live_bus.publish(channel, event)
             segments_since_insights += 1
         if segments_since_insights >= 8:
@@ -190,8 +196,11 @@ async def device_stream(websocket: WebSocket):
                 break
             if message.get("bytes") is not None:
                 audio_buffer.extend(message["bytes"])
-                if len(audio_buffer) >= sample_rate * 2 * 6:
-                    await flush()
+                # Cortes en las pausas, como el WebSocket de la web: el corte
+                # fijo cada 6 s partía palabras al medio y el modelo las perdía.
+                cut = find_cut(bytes(audio_buffer), sample_rate)
+                if cut:
+                    await flush(upto=cut)
             elif message.get("text"):
                 with contextlib.suppress(json.JSONDecodeError):
                     data = json.loads(message["text"])

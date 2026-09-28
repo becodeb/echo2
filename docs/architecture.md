@@ -22,7 +22,7 @@ es un CLI, el WAV temporal se borra al instante (NamedTempFile).
 
 **Modo cloud (fallback):**
 ```
-mic → PCM16 → wss API → buffer RAM (ventana 6 s) → provider STT → texto → DB
+mic → PCM16 → wss API → buffer RAM (tramos de 4-12 s, cortados en pausas) → provider STT → texto → DB
                                    └── chunk descartado tras transcribir
 ```
 

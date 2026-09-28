@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, getAccessToken, wsUrl } from "../api/client";
+import { api, getAccessToken, refreshAccessToken, wsUrl } from "../api/client";
 import type { LiveEvent, MeetingOut, RecordingState } from "../api/types";
 import { MicrophoneSource, SystemAudioSource, listMicrophones, type AudioSource } from "../lib/audio";
 import { BridgeSttSession, checkBridge, type BridgeHealth } from "../lib/bridge";
@@ -24,6 +24,12 @@ type EngineMode = "bridge" | "cloud";
 // Sin frames durante este tiempo = el sistema cortó el micrófono. El worklet
 // manda frames también en silencio, así que un silencio de la sala no cuenta.
 const STALL_MS = 4000;
+// Audio y texto que se guardan mientras se reconecta con el servidor y se
+// mandan al volver (5 min de frames de 100 ms). Antes se tiraban: faltaban
+// en el transcript y también en el audio de la transcripción final.
+const MAX_PENDING_SENDS = 3000;
+// Tope para esperar que el servidor transcriba lo último al finalizar.
+const FLUSH_TIMEOUT_MS = 20000;
 
 /** Web app agregada a la pantalla de inicio del iPhone/iPad. Ahí iOS corta el
  *  micrófono al bloquear la pantalla o cambiar de app (en Safari no): la web
@@ -91,6 +97,9 @@ export default function MeetingLive() {
   const startedAtMs = useRef<number>(0);
   const recordingRef = useRef(false);
   const reconnectTimer = useRef<number | null>(null);
+  const pendingSends = useRef<(ArrayBuffer | string)[]>([]);
+  const flushWaiter = useRef<(() => void) | null>(null);
+  const openWsRef = useRef<(() => Promise<WebSocket>) | null>(null);
   // Mientras arranca (pedir el micrófono puede tardar) no se puede arrancar
   // otra vez: cada arranque abría otro micrófono y el audio se mezclaba.
   const startingRef = useRef(false);
@@ -231,6 +240,9 @@ export default function MeetingLive() {
         case "warning":
           setWarning(event.message);
           break;
+        case "flushed":
+          flushWaiter.current?.();
+          break;
         case "error":
           setError(event.message);
           break;
@@ -240,6 +252,37 @@ export default function MeetingLive() {
   );
 
   const bridgeMode = engine === "bridge" && !!bridge && bridge !== "checking" && bridge.engine.available;
+
+  /** Manda al servidor, o lo guarda para cuando vuelva la conexión. */
+  const sendOrQueue = useCallback((data: ArrayBuffer | string) => {
+    const socket = wsRef.current;
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(data);
+      return;
+    }
+    const pending = pendingSends.current;
+    pending.push(data);
+    if (pending.length > MAX_PENDING_SENDS) pending.splice(0, pending.length - MAX_PENDING_SENDS);
+  }, []);
+
+  /** Reconexión mientras se graba, sin tope de intentos. Antes, si el primer
+   *  reintento fallaba no había otro: la pantalla seguía en "Grabando" y todo
+   *  lo que se decía después se perdía. */
+  const scheduleReconnect = useCallback((attempt: number) => {
+    if (!recordingRef.current || reconnectTimer.current != null) return;
+    const delay = Math.min(1500 * 2 ** attempt, 15000);
+    reconnectTimer.current = window.setTimeout(async () => {
+      reconnectTimer.current = null;
+      if (!recordingRef.current || wsRef.current || !openWsRef.current) return;
+      // El access token dura 15 minutos y el WebSocket no lo renueva solo.
+      await refreshAccessToken().catch(() => false);
+      try {
+        wsRef.current = await openWsRef.current();
+      } catch {
+        scheduleReconnect(attempt + 1);
+      }
+    }, delay);
+  }, []);
 
   const openWs = useCallback((): Promise<WebSocket> => {
     return new Promise((resolve, reject) => {
@@ -261,6 +304,11 @@ export default function MeetingLive() {
             transcribe: !bridgeMode,
           }),
         );
+        wsRef.current = socket;
+        // Lo que se juntó mientras no había conexión, en orden.
+        const pending = pendingSends.current;
+        pendingSends.current = [];
+        for (const data of pending) socket.send(data);
         setWsConnected(true);
         resolve(socket);
       };
@@ -273,6 +321,8 @@ export default function MeetingLive() {
       };
       socket.onerror = () => reject(new Error("No se pudo conectar al servidor"));
       socket.onclose = (event) => {
+        // Si nunca abrió, el intento falló (el que lo pidió reintenta).
+        reject(new Error("No se pudo conectar al servidor"));
         // Una conexión vieja que se cierra no toca a la actual.
         if (wsRef.current !== socket) return;
         setWsConnected(false);
@@ -288,19 +338,36 @@ export default function MeetingLive() {
           return;
         }
         // reconexión con backoff mientras se graba (transcript confirmado nunca se pierde)
-        if (recordingRef.current && reconnectTimer.current == null) {
-          reconnectTimer.current = window.setTimeout(() => {
-            reconnectTimer.current = null;
-            openWs()
-              .then((ws) => {
-                wsRef.current = ws;
-              })
-              .catch(() => {});
-          }, 1500);
-        }
+        scheduleReconnect(0);
       };
     });
-  }, [id, handleLiveEvent, captureSystem, bridgeMode]);
+  }, [id, handleLiveEvent, captureSystem, bridgeMode, scheduleReconnect]);
+
+  useEffect(() => {
+    openWsRef.current = openWs;
+  }, [openWs]);
+
+  /** Espera a que el servidor transcriba lo último (y lo guarde) antes de
+   *  seguir. Si se estaba reconectando, espera la conexión: el audio pendiente
+   *  viaja con ella. */
+  const flushAndWait = useCallback(async () => {
+    const deadline = Date.now() + FLUSH_TIMEOUT_MS;
+    while (wsRef.current?.readyState !== WebSocket.OPEN && Date.now() < deadline && recordingRef.current) {
+      await new Promise((resolve) => window.setTimeout(resolve, 250));
+    }
+    const socket = wsRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    await new Promise<void>((resolve) => {
+      const done = () => {
+        window.clearTimeout(timer);
+        flushWaiter.current = null;
+        resolve();
+      };
+      const timer = window.setTimeout(done, Math.max(0, deadline - Date.now()));
+      flushWaiter.current = done;
+      socket.send(JSON.stringify({ type: "flush" }));
+    });
+  }, []);
 
   const start = useCallback(async () => {
     if (!id || startingRef.current) return;
@@ -318,7 +385,11 @@ export default function MeetingLive() {
       wsRef.current = ws;
 
       const source: AudioSource = captureSystem
-        ? new SystemAudioSource(deviceId || undefined)
+        ? new SystemAudioSource(deviceId || undefined, () =>
+            setWarning(
+              "Se dejó de compartir el audio de la pestaña: ya no se escucha a quienes están del otro lado. Pausá y reanudá para volver a compartirlo.",
+            ),
+          )
         : new MicrophoneSource(deviceId || undefined);
       audioRef.current = source;
       if (deviceId) localStorage.setItem("echo_pref_mic", deviceId);
@@ -352,10 +423,7 @@ export default function MeetingLive() {
           if (!recordingOnRef.current) return;
         }
         // MODO CLOUD: audio → servidor (RAM) → provider STT → texto
-        const socket = wsRef.current;
-        if (socket && socket.readyState === WebSocket.OPEN) {
-          socket.send(frame.buffer);
-        }
+        sendOrQueue(frame.buffer as ArrayBuffer);
       };
       frameHandlerRef.current = onFrame;
       lastFrameAt.current = Date.now();
@@ -368,8 +436,9 @@ export default function MeetingLive() {
           meeting?.language ?? "es",
           (bridgeEvent) => {
             const socket = wsRef.current;
-            if (!socket || socket.readyState !== WebSocket.OPEN) return;
             if (bridgeEvent.type === "partial" && bridgeEvent.text) {
+              // Lo efímero no se guarda para después.
+              if (!socket || socket.readyState !== WebSocket.OPEN) return;
               socket.send(
                 JSON.stringify({
                   type: "partial",
@@ -379,7 +448,7 @@ export default function MeetingLive() {
                 }),
               );
             } else if (bridgeEvent.type === "final" && bridgeEvent.text) {
-              socket.send(
+              sendOrQueue(
                 JSON.stringify({
                   type: "segment",
                   text: bridgeEvent.text,
@@ -414,7 +483,7 @@ export default function MeetingLive() {
       startingRef.current = false;
       setStarting(false);
     }
-  }, [id, engine, bridge, deviceId, captureSystem, meeting?.language, lines, openWs]);
+  }, [id, engine, bridge, deviceId, captureSystem, meeting?.language, lines, openWs, sendOrQueue]);
 
   const pause = useCallback(async () => {
     if (!id) return;
@@ -426,10 +495,10 @@ export default function MeetingLive() {
       interruptedAt.current = null;
     }
     bridgeRef.current?.flush();
-    wsRef.current?.send(JSON.stringify({ type: "flush" }));
+    sendOrQueue(JSON.stringify({ type: "flush" }));
     await api(`/api/meetings/${id}/pause`, { method: "POST" }).catch(() => {});
     setPaused(true);
-  }, [id]);
+  }, [id, sendOrQueue]);
 
   const resume = useCallback(async () => {
     await start();
@@ -526,21 +595,24 @@ export default function MeetingLive() {
 
   const finish = useCallback(async () => {
     if (!id) return;
-    recordingRef.current = false;
     await audioRef.current?.stop().catch(() => {});
     audioRef.current = null;
-    bridgeRef.current?.flush();
+    setProcessing({ stage: "queued", progress: 0 });
+    // Lo último que se dijo tiene que estar transcripto (y el audio en disco)
+    // antes de pedir el acta: si no, el procesamiento arrancaba sin el último
+    // tramo. Primero el bridge, que manda su texto por este mismo WebSocket.
+    await bridgeRef.current?.flushAndWait();
     bridgeRef.current?.close();
     bridgeRef.current = null;
-    wsRef.current?.send(JSON.stringify({ type: "flush" }));
-    setProcessing({ stage: "queued", progress: 0 });
+    await flushAndWait();
+    recordingRef.current = false;
     try {
       await api(`/api/meetings/${id}/finish`, { method: "POST" });
     } catch (err) {
       setProcessing(null);
       setError(err instanceof Error ? err.message : "No se pudo finalizar");
     }
-  }, [id]);
+  }, [id, flushAndWait]);
 
   // Mientras procesa, además del aviso en vivo se pregunta al servidor: si la
   // conexión se cortó justo, la pantalla se quedaba esperando para siempre.
@@ -690,6 +762,15 @@ export default function MeetingLive() {
         {paused && (
           <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-600">
             En pausa
+          </span>
+        )}
+        {recording && !wsConnected && (
+          // En el celular el panel lateral no se ve: el aviso va acá arriba.
+          <span
+            className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700"
+            title="El audio se guarda y se manda al volver la conexión"
+          >
+            Reconectando…
           </span>
         )}
         {recording && recordingOn && (
