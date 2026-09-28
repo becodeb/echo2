@@ -240,3 +240,33 @@ def test_export_minutes_formats(client, fake_ai):
         assert response.status_code == 200, f"export {fmt}: {response.text[:100]}"
         assert content_type in response.headers["content-type"]
         assert len(response.content) > 50
+
+
+def test_exports_need_auth_headers(client):
+    """La web baja los exports con fetch + headers (apiDownload): un link
+    directo no lleva token ni organización y el API lo rechaza."""
+    user = EchoTestUser(client, name="Exporta Web", org_name="Org Export Web")
+    created = client.post("/api/meetings", json={"title": "Acta a mano"}, headers=user.headers)
+    meeting_id = created.json()["id"]
+    saved = client.post(
+        f"/api/meetings/{meeting_id}/minutes/versions",
+        json={"body_markdown": "# Acta\n\n## Decisiones\n\n- Exportar con headers.\n"},
+        headers=user.headers,
+    )
+    assert saved.status_code == 200, saved.text
+
+    for path, content_type in [
+        ("minutes.pdf", "application/pdf"),
+        ("minutes.docx", "officedocument"),
+        ("minutes.md", "text/markdown"),
+        ("transcript.md", "text/markdown"),
+    ]:
+        url = f"/api/meetings/{meeting_id}/export/{path}"
+        # Lo que mandaba el <a href>: sin Authorization ni X-Organization-Id.
+        bare = client.get(url)
+        assert bare.status_code == 401, f"{path} sin headers: {bare.status_code}"
+
+        response = client.get(url, headers=user.headers)
+        assert response.status_code == 200, f"{path}: {response.text[:100]}"
+        assert content_type in response.headers["content-type"]
+        assert "attachment; filename=" in response.headers["content-disposition"]
