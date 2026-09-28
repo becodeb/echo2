@@ -128,7 +128,9 @@ export async function apiDownload(path: string, fallbackName: string, retry = tr
   }
   const disposition = response.headers.get("content-disposition") ?? "";
   const match = /filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i.exec(disposition);
-  const name = match ? decodeURIComponent(match[1] ?? match[2]) : fallbackName;
+  // Solo filename* viene percent-encoded; el filename="…" plano va tal cual
+  // (un título con "%" hacía tirar a decodeURIComponent).
+  const name = match ? (match[1] != null ? decodeURIComponent(match[1]) : match[2]) : fallbackName;
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");
   link.href = url;

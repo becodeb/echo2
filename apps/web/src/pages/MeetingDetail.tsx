@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "../api/client";
+import { api, apiDownload } from "../api/client";
 import type { AdminOrgOut, ChatOut, InsightsOut, MeetingOut, MinutesOut, SegmentOut } from "../api/types";
 import { useAuth } from "../state/auth";
 import { Badge, Button, Card, EmptyState, Input, Modal, Spinner, formatDate, formatDuration, formatMs } from "../components/ui";
@@ -467,6 +467,11 @@ function TranscriptTab({
     }
   }, [jumpMs, pages]);
 
+  const exportMd = useMutation({
+    mutationFn: () =>
+      apiDownload(`/api/meetings/${meeting.id}/export/transcript.md`, `transcript-${meeting.title}.md`),
+  });
+
   const saveEdit = useMutation({
     mutationFn: () =>
       api<SegmentOut>(`/api/meetings/${meeting.id}/transcript/${editing!.id}`, {
@@ -491,13 +496,20 @@ function TranscriptTab({
         {lowConfidence > 0 && (
           <Badge tone="amber">{lowConfidence} fragmentos podrían necesitar revisión</Badge>
         )}
-        <div className="ml-auto flex gap-2">
-          <a
-            href={`/api/meetings/${meeting.id}/export/transcript.md`}
-            className="text-xs font-medium text-accent-600 hover:underline"
+        <div className="ml-auto flex items-center gap-2">
+          {exportMd.isError && (
+            <span className="text-xs text-red-600">
+              {exportMd.error instanceof Error ? exportMd.error.message : "No se pudo exportar"}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => exportMd.mutate()}
+            disabled={exportMd.isPending}
+            className="text-xs font-medium text-accent-600 hover:underline disabled:opacity-50"
           >
             Exportar .md
-          </a>
+          </button>
         </div>
       </div>
 
@@ -671,6 +683,13 @@ function MinutesTab({ meetingId }: { meetingId: string }) {
     },
   });
 
+  // Un link directo al export no lleva el token ni la organización: el API
+  // respondía 401. Se baja con fetch y el archivo se arma en el navegador.
+  const exportMinutes = useMutation({
+    mutationFn: (fmt: "pdf" | "docx" | "md") =>
+      apiDownload(`/api/meetings/${meetingId}/export/minutes.${fmt}`, `acta.${fmt}`),
+  });
+
   const changeStatus = useMutation({
     mutationFn: (status: string) =>
       api(`/api/meetings/${meetingId}/minutes/status`, {
@@ -838,19 +857,24 @@ function MinutesTab({ meetingId }: { meetingId: string }) {
               <Button variant="soft" onClick={() => regenerate.mutate()} disabled={regenerate.isPending}>
                 Regenerar
               </Button>
-              <a href={`/api/meetings/${meetingId}/export/minutes.pdf`}>
-                <Button variant="ghost">PDF</Button>
-              </a>
-              <a href={`/api/meetings/${meetingId}/export/minutes.docx`}>
-                <Button variant="ghost">DOCX</Button>
-              </a>
-              <a href={`/api/meetings/${meetingId}/export/minutes.md`}>
-                <Button variant="ghost">MD</Button>
-              </a>
+              <Button variant="ghost" onClick={() => exportMinutes.mutate("pdf")} disabled={exportMinutes.isPending}>
+                PDF
+              </Button>
+              <Button variant="ghost" onClick={() => exportMinutes.mutate("docx")} disabled={exportMinutes.isPending}>
+                DOCX
+              </Button>
+              <Button variant="ghost" onClick={() => exportMinutes.mutate("md")} disabled={exportMinutes.isPending}>
+                MD
+              </Button>
             </>
           )}
         </div>
       </div>
+      {exportMinutes.isError && (
+        <p className="text-sm text-red-600">
+          {exportMinutes.error instanceof Error ? exportMinutes.error.message : "No se pudo exportar el acta"}
+        </p>
+      )}
 
       {weak.length > 0 && !editing && (
         <Card className="border-amber-200 bg-amber-50/50">
