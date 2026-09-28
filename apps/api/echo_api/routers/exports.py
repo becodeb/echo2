@@ -1,6 +1,8 @@
 """Exportaciones: acta y transcript en Markdown, TXT, DOCX y PDF."""
 import io
+import unicodedata
 import uuid
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
@@ -13,6 +15,20 @@ from ..models import Minutes, MinutesVersion
 from ..services.transcript_util import format_ms, load_transcript_lines
 
 router = APIRouter(prefix="/api/meetings/{meeting_id}/export", tags=["exports"])
+
+
+def _attachment(name: str) -> dict[str, str]:
+    """Content-Disposition para bajar `name` como archivo.
+
+    Los headers viajan en latin-1: un título con "—" o comillas tipográficas
+    hacía explotar la respuesta con un 500. El nombre real va en filename*
+    (UTF-8, RFC 5987) y filename queda como respaldo solo ASCII.
+    """
+    ascii_name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+    ascii_name = ascii_name.replace('"', "").replace("\\", "") or "export"
+    return {
+        "Content-Disposition": f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(name, safe='')}"
+    }
 
 
 async def _get_minutes_markdown(db: AsyncSession, meeting_id: uuid.UUID) -> str:
@@ -165,26 +181,26 @@ async def export_minutes(
     if fmt == "md":
         return Response(
             markdown, media_type="text/markdown; charset=utf-8",
-            headers={"Content-Disposition": f'attachment; filename="{filename}.md"'},
+            headers=_attachment(f"{filename}.md"),
         )
     if fmt == "txt":
         plain = markdown.replace("#", "").replace("**", "").replace("|", "  ")
         return Response(
             plain, media_type="text/plain; charset=utf-8",
-            headers={"Content-Disposition": f'attachment; filename="{filename}.txt"'},
+            headers=_attachment(f"{filename}.txt"),
         )
     if fmt == "docx":
         blob = _markdown_to_docx(markdown, meeting.title)
         return Response(
             blob,
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            headers={"Content-Disposition": f'attachment; filename="{filename}.docx"'},
+            headers=_attachment(f"{filename}.docx"),
         )
     if fmt == "pdf":
         blob = _markdown_to_pdf(markdown, meeting.title)
         return Response(
             blob, media_type="application/pdf",
-            headers={"Content-Disposition": f'attachment; filename="{filename}.pdf"'},
+            headers=_attachment(f"{filename}.pdf"),
         )
     raise HTTPException(status.HTTP_400_BAD_REQUEST, "Formato no soportado (md|txt|docx|pdf)")
 
@@ -206,7 +222,7 @@ async def export_transcript(
         )
         return Response(
             body, media_type="text/markdown; charset=utf-8",
-            headers={"Content-Disposition": f'attachment; filename="{filename}.md"'},
+            headers=_attachment(f"{filename}.md"),
         )
     if fmt == "txt":
         body = "\n".join(
@@ -214,6 +230,6 @@ async def export_transcript(
         )
         return Response(
             body, media_type="text/plain; charset=utf-8",
-            headers={"Content-Disposition": f'attachment; filename="{filename}.txt"'},
+            headers=_attachment(f"{filename}.txt"),
         )
     raise HTTPException(status.HTTP_400_BAD_REQUEST, "Formato no soportado (md|txt)")

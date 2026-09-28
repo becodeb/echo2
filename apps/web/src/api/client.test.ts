@@ -102,6 +102,18 @@ describe("apiDownload (exportar acta y transcript)", () => {
     expect(links.map((link) => link.download)).toEqual(["acta-—.docx", "acta.docx"]);
   });
 
+  it("prefiere filename* aunque venga después del respaldo ASCII", async () => {
+    const client = await loadClient();
+    client.setAccessToken("tok-1");
+    fetchMock.mockResolvedValueOnce(
+      fileResponse("x", "attachment; filename=\"acta-Reunion--equipo.pdf\"; filename*=UTF-8''acta-Reuni%C3%B3n-%E2%80%94-equipo.pdf"),
+    );
+
+    await client.apiDownload("/api/meetings/m1/export/minutes.pdf", "acta.pdf");
+
+    expect(links[0].download).toBe("acta-Reunión-—-equipo.pdf");
+  });
+
   it("si el API rechaza, tira ApiError con el detalle y no baja nada", async () => {
     const client = await loadClient();
     client.setAccessToken("tok-1");

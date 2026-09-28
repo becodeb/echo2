@@ -270,3 +270,37 @@ def test_exports_need_auth_headers(client):
         assert response.status_code == 200, f"{path}: {response.text[:100]}"
         assert content_type in response.headers["content-type"]
         assert "attachment; filename=" in response.headers["content-disposition"]
+
+
+def test_exports_with_non_latin1_title(client):
+    """Un título con "—" o comillas tipográficas no entra en un header latin-1:
+    antes el export respondía 500. Ahora el nombre va en filename* (UTF-8)."""
+    from urllib.parse import unquote
+
+    user = EchoTestUser(client, name="Exporta Unicode", org_name="Org Export Unicode")
+    title = "Reunión — equipo “A”"
+    created = client.post("/api/meetings", json={"title": title}, headers=user.headers)
+    meeting_id = created.json()["id"]
+    saved = client.post(
+        f"/api/meetings/{meeting_id}/minutes/versions",
+        json={"body_markdown": "# Acta\n\n- Algo.\n"},
+        headers=user.headers,
+    )
+    assert saved.status_code == 200, saved.text
+
+    for prefix, path in [
+        ("acta", "minutes.md"),
+        ("acta", "minutes.txt"),
+        ("acta", "minutes.docx"),
+        ("acta", "minutes.pdf"),
+        ("transcript", "transcript.md"),
+        ("transcript", "transcript.txt"),
+    ]:
+        response = client.get(f"/api/meetings/{meeting_id}/export/{path}", headers=user.headers)
+        assert response.status_code == 200, f"{path}: {response.status_code}"
+        disposition = response.headers["content-disposition"]
+        extension = path.rsplit(".", 1)[1]
+        # Respaldo ASCII para clientes viejos, sin comillas que rompan el header.
+        assert 'filename="' + f'{prefix}-Reunion--equipo-A.{extension}"' in disposition
+        encoded = disposition.split("filename*=UTF-8''", 1)[1]
+        assert unquote(encoded) == f"{prefix}-{title.replace(' ', '-')}.{extension}"
