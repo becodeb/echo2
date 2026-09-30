@@ -132,7 +132,7 @@ async def my_billing(ctx: OrgContext = Depends(get_org_context), db: AsyncSessio
             minutes=llm is not None,
             tasks=llm is not None,
             chat=llm is not None and embeddings is not None,
-            voice=bool(user_plan and (user_plan.features or {}).get("voice")),
+            voice=ctx.user.is_superadmin or bool(user_plan and (user_plan.features or {}).get("voice")),
         ),
         plans=[
             PublicPlanOut(

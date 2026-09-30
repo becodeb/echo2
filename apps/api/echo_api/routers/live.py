@@ -41,13 +41,14 @@ from ..db import SessionLocal
 from ..deps import user_can_access_meeting
 from ..models import Meeting, OrganizationMember, TranscriptSegment, User
 from ..security import decode_token
-from ..services.ai_settings import get_vocabulary, resolve_stt
+from ..services.ai_settings import get_vocabulary, resolve_stt, stt_fallbacks
 from ..services.background import spawn
 from ..services.insights_live import maybe_extract_live_insights
 from ..services.live_bus import live_bus
 from ..services.plans import record_usage, stt_cost
 from ..services.recording import PcmWriter, is_enabled, pcm_path, update_state
 from ..services.stt import get_stt_provider
+from ..services.stt.base import FallbackSttProvider
 from ..services.stt.windowing import find_cut
 from ..services.stt.channels import (
     attribute_speaker,
@@ -101,6 +102,13 @@ async def _authorize(websocket: WebSocket, meeting_id: uuid.UUID) -> tuple[Meeti
                 )
             )
         ).scalar_one_or_none()
+        if not member and user.is_superadmin:
+            # Igual que el REST (deps.get_org_context): un superadmin entra a
+            # cualquier sede como owner sin ser miembro. Sin esto, desde la
+            # sede que visitaba no podía grabar: "No se pudo conectar".
+            member = OrganizationMember(
+                organization_id=meeting.organization_id, user_id=user.id, role="owner"
+            )
         if not member:
             await websocket.close(code=4403, reason="Sin acceso")
             return None
@@ -389,7 +397,11 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
                             )
                         )
                         continue
-                    stt_provider = get_stt_provider(config.provider, config.api_key, config.model)
+                    # Con respaldo: si Groq se cae, el tramo va a OpenAI.
+                    chain = [
+                        get_stt_provider(c.provider, c.api_key, c.model) for c in [config, *stt_fallbacks(config)]
+                    ]
+                    stt_provider = chain[0] if len(chain) == 1 else FallbackSttProvider(chain)
                 audio_buffer.extend(message["bytes"])
                 cut = find_cut(bytes(audio_buffer), sample_rate, channels)
                 if cut:

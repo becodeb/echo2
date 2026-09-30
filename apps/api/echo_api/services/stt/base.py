@@ -91,6 +91,46 @@ class TranscriptionProvider:
         raise NotImplementedError
 
 
+class FallbackSttProvider(TranscriptionProvider):
+    """Prueba motores en orden: si uno falla (caído, sin cuota, 5xx), el tramo
+    va al siguiente en vez de perderse. `name` y `model` quedan con los del
+    último que respondió, para anotar el consumo al proveedor correcto."""
+
+    def __init__(self, providers: list[TranscriptionProvider]):
+        if not providers:
+            raise ValueError("Hace falta al menos un motor")
+        self.providers = providers
+        self.name = providers[0].name
+        self.model = getattr(providers[0], "model", None)
+
+    async def _each(self, call):
+        import logging
+
+        last: Exception | None = None
+        for index, provider in enumerate(self.providers):
+            try:
+                result = await call(provider)
+            except Exception as exc:  # noqa: BLE001 - se prueba el siguiente
+                last = exc
+                logging.getLogger("echo.stt").warning(
+                    "stt %s falló: %s; %s", provider.name, str(exc)[:200],
+                    "pruebo el siguiente" if index + 1 < len(self.providers) else "no quedan más",
+                )
+                continue
+            self.name = provider.name
+            self.model = getattr(provider, "model", None)
+            return result
+        raise last  # type: ignore[misc]
+
+    async def transcribe_chunk(self, pcm16, sample_rate, language, vocabulary=None, offset_ms=0, context=None):
+        return await self._each(
+            lambda p: p.transcribe_chunk(pcm16, sample_rate, language, vocabulary, offset_ms=offset_ms)
+        )
+
+    async def transcribe_file(self, data, filename, language, vocabulary=None):
+        return await self._each(lambda p: p.transcribe_file(data, filename, language, vocabulary))
+
+
 # Límite de pedidos (429): Groq gratis deja 20 por minuto, y una reunión en
 # vivo manda uno cada 4-12 s. Se espera lo que dice la API y se reintenta;
 # sin esto el tramo se perdía.

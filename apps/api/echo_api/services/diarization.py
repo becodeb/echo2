@@ -57,7 +57,16 @@ from ..models import (
 from . import plans
 from .ai_settings import get_vocabulary, resolve_stt
 from .recording import pcm_path, recordings_dir
-from .stt.base import GROQ_MODEL, SCRIBE_MODEL, SttResult, SttSegment, SttWord, get_stt_provider, pcm16_to_wav
+from .stt.base import (
+    GROQ_MODEL,
+    SCRIBE_MODEL,
+    FallbackSttProvider,
+    SttResult,
+    SttSegment,
+    SttWord,
+    get_stt_provider,
+    pcm16_to_wav,
+)
 from .stt.channels import (
     MIC_SPEAKER,
     SYSTEM_SPEAKER,
@@ -239,8 +248,13 @@ def _part_ranges(handle, size: int) -> list[tuple[int, int]]:
 
 
 async def _groq_rows(path: Path, api_key: str, language: str | None, vocabulary: list[str]) -> list[Row]:
-    """Texto sin personas de la reunión entera, parte por parte."""
+    """Texto sin personas de la reunión entera, parte por parte.
+
+    Si Groq se cae, la parte va a OpenAI (si hay key) en vez de perderse.
+    """
     provider = get_stt_provider("groq", api_key)
+    if get_settings().openai_api_key:
+        provider = FallbackSttProvider([provider, get_stt_provider("openai", get_settings().openai_api_key)])
     rows: list[Row] = []
     with open(path, "rb") as handle:
         for start, end in _part_ranges(handle, path.stat().st_size):

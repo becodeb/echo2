@@ -284,7 +284,12 @@ export default function MeetingLive() {
     }, delay);
   }, []);
 
-  const openWs = useCallback((): Promise<WebSocket> => {
+  const openWs = useCallback(async (): Promise<WebSocket> => {
+    // El WebSocket no puede renovar la sesión por su cuenta: el token de
+    // acceso dura 15 minutos y con la pantalla abierta un rato el servidor lo
+    // rechazaba ("No se pudo conectar al servidor"). Un pedido común antes de
+    // abrirlo lo renueva si hace falta.
+    if (id) await api(`/api/meetings/${id}`).catch(() => undefined);
     return new Promise((resolve, reject) => {
       const token = getAccessToken();
       if (!token || !id) return reject(new Error("Sesión inválida"));

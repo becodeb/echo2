@@ -36,6 +36,9 @@ async def _agent_id(db: AsyncSession) -> str | None:
 
 async def voice_allowance(db: AsyncSession, user: User) -> tuple[bool, float | None, float]:
     """(tiene voz, segundos del mes (None = sin tope), segundos usados)."""
+    if user.is_superadmin:
+        # Las cuentas de Becode tienen todo habilitado, sin tope.
+        return True, None, (await plans.month_usage(db, user.id)).voice_seconds
     plan = (await db.execute(select(BillingPlan).where(BillingPlan.code == user.plan))).scalar_one_or_none()
     if plan is None or not (plan.features or {}).get("voice"):
         return False, None, 0.0

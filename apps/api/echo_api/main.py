@@ -120,6 +120,34 @@ async def _start_recordings_cleanup() -> None:
 
 
 @app.on_event("startup")
+async def _ensure_voice_agent() -> None:
+    """Crea el agente de voz la primera vez que hay key de ElevenLabs y todavía
+    no existe (services/voice_agent.py). Si falla, se puede crear desde el panel."""
+    from sqlalchemy import select
+
+    from .db import SessionLocal
+    from .models import ServerAISettings
+    from .services import voice_agent
+
+    if settings.echo_env == "test" or not settings.elevenlabs_api_key:
+        return
+    try:
+        async with SessionLocal() as db:
+            row = (await db.execute(select(ServerAISettings).limit(1))).scalar_one_or_none()
+            if row is not None and row.voice_agent_id:
+                return
+            agent_id = await voice_agent.create_or_update_agent(None)
+            if row is None:
+                row = ServerAISettings()
+                db.add(row)
+            row.voice_agent_id = agent_id
+            await db.commit()
+            logging.getLogger("echo").info("agente de voz creado: %s", agent_id)
+    except Exception:  # noqa: BLE001 - nunca impide que la API levante
+        logging.getLogger("echo").exception("no se pudo crear el agente de voz")
+
+
+@app.on_event("startup")
 async def _start_people_retry() -> None:
     """Reintenta cada 15 min la separación de personas que quedó pendiente
     porque ElevenLabs falló (services/diarization.py)."""

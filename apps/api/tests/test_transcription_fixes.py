@@ -209,3 +209,37 @@ def test_groq_transcribes_before_openai_when_both_keys_are_there(monkeypatch):
     monkeypatch.setattr(get_settings(), "groq_api_key", "gsk-groq")
     config = asyncio.run(ai_settings.resolve_stt(None, uuid.uuid4()))
     assert (config.provider, config.api_key) == ("groq", "gsk-groq")
+
+
+def test_a_superadmin_visiting_a_campus_can_record(client):
+    # Bauti entró a Northfield como superadmin (sin ser miembro): el REST lo
+    # dejaba, el WebSocket lo rechazaba y la web decía "No se pudo conectar".
+    owner = EchoTestUser(client, org_name=f"Northfield {uuid.uuid4().hex[:4]}")
+    admin = EchoTestUser(client, org_name="Becode")
+    _sql("UPDATE users SET is_superadmin = true WHERE id = :id", id=admin.user_id)
+    meeting = client.post("/api/meetings", json={"title": "x", "level": "primaria"}, headers=owner.headers).json()
+    with client.websocket_connect(f"/api/meetings/{meeting['id']}/ws?token={admin.token}") as websocket:
+        websocket.send_text(json.dumps({"type": "hello", "role": "viewer"}))
+        assert json.loads(websocket.receive_text())["type"] == "hello_ack"
+
+
+def test_if_the_engine_is_down_the_window_goes_to_the_next(monkeypatch):
+    from echo_api.services.stt.base import FallbackSttProvider
+
+    class Down:
+        name, model = "groq", "whisper-large-v3-turbo"
+
+        async def transcribe_chunk(self, *args, **kwargs):
+            raise httpx.ConnectError("groq caído")
+
+    class Up:
+        name, model = "openai", "gpt-4o-transcribe"
+
+        async def transcribe_chunk(self, pcm16, sample_rate, language, vocabulary=None, offset_ms=0, context=None):
+            return SttResult(segments=[SttSegment("Hola.", offset_ms, offset_ms + 1000)])
+
+    chain = FallbackSttProvider([Down(), Up()])
+    result = asyncio.run(chain.transcribe_chunk(bytes(3200), 16000, "es", [], offset_ms=500))
+    assert [s.text for s in result.segments] == ["Hola."]
+    # El consumo se anota al que respondió.
+    assert (chain.name, chain.model) == ("openai", "gpt-4o-transcribe")

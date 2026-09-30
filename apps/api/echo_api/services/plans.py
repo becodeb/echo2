@@ -174,6 +174,9 @@ async def people_access(
             people_hours_left=hours_left,
         )
 
+    # Las cuentas de Becode (superadmins) tienen todo habilitado, en cualquier sede.
+    if user.is_superadmin:
+        return result("always", "organization")
     if org_plan is not None and org_plan.code != PLAN_BASE and (org_plan.features or {}).get("people") == "always":
         return result("always", "organization")
 

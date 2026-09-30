@@ -159,6 +159,17 @@ async def resolve_stt(db: AsyncSession, org_id: uuid.UUID) -> SttConfig | None:
     return None
 
 
+def stt_fallbacks(primary: SttConfig | None) -> list[SttConfig]:
+    """Motores de respaldo si el principal se cae, en orden: Groq y OpenAI
+    (sin repetir el principal). Solo los que tienen key en el entorno."""
+    env = get_settings()
+    out: list[SttConfig] = []
+    for provider, key in (("groq", env.groq_api_key), ("openai", env.openai_api_key)):
+        if key and (primary is None or primary.provider != provider):
+            out.append(SttConfig(provider=provider, model=None, api_key=key))
+    return out
+
+
 async def resolve_embeddings(db: AsyncSession, org_id: uuid.UUID) -> EmbeddingsConfig | None:
     env = get_settings()
     row = await get_org_ai_settings(db, org_id)

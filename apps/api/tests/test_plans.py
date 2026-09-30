@@ -213,3 +213,12 @@ def test_live_audio_is_recorded_as_usage(client, monkeypatch):
     # Groq cobra 10 s como mínimo por pedido.
     assert float(sum(row.cost_usd for row in rows)) == round(0.04 * 10 / 3600, 6) * len(rows)
     assert str(rows[0].user_id) == user.user_id
+
+
+def test_becode_accounts_have_everything_everywhere(client, monkeypatch):
+    monkeypatch.setattr(get_settings(), "elevenlabs_api_key", "xi-test")
+    user = EchoTestUser(client, org_name=f"Colegio {uuid.uuid4().hex[:4]}")
+    _sql("UPDATE users SET is_superadmin = true WHERE id = :id", id=user.user_id)
+    assert _run(_access(user)).mode == "always"
+    billing = client.get("/api/billing/me", headers=user.headers).json()
+    assert billing["features"]["voice"] is True
