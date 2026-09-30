@@ -48,10 +48,16 @@ class TestSplitChannels:
         assert rms(left) > 1000
         assert rms(right) == 0
 
-    def test_downmix_promedia(self):
-        mixed = downmix(tone(100, 8000), silence(100))
-        # promediar con silencio deja la mitad de la energía
-        assert 0.4 < rms(mixed) / rms(tone(100, 8000)) < 0.6
+    def test_downmix_keeps_a_voice_that_is_only_on_one_channel(self):
+        # En una llamada habla una fuente por vez: quien está solo en el canal
+        # del sistema (y ya se oía bajo) no puede quedar a la mitad.
+        quiet = tone(100, 1500)
+        assert 0.95 < rms(downmix(silence(100), quiet)) / rms(quiet) < 1.05
+
+    def test_downmix_clips_instead_of_wrapping_when_both_are_loud(self):
+        mixed = array.array("h")
+        mixed.frombytes(downmix(tone(100, 30000), tone(100, 30000)))
+        assert max(mixed) == 32767 and min(mixed) == -32768
 
 
 class TestAtribucionDeHablante:

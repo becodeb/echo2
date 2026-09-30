@@ -80,16 +80,18 @@ def split_channels(pcm16_stereo: bytes) -> tuple[bytes, bytes]:
 
 
 def downmix(left: bytes, right: bytes) -> bytes:
-    """Promedia los dos canales para mandar UN audio al motor de STT."""
-    a = array.array("h")
-    a.frombytes(left)
-    b = array.array("h")
-    b.frombytes(right)
+    """Suma los dos canales en UN audio para el motor de STT y la grabación.
+
+    Se suman, no se promedian: en una llamada casi siempre habla una sola
+    fuente a la vez (micrófono o sistema), y promediar con el otro canal en
+    silencio dejaba esa voz a la mitad de volumen; quien ya hablaba bajo en
+    Meet o Zoom quedaba casi inaudible para la separación de personas. Si
+    hablan los dos fuerte a la vez, se recorta en vez de dar la vuelta.
+    """
+    a = np.frombuffer(left[: len(left) // 2 * 2], dtype=np.int16).astype(np.int32)
+    b = np.frombuffer(right[: len(right) // 2 * 2], dtype=np.int16).astype(np.int32)
     size = min(len(a), len(b))
-    mixed = array.array("h", (0,) * size)
-    for index in range(size):
-        mixed[index] = int((a[index] + b[index]) / 2)
-    return mixed.tobytes()
+    return np.clip(a[:size] + b[:size], -32768, 32767).astype(np.int16).tobytes()
 
 
 def rms(pcm16: bytes, start_ms: int = 0, end_ms: int | None = None, sample_rate: int = 16000) -> float:
