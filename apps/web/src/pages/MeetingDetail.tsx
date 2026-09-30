@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, apiDownload } from "../api/client";
+import { api } from "../api/client";
 import type { AdminOrgOut, ChatOut, InsightsOut, MeetingOut, MinutesOut, SegmentOut } from "../api/types";
 import { useAuth } from "../state/auth";
 import { Badge, Button, Card, EmptyState, Input, Modal, Spinner, formatDate, formatDuration, formatMs } from "../components/ui";
@@ -9,6 +9,7 @@ import { EchoFace } from "../components/EchoFace";
 import { ClassificationPanel } from "../components/ClassificationPanel";
 import { Attachments } from "../components/Attachments";
 import { RecordingCard } from "../components/RecordingCard";
+import { ExportMenu } from "../components/ExportMenu";
 import { AnswerText } from "../components/AnswerText";
 import { MarkdownView } from "../components/MarkdownView";
 import { InterviewReview } from "../components/InterviewReview";
@@ -143,7 +144,7 @@ export default function MeetingDetail() {
         </div>
       )}
       {activeTab === "transcript" && <TranscriptTab meeting={meeting} jumpMs={jumpMs ? Number(jumpMs) : null} onRefetch={refetch} />}
-      {activeTab === "minutes" && <MinutesTab meetingId={meeting.id} />}
+      {activeTab === "minutes" && <MinutesTab meetingId={meeting.id} minutesTitle={meeting.title} />}
       {activeTab === "tasks" && <TasksTab meetingId={meeting.id} />}
       {activeTab === "chat" && <ChatTab meetingId={meeting.id} onJump={(ms) => { params.set("t", String(ms)); setParams(params); setTab("transcript"); }} />}
     </div>
@@ -467,11 +468,6 @@ function TranscriptTab({
     }
   }, [jumpMs, pages]);
 
-  const exportMd = useMutation({
-    mutationFn: () =>
-      apiDownload(`/api/meetings/${meeting.id}/export/transcript.md`, `transcript-${meeting.title}.md`),
-  });
-
   const saveEdit = useMutation({
     mutationFn: () =>
       api<SegmentOut>(`/api/meetings/${meeting.id}/transcript/${editing!.id}`, {
@@ -497,19 +493,7 @@ function TranscriptTab({
           <Badge tone="amber">{lowConfidence} fragmentos podrían necesitar revisión</Badge>
         )}
         <div className="ml-auto flex items-center gap-2">
-          {exportMd.isError && (
-            <span className="text-xs text-red-600">
-              {exportMd.error instanceof Error ? exportMd.error.message : "No se pudo exportar"}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={() => exportMd.mutate()}
-            disabled={exportMd.isPending}
-            className="text-xs font-medium text-accent-600 hover:underline disabled:opacity-50"
-          >
-            Exportar .md
-          </button>
+          <ExportMenu meetingId={meeting.id} kind="transcript" title={meeting.title} />
         </div>
       </div>
 
@@ -647,7 +631,7 @@ function SpeakerEditor({ meeting, onChanged }: { meeting: MeetingOut; onChanged:
 
 // ── Acta ─────────────────────────────────────────────────────────
 
-function MinutesTab({ meetingId }: { meetingId: string }) {
+function MinutesTab({ meetingId, minutesTitle }: { meetingId: string; minutesTitle: string }) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
@@ -681,13 +665,6 @@ function MinutesTab({ meetingId }: { meetingId: string }) {
       setEditing(false);
       queryClient.invalidateQueries({ queryKey: ["minutes", meetingId] });
     },
-  });
-
-  // Un link directo al export no lleva el token ni la organización: el API
-  // respondía 401. Se baja con fetch y el archivo se arma en el navegador.
-  const exportMinutes = useMutation({
-    mutationFn: (fmt: "pdf" | "docx" | "md") =>
-      apiDownload(`/api/meetings/${meetingId}/export/minutes.${fmt}`, `acta.${fmt}`),
   });
 
   const changeStatus = useMutation({
@@ -857,24 +834,11 @@ function MinutesTab({ meetingId }: { meetingId: string }) {
               <Button variant="soft" onClick={() => regenerate.mutate()} disabled={regenerate.isPending}>
                 Regenerar
               </Button>
-              <Button variant="ghost" onClick={() => exportMinutes.mutate("pdf")} disabled={exportMinutes.isPending}>
-                PDF
-              </Button>
-              <Button variant="ghost" onClick={() => exportMinutes.mutate("docx")} disabled={exportMinutes.isPending}>
-                DOCX
-              </Button>
-              <Button variant="ghost" onClick={() => exportMinutes.mutate("md")} disabled={exportMinutes.isPending}>
-                MD
-              </Button>
+              <ExportMenu meetingId={meetingId} kind="minutes" title={minutesTitle} />
             </>
           )}
         </div>
       </div>
-      {exportMinutes.isError && (
-        <p className="text-sm text-red-600">
-          {exportMinutes.error instanceof Error ? exportMinutes.error.message : "No se pudo exportar el acta"}
-        </p>
-      )}
 
       {weak.length > 0 && !editing && (
         <Card className="border-amber-200 bg-amber-50/50">

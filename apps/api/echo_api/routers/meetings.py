@@ -56,6 +56,9 @@ class MeetingCreateIn(BaseModel):
     group_id: uuid.UUID | None = None
     # Grabar también el audio completo (services/recording.py).
     record_audio: bool = False
+    # Solo internas: si además de resumen se quiere el acta. Por defecto no: un
+    # equipo puede no querer un acta formal de cada reunión.
+    minutes: bool = False
 
 
 class ParticipantOut(BaseModel):
@@ -199,7 +202,10 @@ async def create_meeting(
         audio_source=data.audio_source,
         stt_engine=data.stt_engine,
         status="draft",
-        meta={"visibility": data.visibility if data.visibility in ("org", "private") else "org"},
+        meta={
+            "visibility": data.visibility if data.visibility in ("org", "private") else "org",
+            **({"minutes": data.minutes} if data.kind == "interna" else {}),
+        },
         level=level,
         kind=data.kind,
         group_id=group.id if group else None,

@@ -179,6 +179,12 @@ export class MicrophoneSource implements AudioSource {
   }
 }
 
+/** El navegador puede compartir el audio de una pestaña o de la pantalla. Safari en
+ *  iPhone/iPad y los navegadores del celular no tienen getDisplayMedia. */
+export function canCaptureSystemAudio(): boolean {
+  return typeof navigator !== "undefined" && typeof navigator.mediaDevices?.getDisplayMedia === "function";
+}
+
 /** Micrófono + audio del sistema (getDisplayMedia con audio). Modo avanzado
  *  para reuniones de Meet/Zoom/Teams/Discord.
  *
@@ -205,6 +211,11 @@ export class SystemAudioSource implements AudioSource {
   }
 
   async start(onFrame: (pcm16: Int16Array) => void, onLevel: (level: number) => void): Promise<void> {
+    if (!canCaptureSystemAudio()) {
+      throw new Error(
+        "Este dispositivo no permite capturar el audio de la videollamada. Ponela en altavoz cerca del micrófono o grabá desde una computadora.",
+      );
+    }
     // El audio del sistema requiere que el usuario comparta una pestaña/pantalla CON audio
     this.displayStream = await navigator.mediaDevices.getDisplayMedia({
       video: true,

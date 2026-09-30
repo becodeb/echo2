@@ -1,4 +1,4 @@
-"""Exportaciones: acta y transcript en Markdown, TXT, DOCX y PDF."""
+"""Exportaciones: acta y transcript en Markdown, TXT, DOCX, PDF y Google Docs."""
 import io
 import unicodedata
 import uuid
@@ -6,12 +6,14 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
 from ..deps import OrgContext, get_meeting_or_404, get_org_context
 from ..models import Minutes, MinutesVersion
+from ..services.drive import DriveError, get_user_connection, upload_google_doc
 from ..services.transcript_util import format_ms, load_transcript_lines
 
 router = APIRouter(prefix="/api/meetings/{meeting_id}/export", tags=["exports"])
@@ -205,6 +207,13 @@ async def export_minutes(
     raise HTTPException(status.HTTP_400_BAD_REQUEST, "Formato no soportado (md|txt|docx|pdf)")
 
 
+async def _transcript_markdown(db: AsyncSession, meeting) -> str:
+    lines = await load_transcript_lines(db, meeting.id)
+    return f"# Transcript — {meeting.title}\n\n" + "\n\n".join(
+        f"**[{format_ms(l['start_ms'])}] {l['speaker'] or 'Hablante'}:** {l['text']}" for l in lines
+    )
+
+
 @router.get("/transcript.{fmt}")
 async def export_transcript(
     meeting_id: uuid.UUID,
@@ -213,18 +222,15 @@ async def export_transcript(
     db: AsyncSession = Depends(get_db),
 ):
     meeting = await get_meeting_or_404(meeting_id, ctx, db)
-    lines = await load_transcript_lines(db, meeting.id)
     filename = f"transcript-{meeting.title[:40].replace(' ', '-')}"
 
     if fmt == "md":
-        body = f"# Transcript — {meeting.title}\n\n" + "\n\n".join(
-            f"**[{format_ms(l['start_ms'])}] {l['speaker'] or 'Hablante'}:** {l['text']}" for l in lines
-        )
         return Response(
-            body, media_type="text/markdown; charset=utf-8",
+            await _transcript_markdown(db, meeting), media_type="text/markdown; charset=utf-8",
             headers=_attachment(f"{filename}.md"),
         )
     if fmt == "txt":
+        lines = await load_transcript_lines(db, meeting.id)
         body = "\n".join(
             f"[{format_ms(l['start_ms'])}] {l['speaker'] or 'Hablante'}: {l['text']}" for l in lines
         )
@@ -232,4 +238,49 @@ async def export_transcript(
             body, media_type="text/plain; charset=utf-8",
             headers=_attachment(f"{filename}.txt"),
         )
-    raise HTTPException(status.HTTP_400_BAD_REQUEST, "Formato no soportado (md|txt)")
+    if fmt == "docx":
+        return Response(
+            _markdown_to_docx(await _transcript_markdown(db, meeting), meeting.title),
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers=_attachment(f"{filename}.docx"),
+        )
+    if fmt == "pdf":
+        return Response(
+            _markdown_to_pdf(await _transcript_markdown(db, meeting), meeting.title),
+            media_type="application/pdf",
+            headers=_attachment(f"{filename}.pdf"),
+        )
+    raise HTTPException(status.HTTP_400_BAD_REQUEST, "Formato no soportado (md|txt|docx|pdf)")
+
+
+class GoogleDocOut(BaseModel):
+    url: str
+
+
+@router.post("/{kind}/google-doc", response_model=GoogleDocOut)
+async def export_google_doc(
+    meeting_id: uuid.UUID,
+    kind: str,
+    ctx: OrgContext = Depends(get_org_context),
+    db: AsyncSession = Depends(get_db),
+):
+    """Crea el acta o el transcript como Documento de Google en el Drive de quien lo pide."""
+    if kind not in ("minutes", "transcript"):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Se puede exportar minutes o transcript")
+    meeting = await get_meeting_or_404(meeting_id, ctx, db)
+    connection = await get_user_connection(db, ctx.user.id)
+    if connection is None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Conectá tu Google Drive en Ajustes para crear el documento."
+        )
+    if kind == "minutes":
+        markdown = await _get_minutes_markdown(db, meeting.id)
+        name = f"Acta — {meeting.title[:80]}"
+    else:
+        markdown = await _transcript_markdown(db, meeting)
+        name = f"Transcript — {meeting.title[:80]}"
+    try:
+        url = await upload_google_doc(db, connection, name, _markdown_to_docx(markdown, meeting.title))
+    except DriveError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc)) from exc
+    return GoogleDocOut(url=url)

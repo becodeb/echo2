@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, getAccessToken, refreshAccessToken, wsUrl } from "../api/client";
 import type { LiveEvent, MeetingOut, RecordingState } from "../api/types";
-import { MicrophoneSource, SystemAudioSource, listMicrophones, type AudioSource } from "../lib/audio";
+import { MicrophoneSource, SystemAudioSource, canCaptureSystemAudio, listMicrophones, type AudioSource } from "../lib/audio";
 import { BridgeSttSession, checkBridge, type BridgeHealth } from "../lib/bridge";
 import { RecordToggle } from "../components/RecordToggle";
 import { Select } from "../components/Select";
@@ -880,20 +880,28 @@ export default function MeetingLive() {
 
                 <RecordToggle checked={recordingOn} onChange={setRecordAudio} disabled={recordingBusy} />
 
-                <label className="flex items-center gap-2 text-sm text-ink-600">
-                  <input
-                    type="checkbox"
-                    checked={captureSystem}
-                    onChange={(event) => setCaptureSystem(event.target.checked)}
-                    className="rounded border-ink-300"
-                  />
-                  <span>
-                    Incluir audio del sistema (Meet, Zoom, Teams, Discord)
-                    <span className="block text-xs text-ink-400">
-                      Separa tu voz de la de los remotos: quedan como Speaker 1 y Speaker 2
+                {canCaptureSystemAudio() ? (
+                  <label className="flex items-center gap-2 text-sm text-ink-600">
+                    <input
+                      type="checkbox"
+                      checked={captureSystem}
+                      onChange={(event) => setCaptureSystem(event.target.checked)}
+                      className="rounded border-ink-300"
+                    />
+                    <span>
+                      Incluir audio del sistema (Meet, Zoom, Teams, Discord)
+                      <span className="block text-xs text-ink-400">
+                        Separa tu voz de la de los remotos: quedan como Speaker 1 y Speaker 2
+                      </span>
                     </span>
-                  </span>
-                </label>
+                  </label>
+                ) : (
+                  <p className="rounded-lg bg-ink-50 px-3 py-2 text-xs text-ink-500">
+                    <span className="font-medium text-ink-700">¿Reunión virtual (Meet, Zoom, Teams)?</span> Este
+                    dispositivo no puede capturar el audio de la llamada. Ponela en altavoz cerca del micrófono
+                    o grabá desde una computadora, donde sí se escucha a todos por separado.
+                  </p>
+                )}
 
                 <div className="border-t border-ink-100 pt-3">
                   <span className="mb-1.5 block text-sm font-medium text-ink-700">Motor de transcripción</span>

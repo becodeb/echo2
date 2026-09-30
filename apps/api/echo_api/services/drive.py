@@ -338,3 +338,52 @@ async def upload_recording(db: AsyncSession, connection: UserGoogleDrive, meetin
     safe_title = meeting.title[:80].replace("/", "-")
     created = await _upload_resumable(token, f"{fecha} — {safe_title}.mp3", parent, path, "audio/mpeg")
     return created.get("webViewLink") or f"https://drive.google.com/file/d/{created['id']}/view"
+
+
+DOCS_FOLDER = "Echo — Documentos"
+GOOGLE_DOC_MIME = "application/vnd.google-apps.document"
+
+
+async def _find_or_create_docs_folder(token: str) -> str:
+    """Carpeta de los documentos exportados. Con drive.file solo se ven las creadas por Echo."""
+    async with httpx.AsyncClient(timeout=30) as client:
+        found = await client.get(
+            FILES_URL,
+            params={
+                "q": f"name = '{DOCS_FOLDER}' and mimeType = '{FOLDER_MIME}' and trashed = false",
+                "fields": "files(id)",
+                "pageSize": "1",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    if found.status_code == 200 and found.json().get("files"):
+        return found.json()["files"][0]["id"]
+    return (await _create_folder(token, DOCS_FOLDER))["id"]
+
+
+async def upload_google_doc(db: AsyncSession, connection: UserGoogleDrive, name: str, docx: bytes) -> str:
+    """Sube un .docx a Drive y Google lo convierte en Documento de Google editable."""
+    try:
+        token = await _access_token(decrypt_secret(connection.refresh_token_enc) or "")
+        parent = await _find_or_create_docs_folder(token)
+        metadata = {"name": name, "parents": [parent], "mimeType": GOOGLE_DOC_MIME}
+        async with httpx.AsyncClient(timeout=120) as client:
+            response = await client.post(
+                UPLOAD_URL,
+                params={"uploadType": "multipart", "supportsAllDrives": "true", "fields": "id,webViewLink"},
+                headers={"Authorization": f"Bearer {token}"},
+                files={
+                    "metadata": ("metadata", json.dumps(metadata), "application/json; charset=UTF-8"),
+                    "file": (name, docx, DOCX_MIME),
+                },
+            )
+        if response.status_code not in (200, 201):
+            raise DriveError(_friendly(response.status_code, response.text))
+    except DriveError as exc:
+        connection.last_error = str(exc)
+        await db.commit()
+        raise
+    connection.last_error = None
+    await db.commit()
+    created = response.json()
+    return created.get("webViewLink") or f"https://docs.google.com/document/d/{created['id']}/edit"

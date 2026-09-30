@@ -1,10 +1,9 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
-import type { InternalGroupOut, MeetingListItem, MeetingOut } from "../api/types";
+import type { InternalGroupOut, MeetingListItem } from "../api/types";
 import { MeetingList } from "../components/MeetingList";
-import { RecordToggle } from "../components/RecordToggle";
+import { NewMeetingModal } from "../components/NewMeetingModal";
 import { Select } from "../components/Select";
 import { Badge, Button, Card, EmptyState, Input, Modal, Spinner } from "../components/ui";
 import { useAuth } from "../state/auth";
@@ -13,8 +12,8 @@ import { useInternalGroups } from "../state/internalGroups";
 /**
  * Reuniones entre directivos, coordinadores y otros equipos, sin alumno de por
  * medio. Cada una es de un grupo y la ve solo ese grupo (ni siquiera los
- * admins de la sede, salvo que se sumen). No tienen acta: lo que importa es
- * el resumen, poder preguntarle y, si se quiere, la grabación.
+ * admins de la sede, salvo que se sumen). El acta es opcional, se elige al
+ * crearla; siempre hay resumen, poder preguntarle y, si se quiere, la grabación.
  */
 export default function InternalMeetings() {
   const { activeOrg } = useAuth();
@@ -105,111 +104,11 @@ export default function InternalMeetings() {
 
       {meetings && meetings.length > 0 && <MeetingList meetings={meetings} />}
 
-      <NewInternalMeetingModal
-        open={creating}
-        onClose={() => setCreating(false)}
-        groups={myGroups}
-        initialGroup={groupFilter}
-      />
+      <NewMeetingModal open={creating} onClose={() => setCreating(false)} initialKind="equipo" initialGroup={groupFilter} />
       {groupsData?.can_manage && (
         <ManageGroupsModal open={managing} onClose={() => setManaging(false)} groups={groupsData.groups} />
       )}
     </div>
-  );
-}
-
-function NewInternalMeetingModal({
-  open,
-  onClose,
-  groups,
-  initialGroup,
-}: {
-  open: boolean;
-  onClose: () => void;
-  groups: InternalGroupOut[];
-  initialGroup: string;
-}) {
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const [groupChoice, setGroupChoice] = useState("");
-  const [title, setTitle] = useState("");
-  const [participants, setParticipants] = useState("");
-  const [recordAudio, setRecordAudio] = useState(true);
-  const groupId = groupChoice || initialGroup || groups[0]?.id || "";
-  const group = groups.find((item) => item.id === groupId);
-  const defaultTitle = `${group?.name ?? "Reunión"} · ${new Date().toLocaleDateString("es")}`;
-
-  const create = useMutation({
-    mutationFn: () =>
-      api<MeetingOut>("/api/meetings", {
-        method: "POST",
-        body: JSON.stringify({
-          title: title.trim() || defaultTitle,
-          kind: "interna",
-          group_id: groupId,
-          record_audio: recordAudio,
-          participants: participants
-            .split(",")
-            .map((name) => name.trim())
-            .filter(Boolean)
-            .map((name) => ({ name })),
-        }),
-      }),
-    onSuccess: (meeting) => {
-      queryClient.invalidateQueries({ queryKey: ["meetings"] });
-      setTitle("");
-      setParticipants("");
-      onClose();
-      navigate(`/meetings/${meeting.id}/live`);
-    },
-  });
-
-  return (
-    <Modal open={open} onClose={onClose} title="Nueva reunión interna">
-      <form
-        onSubmit={(event: FormEvent) => {
-          event.preventDefault();
-          if (groupId) create.mutate();
-        }}
-        className="space-y-4"
-      >
-        <Select
-          label="Grupo"
-          value={groupId}
-          onChange={setGroupChoice}
-          options={groups.map((item) => ({ value: item.id, label: item.name, hint: `${item.members.length}` }))}
-        />
-        <p className="-mt-2 text-xs text-ink-400">
-          La van a ver {group ? group.members.map((member) => member.name).join(", ") : "los integrantes del grupo"}.
-        </p>
-        <Input
-          label="Tema"
-          placeholder={defaultTitle}
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-        />
-        <Input
-          label="Participantes (separados por coma)"
-          placeholder="Ana, Marcos, Juan"
-          value={participants}
-          onChange={(event) => setParticipants(event.target.value)}
-        />
-        <RecordToggle checked={recordAudio} onChange={setRecordAudio} />
-        {create.isError && (
-          <p className="text-sm text-red-600">
-            {create.error instanceof Error ? create.error.message : "No se pudo crear"}
-          </p>
-        )}
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" disabled={!groupId || create.isPending}>
-            {create.isPending ? <Spinner /> : "Comenzar reunión"}
-          </Button>
-        </div>
-      </form>
-    </Modal>
   );
 }
 

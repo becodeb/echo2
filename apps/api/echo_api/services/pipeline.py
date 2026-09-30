@@ -141,6 +141,8 @@ async def _run(meeting_id: uuid.UUID) -> None:
             return
         org_id = meeting.organization_id
         internal = meeting.kind == "interna"
+        # Las internas solo arman acta si se pidió al crearlas (meta.minutes).
+        wants_minutes = not internal or bool((meeting.meta or {}).get("minutes"))
         language = meeting.language
         reference_date = (meeting.started_at or meeting.created_at).date()
         llm_config = await resolve_llm(db, org_id)
@@ -201,8 +203,8 @@ async def _run(meeting_id: uuid.UUID) -> None:
     #    resúmenes. Es lo primero que la persona quiere ver al terminar, así
     #    que no espera a nada más. generate_minutes registra sus propias fallas.
     minutes_task: asyncio.Task | None = None
-    if internal:
-        pass  # sin acta: lo que se quiere es el resumen y poder preguntarle
+    if not wants_minutes:
+        pass  # interna sin acta: lo que se quiere es el resumen y poder preguntarle
     elif provider:
         await _set_stage(meeting_id, "minutes", 30)
         minutes_task = asyncio.create_task(generate_minutes(meeting_id, provider))

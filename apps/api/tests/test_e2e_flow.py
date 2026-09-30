@@ -260,6 +260,8 @@ def test_exports_need_auth_headers(client):
         ("minutes.docx", "officedocument"),
         ("minutes.md", "text/markdown"),
         ("transcript.md", "text/markdown"),
+        ("transcript.docx", "officedocument"),
+        ("transcript.pdf", "application/pdf"),
     ]:
         url = f"/api/meetings/{meeting_id}/export/{path}"
         # Lo que mandaba el <a href>: sin Authorization ni X-Organization-Id.
@@ -295,6 +297,8 @@ def test_exports_with_non_latin1_title(client):
         ("acta", "minutes.pdf"),
         ("transcript", "transcript.md"),
         ("transcript", "transcript.txt"),
+        ("transcript", "transcript.docx"),
+        ("transcript", "transcript.pdf"),
     ]:
         response = client.get(f"/api/meetings/{meeting_id}/export/{path}", headers=user.headers)
         assert response.status_code == 200, f"{path}: {response.status_code}"
@@ -304,3 +308,24 @@ def test_exports_with_non_latin1_title(client):
         assert 'filename="' + f'{prefix}-Reunion--equipo-A.{extension}"' in disposition
         encoded = disposition.split("filename*=UTF-8''", 1)[1]
         assert unquote(encoded) == f"{prefix}-{title.replace(' ', '-')}.{extension}"
+
+
+def test_google_doc_export_needs_connected_drive(client):
+    """Sin Drive conectado el Documento de Google no se puede crear: 409 con el motivo."""
+    user = EchoTestUser(client, name="Sin Drive", org_name="Org Sin Drive")
+    created = client.post("/api/meetings", json={"title": "Sin drive"}, headers=user.headers)
+    meeting_id = created.json()["id"]
+    client.post(
+        f"/api/meetings/{meeting_id}/minutes/versions",
+        json={"body_markdown": "# Acta
+
+- Algo.
+"},
+        headers=user.headers,
+    )
+    for kind in ("minutes", "transcript"):
+        response = client.post(f"/api/meetings/{meeting_id}/export/{kind}/google-doc", headers=user.headers)
+        assert response.status_code == 409, f"{kind}: {response.status_code}"
+        assert "Drive" in response.json()["detail"]
+    unknown = client.post(f"/api/meetings/{meeting_id}/export/otra/google-doc", headers=user.headers)
+    assert unknown.status_code == 404

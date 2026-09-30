@@ -179,3 +179,15 @@ def test_without_recording_the_work_audio_is_deleted_when_closing(client):
     assert not rec.pcm_path(meeting_id).exists()
     assert not rec.mp3_path(meeting_id).exists()
     assert client.get(f"/api/meetings/{meeting_id}", headers=director.headers).json()["recording"] is None
+
+
+def test_internal_meeting_minutes_are_opt_in(client):
+    """El acta de una reunión de equipo se elige al crearla; por defecto no hay."""
+    owner, director, directivos, meeting = _school_with_internal_meeting(client)
+    assert client.get(f"/api/meetings/{meeting['id']}", headers=director.headers).json()["kind"] == "interna"
+    with_minutes = client.post(
+        "/api/meetings",
+        json={"title": "Con acta", "kind": "interna", "group_id": directivos, "minutes": True},
+        headers=director.headers,
+    )
+    assert with_minutes.status_code == 201, with_minutes.text
