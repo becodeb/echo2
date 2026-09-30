@@ -130,11 +130,10 @@ separó a las 3 personas sin un error** (Bautista, Vanina dos veces, el Choto).
 ## 4. ⚠️ Menores de edad (bloqueante legal)
 
 **La política de privacidad de ElevenLabs (actualizada 20/5/2026, sección 11)
-prohíbe mandarle voces de menores de 18 años**: *"all users are strictly
-prohibited from uploading, transmitting, emailing, or otherwise making Voice
-Data from children under the age of 18 available to us or other users or using
-them for any of our Services."* Sus Términos exigen además que el usuario sea
-mayor de 18.
+prohíbe mandarle voces de menores de 18 años**: dice que los usuarios tienen
+prohibido subir, transmitir o poner a su disposición datos de voz de menores de
+18, o usarlos en cualquiera de sus servicios (https://elevenlabs.io/privacy-policy,
+"Children's Privacy"). Sus Términos exigen además que el usuario sea mayor de 18.
 
 Además, en planes que no son Enterprise ElevenLabs **usa los datos para
 entrenar salvo que se desactive** (Perfil → Terms and privacy → Data use), no
