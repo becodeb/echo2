@@ -1,0 +1,207 @@
+{
+"text": " 1, 2, 3 probando, 1, 2, 3 probando, 1, 2, 3 probando Hola, sí, 1, 2, 3 probando, 1, 2, 3 probando Estamos probando Buenas, ¿cómo va? Ahora la prueba es que si puedes arreglar, porque como que está muy arriba Cara, vale Hola Hola Tengo que subir por ahí Sí, ok, déjame Ok, esto sí es Gracias. ¿Qué es lo que se llama? Hola. Prueba unos tres. Probando, probando, probando. Probando. Sí, habla. Hola. Hola. Hola. Hola. Hola. Gracias. Gracias.",
+"language": "Spanish",
+"duration": 135.299998336,
+"segments": [
+{
+"start": 0,
+"end": 4.68,
+"text": " 1, 2, 3 probando, 1, 2, 3 probando, 1, 2, 3 probando",
+"avg_logprob": -0.28165296,
+"no_speech_prob": 0,
+"compression_ratio": 1.6277373
+},
+{
+"start": 4.68,
+"end": 11.24,
+"text": " Hola, sí, 1, 2, 3 probando, 1, 2, 3 probando",
+"avg_logprob": -0.28165296,
+"no_speech_prob": 0,
+"compression_ratio": 1.6277373
+},
+{
+"start": 11.24,
+"end": 14.36,
+"text": " Estamos probando",
+"avg_logprob": -0.28165296,
+"no_speech_prob": 0,
+"compression_ratio": 1.6277373
+},
+{
+"start": 14.36,
+"end": 18.44,
+"text": " Buenas, ¿cómo va?",
+"avg_logprob": -0.28165296,
+"no_speech_prob": 0,
+"compression_ratio": 1.6277373
+},
+{
+"start": 19.66,
+"end": 23.96,
+"text": " Ahora la prueba es que si puedes arreglar, porque como que está muy arriba",
+"avg_logprob": -0.28165296,
+"no_speech_prob": 0,
+"compression_ratio": 1.6277373
+},
+{
+"start": 23.96,
+"end": 25.119999,
+"text": " Cara, vale",
+"avg_logprob": -0.28165296,
+"no_speech_prob": 0,
+"compression_ratio": 1.6277373
+},
+{
+"start": 30,
+"end": 48,
+"text": " Hola",
+"avg_logprob": -0.5416638,
+"no_speech_prob": 0,
+"compression_ratio": 0.9577465
+},
+{
+"start": 48,
+"end": 48.84,
+"text": " Hola",
+"avg_logprob": -0.5416638,
+"no_speech_prob": 0,
+"compression_ratio": 0.9577465
+},
+{
+"start": 48.84,
+"end": 50.64,
+"text": " Tengo que subir por ahí",
+"avg_logprob": -0.5416638,
+"no_speech_prob": 0,
+"compression_ratio": 0.9577465
+},
+{
+"start": 50.64,
+"end": 51.579998,
+"text": " Sí, ok, déjame",
+"avg_logprob": -0.5416638,
+"no_speech_prob": 0,
+"compression_ratio": 0.9577465
+},
+{
+"start": 51.579998,
+"end": 54.98,
+"text": " Ok, esto sí es",
+"avg_logprob": -0.5416638,
+"no_speech_prob": 0,
+"compression_ratio": 0.9577465
+},
+{
+"start": 54.98,
+"end": 55.98,
+"text": " Gracias.",
+"avg_logprob": -0.36111683,
+"no_speech_prob": 0,
+"compression_ratio": 0.5294118
+},
+{
+"start": 62.65,
+"end": 92.630005,
+"text": " ¿Qué es lo que se llama?",
+"avg_logprob": -1.0794805,
+"no_speech_prob": 0,
+"compression_ratio": 0.7714286
+},
+{
+"start": 92.65,
+"end": 93.65,
+"text": " Hola.",
+"avg_logprob": -0.7827339,
+"no_speech_prob": 0,
+"compression_ratio": 1.6428572
+},
+{
+"start": 102.65,
+"end": 108.15,
+"text": " Prueba unos tres.",
+"avg_logprob": -0.7827339,
+"no_speech_prob": 0,
+"compression_ratio": 1.6428572
+},
+{
+"start": 108.71001,
+"end": 110.05,
+"text": " Probando, probando, probando.",
+"avg_logprob": -0.7827339,
+"no_speech_prob": 0,
+"compression_ratio": 1.6428572
+},
+{
+"start": 111.17,
+"end": 111.61,
+"text": " Probando.",
+"avg_logprob": -0.7827339,
+"no_speech_prob": 0,
+"compression_ratio": 1.6428572
+},
+{
+"start": 114.350006,
+"end": 115.630005,
+"text": " Sí, habla.",
+"avg_logprob": -0.7827339,
+"no_speech_prob": 0,
+"compression_ratio": 1.6428572
+},
+{
+"start": 116.05,
+"end": 116.31,
+"text": " Hola.",
+"avg_logprob": -0.7827339,
+"no_speech_prob": 0,
+"compression_ratio": 1.6428572
+},
+{
+"start": 116.31,
+"end": 116.729996,
+"text": " Hola.",
+"avg_logprob": -0.7827339,
+"no_speech_prob": 0,
+"compression_ratio": 1.6428572
+},
+{
+"start": 117.03,
+"end": 117.37,
+"text": " Hola.",
+"avg_logprob": -0.7827339,
+"no_speech_prob": 0,
+"compression_ratio": 1.6428572
+},
+{
+"start": 118.130005,
+"end": 118.729996,
+"text": " Hola.",
+"avg_logprob": -0.7827339,
+"no_speech_prob": 0,
+"compression_ratio": 1.6428572
+},
+{
+"start": 120.09,
+"end": 120.65,
+"text": " Hola.",
+"avg_logprob": -0.7827339,
+"no_speech_prob": 0,
+"compression_ratio": 1.6428572
+},
+{
+"start": 121.05,
+"end": 121.41,
+"text": " Gracias.",
+"avg_logprob": -0.7827339,
+"no_speech_prob": 0,
+"compression_ratio": 1.6428572
+},
+{
+"start": 122.65,
+"end": 123.65,
+"text": " Gracias.",
+"avg_logprob": -0.70077276,
+"no_speech_prob": 0,
+"compression_ratio": 0.5294118
+}
+]
+}

@@ -1,0 +1,738 @@
+{
+"language_code": "spa",
+"text": "Uno, dos, tres. Probando. Uno, dos, tres. Probando. Uno, dos, tres. Probando. Hola. Sí, uno, dos, tres. Probando. Uno, dos, tres. Probando. Estamos probando. Buenas, ¿cómo va? Eeeh, muy cara la profe. Si puedes arreglar un poquito, porque como que está muy arriba. Cara. Vale. Hola. Hola. Hola. Vas a tener que subir por ahí. Sí. Okey, venga, me-- Viene todo para allá. Un ratito. Hola. Perfecto. Muchísimas gracias. Prueba uno, dos, tres. Probando, probando, probando, probando. Sí, habla, habla. Hola. ¿Hola? ¿Puedes hola? Hola. Gracias. Estamos probando. ",
+"words": [
+{
+"text": "Uno,",
+"start": 1.66,
+"end": 1.8,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "dos,",
+"start": 1.84,
+"end": 1.9,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "tres.",
+"start": 1.96,
+"end": 2.08,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Probando.",
+"start": 2.14,
+"end": 2.48,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Uno,",
+"start": 2.56,
+"end": 2.66,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "dos,",
+"start": 2.7,
+"end": 2.74,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "tres.",
+"start": 2.82,
+"end": 2.94,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Probando.",
+"start": 2.98,
+"end": 3.4,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Uno,",
+"start": 3.7,
+"end": 3.9,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "dos,",
+"start": 3.96,
+"end": 4.12,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "tres.",
+"start": 4.16,
+"end": 4.3,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Probando.",
+"start": 4.34,
+"end": 4.84,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Hola.",
+"start": 8.8,
+"end": 9.0,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Sí,",
+"start": 9.1,
+"end": 9.2,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "uno,",
+"start": 9.28,
+"end": 9.36,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "dos,",
+"start": 9.4,
+"end": 9.48,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "tres.",
+"start": 9.52,
+"end": 9.64,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Probando.",
+"start": 9.66,
+"end": 10.06,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Uno,",
+"start": 10.52,
+"end": 10.64,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "dos,",
+"start": 10.68,
+"end": 10.76,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "tres.",
+"start": 10.78,
+"end": 10.9,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Probando.",
+"start": 10.92,
+"end": 11.34,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Estamos",
+"start": 13.7,
+"end": 13.98,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "probando.",
+"start": 14.02,
+"end": 14.46,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Buenas,",
+"start": 17.58,
+"end": 18.06,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "¿cómo",
+"start": 18.16,
+"end": 18.36,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "va?",
+"start": 18.38,
+"end": 18.52,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Eeeh,",
+"start": 19.18,
+"end": 19.46,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "muy",
+"start": 19.88,
+"end": 20.06,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "cara",
+"start": 20.2,
+"end": 20.52,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "la",
+"start": 20.56,
+"end": 20.66,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "profe.",
+"start": 20.74,
+"end": 21.1,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "Si",
+"start": 21.18,
+"end": 21.24,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "puedes",
+"start": 21.34,
+"end": 21.52,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "arreglar",
+"start": 21.56,
+"end": 21.88,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "un",
+"start": 21.88,
+"end": 21.92,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "poquito,",
+"start": 21.96,
+"end": 22.34,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "porque",
+"start": 22.68,
+"end": 22.86,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "como",
+"start": 22.94,
+"end": 23.12,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "que",
+"start": 23.16,
+"end": 23.22,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "está",
+"start": 23.26,
+"end": 23.4,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "muy",
+"start": 23.44,
+"end": 23.6,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "arriba.",
+"start": 23.66,
+"end": 24.04,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "Cara.",
+"start": 24.08,
+"end": 24.4,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Vale.",
+"start": 24.98,
+"end": 25.32,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Hola.",
+"start": 47.94,
+"end": 48.1,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Hola.",
+"start": 48.76,
+"end": 48.92,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Hola.",
+"start": 48.92,
+"end": 48.92,
+"type": "word",
+"speaker_id": "speaker_2"
+},
+{
+"text": "Vas",
+"start": 48.94,
+"end": 49.04,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "a",
+"start": 49.04,
+"end": 49.04,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "tener",
+"start": 49.08,
+"end": 49.24,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "que",
+"start": 49.32,
+"end": 49.5,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "subir",
+"start": 50.12,
+"end": 50.38,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "por",
+"start": 50.44,
+"end": 50.54,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "ahí.",
+"start": 50.58,
+"end": 50.7,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Sí.",
+"start": 50.76,
+"end": 50.92,
+"type": "word",
+"speaker_id": "speaker_2"
+},
+{
+"text": "Okey,",
+"start": 51.08,
+"end": 51.26,
+"type": "word",
+"speaker_id": "speaker_2"
+},
+{
+"text": "venga,",
+"start": 51.32,
+"end": 51.5,
+"type": "word",
+"speaker_id": "speaker_2"
+},
+{
+"text": "me--",
+"start": 51.56,
+"end": 51.7,
+"type": "word",
+"speaker_id": "speaker_2"
+},
+{
+"text": "Viene",
+"start": 73.38,
+"end": 73.58,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "todo",
+"start": 73.62,
+"end": 73.72,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "para",
+"start": 73.74,
+"end": 73.86,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "allá.",
+"start": 73.88,
+"end": 74.04,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Un",
+"start": 80.12,
+"end": 86.1,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "ratito.",
+"start": 88.3,
+"end": 93.26,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Hola.",
+"start": 97.34,
+"end": 97.64,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Perfecto.",
+"start": 100.88,
+"end": 101.28,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "Muchísimas",
+"start": 101.34,
+"end": 101.74,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "gracias.",
+"start": 101.78,
+"end": 102.06,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "Prueba",
+"start": 107.36,
+"end": 107.6,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "uno,",
+"start": 107.64,
+"end": 107.78,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "dos,",
+"start": 107.78,
+"end": 107.84,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "tres.",
+"start": 107.92,
+"end": 108.24,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Probando,",
+"start": 108.78,
+"end": 109.14,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "probando,",
+"start": 109.22,
+"end": 109.5,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "probando,",
+"start": 109.72,
+"end": 110.16,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "probando.",
+"start": 111.28,
+"end": 111.78,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Sí,",
+"start": 115.06,
+"end": 115.14,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "habla,",
+"start": 115.52,
+"end": 115.74,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "habla.",
+"start": 116.18,
+"end": 116.46,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Hola.",
+"start": 116.66,
+"end": 116.86,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "¿Hola?",
+"start": 116.86,
+"end": 117.48,
+"type": "word",
+"speaker_id": "speaker_2"
+},
+{
+"text": "¿Puedes",
+"start": 117.48,
+"end": 118.86,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "hola?",
+"start": 118.88,
+"end": 119.14,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Hola.",
+"start": 120.5,
+"end": 120.84,
+"type": "word",
+"speaker_id": "speaker_3"
+},
+{
+"text": "Gracias.",
+"start": 121.18,
+"end": 121.82,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Estamos",
+"start": 125.44,
+"end": 125.62,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "probando.",
+"start": 125.64,
+"end": 126.02,
+"type": "word",
+"speaker_id": "speaker_0"
+}
+],
+"entities": [
+{
+"text": "Uno",
+"entity_type": "cardinal",
+"start_char": 0,
+"end_char": 3
+},
+{
+"text": "dos",
+"entity_type": "cardinal",
+"start_char": 5,
+"end_char": 8
+},
+{
+"text": "tres",
+"entity_type": "cardinal",
+"start_char": 10,
+"end_char": 14
+},
+{
+"text": "Uno",
+"entity_type": "cardinal",
+"start_char": 26,
+"end_char": 29
+},
+{
+"text": "dos",
+"entity_type": "cardinal",
+"start_char": 31,
+"end_char": 34
+},
+{
+"text": "tres",
+"entity_type": "cardinal",
+"start_char": 36,
+"end_char": 40
+},
+{
+"text": "Uno",
+"entity_type": "cardinal",
+"start_char": 52,
+"end_char": 55
+},
+{
+"text": "dos",
+"entity_type": "cardinal",
+"start_char": 57,
+"end_char": 60
+},
+{
+"text": "tres",
+"entity_type": "cardinal",
+"start_char": 62,
+"end_char": 66
+},
+{
+"text": "uno",
+"entity_type": "cardinal",
+"start_char": 88,
+"end_char": 91
+},
+{
+"text": "dos",
+"entity_type": "cardinal",
+"start_char": 93,
+"end_char": 96
+},
+{
+"text": "tres",
+"entity_type": "cardinal",
+"start_char": 98,
+"end_char": 102
+},
+{
+"text": "Uno",
+"entity_type": "cardinal",
+"start_char": 114,
+"end_char": 117
+},
+{
+"text": "dos",
+"entity_type": "cardinal",
+"start_char": 119,
+"end_char": 122
+},
+{
+"text": "tres",
+"entity_type": "cardinal",
+"start_char": 124,
+"end_char": 128
+},
+{
+"text": "profe",
+"entity_type": "occupation",
+"start_char": 194,
+"end_char": 199
+},
+{
+"text": "uno",
+"entity_type": "cardinal",
+"start_char": 424,
+"end_char": 427
+},
+{
+"text": "dos",
+"entity_type": "cardinal",
+"start_char": 429,
+"end_char": 432
+},
+{
+"text": "tres",
+"entity_type": "cardinal",
+"start_char": 434,
+"end_char": 438
+}
+]
+}

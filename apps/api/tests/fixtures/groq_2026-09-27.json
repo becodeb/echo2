@@ -1,0 +1,87 @@
+{
+"text": " Hola, sí, ¿quién es? Hola, yo soy Bautista Goñi Hola, hola, hola, soy Vanina Ok, ¿y vos quién sos? El Cho ¿El Cho qué? El Choto ¿El Choto sos? Ok, él es el Choto ¿Vos quién sos? Vanina, ya dije",
+"language": "Spanish",
+"duration": 20.399998976,
+"segments": [
+{
+"start": 0,
+"end": 2.5,
+"text": " Hola, sí, ¿quién es?",
+"avg_logprob": -0.22070663,
+"no_speech_prob": 0,
+"compression_ratio": 1.5373135
+},
+{
+"start": 3.5,
+"end": 5.3399997,
+"text": " Hola, yo soy Bautista Goñi",
+"avg_logprob": -0.22070663,
+"no_speech_prob": 0,
+"compression_ratio": 1.5373135
+},
+{
+"start": 5.3399997,
+"end": 6.96,
+"text": " Hola, hola, hola, soy Vanina",
+"avg_logprob": -0.22070663,
+"no_speech_prob": 0,
+"compression_ratio": 1.5373135
+},
+{
+"start": 6.96,
+"end": 10.26,
+"text": " Ok, ¿y vos quién sos?",
+"avg_logprob": -0.22070663,
+"no_speech_prob": 0,
+"compression_ratio": 1.5373135
+},
+{
+"start": 10.76,
+"end": 11.179999,
+"text": " El Cho",
+"avg_logprob": -0.22070663,
+"no_speech_prob": 0,
+"compression_ratio": 1.5373135
+},
+{
+"start": 11.179999,
+"end": 12.88,
+"text": " ¿El Cho qué?",
+"avg_logprob": -0.22070663,
+"no_speech_prob": 0,
+"compression_ratio": 1.5373135
+},
+{
+"start": 13.139999,
+"end": 13.74,
+"text": " El Choto",
+"avg_logprob": -0.22070663,
+"no_speech_prob": 0,
+"compression_ratio": 1.5373135
+},
+{
+"start": 13.74,
+"end": 15.96,
+"text": " ¿El Choto sos? Ok, él es el Choto",
+"avg_logprob": -0.22070663,
+"no_speech_prob": 0,
+"compression_ratio": 1.5373135
+},
+{
+"start": 15.96,
+"end": 17.48,
+"text": " ¿Vos quién sos?",
+"avg_logprob": -0.22070663,
+"no_speech_prob": 0,
+"compression_ratio": 1.5373135
+},
+{
+"start": 18.16,
+"end": 19.859999,
+"text": " Vanina, ya dije",
+"avg_logprob": -0.22070663,
+"no_speech_prob": 0,
+"compression_ratio": 1.5373135
+}
+]
+}

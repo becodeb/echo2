@@ -38,6 +38,9 @@ MP3_MIME = "audio/mpeg"
 # Un PCM que no se toca hace este tiempo es de una reunión que nunca se
 # finalizó (se cerró la pestaña y nadie volvió): se borra igual.
 ORPHAN_PCM_HOURS = 24
+# El audio guardado para reintentar la separación de personas (ElevenLabs
+# caído) no se guarda más que esto.
+PEOPLE_RETRY_HOURS = 48
 
 
 def recordings_dir() -> Path:
@@ -209,6 +212,13 @@ async def cleanup_recordings() -> int:
     folder = recordings_dir()
     mp3s: dict[uuid.UUID, Path] = {}
     for path in folder.iterdir():
+        if path.name.endswith(".people.mp3"):
+            # Copia para reintentar la separación de personas: los reintentos
+            # la borran; si quedó colgada, se va igual que un PCM abandonado.
+            if time.time() - path.stat().st_mtime > PEOPLE_RETRY_HOURS * 3600:
+                path.unlink(missing_ok=True)
+                removed += 1
+            continue
         try:
             meeting_id = uuid.UUID(path.stem)
         except ValueError:

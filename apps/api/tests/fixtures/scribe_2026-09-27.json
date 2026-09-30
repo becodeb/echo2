@@ -1,0 +1,344 @@
+{
+"language_code": "spa",
+"text": "Hola, sí, ¿quién es? Yo soy-- hola, yo soy Bautista Goñi. Hola, hola, hola, soy Vanina. Okey. ¿Y vos quién sos? El Cho. ¿El Cho qué? El Choto. ¿El Choto sos? Okey, él es el Choto. ¿Vos quién sos? Vanina, ya dije.",
+"words": [
+{
+"text": "Hola,",
+"start": 1.64,
+"end": 1.84,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "sí,",
+"start": 1.92,
+"end": 2.04,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "¿quién",
+"start": 2.1,
+"end": 2.24,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "es?",
+"start": 2.32,
+"end": 2.6,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Yo",
+"start": 3.5,
+"end": 3.6,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "soy--",
+"start": 3.64,
+"end": 3.76,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "hola,",
+"start": 3.92,
+"end": 4.1,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "yo",
+"start": 4.18,
+"end": 4.28,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "soy",
+"start": 4.34,
+"end": 4.42,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Bautista",
+"start": 4.44,
+"end": 4.82,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Goñi.",
+"start": 4.86,
+"end": 5.18,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Hola,",
+"start": 5.56,
+"end": 5.72,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "hola,",
+"start": 5.78,
+"end": 5.98,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "hola,",
+"start": 6.06,
+"end": 6.26,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "soy",
+"start": 6.44,
+"end": 6.6,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "Vanina.",
+"start": 6.62,
+"end": 7.14,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "Okey.",
+"start": 8.96,
+"end": 9.32,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "¿Y",
+"start": 9.32,
+"end": 9.74,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "vos",
+"start": 9.76,
+"end": 9.86,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "quién",
+"start": 9.9,
+"end": 10.04,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "sos?",
+"start": 10.1,
+"end": 10.38,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "El",
+"start": 10.92,
+"end": 11.04,
+"type": "word",
+"speaker_id": "speaker_2"
+},
+{
+"text": "Cho.",
+"start": 11.12,
+"end": 11.28,
+"type": "word",
+"speaker_id": "speaker_2"
+},
+{
+"text": "¿El",
+"start": 11.28,
+"end": 12.66,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Cho",
+"start": 12.7,
+"end": 12.8,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "qué?",
+"start": 12.86,
+"end": 12.98,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "El",
+"start": 13.3,
+"end": 13.4,
+"type": "word",
+"speaker_id": "speaker_2"
+},
+{
+"text": "Choto.",
+"start": 13.5,
+"end": 13.84,
+"type": "word",
+"speaker_id": "speaker_2"
+},
+{
+"text": "¿El",
+"start": 13.88,
+"end": 14.4,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Choto",
+"start": 14.46,
+"end": 14.68,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "sos?",
+"start": 14.74,
+"end": 14.96,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Okey,",
+"start": 15.18,
+"end": 15.36,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "él",
+"start": 15.4,
+"end": 15.46,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "es",
+"start": 15.48,
+"end": 15.54,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "el",
+"start": 15.58,
+"end": 15.66,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Choto.",
+"start": 15.74,
+"end": 16.04,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "¿Vos",
+"start": 16.04,
+"end": 17.2,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "quién",
+"start": 17.22,
+"end": 17.32,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "sos?",
+"start": 17.36,
+"end": 17.56,
+"type": "word",
+"speaker_id": "speaker_0"
+},
+{
+"text": "Vanina,",
+"start": 18.28,
+"end": 18.72,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "ya",
+"start": 18.82,
+"end": 18.96,
+"type": "word",
+"speaker_id": "speaker_1"
+},
+{
+"text": "dije.",
+"start": 18.98,
+"end": 19.38,
+"type": "word",
+"speaker_id": "speaker_1"
+}
+],
+"entities": [
+{
+"text": "Bautista Goñi",
+"entity_type": "name",
+"start_char": 43,
+"end_char": 56
+},
+{
+"text": "Bautista",
+"entity_type": "name_given",
+"start_char": 43,
+"end_char": 51
+},
+{
+"text": "Goñi",
+"entity_type": "name_family",
+"start_char": 52,
+"end_char": 56
+},
+{
+"text": "Vanina",
+"entity_type": "name",
+"start_char": 80,
+"end_char": 86
+},
+{
+"text": "Vanina",
+"entity_type": "name_given",
+"start_char": 80,
+"end_char": 86
+},
+{
+"text": "Vanina",
+"entity_type": "name",
+"start_char": 196,
+"end_char": 202
+},
+{
+"text": "Vanina",
+"entity_type": "name_given",
+"start_char": 196,
+"end_char": 202
+}
+]
+}

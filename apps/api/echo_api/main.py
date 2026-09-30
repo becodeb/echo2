@@ -118,6 +118,17 @@ async def _start_recordings_cleanup() -> None:
 
 
 @app.on_event("startup")
+async def _start_people_retry() -> None:
+    """Reintenta cada 15 min la separación de personas que quedó pendiente
+    porque ElevenLabs falló (services/diarization.py)."""
+    from .services.background import spawn
+    from .services.diarization import retry_loop
+
+    if settings.echo_env != "test":
+        spawn(retry_loop(), name="people-retry")
+
+
+@app.on_event("startup")
 async def _sync_superadmins() -> None:
     """Aplica SUPERADMIN_EMAILS sobre los usuarios existentes.
 
