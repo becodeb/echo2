@@ -1,4 +1,6 @@
 import { Composition } from "remotion";
+import { EchoDemo } from "./demo/EchoDemo";
+import { FPS as DEMO_FPS, HEIGHT, TOTAL, WIDTH } from "./demo/timeline";
 import { EchoOjos } from "./EchoOjos";
 import { Variante, VARIANTES } from "./Variantes";
 
@@ -6,6 +8,15 @@ const FPS = 30;
 
 export const Root = () => (
   <>
+    {/* La demo de producto (STORYBOARD.md): el hero de la landing + 30 s de demo, a 60 fps. */}
+    <Composition
+      id="EchoDemo"
+      component={EchoDemo}
+      durationInFrames={TOTAL}
+      fps={DEMO_FPS}
+      width={WIDTH}
+      height={HEIGHT}
+    />
     <Composition
       id="EchoOjos"
       component={EchoOjos}

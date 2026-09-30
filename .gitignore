@@ -40,3 +40,5 @@ firmware/esp32/secrets.h
 
 # renders de Remotion (se regeneran)
 apps/video/out/
+# videos de referencia de las otras demos (pesados; se suben a mano)
+apps/video/reference/
