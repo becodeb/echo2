@@ -54,6 +54,8 @@ from ..services.stt.channels import (
     is_noise_transcript,
     is_prompt_echo,
     is_silent,
+    is_unreliable,
+    repeats_previous,
     split_channels,
     strip_hallucinations,
 )
@@ -182,8 +184,12 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
     vocabulary: list[str] = []
     stt_error_sent = False
     segments_since_insights = 0
-    # Lo último transcripto: contexto para el tramo siguiente.
-    recent_text = ""
+    # El último tramo guardado: un tramo que lo repite entero es el modelo
+    # devolviendo lo anterior, no alguien que habló.
+    previous_text = ""
+    # Idioma fijo: con "auto", Whisper adivina el idioma de cada tramo y sobre
+    # ruido escribe en árabe o en inglés.
+    language = meeting.language if meeting.language and meeting.language != "auto" else "es"
     # Control de ritmo: cuánto audio llegó desde que empezó a llegar.
     audio_started_at: float | None = None
     audio_received_ms = 0
@@ -225,7 +231,7 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
         jobs.put_nowait((chunk, offset, final))
 
     async def transcribe_chunk(chunk: bytes, offset: int, final: bool) -> None:
-        nonlocal stt_error_sent, segments_since_insights, recent_text
+        nonlocal stt_error_sent, segments_since_insights, previous_text
         mic_track: bytes | None = None
         system_track: bytes | None = None
         tracks = [chunk]
@@ -243,11 +249,15 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
             return
         # Un error suelto (timeout, 5xx, rate limit) se reintenta una vez: sin
         # eso el tramo se perdía entero.
+        # Sin lo último dicho como pista, solo el diccionario: en un tramo casi
+        # mudo el modelo devolvía la pista tal cual (el turno gigante de las
+        # 02:10 de la reunión eb3ce903), y con pista "uno dos tres probando"
+        # salía 12 veces en vez de 5 (bench/casos/2026-09-30).
         result = None
         for attempt in range(2):
             try:
                 result = await stt_provider.transcribe_chunk(
-                    chunk, sample_rate, meeting.language, vocabulary, offset_ms=offset, context=recent_text
+                    chunk, sample_rate, language, vocabulary, offset_ms=offset
                 )
                 break
             except Exception as exc:  # provider caído: avisar sin matar la reunión
@@ -266,7 +276,13 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
         stt_error_sent = False
         for seg in result.segments:
             text = strip_hallucinations(seg.text)
-            if not text or is_prompt_echo(text, vocabulary) or is_noise_transcript(text, meeting.language):
+            if (
+                not text
+                or is_unreliable(seg)
+                or is_prompt_echo(text, vocabulary)
+                or is_noise_transcript(text, language)
+                or repeats_previous(text, previous_text)
+            ):
                 continue
             speaker = seg.speaker
             if mic_track is not None and system_track is not None:
@@ -284,7 +300,7 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
                 )
             event = await _store_segment(meeting, text, seg.start_ms, seg.end_ms, seg.confidence, speaker)
             await live_bus.publish(channel, event)
-            recent_text = (recent_text + " " + text)[-300:]
+            previous_text = text
             segments_since_insights += 1
         if segments_since_insights >= 8 or (final and segments_since_insights > 0):
             segments_since_insights = 0

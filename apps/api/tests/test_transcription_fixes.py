@@ -257,3 +257,73 @@ def test_live_audio_is_retried_and_the_flush_is_confirmed(client, monkeypatch):
     # Y el audio de trabajo quedó entero en disco antes del aviso.
     assert rec.pcm_path(meeting_id).stat().st_size == len(audio)
     rec.pcm_path(meeting_id).unlink(missing_ok=True)
+
+
+def test_live_sends_no_hint_and_drops_a_window_that_repeats_the_last_one(client, monkeypatch):
+    # Reunión eb3ce903, 02:10: sobre un tramo casi mudo el modelo devolvió
+    # lo último dicho (la pista que se le mandaba) y quedó un turno gigante
+    # repetido. Ahora no se manda pista, y si igual vuelve lo anterior, se tira.
+    import echo_api.routers.live as live_module
+    from echo_api.services.ai_settings import SttConfig
+
+    said = "Uno dos tres probando, esto es una prueba de Echo."
+    replies = [said, said, "Ahora sí, arrancamos la reunión."]
+    calls: list[dict] = []
+
+    class EchoingSTT:
+        async def transcribe_chunk(self, pcm16, sample_rate, language, vocabulary, offset_ms=0, context=None):
+            calls.append({"language": language, "context": context})
+            duration = len(pcm16) // 32
+            text = replies[min(len(calls) - 1, len(replies) - 1)]
+            return SttResult(segments=[SttSegment(text=text, start_ms=offset_ms, end_ms=offset_ms + duration)])
+
+    async def fake_resolve_stt(db, org_id):
+        return SttConfig(provider="groq", model=None, api_key="x")
+
+    monkeypatch.setattr(live_module, "resolve_stt", fake_resolve_stt)
+    monkeypatch.setattr(live_module, "get_stt_provider", lambda *args, **kwargs: EchoingSTT())
+
+    user = EchoTestUser(client, org_name=f"Colegio {uuid.uuid4().hex[:4]}")
+    meeting = client.post(
+        "/api/meetings", json={"title": "x", "level": "primaria", "language": "auto"}, headers=user.headers
+    ).json()
+    meeting_id = uuid.UUID(meeting["id"])
+    # Tres tramos: habla, pausa (corte), habla, pausa, habla.
+    audio = (_tone(5.0) + _silence(1.0)) * 3
+    with client.websocket_connect(f"/api/meetings/{meeting_id}/ws?token={user.token}") as websocket:
+        websocket.send_text(json.dumps({"type": "hello", "role": "recorder", "sample_rate": 16000}))
+        assert json.loads(websocket.receive_text())["type"] == "hello_ack"
+        for start in range(0, len(audio), 3200):
+            websocket.send_bytes(audio[start:start + 3200])
+        websocket.send_text(json.dumps({"type": "flush"}))
+        while json.loads(websocket.receive_text())["type"] != "flushed":
+            pass
+    assert len(calls) == 3
+    assert all(call["context"] is None for call in calls)
+    # Idioma fijo aunque la reunión diga "auto": sin eso Whisper inventa idiomas.
+    assert all(call["language"] == "es" for call in calls)
+    segments = client.get(f"/api/meetings/{meeting_id}/transcript", headers=user.headers).json()["segments"]
+    assert [seg["text"] for seg in segments] == [said, "Ahora sí, arrancamos la reunión."]
+    rec.pcm_path(meeting_id).unlink(missing_ok=True)
+
+
+def test_a_short_answer_said_twice_is_kept():
+    from echo_api.services.stt.channels import repeats_previous
+
+    assert repeats_previous("Sí, dale.", "Sí, dale.") is False
+    assert repeats_previous("Uno dos tres probando.", "uno, dos, tres, probando") is True
+    assert repeats_previous("Uno dos tres probando.", "Uno dos tres.") is False
+
+
+def test_groq_transcribes_before_openai_when_both_keys_are_there(monkeypatch):
+    from echo_api.config import get_settings
+    from echo_api.services import ai_settings
+
+    async def no_org_settings(db, org_id):
+        return None
+
+    monkeypatch.setattr(ai_settings, "get_org_ai_settings", no_org_settings)
+    monkeypatch.setattr(get_settings(), "openai_api_key", "sk-openai")
+    monkeypatch.setattr(get_settings(), "groq_api_key", "gsk-groq")
+    config = asyncio.run(ai_settings.resolve_stt(None, uuid.uuid4()))
+    assert (config.provider, config.api_key) == ("groq", "gsk-groq")

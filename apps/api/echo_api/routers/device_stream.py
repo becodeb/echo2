@@ -27,7 +27,13 @@ from ..services.background import spawn
 from ..services.insights_live import maybe_extract_live_insights
 from ..services.live_bus import live_bus
 from ..services.stt import get_stt_provider
-from ..services.stt.channels import is_noise_transcript, is_prompt_echo, is_silent, strip_hallucinations
+from ..services.stt.channels import (
+    is_noise_transcript,
+    is_prompt_echo,
+    is_silent,
+    is_unreliable,
+    strip_hallucinations,
+)
 from ..services.stt.windowing import find_cut
 
 log = logging.getLogger("echo.device")
@@ -180,7 +186,12 @@ async def device_stream(websocket: WebSocket):
         for seg in result.segments:
             # Los mismos filtros que el vivo de la web.
             text = strip_hallucinations(seg.text)
-            if not text or is_prompt_echo(text, vocabulary) or is_noise_transcript(text, meeting.language):
+            if (
+                not text
+                or is_unreliable(seg)
+                or is_prompt_echo(text, vocabulary)
+                or is_noise_transcript(text, meeting.language)
+            ):
                 continue
             event = await _store_segment(meeting, text, seg.start_ms, seg.end_ms, seg.confidence, "device")
             await live_bus.publish(channel, event)

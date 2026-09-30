@@ -102,3 +102,71 @@ class TestAlucinaciones:
     def test_habla_real_pasa(self):
         assert is_hallucination("No sé para qué tiene dos micrófonos") is False
         assert is_hallucination("El presupuesto de compras quedó aprobado") is False
+
+
+# ── Alucinaciones (banco del 30/9) ───────────────────────────────
+
+
+def test_a_loop_of_the_model_is_left_once():
+    from echo_api.services.stt.channels import strip_hallucinations
+
+    # gpt-4o-transcribe con el audio entero: "¿Cómo estás?" x100.
+    assert strip_hallucinations(" ".join(["¿Cómo estás?"] * 100) + " Bien, ¿y vos?") == "¿Cómo estás? Bien, ¿y vos?"
+    # Alguien probando el micrófono lo dice 5 veces: eso se dijo, queda.
+    said = " ".join(["Uno dos tres probando."] * 5)
+    assert strip_hallucinations(said) == said
+
+
+def test_lone_amen_dashes_and_english_fillers_are_not_speech():
+    from echo_api.services.stt.channels import strip_hallucinations
+
+    assert strip_hallucinations("Amén.") == ""
+    assert strip_hallucinations("- -") == ""
+    assert strip_hallucinations("Thank you.") == ""
+    assert strip_hallucinations("¡Suscríbete al canal!") == ""
+    # El guion de diálogo de subtítulos se saca, lo dicho queda.
+    assert strip_hallucinations("- Hola, ¿cómo estás? - Bien.") == "Hola, ¿cómo estás? Bien."
+    # Dentro de una frase real no se toca.
+    assert strip_hallucinations("Rezamos y dijimos amén con los chicos.") == "Rezamos y dijimos amén con los chicos."
+
+
+def test_whisper_signals_flag_invented_text():
+    from echo_api.services.stt.base import SttSegment
+    from echo_api.services.stt.channels import is_unreliable
+
+    def seg(no_speech, logprob):
+        return SttSegment("Gracias.", 0, 1000, no_speech_prob=no_speech, avg_logprob=logprob)
+
+    assert is_unreliable(seg(0.9, -1.2)) is True  # silencio que el modelo completó
+    assert is_unreliable(seg(0.9, -0.3)) is False  # dudó, pero lo oyó claro
+    assert is_unreliable(seg(0.1, -1.8)) is True  # ruido puro
+    assert is_unreliable(seg(0.1, -0.4)) is False
+    assert is_unreliable(SttSegment("Hola.", 0, 1000)) is False  # motor sin señales
+
+
+def test_groq_segments_carry_the_signals(monkeypatch):
+    import asyncio
+
+    import httpx
+
+    from echo_api.services.stt.base import get_stt_provider
+
+    class Reply:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        async def post(self, url, **kwargs):
+            body = {"segments": [{"start": 0, "end": 1.2, "text": " Amén.", "no_speech_prob": 0.8,
+                                  "avg_logprob": -1.3, "compression_ratio": 0.6}]}
+            return httpx.Response(200, json=body, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(httpx, "AsyncClient", Reply)
+    result = asyncio.run(get_stt_provider("groq", "k").transcribe_chunk(bytes(3200), 16000, "es"))
+    [segment] = result.segments
+    assert (segment.no_speech_prob, segment.avg_logprob, segment.compression_ratio) == (0.8, -1.3, 0.6)

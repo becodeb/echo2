@@ -38,6 +38,13 @@ def build_prompt(vocabulary: list[str] | None, context: str | None = None) -> st
     return " ".join(parts) or None
 
 
+def _float(value) -> float | None:
+    try:
+        return float(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
 def is_diarize_model(model: str) -> bool:
     return "diarize" in model
 
@@ -134,6 +141,9 @@ class WhisperApiProvider(TranscriptionProvider):
                         end_ms=offset_ms + int(float(seg.get("end", 0)) * 1000),
                         confidence=confidence,
                         speaker=f"Speaker {speaker}" if speaker else None,
+                        no_speech_prob=_float(seg.get("no_speech_prob")),
+                        avg_logprob=_float(seg.get("avg_logprob")),
+                        compression_ratio=_float(seg.get("compression_ratio")),
                     )
                 )
         elif payload.get("text"):

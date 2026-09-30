@@ -46,7 +46,28 @@ HALLUCINATION_MARKERS = (
     "thanks for watching",
     "gracias por ver el video",
     "¡gracias por ver el video!",
+    "subtítulos en español",
+    "subtitulos en español",
+    "subtítulos hechos por",
+    "suscríbete",
+    "suscribete",
+    "no olvides suscribirte",
+    "dale like",
+    "activa la campanita",
 )
+
+# Oraciones que, SOLAS, son lo que Whisper escribe sobre silencio o música
+# (visto en producción y en el banco). Dentro de una frase más larga no se tocan.
+HALLUCINATION_SENTENCES = {
+    "amén", "amen", "música", "musica", "aplausos", "risas",
+    "gracias por ver", "gracias por mirar",
+    # En inglés aunque se pida castellano: los clásicos de Whisper sobre ruido.
+    "you", "thank you", "thanks", "bye", "thank you very much",
+}
+
+# Signos que se sacan antes de comparar: puntuación y los guiones de diálogo
+# de subtítulos ("- Hola. - Hola.").
+_EDGE = ".!¡¿?,;:…-–—\"' "
 
 
 def split_channels(pcm16_stereo: bytes) -> tuple[bytes, bytes]:
@@ -123,21 +144,87 @@ def is_silent(pcm16: bytes, sample_rate: int = 16000) -> bool:
 
 def is_hallucination(text: str) -> bool:
     """Texto que Whisper inventa sobre silencio, no algo que alguien dijo."""
-    normalized = text.strip().lower().strip(".!¡¿? ")
+    normalized = " ".join(text.strip().lower().strip(_EDGE).split())
     if not normalized:
+        return True
+    if normalized in HALLUCINATION_SENTENCES:
         return True
     return any(marker in normalized for marker in HALLUCINATION_MARKERS)
 
 
+def _clean_sentence(sentence: str) -> str:
+    """Sin el guion de diálogo de subtítulos adelante ("- Hola." → "Hola.")."""
+    return re.sub(r"^[-–—]+\s*", "", sentence.strip()).strip()
+
+
+# Una frase repetida seguida más de esto es un bucle del modelo, no habla: en
+# el banco "¿Cómo estás?" salió 100 veces; alguien que prueba el micrófono
+# repite "uno dos tres probando" 5.
+MAX_REPEATS = 5
+_MAX_LOOP_WORDS = 8
+
+
+def collapse_loops(text: str) -> str:
+    """Deja una sola vez una frase que el modelo repitió en bucle."""
+    tokens = (text or "").split()
+    if len(tokens) < MAX_REPEATS + 1:
+        return (text or "").strip()
+    norm = [token.lower().strip(_EDGE) for token in tokens]
+    out: list[str] = []
+    index = 0
+    while index < len(tokens):
+        collapsed = False
+        for size in range(1, _MAX_LOOP_WORDS + 1):
+            unit = norm[index:index + size]
+            if len(unit) < size or not any(unit):
+                break
+            repeats = 1
+            while norm[index + repeats * size:index + (repeats + 1) * size] == unit:
+                repeats += 1
+            if repeats > MAX_REPEATS:
+                out.extend(tokens[index:index + size])
+                index += repeats * size
+                collapsed = True
+                break
+        if not collapsed:
+            out.append(tokens[index])
+            index += 1
+    return " ".join(out)
+
+
 def strip_hallucinations(text: str) -> str:
-    """El texto sin las oraciones inventadas.
+    """El texto sin las oraciones inventadas ni los bucles.
 
     Los modelos de solo texto devuelven UN texto por tramo de 4-12 s: si al
     final le pegan "Subtítulos realizados por la comunidad de Amara.org",
     descartarlo entero se llevaba también lo que alguien dijo de verdad.
     """
-    sentences = re.split(r"(?<=[.!?…])\s+", (text or "").strip())
-    return " ".join(sentence for sentence in sentences if sentence and not is_hallucination(sentence)).strip()
+    sentences = re.split(r"(?<=[.!?…])\s+", collapse_loops(text))
+    kept = [_clean_sentence(sentence) for sentence in sentences if sentence and not is_hallucination(sentence)]
+    return " ".join(sentence for sentence in kept if sentence).strip()
+
+
+# Umbrales de Whisper (los mismos que usa su propio decodificador): mucha
+# probabilidad de silencio con poca confianza es un tramo sin habla que el
+# modelo "completó".
+NO_SPEECH_PROB = 0.6
+LOW_LOGPROB = -1.0
+# Muy por debajo de esto el texto es ruido aunque el modelo crea que hubo habla.
+VERY_LOW_LOGPROB = -1.5
+
+
+def is_unreliable(segment) -> bool:
+    """Una frase que el propio modelo marca como probablemente inventada.
+
+    Solo con las señales de verbose_json (Groq, whisper-1); sin ellas, nunca.
+    """
+    no_speech = getattr(segment, "no_speech_prob", None)
+    logprob = getattr(segment, "avg_logprob", None)
+    if logprob is None:
+        return False
+    if no_speech is not None and no_speech >= NO_SPEECH_PROB and logprob < LOW_LOGPROB:
+        return True
+    return logprob < VERY_LOW_LOGPROB
 
 
 def is_prompt_echo(text: str, vocabulary: list[str] | None) -> bool:
@@ -155,6 +242,25 @@ def is_prompt_echo(text: str, vocabulary: list[str] | None) -> bool:
         return False
     known = {w for term in vocabulary for w in "".join(c.lower() if c.isalnum() else " " for c in term).split()}
     return all(word in known for word in words)
+
+
+def _words(text: str) -> list[str]:
+    return "".join(c.lower() if c.isalnum() else " " for c in text or "").split()
+
+
+# Menos palabras que esto pueden repetirse de verdad ("Sí, dale." dos veces).
+MIN_REPEAT_WORDS = 3
+
+
+def repeats_previous(text: str, previous: str | None) -> bool:
+    """El tramo es el anterior otra vez, palabra por palabra.
+
+    Sobre un tramo casi mudo el modelo a veces devuelve lo último que oyó en
+    vez de lo que hay (reunión eb3ce903, 02:10). Una frase corta repetida
+    puede ser real, así que solo cuenta desde MIN_REPEAT_WORDS palabras.
+    """
+    words = _words(text)
+    return len(words) >= MIN_REPEAT_WORDS and words == _words(previous or "")
 
 
 # Lo que los modelos devuelven sobre ruido en vez de habla: descripciones de

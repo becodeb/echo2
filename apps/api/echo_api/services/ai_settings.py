@@ -147,10 +147,13 @@ async def resolve_stt(db: AsyncSession, org_id: uuid.UUID) -> SttConfig | None:
             key = _env_key_for(row.stt_provider)
         if key:
             return SttConfig(provider=row.stt_provider, model=row.stt_model, api_key=key)
-    if env.openai_api_key:
-        return SttConfig(provider="openai", model=None, api_key=env.openai_api_key)
+    # Groq primero: whisper-large-v3-turbo sin pista fue lo más estable del
+    # banco (sin bucles ni idiomas inventados) y cuesta US$ 0,04/h. OpenAI
+    # queda solo si no hay otra key (docs/plan-transcripcion-y-planes.md).
     if env.groq_api_key:
         return SttConfig(provider="groq", model=None, api_key=env.groq_api_key)
+    if env.openai_api_key:
+        return SttConfig(provider="openai", model=None, api_key=env.openai_api_key)
     if env.deepgram_api_key:
         return SttConfig(provider="deepgram", model=None, api_key=env.deepgram_api_key)
     return None
