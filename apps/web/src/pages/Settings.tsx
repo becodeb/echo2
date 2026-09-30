@@ -9,6 +9,7 @@ import { useAuth } from "../state/auth";
 import { LEVEL_LABEL, useMyAccess, type Level, type LevelAccess } from "../state/access";
 import { ACTA_ENTREVISTA_COLEGIO } from "../lib/actaTemplates";
 import { LetterheadSection } from "./settings/LetterheadSection";
+import { CreateOrJoin } from "./OnboardingOrg";
 
 const SECTIONS = [
   { path: "org", label: "Organización" },
@@ -78,6 +79,21 @@ export default function Settings() {
 
 // ── Organización y miembros ──────────────────────────────────────
 
+/** Desde la cuenta individual: sumarse al colegio con un código, o dar de alta la institución. */
+function JoinOrCreateCard() {
+  const [mode, setMode] = useState<"create" | "join">("join");
+  return (
+    <div>
+      <h2 className="mb-1 font-semibold text-ink-900">¿Tu colegio usa Echo?</h2>
+      <p className="mb-4 text-sm text-ink-500">
+        Unite con el código de invitación que te pasen, o creá la organización de tu institución. Tu cuenta individual
+        sigue estando: cambiás entre las dos desde el menú.
+      </p>
+      <CreateOrJoin mode={mode} onMode={setMode} />
+    </div>
+  );
+}
+
 function OrgSection() {
   const { activeOrg } = useAuth();
   const queryClient = useQueryClient();
@@ -107,8 +123,12 @@ function OrgSection() {
     <div className="space-y-5">
       <Card>
         <h2 className="mb-1 font-semibold text-ink-900">{activeOrg?.name}</h2>
-        <p className="text-sm text-ink-400">Tu rol: {activeOrg?.role}</p>
+        <p className="text-sm text-ink-400">
+          {activeOrg?.is_personal ? "Tu cuenta individual" : `Tu rol: ${activeOrg?.role}`}
+        </p>
       </Card>
+
+      {activeOrg?.is_personal && <JoinOrCreateCard />}
 
       <Card>
         <h2 className="mb-3 font-semibold text-ink-900">Miembros</h2>

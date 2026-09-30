@@ -145,7 +145,7 @@ function CampusChoice({ options }: { options: JoinOptions }) {
   );
 }
 
-function CreateOrJoin({ mode, onMode }: { mode: "create" | "join"; onMode: (mode: "create" | "join") => void }) {
+export function CreateOrJoin({ mode, onMode }: { mode: "create" | "join"; onMode: (mode: "create" | "join") => void }) {
   const { createOrganization } = useAuth();
   const [name, setName] = useState("");
   const [inviteToken, setInviteToken] = useState("");
