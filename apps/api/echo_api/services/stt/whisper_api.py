@@ -53,8 +53,17 @@ def response_format_for(model: str) -> str:
 class WhisperApiProvider(TranscriptionProvider):
     supports_streaming = False
 
-    def __init__(self, name: str, base_url: str, api_key: str, model: str, file_model: str | None = None):
+    def __init__(
+        self,
+        name: str,
+        base_url: str,
+        api_key: str,
+        model: str,
+        file_model: str | None = None,
+        temperature: float | None = None,
+    ):
         self.name = name
+        self.temperature = temperature
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model = model
@@ -75,6 +84,8 @@ class WhisperApiProvider(TranscriptionProvider):
         context: str | None = None,
     ) -> dict:
         form: dict = {"model": model, "response_format": response_format_for(model)}
+        if self.temperature is not None:
+            form["temperature"] = str(self.temperature)
         if is_diarize_model(model):
             # Sin prompt ni idioma: la API los rechaza. Audio de más de 30 s
             # pide una estrategia de cortes.

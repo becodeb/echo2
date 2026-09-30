@@ -199,6 +199,7 @@ def _env_key_for(provider: str) -> str:
         "openai": env.openai_api_key,
         "anthropic": env.anthropic_api_key,
         "groq": env.groq_api_key,
+        "elevenlabs": env.elevenlabs_api_key,
         "deepgram": env.deepgram_api_key,
         "openrouter": env.openrouter_api_key,
         "gmi": env.gmi_api_key,

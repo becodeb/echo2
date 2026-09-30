@@ -117,3 +117,65 @@ def test_announcement_is_shown_once_per_person_across_schools(client):
     other_headers = {**user.headers, "X-Organization-Id": second}
     unread_other = client.get("/api/notifications?unread_only=true", headers=other_headers).json()["notifications"]
     assert not [item for item in unread_other if item["kind"] == kind]
+
+
+def test_groq_is_deterministic_and_whisper_turbo(monkeypatch):
+    provider = get_stt_provider("groq", "k")
+    assert provider.model == "whisper-large-v3-turbo"
+    _run(monkeypatch, {"segments": []}, provider.transcribe_chunk(bytes(3200), 16000, "es", ["Glifing"]))
+    form = _Capture.sent[0]
+    assert form["temperature"] == "0.0"
+    assert form["language"] == "es"
+    assert form["response_format"] == "verbose_json"
+    assert form["prompt"] == "Glifing."
+
+
+# Respuesta de Scribe v2 recortada con la forma real de la API: palabras con
+# espacios intercalados, speaker_id desde speaker_0 y entidades.
+SCRIBE_PAYLOAD = {
+    "language_code": "spa",
+    "text": "Hola, soy Vanina. ¿Cómo están? Bien.",
+    "words": [
+        {"text": "Hola,", "start": 0.1, "end": 0.4, "type": "word", "speaker_id": "speaker_3", "logprob": -0.1},
+        {"text": " ", "start": 0.4, "end": 0.45, "type": "spacing", "speaker_id": "speaker_3"},
+        {"text": "soy", "start": 0.45, "end": 0.6, "type": "word", "speaker_id": "speaker_3"},
+        {"text": " ", "start": 0.6, "end": 0.62, "type": "spacing"},
+        {"text": "Vanina.", "start": 0.62, "end": 1.1, "type": "word", "speaker_id": None},
+        {"text": "(risas)", "start": 1.1, "end": 1.5, "type": "audio_event"},
+        {"text": "¿Cómo", "start": 3.0, "end": 3.2, "type": "word", "speaker_id": "speaker_3"},
+        {"text": "están?", "start": 3.2, "end": 3.6, "type": "word", "speaker_id": "speaker_3"},
+        {"text": "Bien.", "start": 4.0, "end": 4.3, "type": "word", "speaker_id": "speaker_0"},
+    ],
+    "entities": [{"text": "Vanina", "entity_type": "person_name", "start_char": 10, "end_char": 16}],
+}
+
+
+def test_elevenlabs_request_asks_for_words_speakers_and_entities(monkeypatch):
+    provider = get_stt_provider("elevenlabs", "k")
+    vocabulary = ["Glifing", "x" * 60, "uno dos tres cuatro cinco seis", "Glifing"]
+    _run(monkeypatch, SCRIBE_PAYLOAD, provider.transcribe_file(b"RIFF", "a.wav", "es", vocabulary))
+    form = _Capture.sent[0]
+    assert form["model_id"] == "scribe_v2"
+    assert form["language_code"] == "spa"
+    assert form["diarize"] == "true"
+    assert form["timestamps_granularity"] == "word"
+    assert form["tag_audio_events"] == "false"
+    # Los términos que la API rechazaría (largos o de más de 5 palabras) no van.
+    assert form["keyterms"] == ["Glifing"]
+    assert form["entity_detection"] == ["pii", "phi"]
+    assert "enable_logging" not in form
+
+
+def test_elevenlabs_words_become_turns_with_a_person_each(monkeypatch):
+    provider = get_stt_provider("elevenlabs", "k")
+    result = _run(monkeypatch, SCRIBE_PAYLOAD, provider.transcribe_file(b"RIFF", "a.wav", "es"))
+    assert [w.text for w in result.words] == ["Hola,", "soy", "Vanina.", "¿Cómo", "están?", "Bien."]
+    # Nadie queda sin persona: "Vanina." hereda la de la palabra de al lado.
+    assert all(w.speaker for w in result.words)
+    assert [(s.speaker, s.text) for s in result.segments] == [
+        ("speaker_1", "Hola, soy Vanina."),
+        ("speaker_1", "¿Cómo están?"),
+        ("speaker_2", "Bien."),
+    ]
+    assert (result.segments[0].start_ms, result.segments[0].end_ms) == (100, 1100)
+    assert [(e.text, e.entity_type) for e in result.entities] == [("Vanina", "person_name")]

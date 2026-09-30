@@ -26,12 +26,40 @@ class SttSegment:
     # Etiqueta de hablante del motor ("A", "B", "speaker_0"…). El pipeline la
     # agrupa en filas Speaker. None = el motor no diariza.
     speaker: str | None = None
+    # Señales de Whisper por frase (verbose_json): probabilidad de que no haya
+    # habla, confianza media y cuánto se repite el texto. None = no las da.
+    no_speech_prob: float | None = None
+    avg_logprob: float | None = None
+    compression_ratio: float | None = None
+
+
+@dataclass
+class SttWord:
+    """Una palabra con su tiempo y su hablante (solo los motores que las dan)."""
+
+    text: str
+    start_ms: int
+    end_ms: int
+    speaker: str | None = None
+    logprob: float | None = None
+
+
+@dataclass
+class SttEntity:
+    """Un nombre, dato de contacto o documento que el motor detectó en el audio."""
+
+    text: str
+    entity_type: str
 
 
 @dataclass
 class SttResult:
     segments: list[SttSegment] = field(default_factory=list)
     language: str | None = None
+    # Palabra por palabra, cuando el motor lo da (ElevenLabs): de ahí salen
+    # los turnos de la pasada final, con texto y persona de la misma fuente.
+    words: list[SttWord] = field(default_factory=list)
+    entities: list[SttEntity] = field(default_factory=list)
 
     @property
     def text(self) -> str:
@@ -80,6 +108,8 @@ def pcm16_to_wav(pcm16: bytes, sample_rate: int, channels: int = 1) -> bytes:
 
 OPENAI_LIVE_MODEL = "gpt-4o-transcribe"
 OPENAI_FILE_MODEL = "gpt-4o-transcribe-diarize"
+GROQ_MODEL = "whisper-large-v3-turbo"
+SCRIBE_MODEL = "scribe_v2"
 
 
 def get_stt_provider(provider: str, api_key: str, model: str | None = None) -> TranscriptionProvider:
@@ -99,12 +129,19 @@ def get_stt_provider(provider: str, api_key: str, model: str | None = None) -> T
             file_model=model or OPENAI_FILE_MODEL,
         )
     if provider == "groq":
+        # temperature 0: sobre un tramo dudoso el modelo elige lo más
+        # probable en vez de "inventar" (banco del 30/9: estable entre corridas).
         return WhisperApiProvider(
             name="groq",
             base_url="https://api.groq.com/openai/v1",
             api_key=api_key,
-            model=model or "whisper-large-v3-turbo",
+            model=model or GROQ_MODEL,
+            temperature=0.0,
         )
+    if provider == "elevenlabs":
+        from .elevenlabs import ElevenLabsProvider
+
+        return ElevenLabsProvider(api_key=api_key, model=model or SCRIBE_MODEL)
     if provider == "deepgram":
         from .deepgram import DeepgramProvider
 

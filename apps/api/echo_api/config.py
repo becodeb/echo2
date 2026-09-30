@@ -90,6 +90,8 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     groq_api_key: str = ""
+    # ElevenLabs Scribe: pasada final con quién habló (services/stt/elevenlabs.py).
+    elevenlabs_api_key: str = ""
     deepgram_api_key: str = ""
     openrouter_api_key: str = ""
     orcarouter_api_key: str = ""
