@@ -55,7 +55,6 @@ GROQ_MIN_BILLED_SECONDS = 10
 LLM_PRICE_PER_MTOK = {
     "gpt-4o-mini": (0.15, 0.60),
     "gpt-4o": (2.50, 10.00),
-    "llama-3.3-70b-versatile": (0.59, 0.79),
 }
 
 

@@ -222,7 +222,8 @@ def _default_model(provider: str) -> str:
         "openai": "gpt-6-luna",
         "anthropic": "claude-sonnet-5",
         "gemini": "gemini-2.0-flash",
-        "groq": "llama-3.3-70b-versatile",
+        # Groq retiró llama-3.3-70b (404 el 30/9/2026); gpt-oss-120b anda bien en castellano.
+        "groq": "openai/gpt-oss-120b",
         "openrouter": "anthropic/claude-sonnet-4.5",
         "gmi": "MiniMaxAI/MiniMax-M3",
         "orcarouter": "orcarouter/free",
