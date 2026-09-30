@@ -62,6 +62,7 @@ def _include_optional_routers() -> None:
     for name in (
         "auth_google",
         "admin",
+        "admin_billing",
         "families",
         "attachments",
         "drive",

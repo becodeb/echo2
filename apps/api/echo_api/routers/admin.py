@@ -58,6 +58,10 @@ class AdminOrgOut(BaseModel):
     uses_own_key: bool
     # Dominios o emails que se unen solos (services/org_join.py).
     join_rules: list[str] = []
+    # Plan (models/billing.py) y topes propios.
+    plan: str = "base"
+    is_personal: bool = False
+    limits: dict = {}
 
 
 class AdminOrgAIIn(BaseModel):
@@ -126,6 +130,9 @@ async def list_organizations(
                 ),
                 uses_own_key=own_key,
                 join_rules=org.join_rules or [],
+                plan=org.plan,
+                is_personal=org.is_personal,
+                limits=org.limits or {},
             )
         )
     return out
@@ -230,6 +237,9 @@ async def set_organization_ai(
         llm_api_key_masked=mask_secret(plain) if plain else None,
         uses_own_key=bool(row.llm_api_key_enc),
         join_rules=org.join_rules or [],
+        plan=org.plan,
+        is_personal=org.is_personal,
+        limits=org.limits or {},
     )
 
 

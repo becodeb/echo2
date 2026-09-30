@@ -33,6 +33,11 @@ class User(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
     # organizaciones y les configura la IA. Se otorga por SUPERADMIN_EMAILS,
     # nunca desde la propia app.
     is_superadmin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Plan individual que paga esta persona (models/billing.py), aunque esté
+    # dentro de un colegio. "base" = no paga nada.
+    plan: Mapped[str] = mapped_column(String(30), default="base", server_default="base", nullable=False)
+    # Topes propios que pisan los del plan; los pone un superadmin.
+    limits: Mapped[dict | None] = mapped_column(JSONB)
 
     memberships: Mapped[list["OrganizationMember"]] = relationship(back_populates="user")
 
@@ -49,6 +54,13 @@ class Organization(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
     # emails exactos. Lo edita un superadmin, nunca la propia organización
     # (podría reclamar "gmail.com"). Ver services/org_join.py.
     join_rules: Mapped[list | None] = mapped_column(JSONB)
+    # Plan de la organización (models/billing.py): base | institucion | cortesia.
+    plan: Mapped[str] = mapped_column(String(30), default="base", server_default="base", nullable=False)
+    # Cuenta individual: la organización personal de una sola persona que se
+    # registró sin colegio.
+    is_personal: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    # Topes propios que pisan los del plan; los pone un superadmin.
+    limits: Mapped[dict | None] = mapped_column(JSONB)
 
     members: Mapped[list["OrganizationMember"]] = relationship(back_populates="organization")
 

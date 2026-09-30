@@ -45,6 +45,7 @@ from ..services.ai_settings import get_vocabulary, resolve_stt
 from ..services.background import spawn
 from ..services.insights_live import maybe_extract_live_insights
 from ..services.live_bus import live_bus
+from ..services.plans import record_usage, stt_cost
 from ..services.recording import PcmWriter, is_enabled, pcm_path, update_state
 from ..services.stt import get_stt_provider
 from ..services.stt.windowing import find_cut
@@ -161,6 +162,29 @@ async def _store_segment(
         }
 
 
+async def _record_live_usage(meeting: Meeting, user_id: uuid.UUID, provider, seconds: float) -> None:
+    """Segundos de audio que se mandaron a transcribir en vivo (panel de consumo)."""
+    name = getattr(provider, "name", "desconocido")
+    model = getattr(provider, "model", None)
+    try:
+        async with SessionLocal() as db:
+            await record_usage(
+                db,
+                kind="stt_live",
+                provider=name,
+                model=model,
+                unit="audio_seconds",
+                quantity=round(seconds, 2),
+                cost_usd=stt_cost(name, model, seconds),
+                organization_id=meeting.organization_id,
+                user_id=user_id,
+                meeting_id=meeting.id,
+            )
+            await db.commit()
+    except Exception as exc:  # noqa: BLE001 - anotar el consumo no corta la reunión
+        log.warning("live %s: no se pudo anotar el consumo: %s", meeting.id, exc)
+
+
 @router.websocket("/api/meetings/{meeting_id}/ws")
 async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
     auth = await _authorize(websocket, meeting_id)
@@ -274,6 +298,7 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
                 )
             return
         stt_error_sent = False
+        await _record_live_usage(meeting, user.id, stt_provider, len(tracks[0]) / 2 / sample_rate)
         for seg in result.segments:
             text = strip_hallucinations(seg.text)
             if (
