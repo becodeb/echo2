@@ -1,0 +1,600 @@
+[
+ {
+  "variant": "groq/raw",
+  "run": 1,
+  "turns": 10,
+  "people": 0,
+  "orphan_turns": 10,
+  "orphan_words_pct": 1.0,
+  "canary": 0,
+  "hallucinations": [],
+  "excess_phrases": 2,
+  "detail": [
+   [
+    "y vos quién sos",
+    2,
+    0
+   ],
+   [
+    "el cho",
+    2,
+    0
+   ]
+  ],
+  "latency_ms": 625,
+  "transcript": [
+   [
+    null,
+    0,
+    "Hola, sí, ¿quién es?",
+    2500
+   ],
+   [
+    null,
+    3500,
+    "Hola, yo soy Bautista Goñi",
+    5339
+   ],
+   [
+    null,
+    5339,
+    "Hola, hola, hola, soy Vanina",
+    6960
+   ],
+   [
+    null,
+    6960,
+    "Ok, ¿y vos quién sos?",
+    10260
+   ],
+   [
+    null,
+    10760,
+    "El Cho",
+    11179
+   ],
+   [
+    null,
+    11179,
+    "¿El Cho qué?",
+    12880
+   ],
+   [
+    null,
+    13139,
+    "El Choto",
+    13740
+   ],
+   [
+    null,
+    13740,
+    "¿El Choto sos? Ok, él es el Choto",
+    15960
+   ],
+   [
+    null,
+    15960,
+    "¿Vos quién sos?",
+    17480
+   ],
+   [
+    null,
+    18160,
+    "Vanina, ya dije",
+    19859
+   ]
+  ]
+ },
+ {
+  "variant": "prod_final sin personas",
+  "run": 1,
+  "turns": 10,
+  "people": 0,
+  "orphan_turns": 10,
+  "orphan_words_pct": 1.0,
+  "canary": 0,
+  "hallucinations": [],
+  "excess_phrases": 2,
+  "detail": [
+   [
+    "y vos quién sos",
+    2,
+    0
+   ],
+   [
+    "el cho",
+    2,
+    0
+   ]
+  ],
+  "transcript": [
+   [
+    null,
+    0,
+    "Hola, sí, ¿quién es?",
+    2500
+   ],
+   [
+    null,
+    3500,
+    "Hola, yo soy Bautista Goñi",
+    5339
+   ],
+   [
+    null,
+    5339,
+    "Hola, hola, hola, soy Vanina",
+    6960
+   ],
+   [
+    null,
+    6960,
+    "Ok, ¿y vos quién sos?",
+    10260
+   ],
+   [
+    null,
+    10760,
+    "El Cho",
+    11179
+   ],
+   [
+    null,
+    11179,
+    "¿El Cho qué?",
+    12880
+   ],
+   [
+    null,
+    13139,
+    "El Choto",
+    13740
+   ],
+   [
+    null,
+    13740,
+    "¿El Choto sos? Ok, él es el Choto",
+    15960
+   ],
+   [
+    null,
+    15960,
+    "¿Vos quién sos?",
+    17480
+   ],
+   [
+    null,
+    18160,
+    "Vanina, ya dije",
+    19859
+   ]
+  ]
+ },
+ {
+  "variant": "scribe/raw",
+  "run": 1,
+  "turns": 42,
+  "people": 3,
+  "orphan_turns": 0,
+  "orphan_words_pct": 0.0,
+  "canary": 0,
+  "hallucinations": [],
+  "excess_phrases": 0,
+  "detail": [],
+  "latency_ms": 1875,
+  "transcript": [
+   [
+    "speaker_0",
+    1640,
+    "Hola,",
+    1840
+   ],
+   [
+    "speaker_0",
+    1920,
+    "sí,",
+    2040
+   ],
+   [
+    "speaker_0",
+    2100,
+    "¿quién",
+    2240
+   ],
+   [
+    "speaker_0",
+    2320,
+    "es?",
+    2600
+   ],
+   [
+    "speaker_0",
+    3500,
+    "Yo",
+    3600
+   ],
+   [
+    "speaker_0",
+    3640,
+    "soy--",
+    3760
+   ],
+   [
+    "speaker_0",
+    3920,
+    "hola,",
+    4100
+   ],
+   [
+    "speaker_0",
+    4180,
+    "yo",
+    4280
+   ],
+   [
+    "speaker_0",
+    4340,
+    "soy",
+    4420
+   ],
+   [
+    "speaker_0",
+    4440,
+    "Bautista",
+    4820
+   ],
+   [
+    "speaker_0",
+    4860,
+    "Goñi.",
+    5180
+   ],
+   [
+    "speaker_1",
+    5560,
+    "Hola,",
+    5720
+   ],
+   [
+    "speaker_1",
+    5780,
+    "hola,",
+    5980
+   ],
+   [
+    "speaker_1",
+    6060,
+    "hola,",
+    6260
+   ],
+   [
+    "speaker_1",
+    6440,
+    "soy",
+    6600
+   ],
+   [
+    "speaker_1",
+    6620,
+    "Vanina.",
+    7140
+   ],
+   [
+    "speaker_0",
+    8960,
+    "Okey.",
+    9320
+   ],
+   [
+    "speaker_0",
+    9320,
+    "¿Y",
+    9740
+   ],
+   [
+    "speaker_0",
+    9760,
+    "vos",
+    9860
+   ],
+   [
+    "speaker_0",
+    9900,
+    "quién",
+    10040
+   ],
+   [
+    "speaker_0",
+    10100,
+    "sos?",
+    10380
+   ],
+   [
+    "speaker_2",
+    10920,
+    "El",
+    11040
+   ],
+   [
+    "speaker_2",
+    11120,
+    "Cho.",
+    11280
+   ],
+   [
+    "speaker_0",
+    11280,
+    "¿El",
+    12660
+   ],
+   [
+    "speaker_0",
+    12700,
+    "Cho",
+    12800
+   ],
+   [
+    "speaker_0",
+    12860,
+    "qué?",
+    12980
+   ],
+   [
+    "speaker_2",
+    13300,
+    "El",
+    13400
+   ],
+   [
+    "speaker_2",
+    13500,
+    "Choto.",
+    13840
+   ],
+   [
+    "speaker_0",
+    13880,
+    "¿El",
+    14400
+   ],
+   [
+    "speaker_0",
+    14460,
+    "Choto",
+    14680
+   ],
+   [
+    "speaker_0",
+    14740,
+    "sos?",
+    14960
+   ],
+   [
+    "speaker_0",
+    15180,
+    "Okey,",
+    15360
+   ],
+   [
+    "speaker_0",
+    15400,
+    "él",
+    15460
+   ],
+   [
+    "speaker_0",
+    15480,
+    "es",
+    15540
+   ],
+   [
+    "speaker_0",
+    15580,
+    "el",
+    15660
+   ],
+   [
+    "speaker_0",
+    15740,
+    "Choto.",
+    16040
+   ],
+   [
+    "speaker_0",
+    16040,
+    "¿Vos",
+    17200
+   ],
+   [
+    "speaker_0",
+    17220,
+    "quién",
+    17320
+   ],
+   [
+    "speaker_0",
+    17360,
+    "sos?",
+    17560
+   ],
+   [
+    "speaker_1",
+    18280,
+    "Vanina,",
+    18720
+   ],
+   [
+    "speaker_1",
+    18820,
+    "ya",
+    18960
+   ],
+   [
+    "speaker_1",
+    18980,
+    "dije.",
+    19380
+   ]
+  ]
+ },
+ {
+  "variant": "prod_final",
+  "run": 1,
+  "turns": 8,
+  "people": 3,
+  "orphan_turns": 0,
+  "orphan_words_pct": 0.0,
+  "canary": 0,
+  "hallucinations": [],
+  "excess_phrases": 2,
+  "detail": [
+   [
+    "y vos quién sos",
+    2,
+    0
+   ],
+   [
+    "el cho",
+    2,
+    0
+   ]
+  ],
+  "transcript": [
+   [
+    "speaker_1",
+    1640,
+    "Hola, sí, ¿quién es? Yo soy-- hola, yo soy Bautista Goñi.",
+    5180
+   ],
+   [
+    "speaker_2",
+    5560,
+    "Hola, hola, hola, soy Vanina.",
+    7140
+   ],
+   [
+    "speaker_1",
+    8960,
+    "Okey. ¿Y vos quién sos?",
+    10380
+   ],
+   [
+    "speaker_3",
+    10920,
+    "El Cho.",
+    11280
+   ],
+   [
+    "speaker_1",
+    11280,
+    "¿El Cho qué?",
+    12980
+   ],
+   [
+    "speaker_3",
+    13300,
+    "El Choto.",
+    13840
+   ],
+   [
+    "speaker_1",
+    13880,
+    "¿El Choto sos? Okey, él es el Choto. ¿Vos quién sos?",
+    17560
+   ],
+   [
+    "speaker_2",
+    18280,
+    "Vanina, ya dije.",
+    19380
+   ]
+  ]
+ },
+ {
+  "variant": "prod_live",
+  "run": 1,
+  "turns": 11,
+  "people": 0,
+  "orphan_turns": 11,
+  "orphan_words_pct": 1.0,
+  "canary": 0,
+  "hallucinations": [],
+  "excess_phrases": 1,
+  "detail": [
+   [
+    "y vos quién sos",
+    2,
+    0
+   ]
+  ],
+  "chunks": 4,
+  "transcript": [
+   [
+    null,
+    0,
+    "Hola, sí, ¿quién es?",
+    2500
+   ],
+   [
+    null,
+    3500,
+    "Hola, yo soy Bautista Goñi",
+    5339
+   ],
+   [
+    null,
+    5339,
+    "Hola, hola, hola, soy Vanina",
+    7480
+   ],
+   [
+    null,
+    7500,
+    "Ok, ¿y vos quién sos?",
+    10280
+   ],
+   [
+    null,
+    10740,
+    "El Chum",
+    11399
+   ],
+   [
+    null,
+    11500,
+    "¿A quién el Cho qué?",
+    12880
+   ],
+   [
+    null,
+    13140,
+    "El Choto",
+    13740
+   ],
+   [
+    null,
+    13740,
+    "¿El Choto sos?",
+    14820
+   ],
+   [
+    null,
+    15040,
+    "Ok, él es el Choto",
+    15960
+   ],
+   [
+    null,
+    15960,
+    "¿Vos quién sos?",
+    17480
+   ],
+   [
+    null,
+    17900,
+    "Vanina, ya dije.",
+    19140
+   ]
+  ]
+ }
+]

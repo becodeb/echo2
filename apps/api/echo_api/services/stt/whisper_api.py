@@ -20,7 +20,7 @@ import time
 
 import httpx
 
-from .base import SttResult, SttSegment, TranscriptionProvider, pcm16_to_wav
+from .base import SttResult, SttSegment, TranscriptionProvider, pcm16_to_wav, post_with_rate_limit
 
 log = logging.getLogger("echo.stt")
 
@@ -108,7 +108,8 @@ class WhisperApiProvider(TranscriptionProvider):
                 form["prompt"] = prompt
         started = time.monotonic()
         async with httpx.AsyncClient(timeout=300) as client:
-            response = await client.post(
+            response = await post_with_rate_limit(
+                client,
                 f"{self.base_url}/audio/transcriptions",
                 headers={"Authorization": f"Bearer {self.api_key}"},
                 data=form,

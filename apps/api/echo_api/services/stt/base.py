@@ -91,6 +91,35 @@ class TranscriptionProvider:
         raise NotImplementedError
 
 
+# Límite de pedidos (429): Groq gratis deja 20 por minuto, y una reunión en
+# vivo manda uno cada 4-12 s. Se espera lo que dice la API y se reintenta;
+# sin esto el tramo se perdía.
+RATE_LIMIT_RETRIES = 3
+RATE_LIMIT_MAX_WAIT = 20.0
+
+
+def retry_after_seconds(response) -> float:
+    """Cuánto esperar antes de reintentar un 429 (header Retry-After, o 2 s)."""
+    raw = response.headers.get("retry-after") if response is not None else None
+    try:
+        wait = float(raw) if raw is not None else 2.0
+    except ValueError:
+        wait = 2.0
+    return max(0.5, min(wait, RATE_LIMIT_MAX_WAIT))
+
+
+async def post_with_rate_limit(client, url: str, **kwargs):
+    """POST que, ante un 429, espera lo que pide la API y reintenta."""
+    import asyncio
+
+    for attempt in range(RATE_LIMIT_RETRIES + 1):
+        response = await client.post(url, **kwargs)
+        if response.status_code != 429 or attempt == RATE_LIMIT_RETRIES:
+            return response
+        await asyncio.sleep(retry_after_seconds(response))
+    return response
+
+
 def pcm16_to_wav(pcm16: bytes, sample_rate: int, channels: int = 1) -> bytes:
     """Empaqueta PCM16 crudo como WAV en memoria (sin tocar disco)."""
     buffer = io.BytesIO()

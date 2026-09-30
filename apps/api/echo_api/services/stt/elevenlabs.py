@@ -26,7 +26,15 @@ import time
 
 import httpx
 
-from .base import SttEntity, SttResult, SttSegment, SttWord, TranscriptionProvider, pcm16_to_wav
+from .base import (
+    SttEntity,
+    SttResult,
+    SttSegment,
+    SttWord,
+    TranscriptionProvider,
+    pcm16_to_wav,
+    post_with_rate_limit,
+)
 
 log = logging.getLogger("echo.stt")
 
@@ -193,7 +201,8 @@ class ElevenLabsProvider(TranscriptionProvider):
     async def _request(self, data: bytes, filename: str, form: dict) -> dict:
         started = time.monotonic()
         async with httpx.AsyncClient(timeout=900) as client:
-            response = await client.post(
+            response = await post_with_rate_limit(
+                client,
                 URL,
                 headers={"xi-api-key": self.api_key},
                 data=form,

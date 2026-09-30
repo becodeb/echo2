@@ -1,18 +1,24 @@
 """Banco de transcripción: el mismo audio por varios modelos y pre-procesados.
 
-    python bench/stt_bench.py --case bench/casos/2026-09-30 --audio "D:/.../reunion.mp3"
+    python bench/stt_bench.py --case bench/casos/2026-09-30 --audio "C:/.../reunion.mp3"
 
-Necesita OPENAI_API_KEY en el entorno y ffmpeg (FFMPEG=ruta, o imageio-ffmpeg
-instalado). Las respuestas de la API quedan en bench/.cache: volver a correr
-con otra referencia o con otras métricas no gasta de nuevo (--fresh para
-pedir todo otra vez; --repeat N para medir cuánto varía el modelo).
+Keys en bench/.env (fuera de git): GROQ_API_KEY y ELEVENLABS_API_KEY (las de
+PRUEBA). Necesita ffmpeg (FFMPEG=ruta, o imageio-ffmpeg instalado). Las
+respuestas quedan en bench/.cache: volver a correr con otra referencia o con
+otras métricas no gasta de nuevo (--fresh para pedir todo otra vez; --repeat N
+para medir cuánto varía el modelo).
 
-Variantes (modelo × pre-procesado), más dos que reproducen producción:
-- prod_live: el transcript en vivo tal cual lo arma routers/live.py (cortes
-  de services/stt/windowing.py, contexto de 300 caracteres como prompt,
-  filtros de channels.py).
-- prod_final: la pasada final de services/diarization.py sobre ese audio, con
-  el en vivo simulado como respaldo (lo que termina en la base).
+Variantes:
+- groq/raw: Groq whisper-large-v3-turbo con el audio entero (es, temperature 0).
+- scribe/raw: ElevenLabs Scribe v2 con el audio entero, con personas.
+- prod_live: el en vivo de routers/live.py (cortes de services/stt/windowing.py,
+  Groq sin pista de contexto, filtros de channels.py).
+- prod_final: la pasada final de services/diarization.py con personas
+  (Scribe → turnos desde las palabras).
+- prod_final sin personas: la misma pasada con Groq (plan Base sin crédito,
+  reuniones con menores).
+- Con --openai (gasta en OpenAI; Bauti pidió no usarlo): los modelos de
+  OpenAI × pre-procesados (raw, norm, vad, vad+norm).
 
 El audio real no va al repo: se pasa con --audio.
 """
@@ -39,6 +45,8 @@ import metrics  # noqa: E402
 from metrics import Turn  # noqa: E402
 
 URL = "https://api.openai.com/v1/audio/transcriptions"
+GROQ_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
+SCRIBE_URL = "https://api.elevenlabs.io/v1/speech-to-text"
 SR = 16000
 CACHE = HERE / ".cache"
 
@@ -122,25 +130,41 @@ def unmap(ms: int, mapping: list[tuple[int, int, int]] | None) -> int:
 # ── API con caché ────────────────────────────────────────────────
 
 
-def _key(form: dict, audio: bytes, run: int) -> str:
+def _key(form: dict, audio: bytes, run: int, url: str = URL) -> str:
     h = hashlib.sha256(audio)
     h.update(json.dumps(form, sort_keys=True).encode())
     h.update(str(run).encode())
+    if url != URL:  # las claves de OpenAI quedan como estaban: su caché sigue sirviendo
+        h.update(url.encode())
     return h.hexdigest()[:24]
 
 
-async def transcribe(client: httpx.AsyncClient, sem: asyncio.Semaphore, form: dict, audio: bytes, run: int, fresh: bool) -> dict:
+def _auth(url: str) -> dict:
+    if url == SCRIBE_URL:
+        return {"xi-api-key": os.environ["ELEVENLABS_API_KEY"]}
+    if url == GROQ_URL:
+        return {"Authorization": f"Bearer {os.environ['GROQ_API_KEY']}"}
+    return {"Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}"}
+
+
+async def transcribe(
+    client: httpx.AsyncClient, sem: asyncio.Semaphore, form: dict, audio: bytes, run: int, fresh: bool,
+    url: str = URL, filename: str = "audio.wav",
+) -> dict:
     CACHE.mkdir(exist_ok=True)
-    path = CACHE / f"{_key(form, audio, run)}.json"
+    path = CACHE / f"{_key(form, audio, run, url)}.json"
     if path.exists() and not fresh:
         return json.loads(path.read_text(encoding="utf-8"))
     async with sem:
         started = time.monotonic()
-        response = await client.post(
-            URL,
-            headers={"Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}"},
+        from echo_api.services.stt.base import post_with_rate_limit
+
+        response = await post_with_rate_limit(
+            client,
+            url,
+            headers=_auth(url),
             data=form,
-            files={"file": ("audio.wav", audio, "audio/wav")},
+            files={"file": (filename, audio, "audio/mpeg" if filename.endswith(".mp3") else "audio/wav")},
         )
     payload = {"status": response.status_code, "latency_ms": int((time.monotonic() - started) * 1000)}
     try:
@@ -150,6 +174,31 @@ async def transcribe(client: httpx.AsyncClient, sem: asyncio.Semaphore, form: di
     if response.status_code < 400:
         path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
     return payload
+
+
+def mp3(pcm: np.ndarray) -> bytes:
+    """Lo que producción le manda a Scribe (services/diarization.py): mp3 64 kbps."""
+    cmd = [ffmpeg(), "-hide_banner", "-loglevel", "error", "-f", "s16le", "-ar", str(SR), "-ac", "1", "-i", "-",
+           "-codec:a", "libmp3lame", "-b:a", "64k", "-f", "mp3", "-"]
+    return subprocess.run(cmd, input=pcm.astype(np.int16).tobytes(), check=True, capture_output=True).stdout
+
+
+def groq_form(language: str | None, vocabulary: list[str]) -> dict:
+    from echo_api.services.stt.whisper_api import build_prompt
+
+    form = {"model": "whisper-large-v3-turbo", "response_format": "verbose_json", "temperature": "0.0"}
+    if language:
+        form["language"] = language
+    prompt = build_prompt(vocabulary)
+    if prompt:
+        form["prompt"] = prompt
+    return form
+
+
+def scribe_form(language: str | None, vocabulary: list[str]) -> dict:
+    from echo_api.services.stt.elevenlabs import ElevenLabsProvider
+
+    return ElevenLabsProvider("x").form(language, vocabulary)
 
 
 def form_for(model: str, language: str | None, prompt: str | None) -> dict:
@@ -182,13 +231,17 @@ def to_turns(body: dict, mapping) -> list[Turn]:
 # ── Producción simulada ──────────────────────────────────────────
 
 
-async def prod_live(client, sem, pcm: np.ndarray, language: str, vocabulary: list[str], model: str, run: int, fresh: bool, context: bool = True):
-    """routers/live.py: cortes en pausas, contexto de lo último dicho, filtros.
-
-    context=False: el mismo camino sin mandar lo último dicho como pista.
-    """
-    from echo_api.services.stt.channels import is_noise_transcript, is_prompt_echo, is_silent, strip_hallucinations
-    from echo_api.services.stt.whisper_api import build_prompt
+async def prod_live(client, sem, pcm: np.ndarray, language: str, vocabulary: list[str], run: int, fresh: bool):
+    """routers/live.py: cortes en pausas, Groq sin pista, filtros."""
+    from echo_api.services.stt.channels import (
+        is_noise_transcript,
+        is_prompt_echo,
+        is_silent,
+        is_unreliable,
+        repeats_previous,
+        strip_hallucinations,
+    )
+    from echo_api.services.stt.whisper_api import WhisperApiProvider
     from echo_api.services.stt.windowing import find_cut
 
     raw = pcm.astype(np.int16).tobytes()
@@ -204,62 +257,47 @@ async def prod_live(client, sem, pcm: np.ndarray, language: str, vocabulary: lis
     if buffer:
         chunks.append((bytes(buffer), offset))
 
-    rows, recent = [], ""
-    for chunk, start in chunks:  # en orden: cada tramo usa el texto del anterior
+    parser = WhisperApiProvider("groq", "", "", "whisper-large-v3-turbo")
+    rows, previous = [], ""
+    for chunk, start in chunks:
         if is_silent(chunk):
             continue
-        form = form_for(model, language, build_prompt(vocabulary, recent if context else None))
-        if "diarize" not in model and model != "whisper-1":
-            form["response_format"] = "json"
-        payload = await transcribe(client, sem, form, wav(np.frombuffer(chunk, dtype=np.int16)), run, fresh)
-        body = payload.get("body") or {}
-        texts = [s.get("text", "") for s in body.get("segments") or []] or [body.get("text") or ""]
-        for text in texts:
-            text = strip_hallucinations(" ".join(text.split()))
-            if not text or is_prompt_echo(text, vocabulary) or is_noise_transcript(text, language):
+        audio = wav(np.frombuffer(chunk, dtype=np.int16))
+        payload = await transcribe(client, sem, groq_form(language, vocabulary), audio, run, fresh, GROQ_URL)
+        if payload["status"] >= 400:
+            print(f"  prod_live: Groq {payload['status']}: {json.dumps(payload['body'])[:200]}")
+            continue
+        for seg in parser._parse(payload["body"], start, len(chunk) // 32).segments:
+            text = strip_hallucinations(seg.text)
+            if (
+                not text
+                or is_unreliable(seg)
+                or is_prompt_echo(text, vocabulary)
+                or is_noise_transcript(text, language)
+                or repeats_previous(text, previous)
+            ):
                 continue
-            rows.append((start, start + len(chunk) // 32, text))
-            recent = (recent + " " + text)[-300:]
+            rows.append((seg.start_ms, seg.end_ms, text))
+            previous = text
     return rows, len(chunks)
 
 
-async def prod_final(client, sem, pcm: np.ndarray, language: str, vocabulary: list[str], live_rows, run: int, fresh: bool):
-    """services/diarization.py: separación de voces + texto final + mezcla (una sola parte)."""
-    from echo_api.services import diarization as d
+def final_turns(body: dict, language: str) -> list[Turn]:
+    """services/diarization.py con personas: Scribe → turnos desde las palabras."""
+    from echo_api.services.diarization import rows_from_scribe
+    from echo_api.services.stt.elevenlabs import parse
 
-    audio = wav(pcm)
-    diar = await transcribe(client, sem, form_for("gpt-4o-transcribe-diarize", None, None), audio, run, fresh)
-    part, local = [], {}
-    for seg in (diar.get("body") or {}).get("segments") or []:
-        label = str(seg.get("speaker") or "").strip()
-        if not label:
-            continue
-        local.setdefault(label, f"persona_{len(local) + 1}")
-        part.append(d.DiarSegment(int(float(seg["start"]) * 1000), int(float(seg["end"]) * 1000), local[label], (seg.get("text") or "").strip()))
+    rows, _ = rows_from_scribe(parse(body), language, [], 0)
+    return [Turn(label, start, text, end) for label, text, start, end in rows]
 
-    text, note = None, ""
-    for terms in [vocabulary, []] if vocabulary else [[]]:
-        from echo_api.services.stt.whisper_api import build_prompt
 
-        payload = await transcribe(client, sem, form_for("gpt-4o-transcribe", language, build_prompt(terms)), audio, run, fresh)
-        candidate = d.strip_prompt_echo((payload.get("body") or {}).get("text") or "", vocabulary)
-        if not candidate:
-            continue
-        score = d.agreement(candidate, part)
-        note += f"acuerdo {score:.0%}; "
-        if score >= d.MIN_AGREEMENT:
-            text = candidate
-            break
-    end_ms = len(pcm) // 16
-    if text and part:
-        final, note = d.merge_text_with_voices(text, part, 0, end_ms), note + "texto final + voces"
-    elif text:
-        final, note = [(None, text, 0, end_ms)], note + "texto final sin voces"
-    else:
-        final, note = d.fallback_pieces(live_rows, part, 0, end_ms), note + "RESPALDO: en vivo"
-    # Lo "dicho después del audio de trabajo" se agrega sin persona.
-    final += [(None, t, s, e) for s, e, t in live_rows if s >= end_ms]
-    return [Turn(label, start, text, end) for label, text, start, end in final], note
+def final_turns_without_people(body: dict, language: str) -> list[Turn]:
+    """services/diarization.py sin personas: Groq sobre el audio entero, con filtros."""
+    from echo_api.services.diarization import _clean_rows
+    from echo_api.services.stt.whisper_api import WhisperApiProvider
+
+    segments = WhisperApiProvider("groq", "", "", "whisper-large-v3-turbo")._parse(body, 0).segments
+    return [Turn(None, start, text, end) for _, text, start, end in _clean_rows(segments, language)]
 
 
 # ── Corrida ──────────────────────────────────────────────────────
@@ -277,12 +315,15 @@ async def main() -> None:
     parser.add_argument("--fresh", action="store_true")
     parser.add_argument("--only", help="variantes separadas por coma (p. ej. prod_final,gpt-4o-transcribe/raw)")
     parser.add_argument("--no-api", action="store_true", help="solo el transcript exportado de producción")
+    parser.add_argument("--openai", action="store_true", help="también los modelos de OpenAI (gasta en OpenAI)")
+    parser.add_argument("--out", default="results.json", help="archivo de resultados dentro del caso")
     args = parser.parse_args()
 
-    if not os.environ.get("OPENAI_API_KEY") and (HERE / ".env").exists():
+    if (HERE / ".env").exists():
         for line in (HERE / ".env").read_text(encoding="utf-8").splitlines():
-            if line.startswith("OPENAI_API_KEY="):
-                os.environ["OPENAI_API_KEY"] = line.split("=", 1)[1].strip()
+            key, sep, value = line.partition("=")
+            if sep and key.strip() and not os.environ.get(key.strip()):
+                os.environ[key.strip()] = value.strip()
     case = Path(args.case)
     meta = json.loads((case / "case.json").read_text(encoding="utf-8"))
     language, vocabulary = meta.get("language"), meta.get("vocabulary") or []
@@ -315,34 +356,62 @@ async def main() -> None:
         sem = asyncio.Semaphore(4)
         async with httpx.AsyncClient(timeout=600) as client:
             for run in range(1, args.repeat + 1):
-                jobs = []
-                for model in MODELS:
-                    for pre in PREPROCESS:
-                        name = f"{model}/{pre}"
-                        if wanted and name not in wanted:
+                def want(name: str) -> bool:
+                    return not wanted or name in wanted
+
+                raw = variants["raw"][0]
+                if args.openai:
+                    jobs = []
+                    for model in MODELS:
+                        for pre in PREPROCESS:
+                            name = f"{model}/{pre}"
+                            if not want(name):
+                                continue
+                            pcm, mapping = variants[pre]
+                            # Idioma y diccionario fijos: así va a producción.
+                            prompt = ", ".join(vocabulary) + "." if vocabulary else None
+                            form = form_for(model, language, prompt)
+                            jobs.append((name, mapping, transcribe(client, sem, form, wav(pcm), run, args.fresh)))
+                    for name, mapping, job in jobs:
+                        payload = await job
+                        if payload["status"] >= 400:
+                            print(f"  {name}: API {payload['status']}: {json.dumps(payload['body'])[:200]}")
+                            results.append({"variant": name, "run": run, "error": payload["body"]})
                             continue
-                        pcm, mapping = variants[pre]
-                        # Idioma y diccionario fijos: así va a producción.
-                        prompt = ", ".join(vocabulary) + "." if vocabulary else None
-                        jobs.append((name, mapping, transcribe(client, sem, form_for(model, language, prompt), wav(pcm), run, args.fresh)))
-                for name, mapping, job in jobs:
-                    payload = await job
+                        record(name, run, to_turns(payload["body"], mapping), {"latency_ms": payload["latency_ms"]})
+
+                if want("groq/raw") or want("prod_final sin personas"):
+                    form = groq_form(language, vocabulary)
+                    payload = await transcribe(client, sem, form, wav(raw), run, args.fresh, GROQ_URL)
                     if payload["status"] >= 400:
-                        print(f"  {name}: API {payload['status']}: {json.dumps(payload['body'])[:200]}")
-                        results.append({"variant": name, "run": run, "error": payload["body"]})
-                        continue
-                    record(name, run, to_turns(payload["body"], mapping), {"latency_ms": payload["latency_ms"]})
+                        print(f"  groq: API {payload['status']}: {json.dumps(payload['body'])[:200]}")
+                    else:
+                        if want("groq/raw"):
+                            record("groq/raw", run, to_turns(payload["body"], None), {"latency_ms": payload["latency_ms"]})
+                        if want("prod_final sin personas"):
+                            record("prod_final sin personas", run, final_turns_without_people(payload["body"], language))
 
-                if not wanted or {"prod_live", "prod_final"} & wanted:
-                    raw = variants["raw"][0]
-                    live_rows, chunks = await prod_live(client, sem, raw, language, vocabulary, meta.get("live_model", "gpt-4o-transcribe"), run, args.fresh)
-                    record("prod_live (simulado)", run, [Turn(None, s, t) for s, _, t in live_rows], {"chunks": chunks})
-                    quiet, _ = await prod_live(client, sem, raw, language, vocabulary, meta.get("live_model", "gpt-4o-transcribe"), run, args.fresh, context=False)
-                    record("prod_live sin contexto", run, [Turn(None, s, t) for s, _, t in quiet])
-                    turns, note = await prod_final(client, sem, raw, language, vocabulary, live_rows, run, args.fresh)
-                    record("prod_final (simulado)", run, turns, {"note": note})
+                if want("scribe/raw") or want("prod_final"):
+                    form = scribe_form(language, vocabulary)
+                    payload = await transcribe(client, sem, form, mp3(raw), run, args.fresh, SCRIBE_URL, "reunion.mp3")
+                    if payload["status"] >= 400:
+                        print(f"  scribe: API {payload['status']}: {json.dumps(payload['body'])[:200]}")
+                    else:
+                        if want("scribe/raw"):
+                            words = [w for w in payload["body"].get("words") or [] if w.get("type") == "word"]
+                            turns = [
+                                Turn(w.get("speaker_id"), int(w["start"] * 1000), w["text"], int(w["end"] * 1000))
+                                for w in words
+                            ]
+                            record("scribe/raw", run, turns, {"latency_ms": payload["latency_ms"]})
+                        if want("prod_final"):
+                            record("prod_final", run, final_turns(payload["body"], language))
 
-    out = case / "results.json"
+                if want("prod_live"):
+                    live_rows, chunks = await prod_live(client, sem, raw, language, vocabulary, run, args.fresh)
+                    record("prod_live", run, [Turn(None, s, t, e) for s, e, t in live_rows], {"chunks": chunks})
+
+    out = case / args.out
     out.write_text(json.dumps(results, ensure_ascii=False, indent=1), encoding="utf-8")
     print_table(results, reference is not None)
     print(f"\nDetalle (transcripts de cada variante): {out}")

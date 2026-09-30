@@ -1,0 +1,1701 @@
+[
+ {
+  "variant": "prod_export (lo que salió)",
+  "run": 0,
+  "turns": 22,
+  "people": 2,
+  "orphan_turns": 3,
+  "orphan_words_pct": 0.4557823129251701,
+  "canary": 27,
+  "hallucinations": [
+   "Amén.",
+   "- Hola,",
+   "- Hola,"
+  ],
+  "excess_phrases": 30,
+  "detail": [
+   [
+    "uno dos tres probando",
+    23,
+    0
+   ],
+   [
+    "hola sí",
+    1,
+    0
+   ],
+   [
+    "la profe si puedes arreglar porque como que está muy arriba",
+    1,
+    0
+   ],
+   [
+    "prueba uno dos tres",
+    1,
+    0
+   ],
+   [
+    "tá brón orm",
+    1,
+    0
+   ],
+   [
+    "hola prueba uno dos tres probando",
+    1,
+    0
+   ],
+   [
+    "probando hola",
+    1,
+    0
+   ],
+   [
+    "tá brón orm uno dos tres probando",
+    1,
+    0
+   ]
+  ],
+  "wer": 2.086206896551724,
+  "sub": 20,
+  "del": 6,
+  "ins": 95,
+  "ref_words": 58,
+  "hyp_words": 147,
+  "invented": [
+   "amén",
+   "prueba uno dos tres",
+   "tá brón orm",
+   "hola prueba uno dos tres probando",
+   "tá brón orm uno dos tres probando"
+  ],
+  "word_speaker_acc": 0.5769230769230769,
+  "turn_speaker_acc": 0.2857142857142857,
+  "mapping": {
+   "Persona 1": "A",
+   "Persona 2": "B"
+  },
+  "time_speaker_acc": 0.4666666666666667,
+  "per_person": {
+   "A": 0.65,
+   "B": 1.0,
+   "C": 0.0,
+   "D": 0.0,
+   "E": 0.0
+  },
+  "time_mapping": {
+   "Persona 1": "A",
+   "Persona 2": "B"
+  },
+  "transcript": [
+   [
+    "Persona 1",
+    0,
+    "Uno dos tres probando, uno dos tres probando, uno dos tres probando.",
+    null
+   ],
+   [
+    "Persona 1",
+    5000,
+    "Hola sí, uno, dos, tres, probando.",
+    null
+   ],
+   [
+    "Persona 1",
+    11000,
+    "Estamos probando.",
+    null
+   ],
+   [
+    "Persona 2",
+    15000,
+    "Hola, la profe si puedes arreglar porque como que está muy arriba.",
+    null
+   ],
+   [
+    "Persona 2",
+    24000,
+    "Amén.",
+    null
+   ],
+   [
+    "Persona 2",
+    28000,
+    "Uno dos tres probando, uno dos tres probando, uno dos tres probando.",
+    null
+   ],
+   [
+    null,
+    32000,
+    "Uno dos tres probando, uno dos tres probando, uno dos tres probando.",
+    null
+   ],
+   [
+    "Persona 1",
+    37000,
+    "- Hola,",
+    null
+   ],
+   [
+    "Persona 1",
+    48000,
+    "- Hola,",
+    null
+   ],
+   [
+    "Persona 2",
+    53000,
+    "Uno dos tres probando,",
+    null
+   ],
+   [
+    "Persona 2",
+    58000,
+    "Uno dos tres probando,",
+    null
+   ],
+   [
+    "Persona 2",
+    63000,
+    "Uno dos tres probando,",
+    null
+   ],
+   [
+    "Persona 2",
+    74000,
+    "Uno dos tres probando,",
+    null
+   ],
+   [
+    "Persona 2",
+    83000,
+    "Uno dos tres probando.",
+    null
+   ],
+   [
+    "Persona 2",
+    90000,
+    "Hola",
+    null
+   ],
+   [
+    null,
+    98000,
+    "Prueba uno dos tres",
+    null
+   ],
+   [
+    "Persona 2",
+    108000,
+    "Probando, probando, probando",
+    null
+   ],
+   [
+    "Persona 1",
+    113000,
+    "Hola?",
+    null
+   ],
+   [
+    "Persona 1",
+    117000,
+    "Hola.",
+    null
+   ],
+   [
+    "Persona 1",
+    122000,
+    "Tá brón orm",
+    null
+   ],
+   [
+    "Persona 1",
+    126000,
+    "uno dos tres probando.",
+    null
+   ],
+   [
+    null,
+    130000,
+    "Uno dos tres probando, uno dos tres probando, uno dos tres probando. - Hola, - Hola, Uno dos tres probando, Uno dos tres probando, Uno dos tres probando, Uno dos tres probando, Uno dos tres probando. Hola Prueba uno dos tres Probando, probando, probando Hola? Hola. Tá brón orm uno dos tres probando.",
+    null
+   ]
+  ]
+ },
+ {
+  "variant": "groq/raw",
+  "run": 1,
+  "turns": 25,
+  "people": 0,
+  "orphan_turns": 25,
+  "orphan_words_pct": 1.0,
+  "canary": 5,
+  "hallucinations": [],
+  "excess_phrases": 4,
+  "detail": [
+   [
+    "tengo que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "esto sí es",
+    1,
+    0
+   ],
+   [
+    "qué es lo que se llama",
+    1,
+    0
+   ],
+   [
+    "prueba unos tres",
+    1,
+    0
+   ]
+  ],
+  "wer": 0.7068965517241379,
+  "sub": 18,
+  "del": 0,
+  "ins": 23,
+  "ref_words": 58,
+  "hyp_words": 81,
+  "invented": [
+   "tengo que subir por ahí",
+   "ok",
+   "déjame",
+   "ok",
+   "esto sí es",
+   "qué es lo que se llama",
+   "prueba unos tres"
+  ],
+  "latency_ms": 1655,
+  "transcript": [
+   [
+    null,
+    0,
+    "1, 2, 3 probando, 1, 2, 3 probando, 1, 2, 3 probando",
+    4680
+   ],
+   [
+    null,
+    4680,
+    "Hola, sí, 1, 2, 3 probando, 1, 2, 3 probando",
+    11240
+   ],
+   [
+    null,
+    11240,
+    "Estamos probando",
+    14360
+   ],
+   [
+    null,
+    14360,
+    "Buenas, ¿cómo va?",
+    18440
+   ],
+   [
+    null,
+    19660,
+    "Ahora la prueba es que si puedes arreglar, porque como que está muy arriba",
+    23960
+   ],
+   [
+    null,
+    23960,
+    "Cara, vale",
+    25119
+   ],
+   [
+    null,
+    30000,
+    "Hola",
+    48000
+   ],
+   [
+    null,
+    48000,
+    "Hola",
+    48840
+   ],
+   [
+    null,
+    48840,
+    "Tengo que subir por ahí",
+    50640
+   ],
+   [
+    null,
+    50640,
+    "Sí, ok, déjame",
+    51579
+   ],
+   [
+    null,
+    51579,
+    "Ok, esto sí es",
+    54980
+   ],
+   [
+    null,
+    54980,
+    "Gracias.",
+    55980
+   ],
+   [
+    null,
+    62650,
+    "¿Qué es lo que se llama?",
+    92630
+   ],
+   [
+    null,
+    92650,
+    "Hola.",
+    93650
+   ],
+   [
+    null,
+    102650,
+    "Prueba unos tres.",
+    108150
+   ],
+   [
+    null,
+    108710,
+    "Probando, probando, probando.",
+    110050
+   ],
+   [
+    null,
+    111170,
+    "Probando.",
+    111610
+   ],
+   [
+    null,
+    114350,
+    "Sí, habla.",
+    115630
+   ],
+   [
+    null,
+    116050,
+    "Hola.",
+    116310
+   ],
+   [
+    null,
+    116310,
+    "Hola.",
+    116729
+   ],
+   [
+    null,
+    117030,
+    "Hola.",
+    117370
+   ],
+   [
+    null,
+    118130,
+    "Hola.",
+    118729
+   ],
+   [
+    null,
+    120090,
+    "Hola.",
+    120650
+   ],
+   [
+    null,
+    121050,
+    "Gracias.",
+    121410
+   ],
+   [
+    null,
+    122650,
+    "Gracias.",
+    123650
+   ]
+  ]
+ },
+ {
+  "variant": "prod_final sin personas",
+  "run": 1,
+  "turns": 25,
+  "people": 0,
+  "orphan_turns": 25,
+  "orphan_words_pct": 1.0,
+  "canary": 5,
+  "hallucinations": [],
+  "excess_phrases": 4,
+  "detail": [
+   [
+    "tengo que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "esto sí es",
+    1,
+    0
+   ],
+   [
+    "qué es lo que se llama",
+    1,
+    0
+   ],
+   [
+    "prueba unos tres",
+    1,
+    0
+   ]
+  ],
+  "wer": 0.7068965517241379,
+  "sub": 18,
+  "del": 0,
+  "ins": 23,
+  "ref_words": 58,
+  "hyp_words": 81,
+  "invented": [
+   "tengo que subir por ahí",
+   "ok",
+   "déjame",
+   "ok",
+   "esto sí es",
+   "qué es lo que se llama",
+   "prueba unos tres"
+  ],
+  "transcript": [
+   [
+    null,
+    0,
+    "1, 2, 3 probando, 1, 2, 3 probando, 1, 2, 3 probando",
+    4680
+   ],
+   [
+    null,
+    4680,
+    "Hola, sí, 1, 2, 3 probando, 1, 2, 3 probando",
+    11240
+   ],
+   [
+    null,
+    11240,
+    "Estamos probando",
+    14360
+   ],
+   [
+    null,
+    14360,
+    "Buenas, ¿cómo va?",
+    18440
+   ],
+   [
+    null,
+    19660,
+    "Ahora la prueba es que si puedes arreglar, porque como que está muy arriba",
+    23960
+   ],
+   [
+    null,
+    23960,
+    "Cara, vale",
+    25119
+   ],
+   [
+    null,
+    30000,
+    "Hola",
+    48000
+   ],
+   [
+    null,
+    48000,
+    "Hola",
+    48840
+   ],
+   [
+    null,
+    48840,
+    "Tengo que subir por ahí",
+    50640
+   ],
+   [
+    null,
+    50640,
+    "Sí, ok, déjame",
+    51579
+   ],
+   [
+    null,
+    51579,
+    "Ok, esto sí es",
+    54980
+   ],
+   [
+    null,
+    54980,
+    "Gracias.",
+    55980
+   ],
+   [
+    null,
+    62650,
+    "¿Qué es lo que se llama?",
+    92630
+   ],
+   [
+    null,
+    92650,
+    "Hola.",
+    93650
+   ],
+   [
+    null,
+    102650,
+    "Prueba unos tres.",
+    108150
+   ],
+   [
+    null,
+    108710,
+    "Probando, probando, probando.",
+    110050
+   ],
+   [
+    null,
+    111170,
+    "Probando.",
+    111610
+   ],
+   [
+    null,
+    114350,
+    "Sí, habla.",
+    115630
+   ],
+   [
+    null,
+    116050,
+    "Hola.",
+    116310
+   ],
+   [
+    null,
+    116310,
+    "Hola.",
+    116729
+   ],
+   [
+    null,
+    117030,
+    "Hola.",
+    117370
+   ],
+   [
+    null,
+    118130,
+    "Hola.",
+    118729
+   ],
+   [
+    null,
+    120090,
+    "Hola.",
+    120650
+   ],
+   [
+    null,
+    121050,
+    "Gracias.",
+    121410
+   ],
+   [
+    null,
+    122650,
+    "Gracias.",
+    123650
+   ]
+  ]
+ },
+ {
+  "variant": "scribe/raw",
+  "run": 1,
+  "turns": 87,
+  "people": 3,
+  "orphan_turns": 0,
+  "orphan_words_pct": 0.0,
+  "canary": 6,
+  "hallucinations": [],
+  "excess_phrases": 0,
+  "detail": [],
+  "wer": 0.7758620689655172,
+  "sub": 16,
+  "del": 0,
+  "ins": 29,
+  "ref_words": 58,
+  "hyp_words": 87,
+  "invented": [
+   "eeeh",
+   "profe",
+   "si",
+   "puedes",
+   "arreglar",
+   "porque",
+   "porque",
+   "como",
+   "que",
+   "está",
+   "muy",
+   "vas",
+   "a",
+   "tener",
+   "que",
+   "subir",
+   "por",
+   "ahí",
+   "okey",
+   "venga",
+   "me",
+   "tiene",
+   "todo",
+   "allá",
+   "ratito",
+   "yes",
+   "perfecto",
+   "muchísimas",
+   "prueba",
+   "pedro"
+  ],
+  "word_speaker_acc": 0.8620689655172413,
+  "turn_speaker_acc": 0.7857142857142857,
+  "mapping": {
+   "speaker_0": "A",
+   "speaker_1": "B",
+   "speaker_2": "E"
+  },
+  "time_speaker_acc": 0.2822222222222222,
+  "per_person": {
+   "A": 0.4,
+   "B": 0.52,
+   "C": 0.0,
+   "D": 0.0,
+   "E": 0.2
+  },
+  "time_mapping": {
+   "speaker_0": "A",
+   "speaker_1": "B",
+   "speaker_2": "E"
+  },
+  "latency_ms": 3906,
+  "transcript": [
+   [
+    "speaker_0",
+    1660,
+    "Uno,",
+    1800
+   ],
+   [
+    "speaker_0",
+    1840,
+    "dos,",
+    1900
+   ],
+   [
+    "speaker_0",
+    1960,
+    "tres.",
+    2080
+   ],
+   [
+    "speaker_0",
+    2140,
+    "Probando",
+    2480
+   ],
+   [
+    "speaker_0",
+    2560,
+    "uno,",
+    2660
+   ],
+   [
+    "speaker_0",
+    2680,
+    "dos,",
+    2740
+   ],
+   [
+    "speaker_0",
+    2820,
+    "tres.",
+    2940
+   ],
+   [
+    "speaker_0",
+    2980,
+    "Probando",
+    3400
+   ],
+   [
+    "speaker_0",
+    3700,
+    "uno,",
+    3900
+   ],
+   [
+    "speaker_0",
+    3960,
+    "dos,",
+    4120
+   ],
+   [
+    "speaker_0",
+    4160,
+    "tres.",
+    4300
+   ],
+   [
+    "speaker_0",
+    4340,
+    "Probando.",
+    4840
+   ],
+   [
+    "speaker_0",
+    8800,
+    "Hola.",
+    9000
+   ],
+   [
+    "speaker_0",
+    9100,
+    "Sí,",
+    9200
+   ],
+   [
+    "speaker_0",
+    9280,
+    "uno,",
+    9360
+   ],
+   [
+    "speaker_0",
+    9400,
+    "dos,",
+    9480
+   ],
+   [
+    "speaker_0",
+    9500,
+    "tres.",
+    9640
+   ],
+   [
+    "speaker_0",
+    9640,
+    "Probando",
+    10060
+   ],
+   [
+    "speaker_0",
+    10540,
+    "uno,",
+    10640
+   ],
+   [
+    "speaker_0",
+    10680,
+    "dos,",
+    10740
+   ],
+   [
+    "speaker_0",
+    10780,
+    "tres.",
+    10900
+   ],
+   [
+    "speaker_0",
+    10920,
+    "Probando.",
+    11340
+   ],
+   [
+    "speaker_0",
+    13700,
+    "Estamos",
+    13980
+   ],
+   [
+    "speaker_0",
+    14020,
+    "probando.",
+    14460
+   ],
+   [
+    "speaker_0",
+    17580,
+    "Buenas,",
+    18060
+   ],
+   [
+    "speaker_0",
+    18160,
+    "¿cómo",
+    18360
+   ],
+   [
+    "speaker_0",
+    18400,
+    "va?",
+    18520
+   ],
+   [
+    "speaker_1",
+    19180,
+    "Eeeh,",
+    19560
+   ],
+   [
+    "speaker_1",
+    20220,
+    "cara",
+    20380
+   ],
+   [
+    "speaker_1",
+    20560,
+    "la",
+    20660
+   ],
+   [
+    "speaker_1",
+    20740,
+    "profe,",
+    21080
+   ],
+   [
+    "speaker_1",
+    21180,
+    "si",
+    21240
+   ],
+   [
+    "speaker_1",
+    21340,
+    "puedes",
+    21520
+   ],
+   [
+    "speaker_1",
+    21560,
+    "arreglar",
+    21920
+   ],
+   [
+    "speaker_1",
+    21960,
+    "porque,",
+    22320
+   ],
+   [
+    "speaker_1",
+    22680,
+    "porque",
+    22860
+   ],
+   [
+    "speaker_1",
+    22940,
+    "como",
+    23120
+   ],
+   [
+    "speaker_1",
+    23160,
+    "que",
+    23220
+   ],
+   [
+    "speaker_1",
+    23260,
+    "está",
+    23400
+   ],
+   [
+    "speaker_1",
+    23440,
+    "muy",
+    23600
+   ],
+   [
+    "speaker_1",
+    23660,
+    "arriba.",
+    24040
+   ],
+   [
+    "speaker_0",
+    24080,
+    "Cara.",
+    24300
+   ],
+   [
+    "speaker_0",
+    24980,
+    "Vale.",
+    25320
+   ],
+   [
+    "speaker_0",
+    47940,
+    "Hola.",
+    48100
+   ],
+   [
+    "speaker_0",
+    48760,
+    "Hola.",
+    48900
+   ],
+   [
+    "speaker_1",
+    48920,
+    "Hola.",
+    48920
+   ],
+   [
+    "speaker_0",
+    48940,
+    "Vas",
+    49040
+   ],
+   [
+    "speaker_0",
+    49040,
+    "a",
+    49040
+   ],
+   [
+    "speaker_0",
+    49060,
+    "tener",
+    49240
+   ],
+   [
+    "speaker_0",
+    49320,
+    "que",
+    49500
+   ],
+   [
+    "speaker_0",
+    50120,
+    "subir",
+    50380
+   ],
+   [
+    "speaker_0",
+    50420,
+    "por",
+    50540
+   ],
+   [
+    "speaker_0",
+    50580,
+    "ahí.",
+    50700
+   ],
+   [
+    "speaker_1",
+    50760,
+    "Sí.",
+    50920
+   ],
+   [
+    "speaker_1",
+    51060,
+    "Okey,",
+    51260
+   ],
+   [
+    "speaker_1",
+    51320,
+    "venga,",
+    51500
+   ],
+   [
+    "speaker_1",
+    51560,
+    "me--",
+    51700
+   ],
+   [
+    "speaker_0",
+    73380,
+    "Tiene",
+    73580
+   ],
+   [
+    "speaker_0",
+    73620,
+    "todo",
+    73720
+   ],
+   [
+    "speaker_0",
+    73740,
+    "para",
+    73860
+   ],
+   [
+    "speaker_0",
+    73880,
+    "allá.",
+    74040
+   ],
+   [
+    "speaker_0",
+    80120,
+    "Un",
+    80160
+   ],
+   [
+    "speaker_0",
+    84780,
+    "ratito.",
+    86080
+   ],
+   [
+    "speaker_0",
+    86280,
+    "Yes.",
+    86460
+   ],
+   [
+    "speaker_0",
+    97340,
+    "Hola.",
+    97640
+   ],
+   [
+    "speaker_1",
+    100880,
+    "Perfecto.",
+    101280
+   ],
+   [
+    "speaker_1",
+    101320,
+    "Muchísimas",
+    101740
+   ],
+   [
+    "speaker_1",
+    101760,
+    "gracias.",
+    102060
+   ],
+   [
+    "speaker_0",
+    107360,
+    "Prueba",
+    107600
+   ],
+   [
+    "speaker_0",
+    107640,
+    "uno,",
+    107780
+   ],
+   [
+    "speaker_0",
+    107780,
+    "dos,",
+    107840
+   ],
+   [
+    "speaker_0",
+    107920,
+    "tres.",
+    108240
+   ],
+   [
+    "speaker_0",
+    108780,
+    "Probando,",
+    109140
+   ],
+   [
+    "speaker_0",
+    109220,
+    "probando,",
+    109500
+   ],
+   [
+    "speaker_0",
+    109720,
+    "probando,",
+    110160
+   ],
+   [
+    "speaker_0",
+    111280,
+    "probando.",
+    111780
+   ],
+   [
+    "speaker_0",
+    115060,
+    "Sí,",
+    115140
+   ],
+   [
+    "speaker_0",
+    115520,
+    "habla.",
+    115760
+   ],
+   [
+    "speaker_0",
+    116180,
+    "Habla.",
+    116440
+   ],
+   [
+    "speaker_0",
+    116660,
+    "Hola.",
+    116840
+   ],
+   [
+    "speaker_1",
+    117220,
+    "Hola.",
+    117500
+   ],
+   [
+    "speaker_0",
+    117500,
+    "¿Pedro",
+    118820
+   ],
+   [
+    "speaker_0",
+    118860,
+    "hola?",
+    119140
+   ],
+   [
+    "speaker_2",
+    120500,
+    "Hola.",
+    120840
+   ],
+   [
+    "speaker_0",
+    121180,
+    "Gracias.",
+    121820
+   ],
+   [
+    "speaker_0",
+    125440,
+    "Estamos",
+    125620
+   ],
+   [
+    "speaker_0",
+    125640,
+    "probando.",
+    126020
+   ]
+  ]
+ },
+ {
+  "variant": "prod_final",
+  "run": 1,
+  "turns": 21,
+  "people": 3,
+  "orphan_turns": 0,
+  "orphan_words_pct": 0.0,
+  "canary": 6,
+  "hallucinations": [],
+  "excess_phrases": 11,
+  "detail": [
+   [
+    "probando uno",
+    3,
+    0
+   ],
+   [
+    "cara la profe",
+    1,
+    0
+   ],
+   [
+    "si puedes arreglar porque",
+    1,
+    0
+   ],
+   [
+    "vas a tener que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "tiene todo para allá",
+    1,
+    0
+   ],
+   [
+    "un ratito",
+    1,
+    0
+   ],
+   [
+    "muchísimas gracias",
+    1,
+    0
+   ],
+   [
+    "prueba uno",
+    1,
+    0
+   ]
+  ],
+  "wer": 0.7758620689655172,
+  "sub": 16,
+  "del": 0,
+  "ins": 29,
+  "ref_words": 58,
+  "hyp_words": 87,
+  "invented": [
+   "eeeh",
+   "cara la profe",
+   "si puedes arreglar porque",
+   "vas a tener que subir por ahí",
+   "okey",
+   "venga",
+   "me",
+   "tiene todo para allá",
+   "un ratito",
+   "yes",
+   "perfecto",
+   "muchísimas gracias",
+   "prueba uno",
+   "pedro hola"
+  ],
+  "word_speaker_acc": 0.8620689655172413,
+  "turn_speaker_acc": 0.7857142857142857,
+  "mapping": {
+   "speaker_1": "A",
+   "speaker_2": "B",
+   "speaker_3": "E"
+  },
+  "time_speaker_acc": 0.4111111111111111,
+  "per_person": {
+   "A": 0.57,
+   "B": 0.82,
+   "C": 0.0,
+   "D": 0.0,
+   "E": 0.2
+  },
+  "time_mapping": {
+   "speaker_1": "A",
+   "speaker_2": "B",
+   "speaker_3": "E"
+  },
+  "transcript": [
+   [
+    "speaker_1",
+    1660,
+    "Uno, dos, tres. Probando uno, dos, tres. Probando uno, dos, tres. Probando.",
+    4840
+   ],
+   [
+    "speaker_1",
+    8800,
+    "Hola. Sí, uno, dos, tres. Probando uno, dos, tres. Probando.",
+    11340
+   ],
+   [
+    "speaker_1",
+    13700,
+    "Estamos probando.",
+    14460
+   ],
+   [
+    "speaker_1",
+    17580,
+    "Buenas, ¿cómo va?",
+    18520
+   ],
+   [
+    "speaker_2",
+    19180,
+    "Eeeh, cara la profe, si puedes arreglar porque, porque como que está muy arriba.",
+    24040
+   ],
+   [
+    "speaker_1",
+    24080,
+    "Cara. Vale.",
+    25320
+   ],
+   [
+    "speaker_1",
+    47940,
+    "Hola. Hola.",
+    48900
+   ],
+   [
+    "speaker_2",
+    48920,
+    "Hola.",
+    48921
+   ],
+   [
+    "speaker_1",
+    48940,
+    "Vas a tener que subir por ahí.",
+    50700
+   ],
+   [
+    "speaker_2",
+    50760,
+    "Sí. Okey, venga, me--",
+    51700
+   ],
+   [
+    "speaker_1",
+    73380,
+    "Tiene todo para allá.",
+    74040
+   ],
+   [
+    "speaker_1",
+    80120,
+    "Un ratito. Yes.",
+    86460
+   ],
+   [
+    "speaker_1",
+    97340,
+    "Hola.",
+    97640
+   ],
+   [
+    "speaker_2",
+    100880,
+    "Perfecto. Muchísimas gracias.",
+    102060
+   ],
+   [
+    "speaker_1",
+    107360,
+    "Prueba uno, dos, tres. Probando, probando, probando, probando.",
+    111780
+   ],
+   [
+    "speaker_1",
+    115060,
+    "Sí, habla. Habla. Hola.",
+    116840
+   ],
+   [
+    "speaker_2",
+    117220,
+    "Hola.",
+    117500
+   ],
+   [
+    "speaker_1",
+    117500,
+    "¿Pedro hola?",
+    119140
+   ],
+   [
+    "speaker_3",
+    120500,
+    "Hola.",
+    120840
+   ],
+   [
+    "speaker_1",
+    121180,
+    "Gracias.",
+    121820
+   ],
+   [
+    "speaker_1",
+    125440,
+    "Estamos probando.",
+    126020
+   ]
+  ]
+ },
+ {
+  "variant": "prod_live",
+  "run": 1,
+  "turns": 30,
+  "people": 0,
+  "orphan_turns": 30,
+  "orphan_words_pct": 1.0,
+  "canary": 3,
+  "hallucinations": [],
+  "excess_phrases": 10,
+  "detail": [
+   [
+    "qué es lo que se ha hecho",
+    2,
+    0
+   ],
+   [
+    "ahora sí uno no está probando",
+    1,
+    0
+   ],
+   [
+    "uno no está probando",
+    1,
+    0
+   ],
+   [
+    "la prueba que sí puede se arreglar",
+    1,
+    0
+   ],
+   [
+    "voy a tener que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "qué es lo que pasa",
+    1,
+    0
+   ],
+   [
+    "prueba una a tres",
+    1,
+    0
+   ],
+   [
+    "una pasada aquí",
+    1,
+    0
+   ]
+  ],
+  "wer": 1.103448275862069,
+  "sub": 24,
+  "del": 0,
+  "ins": 40,
+  "ref_words": 58,
+  "hyp_words": 98,
+  "invented": [
+   "ahora sí uno no está probando",
+   "qué es lo que se ha hecho",
+   "voy a tener que subir por ahí",
+   "ok",
+   "déjame",
+   "qué es lo que se ha venido",
+   "qué es lo que pasa",
+   "prueba una a tres",
+   "ronda",
+   "ronda",
+   "ronda",
+   "ronda",
+   "una pasada aquí",
+   "renzo"
+  ],
+  "chunks": 22,
+  "transcript": [
+   [
+    null,
+    0,
+    "Uno, dos, tres, probando, uno, dos, tres, probando, uno, dos, tres, probando.",
+    5100
+   ],
+   [
+    null,
+    5100,
+    "ahora sí uno no está probando",
+    9980
+   ],
+   [
+    null,
+    9980,
+    "uno no está probando",
+    11600
+   ],
+   [
+    null,
+    11600,
+    "estamos probando",
+    15400
+   ],
+   [
+    null,
+    15400,
+    "Buenas, ¿cómo va?",
+    18440
+   ],
+   [
+    null,
+    19640,
+    "Cara, la prueba que sí puede se arreglar",
+    21840
+   ],
+   [
+    null,
+    21840,
+    "Porque como que está muy arriba",
+    23959
+   ],
+   [
+    null,
+    23959,
+    "Cara",
+    24600
+   ],
+   [
+    null,
+    28400,
+    "¿Qué es lo que se ha hecho?",
+    32200
+   ],
+   [
+    null,
+    32200,
+    "¿Vale?",
+    37100
+   ],
+   [
+    null,
+    37100,
+    "Buenas",
+    48300
+   ],
+   [
+    null,
+    48300,
+    "Voy a tener que subir por ahí",
+    50640
+   ],
+   [
+    null,
+    50640,
+    "Sí, ok, déjame",
+    51560
+   ],
+   [
+    null,
+    53100,
+    "¿Qué es lo que se ha venido?",
+    55180
+   ],
+   [
+    null,
+    58100,
+    "Gracias.",
+    59100
+   ],
+   [
+    null,
+    63800,
+    "¿Qué es lo que pasa?",
+    74100
+   ],
+   [
+    null,
+    74100,
+    "Gracias.",
+    75100
+   ],
+   [
+    null,
+    83600,
+    "Gracias.",
+    84600
+   ],
+   [
+    null,
+    90200,
+    "¡Gracias!",
+    97200
+   ],
+   [
+    null,
+    98300,
+    "Prueba una a tres",
+    108399
+   ],
+   [
+    null,
+    108400,
+    "Ronda, ronda, ronda, ronda.",
+    111599
+   ],
+   [
+    null,
+    112140,
+    "¿Una pasada aquí?",
+    112920
+   ],
+   [
+    null,
+    113600,
+    "Hola",
+    115600
+   ],
+   [
+    null,
+    115600,
+    "Hola",
+    117800
+   ],
+   [
+    null,
+    117800,
+    "Renzo, hola.",
+    119300
+   ],
+   [
+    null,
+    120340,
+    "Hola.",
+    120640
+   ],
+   [
+    null,
+    121040,
+    "Gracias.",
+    121400
+   ],
+   [
+    null,
+    122100,
+    "Hasta pronto",
+    125759
+   ],
+   [
+    null,
+    126600,
+    "Gracias.",
+    130400
+   ],
+   [
+    null,
+    130400,
+    "Gracias.",
+    132400
+   ]
+  ]
+ }
+]

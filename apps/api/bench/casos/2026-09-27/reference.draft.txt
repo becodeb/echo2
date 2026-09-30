@@ -1,0 +1,11 @@
+# Borrador de referencia 2026-09-27, sacado de ElevenLabs Scribe v2 (30/9). Falta
+# confirmarlo escuchando el audio; recién ahí se renombra a reference.txt.
+# A = Bautista Goñi, B = Vanina, C = "el Choto".
+[00:01-00:05] A: Hola, sí, ¿quién es? Yo soy... hola, yo soy Bautista Goñi.
+[00:05-00:07] B: Hola, hola, hola, soy Vanina.
+[00:09-00:10] A: Okey. ¿Y vos quién sos?
+[00:10-00:11] C: El Cho.
+[00:11-00:13] A: ¿El Cho qué?
+[00:13-00:13] C: El Choto.
+[00:13-00:17] A: ¿El Choto sos? Okey, él es el Choto. ¿Vos quién sos?
+[00:18-00:19] B: Vanina, ya dije.

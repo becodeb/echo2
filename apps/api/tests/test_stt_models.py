@@ -179,3 +179,29 @@ def test_elevenlabs_words_become_turns_with_a_person_each(monkeypatch):
     ]
     assert (result.segments[0].start_ms, result.segments[0].end_ms) == (100, 1100)
     assert [(e.text, e.entity_type) for e in result.entities] == [("Vanina", "person_name")]
+
+
+def test_a_rate_limit_waits_and_retries_instead_of_losing_the_window(monkeypatch):
+    import echo_api.services.stt.base as base
+
+    waits: list[float] = []
+
+    async def no_sleep(seconds):
+        waits.append(seconds)
+
+    monkeypatch.setattr(asyncio, "sleep", no_sleep)
+
+    class Limited(_Capture):
+        async def post(self, url, headers=None, data=None, files=None):
+            _Capture.sent.append(dict(data or {}))
+            request = httpx.Request("POST", url)
+            if len(_Capture.sent) < 3:
+                return httpx.Response(429, headers={"retry-after": "7"}, json={}, request=request)
+            return httpx.Response(200, json={"segments": [{"start": 0, "end": 1, "text": " Hola."}]}, request=request)
+
+    _Capture.sent = []
+    monkeypatch.setattr(httpx, "AsyncClient", Limited)
+    result = asyncio.run(get_stt_provider("groq", "k").transcribe_chunk(bytes(3200), 16000, "es"))
+    assert [s.text for s in result.segments] == ["Hola."]
+    assert waits == [7.0, 7.0] and len(_Capture.sent) == 3
+    assert base.retry_after_seconds(httpx.Response(429, headers={"retry-after": "600"})) == base.RATE_LIMIT_MAX_WAIT
