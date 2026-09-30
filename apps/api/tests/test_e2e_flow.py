@@ -317,10 +317,7 @@ def test_google_doc_export_needs_connected_drive(client):
     meeting_id = created.json()["id"]
     client.post(
         f"/api/meetings/{meeting_id}/minutes/versions",
-        json={"body_markdown": "# Acta
-
-- Algo.
-"},
+        json={"body_markdown": "# Acta\n\n- Algo.\n"},
         headers=user.headers,
     )
     for kind in ("minutes", "transcript"):
