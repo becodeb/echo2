@@ -326,3 +326,65 @@ Respondidas:
   explica en persona en la venta.
 
 Si surge una duda que no está acá, preguntarle a Bauti antes de decidir.
+
+---
+
+## 9. Estado al 30/9 (fin de la sesión de implementación)
+
+Todo en la rama `planes-y-transcripcion`, commits chicos, tests verdes (API
+~200 tests, web 11) y `npm run build` ok. **No está deployado.**
+
+| Tarea | Estado |
+|---|---|
+| 1. Configuración y proveedores | Hecha: `ELEVENLABS_API_KEY` (config y compose), `services/stt/elevenlabs.py`, Groq con temperature 0. |
+| 2. En vivo con Groq sin pista | Hecha: sin `context`, descarta un tramo que repite el anterior, idioma fijo. Groq antes que OpenAI sin config de la sede. |
+| 3. Pasada final nueva | Hecha: Scribe (con personas) o Groq (sin), turnos desde las palabras, sin red de seguridad, respaldo con reintento cada 15 min. Fixtures reales de 30/9 y 27/9 en `apps/api/tests/fixtures`. |
+| 4. Entidades → privacidad | Hecha: `meta.detected_entities` entra a la seudonimización. |
+| 5. Alucinaciones | Hecha: bucles, frases sueltas, `avg_logprob` (Groq devuelve siempre `no_speech_prob = 0`). |
+| 6. Planes, créditos y uso | Hecha: migraciones 0016-0017, `services/plans.py`, panel de superadmin. |
+| 7. Crear reunión | Hecha: "Lo que va a hacer Echo" + toggle de menores. |
+| 8. Zoom/Meet | Parcial: la mezcla a mono suma los canales (antes promediaba y bajaba a la mitad a quien habla solo). **Falta probar con una llamada real.** |
+| 9. Cobros y voz | Cobros: nada (decisión). Voz: hecha (`services/voice_agent.py`, `routers/voice.py`, "Hablar con Echo"). |
+| 10. Banco | Hecho: variantes Groq/Scribe, caso 27/9, `results.groq-elevenlabs.md`. |
+| 11. Panel de consumo | Hecho: `/usage` (persona y organización) y pestaña Consumo del panel de Becode. Tokens del LLM incluidos. |
+| 12. Página de planes | Hecha: `/plans`, pedidos que avisan a Becode. |
+| 13. Muestra de voz | Hecha: invitación una sola vez; las voces van delante del audio en la pasada final. |
+| 14. Legal | Hecha: `/legal/privacidad` y `/legal/terminos`, landing corregida. |
+
+De punta a punta en local con las keys de prueba: 27/9 → 3 de 3 personas, 0
+turnos sin persona, 0 duplicados, 1 crédito; 30/9 → sin el turno "Hablante",
+sin turnos sin persona, 3 personas de 5 (C, D, E pegadas, como en el banco).
+
+Decisiones que tomó la implementación (confirmar con Bauti):
+- Créditos: uno por hora empezada (70 min = 2, 3 h = 3). Si queda 1 crédito
+  y la reunión duró 2 h, gasta el que queda y separa igual.
+- Los créditos se cobran al terminar y solo si la separación salió bien.
+- Cuenta individual: solo si el email no es de ningún colegio configurado y
+  no tiene una invitación pendiente.
+- LLM del agente de voz: `gemini-3.5-flash-lite` (probados también
+  `gemini-3.1-flash-lite` y `gpt-5.4-nano`). Voz por defecto: Malena.
+- LLM por defecto en Groq: `openai/gpt-oss-120b` (Groq retiró
+  `llama-3.3-70b-versatile`).
+
+Lo que tiene que hacer Bauti antes o después del deploy:
+- Confirmar el deploy (migraciones 0016-0018 corren solas al arrancar).
+- Panel de Becode → Organizaciones: poner a **Northfield en "Cortesía"** (no
+  se pudo leer la base de producción desde esta sesión).
+- Elegir la voz del agente escuchando `Downloads/echo-audios/voces-agente`
+  (Malena, Agustín, Melisa, Tomás); si no es Malena, cargar su id en
+  `ELEVENLABS_AGENT_VOICE_ID` en Coolify. Después: Panel → Planes y topes →
+  "Crear o actualizar el agente".
+- Coolify: `SMTP_HOST/PORT/USER/PASSWORD/FROM` para que los pedidos de plan
+  lleguen por mail a becodestudio@gmail.com (sin eso quedan en el panel).
+- ElevenLabs: borrar del historial de Speech to Text **de la cuenta de
+  prueba** las corridas del 30/9 con el audio de la alumna (esta sesión lo
+  volvió a mandar para grabar los fixtures y el banco).
+- Groq: pasar al plan pago antes de que haya más de una reunión a la vez (el
+  gratis deja 20 pedidos por minuto y una reunión en vivo ya lo roza; ahora
+  se espera y reintenta, pero el texto en vivo se atrasa).
+- Decidir qué hacer con OpenAI y las reuniones con menores: el acta recibe
+  texto seudonimizado, pero OpenAI pide retención cero para datos de menores
+  de 13 (§4).
+- Confirmar la referencia del 27/9 (`bench/casos/2026-09-27/reference.draft.txt`).
+- Probar una llamada real de Meet o Zoom (tarea 8).
+- Que un abogado revise `/legal/privacidad` y `/legal/terminos`.
