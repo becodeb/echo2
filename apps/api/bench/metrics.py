@@ -26,8 +26,13 @@ class Turn:
 # ── Texto ────────────────────────────────────────────────────────
 
 
+_NUMBERS = "cero uno dos tres cuatro cinco seis siete ocho nueve diez".split()
+
+
 def normalize(text: str) -> str:
+    """Minúsculas, sin puntuación, y "1, 2, 3" igual que "uno, dos, tres"."""
     text = (text or "").lower()
+    text = re.sub(r"\b(10|[0-9])\b", lambda m: " " + _NUMBERS[int(m.group(1))] + " ", text)
     text = re.sub(r"[^\wáéíóúüñ ]", " ", text)
     return " ".join(text.split())
 
