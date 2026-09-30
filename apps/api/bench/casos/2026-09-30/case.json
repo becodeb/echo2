@@ -1,0 +1,13 @@
+{
+  "meeting_id": "eb3ce903-256b-40e6-b242-ef4ccd271833",
+  "audio": "D:/Descargas/2026-09-30 Reunión 3092026.mp3",
+  "language": "es",
+  "live_model": "gpt-4o-transcribe",
+  "people": 5,
+  "vocabulary": [],
+  "prod": {
+    "notes": "Leído de la base el 30/9: la sede no tiene ajustes de IA (usa OPENAI_API_KEY de las envs), 0 muestras de voz, 0 participantes anotados. Los 22 tramos guardados tienen los mismos inicios/fines que los cortes del en vivo (windowing.py): la pasada final no reemplazó el texto, solo asignó voces (_apply sobre el en vivo). Tramos 7 (32.2-37.1 s) y 16 (98.3-108.4 s) quedaron sin persona. Los logs de esa corrida se perdieron (el api se reinició 12:44 UTC).",
+    "speakers": ["Persona 1", "Persona 2"],
+    "orphan_segments_ms": [[32200, 37100], [98300, 108400], [130400, 135300]]
+  }
+}
