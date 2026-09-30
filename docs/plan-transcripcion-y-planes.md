@@ -51,7 +51,7 @@ Tests: `docker compose up -d db` y, en `apps/api`,
 | Producción, Groq | Envs de Coolify (app echo) | `GROQ_API_KEY` (ya cargada; `docker-compose.prod.yml` ya la pasa al api) |
 | Producción, ElevenLabs | Envs de Coolify (app echo) | `ELEVENLABS_API_KEY` (ya cargada; **falta** pasarla en `docker-compose.prod.yml` y leerla en `echo_api/config.py`) |
 | Producción, OpenAI | Envs de Coolify | `OPENAI_API_KEY` (hoy la usa el STT; queda para el LLM del acta/chat) |
-| Pruebas locales | `apps/api/bench/.env` del worktree `D:\Descargas\echo-transcripcion` (en `.gitignore`) | `GROQ_API_KEY`, `ELEVENLABS_API_KEY`, `OPENAI_API_KEY` (de prueba) |
+| Pruebas locales | `apps/api/bench/.env` (en `.gitignore`; copiado a cada worktree) | `ELEVENLABS_API_KEY` = la key **de prueba** (plan gratis; usarla para probar, no la de producción), `GROQ_API_KEY`, `OPENAI_API_KEY` (de prueba) |
 
 Bauti pidió **no gastar más tokens de OpenAI en pruebas**: probar con Groq/ElevenLabs.
 
@@ -66,6 +66,12 @@ y tiempo). Caso `bench/casos/2026-09-30` (reunión eb3ce903, 2:15, 5 personas,
 `reference.txt` marcado por Bauti). Resultados en `results.json`,
 `results.repeat.json` y `results.local.md`. Segundo audio de prueba: reunión del
 27/9 (20 s, 3 personas: Bautista Goñi, Vanina, "el Choto").
+
+Audios (no van al repo): `D:\Descargas\2026-09-30 Reunión 3092026.mp3` y
+`D:\Descargas\2026-09-27 Reunión 2792026.mp3`. Para correr el banco: un venv con
+`numpy httpx imageio-ffmpeg` más `apps/api/requirements.txt`, y
+`python bench/stt_bench.py --case bench/casos/2026-09-30 --audio "<mp3>"`
+(las respuestas quedan en `bench/.cache`; no volver a pedirle a OpenAI).
 
 Hallazgos que explican los bugs de producción:
 - El turno "Hablante" gigante de las 02:10 era **la pista del en vivo devuelta
@@ -141,9 +147,12 @@ publica cuánto guarda el audio de STT, y la retención cero (`enable_logging=fa
 es **solo Enterprise**. Guarda datos de voz hasta 3 años.
 
 Comparación de proveedores sobre esto:
-- **Groq**: por defecto no guarda nada; logs de hasta 30 días solo para
-  errores/abuso; **retención cero disponible para todos** (Settings → Data
-  Controls). No menciona menores. → apto para reuniones con alumnos.
+- **Groq**: **no entrena con los datos, por contrato** (Services Agreement,
+  sección 4.2, vigente desde 22/6/2026: no puede usar inputs ni outputs para
+  entrenar sin permiso explícito del cliente); por defecto no guarda nada; logs
+  de hasta 30 días solo para errores/abuso; **retención cero disponible para
+  todos** (console.groq.com → Settings → Data Controls). No menciona menores. →
+  apto para reuniones con alumnos.
 - **OpenAI** (lo que se usa hoy): exige retención cero para datos de menores de
   13 años. Hoy Echo no la tiene → otro motivo para dejarlo para STT.
 - **AssemblyAI**: sin cláusula de menores en sus términos; transcripts 30 días
@@ -171,10 +180,28 @@ ElevenLabs** (ni al agente de voz). Ver pregunta P1.
 - **Individual US$ 10/mes**: lo anterior + **conversación por voz con el
   asistente de Echo** (speech-to-speech). ElevenLabs Agents (US$ 0,08/min + LLM
   aparte) con la voz del modelo **Eleven v4** de ElevenLabs (el nuevo; confirmar
-  en la doc de Agents que se puede usar ahí y su latencia; si no, Flash). Elegir
-  una voz linda en castellano rioplatense de su biblioteca. Tope de minutos por
-  mes (proponer 30 min ≈ US$ 2,40). **Solo cuentas individuales, nunca
-  organizaciones**, solo mayores de 18.
+  en la doc de Agents que se puede usar ahí y su latencia; si no, Flash). Voz:
+  elegir de su biblioteca una voz linda, cálida y "piola" en castellano
+  rioplatense (probar 3 y dejar la mejor). LLM del agente: **el más barato de los
+  que ofrece ElevenLabs Agents que ande bien en castellano** (probar 2-3 de las
+  líneas Flash-Lite / nano / mini con conversaciones reales). **30 minutos de voz
+  por mes.** Solo cuentas individuales, nunca organizaciones, solo mayores de 18.
+- **Rentabilidad (peor caso, usando todo el mes; estimada)**:
+  | | Individual US$ 5 | Individual + voz US$ 10 |
+  |---|---|---|
+  | Reuniones 5 h (Groq US$ 0,20 + Scribe US$ 1,10) | 1,30 | 1,30 |
+  | LLM de actas/chat (estimado) | 0,20 | 0,20 |
+  | Voz 30 min (US$ 0,08/min + LLM) | — | 2,50 |
+  | Comisión de cobro (~8%, a confirmar con MercadoPago) | 0,40 | 0,80 |
+  | **Ganancia** | **~US$ 3,10 (62%)** | **~US$ 5,20 (52%)** |
+  En la práctica casi nadie usa todo, así que el margen real es mayor. Las
+  horas y minutos que trae el Starter de ElevenLabs (27 h de Scribe, 75 min de
+  agente, para toda la cuenta) bajan el costo al principio.
+- **Cuentas individuales**: hay que crearlas. Al registrarse, si el dominio del
+  mail coincide con una organización (`join_rules`, `services/org_join.py`), la
+  persona entra sola a esa organización (como hoy). Si no, se crea su cuenta
+  individual (una organización personal de una persona) con el plan Base. Una
+  persona dentro de un colegio también puede pagar un plan individual para ella.
 - **Northfield School**: todo habilitado, sin pagar.
 - **Topes contra abuso**: sin valor fijo en el código; los define un superadmin
   (`SUPERADMIN_EMAILS`: becodestudio@gmail.com y gonibauti@gmail.com) por plan,
@@ -238,8 +265,9 @@ ElevenLabs** (ni al agente de voz). Ver pregunta P1.
     0015) y usarlas como voces conocidas en la pasada final.
 14. **Legal en la landing**: términos y privacidad claros: qué proveedores
     procesan el audio (Groq, ElevenLabs, el LLM), que no se usa para entrenar
-    (ElevenLabs: desactivado en la cuenta el 30/9; Groq/LLM: **verificar en sus
-    políticas antes de afirmarlo**), qué se guarda y cuánto, reuniones con
+    (ElevenLabs: desactivado en la cuenta el 30/9; Groq: por contrato; el LLM del
+    acta: **verificar su política antes de afirmarlo**; lo que no se pueda
+    garantizar no se escribe), qué se guarda y cuánto, reuniones con
     menores, consentimiento/aviso de grabación a las familias. Recomendar que
     lo revise un abogado.
 
@@ -263,8 +291,10 @@ Bauti confirma antes del deploy.
 - ElevenLabs: uso para entrenamiento **ya desactivado** (30/9). Falta borrar del
   historial de Speech to Text las pruebas con el audio del 30/9 (tenía la voz de
   una alumna).
-- Groq: activar Zero Data Retention (Settings → Data Controls). Para cargar
-  saldo, pasar al plan pago desde Settings → Billing cuando haga falta.
+- Groq: activar Zero Data Retention (console.groq.com → Settings → Data
+  Controls; lo puede hacer un admin de la organización de Groq). Entrenamiento no
+  hay que desactivarlo: por contrato no entrenan. Para cargar saldo, pasar al
+  plan pago desde Settings → Billing cuando haga falta.
 
 ---
 
@@ -280,7 +310,12 @@ Respondidas:
 - Topes: los pone un superadmin desde el panel, sin número fijo en el código.
 - ElevenLabs: Bauti ya desactivó "Improve the models for everyone" (entrenamiento).
 
-Pendientes (preguntar cuando llegue esa tarea):
-- ¿Existen hoy usuarios sin organización, o hay que crear la cuenta individual?
-- Minutos de voz por mes en el plan de US$ 10 (propuesta: 30).
-- Qué LLM usa el agente de voz (el más barato que funcione bien en castellano).
+- Cuentas individuales: se crean; si el dominio coincide con una organización,
+  entra sola; si no, cuenta individual con plan Base.
+- Voz: 30 min/mes en el plan de US$ 10; el LLM más barato que ande bien; voz
+  linda en rioplatense.
+- Groq: no entrena por contrato; Bauti activa la retención cero en su cuenta. Si
+  algo de privacidad no se puede garantizar, no se promete en la web: Bauti lo
+  explica en persona en la venta.
+
+Si surge una duda que no está acá, preguntarle a Bauti antes de decidir.
