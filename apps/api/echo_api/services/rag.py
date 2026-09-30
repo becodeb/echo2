@@ -42,7 +42,10 @@ async def embed_meeting_segments(meeting_id: uuid.UUID, config: EmbeddingsConfig
         for start in range(0, len(rows), EMBED_BATCH):
             batch = rows[start : start + EMBED_BATCH]
             vectors = await embed_texts(
-                config, [segment.text for segment in batch], org_id=batch[0].organization_id
+                config,
+                [segment.text for segment in batch],
+                org_id=batch[0].organization_id,
+                meeting_id=meeting_id,
             )
             for segment, vector in zip(batch, vectors):
                 segment.embedding = vector

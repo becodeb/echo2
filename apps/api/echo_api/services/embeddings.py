@@ -29,7 +29,11 @@ def _normalize(vector: list[float]) -> list[float]:
 
 
 async def embed_texts(
-    config: EmbeddingsConfig, texts: list[str], *, org_id: uuid.UUID | None
+    config: EmbeddingsConfig,
+    texts: list[str],
+    *,
+    org_id: uuid.UUID | None,
+    meeting_id: uuid.UUID | None = None,
 ) -> list[list[float]]:
     """`org_id` es obligatorio a propósito: con él, los nombres de esa
     organización se reemplazan antes de salir (services/privacy.py). None solo
@@ -41,7 +45,7 @@ async def embed_texts(
         from .privacy import scrub_for_embeddings
 
         async with SessionLocal() as db:
-            texts = await scrub_for_embeddings(db, org_id, texts)
+            texts = await scrub_for_embeddings(db, org_id, texts, meeting_id)
     if config.provider == "openai":
         return await _openai_embed(config, texts)
     if config.provider == "ollama":

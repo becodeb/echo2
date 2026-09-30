@@ -368,6 +368,30 @@ def forget_org_cache(org_id: uuid.UUID) -> None:
     _org_cache.pop(org_id, None)
 
 
+# Tipos de entidad de ElevenLabs Scribe que son nombres de persona (en la
+# reunión del 27/9 devolvió "name", "name_given" y "name_family").
+_NAME_ENTITY = re.compile(r"^(person|name)", re.IGNORECASE)
+
+
+def detected_names(meta: dict | None) -> list[str]:
+    """Nombres que Scribe detectó en el audio (meta.detected_entities).
+
+    Un nombre de pila o apellido suelto que ya es parte de un nombre completo
+    detectado no se agrega aparte: "Bautista" y "Goñi" son "Bautista Goñi",
+    no dos personas más.
+    """
+    names: list[str] = []
+    for entity in (meta or {}).get("detected_entities") or []:
+        text = " ".join(str(entity.get("text") or "").split())
+        if text and _NAME_ENTITY.match(str(entity.get("type") or "")) and text not in names:
+            names.append(text)
+    full = [set(fold(name).split()) for name in names if len(name.split()) > 1]
+    return [
+        name for name in names
+        if len(name.split()) > 1 or not any(fold(name) in words for words in full)
+    ]
+
+
 async def build_pseudonymizer(
     db: AsyncSession, org_id: uuid.UUID, meeting_id: uuid.UUID | None = None
 ) -> Pseudonymizer:
@@ -380,6 +404,12 @@ async def build_pseudonymizer(
         meeting = await db.get(Meeting, meeting_id)
         if meeting is not None and meeting.family_id:
             priority_groups.add(f"family:{meeting.family_id}")
+        # Lo que se dijo en voz alta aunque no esté en ninguna nómina: los
+        # nombres que detectó la pasada final (services/diarization.py).
+        for name in detected_names(meeting.meta if meeting is not None else None):
+            person = Person.parse(name, "persona")
+            if person:
+                priority_people.append(person)
         for (name,) in (await db.execute(
             select(MeetingParticipant.name).where(MeetingParticipant.meeting_id == meeting_id)
         )).all():
@@ -403,13 +433,15 @@ async def protect(
     return PrivateLLMProvider(provider, await build_pseudonymizer(db, org_id, meeting_id))
 
 
-async def scrub_for_embeddings(db: AsyncSession, org_id: uuid.UUID, texts: list[str]) -> list[str]:
+async def scrub_for_embeddings(
+    db: AsyncSession, org_id: uuid.UUID, texts: list[str], meeting_id: uuid.UUID | None = None
+) -> list[str]:
     """Para embeddings no hace falta restaurar: basta con que el nombre no salga.
 
     El marcador lleva solo el tipo ("[ALUMNO]") para que el mismo nombre dé
     el mismo vector en todas las reuniones.
     """
-    pseudo = await build_pseudonymizer(db, org_id)
+    pseudo = await build_pseudonymizer(db, org_id, meeting_id)
     out = []
     for text in texts:
         scrubbed = pseudo.apply(text)

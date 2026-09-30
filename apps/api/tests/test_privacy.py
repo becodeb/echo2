@@ -124,3 +124,53 @@ def test_nombre_de_pila_compuesto_se_reconoce_entero():
     safe = pseudo.apply("Hola, soy Maria del Pilar, la mamá.")
     assert safe == "Hola, soy [MADRE_1], la mamá."
     assert pseudo.restore("la Sra. [MADRE_1]") == "la Sra. Maria del Pilar Castro"
+
+
+# ── Nombres que detectó la pasada final ──────────────────────────
+
+
+def test_detected_names_do_not_repeat_parts_of_a_full_name():
+    from echo_api.services.privacy import detected_names
+
+    # Lo que devolvió Scribe en la reunión del 27/9 (tests/fixtures/scribe_2026-09-27.json).
+    meta = {"detected_entities": [
+        {"text": "Bautista Goñi", "type": "name"}, {"text": "Bautista", "type": "name_given"},
+        {"text": "Goñi", "type": "name_family"}, {"text": "Vanina", "type": "name"},
+        {"text": "Vanina", "type": "name_given"}, {"text": "profe", "type": "occupation"},
+        {"text": "tres", "type": "cardinal"},
+    ]}
+    assert detected_names(meta) == ["Bautista Goñi", "Vanina"]
+    assert detected_names(None) == []
+
+
+def test_a_name_in_no_roster_does_not_reach_the_ai(client):
+    import json
+    import uuid
+
+    from conftest import EchoTestUser
+    from test_levels import _sql
+
+    from echo_api.db import SessionLocal
+
+    user = EchoTestUser(client, org_name=f"Colegio {uuid.uuid4().hex[:4]}")
+    meeting = client.post("/api/meetings", json={"title": "x", "level": "primaria"}, headers=user.headers).json()
+    meta = {"detected_entities": [{"text": "Vanina", "type": "name"}, {"text": "Ezequiel Toranzo", "type": "name"}]}
+    _sql("UPDATE meetings SET meta = CAST(:meta AS jsonb) WHERE id = :id", meta=json.dumps(meta), id=meeting["id"])
+
+    sent: list[str] = []
+
+    class Spy(LLMProvider):
+        async def chat(self, system, messages, temperature=0.2, max_tokens=4096):
+            sent.append(system + " ".join(m["content"] for m in messages))
+            return "Hablaron [PERSONA_1] y [PERSONA_2]."
+
+    async def run():
+        from echo_api.services.privacy import protect
+
+        async with SessionLocal() as db:
+            provider = await protect(db, uuid.UUID(user.org_id), Spy(), uuid.UUID(meeting["id"]))
+            return await provider.chat("Resumí.", [{"role": "user", "content": "Soy Vanina. Ezequiel Toranzo no vino, Toranzo avisó."}])
+
+    answer = asyncio.run(run())
+    assert sent and "Vanina" not in sent[0] and "Toranzo" not in sent[0] and "Ezequiel" not in sent[0]
+    assert answer == "Hablaron Vanina y Ezequiel Toranzo."
