@@ -186,3 +186,47 @@ async def join_chosen(db: AsyncSession, user: User, org_id: uuid.UUID) -> Organi
     if org.id not in await _member_org_ids(db, user.id):
         await _join(db, user, org, "choice")
     return org
+
+
+async def ensure_personal_org(db: AsyncSession, user: User) -> Organization | None:
+    """Cuenta individual: quien se registra sin colegio tiene su organización propia.
+
+    Solo si no está en ninguna organización, su email no es de ningún colegio
+    configurado (ahí le toca elegir sede o entrar con Google) y no tiene una
+    invitación esperando. Queda con el plan Base (docs/plan-transcripcion-y-planes.md, §5).
+    No hace commit: lo hace quien llama.
+    """
+    from datetime import UTC, datetime
+
+    from ..models import OrganizationInvite
+    from .default_reasons import add_default_reasons
+
+    if await _member_org_ids(db, user.id):
+        return None
+    if (await matching_organizations(db, user.email)).all:
+        return None
+    invited = (
+        await db.execute(
+            select(OrganizationInvite.id).where(
+                OrganizationInvite.email == user.email.lower(),
+                OrganizationInvite.accepted_at.is_(None),
+                OrganizationInvite.expires_at > datetime.now(UTC),
+            ).limit(1)
+        )
+    ).first()
+    if invited:
+        return None
+    first = (user.name or "").split(" ")[0] or "Mi cuenta"
+    org = Organization(name=f"Cuenta de {first}"[:200], slug=_personal_slug(user), is_personal=True, plan="base")
+    db.add(org)
+    await db.flush()
+    db.add(OrganizationMember(organization_id=org.id, user_id=user.id, role="owner"))
+    add_default_reasons(db, org.id)
+    await audit(db, org.id, user.id, "org.personal_created", "organization", str(org.id))
+    return org
+
+
+def _personal_slug(user: User) -> str:
+    import secrets
+
+    return f"personal-{user.id.hex[:12]}-{secrets.token_hex(2)}"

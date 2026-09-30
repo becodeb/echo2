@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 import logging
+from contextlib import contextmanager
+from contextvars import ContextVar
 import re
 import time
 
@@ -18,6 +20,29 @@ log = logging.getLogger("echo.llm")
 
 class LLMError(Exception):
     pass
+
+
+# Tokens de cada llamada, para el panel de consumo. Quien quiere contarlos
+# (PrivateLLMProvider, por donde pasa toda llamada con datos de un colegio)
+# abre un colector; los proveedores anotan ahí lo que informa la API.
+_usage: ContextVar[list | None] = ContextVar("echo_llm_usage", default=None)
+
+
+def note_usage(provider: str, model: str, tokens_in: int | None, tokens_out: int | None) -> None:
+    collector = _usage.get()
+    if collector is not None and (tokens_in or tokens_out):
+        collector.append((provider, model, int(tokens_in or 0), int(tokens_out or 0)))
+
+
+@contextmanager
+def collect_usage():
+    """Junta los tokens de las llamadas hechas adentro del bloque."""
+    collected: list[tuple[str, str, int, int]] = []
+    token = _usage.set(collected)
+    try:
+        yield collected
+    finally:
+        _usage.reset(token)
 
 
 class LLMProvider:
@@ -151,6 +176,8 @@ class OpenAICompatibleProvider(LLMProvider):
             content = choice["message"]["content"] or ""
         except (KeyError, IndexError) as exc:
             raise LLMError(f"Respuesta inesperada de {self.name}") from exc
+        usage = data.get("usage") or {}
+        note_usage(self.name, self.model, usage.get("prompt_tokens"), usage.get("completion_tokens"))
         if not content.strip():
             # Los modelos razonadores pueden gastar todo el presupuesto pensando
             # y devolver 200 con contenido vacío. Tratarlo como éxito produce
@@ -199,6 +226,8 @@ class AnthropicProvider(LLMProvider):
         if response.status_code >= 400:
             raise LLMError(f"Anthropic devolvió {response.status_code}: {response.text[:300]}")
         data = response.json()
+        usage = data.get("usage") or {}
+        note_usage("anthropic", self.model, usage.get("input_tokens"), usage.get("output_tokens"))
         parts = [block.get("text", "") for block in data.get("content", []) if block.get("type") == "text"]
         return "".join(parts)
 

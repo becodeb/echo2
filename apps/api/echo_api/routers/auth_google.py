@@ -32,6 +32,7 @@ from ..config import Settings, get_settings
 from ..db import get_db
 from ..models import User
 from ..services.audit import audit
+from ..services import org_join
 from .auth import AVATAR_COLORS, _issue_refresh, _set_refresh_cookie, join_domain_organizations
 
 log = logging.getLogger("echo.auth.google")
@@ -198,6 +199,9 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
 
     refresh = await _issue_refresh(db, user, request)
     await join_domain_organizations(db, user)
+    if created:
+        # Sin colegio: cuenta individual con el plan Base.
+        await org_join.ensure_personal_org(db, user)
     await audit(
         db,
         None,

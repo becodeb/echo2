@@ -59,6 +59,11 @@ class MeetingCreateIn(BaseModel):
     # Solo internas: si además de resumen se quiere el acta. Por defecto no: un
     # equipo puede no querer un acta formal de cada reunión.
     minutes: bool = False
+    # Separar quién habló al finalizar (plan Base: gasta créditos; con plan
+    # pago va siempre). Ver services/plans.py.
+    people: bool = False
+    # Hablan alumnos menores de 18: la reunión nunca va a ElevenLabs.
+    minors: bool = False
 
 
 class ParticipantOut(BaseModel):
@@ -205,6 +210,8 @@ async def create_meeting(
         meta={
             "visibility": data.visibility if data.visibility in ("org", "private") else "org",
             **({"minutes": data.minutes} if data.kind == "interna" else {}),
+            **({"people": True} if data.people else {}),
+            **({"minors": True} if data.minors else {}),
         },
         level=level,
         kind=data.kind,

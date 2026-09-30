@@ -67,6 +67,8 @@ class OrgOut(BaseModel):
     name: str
     slug: str
     role: str
+    # Cuenta individual (organización de una sola persona).
+    is_personal: bool = False
 
 
 class SessionOut(BaseModel):
@@ -90,7 +92,7 @@ async def _user_orgs(db: AsyncSession, user_id: uuid.UUID) -> list[OrgOut]:
             .order_by(Organization.created_at)
         )
     ).all()
-    return [OrgOut(id=o.id, name=o.name, slug=o.slug, role=r) for o, r in rows]
+    return [OrgOut(id=o.id, name=o.name, slug=o.slug, role=r, is_personal=o.is_personal) for o, r in rows]
 
 
 def _set_refresh_cookie(response: Response, token: str) -> None:
@@ -171,6 +173,8 @@ async def register(
     )
     db.add(user)
     await db.flush()
+    # Sin colegio: cuenta individual con el plan Base.
+    await org_join.ensure_personal_org(db, user)
 
     refresh = await _issue_refresh(db, user, request)
     await audit(db, None, user.id, "user.register", "user", str(user.id))

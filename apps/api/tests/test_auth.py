@@ -12,7 +12,9 @@ def test_register_login_me(client):
     body = response.json()
     assert body["access_token"]
     assert body["user"]["email"] == email
-    assert body["organizations"] == []
+    # Sin colegio: cuenta individual propia (plan Base).
+    [personal] = body["organizations"]
+    assert personal["is_personal"] is True and personal["role"] == "owner"
 
     # login con contraseña incorrecta
     bad = client.post("/api/auth/login", json={"email": email, "password": "incorrecta1"})

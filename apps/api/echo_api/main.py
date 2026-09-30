@@ -63,6 +63,7 @@ def _include_optional_routers() -> None:
         "auth_google",
         "admin",
         "admin_billing",
+        "billing",
         "families",
         "attachments",
         "drive",

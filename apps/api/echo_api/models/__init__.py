@@ -1,5 +1,5 @@
 from .base import Base
-from .billing import ORG_PLANS, USER_PLANS, BillingPlan, UsageEvent
+from .billing import ORG_PLANS, USER_PLANS, BillingPlan, PlanRequest, UsageEvent
 from .families import (
     AUDIENCES,
     RELATIONSHIPS,
@@ -63,7 +63,7 @@ from .workspace import (
 )
 
 __all__ = [
-    "Base", "BillingPlan", "UsageEvent", "ORG_PLANS", "USER_PLANS", "User", "Organization", "OrganizationMember", "OrganizationInvite",
+    "Base", "BillingPlan", "PlanRequest", "UsageEvent", "ORG_PLANS", "USER_PLANS", "User", "Organization", "OrganizationMember", "OrganizationInvite",
     "MemberLevelAccess", "LEVELS", "LEVEL_ACCESS",
     "Family", "FamilyMember", "MeetingReason", "MeetingAttendance",
     "Professional", "FamilyProfessional", "MeetingProfessionalAttendance",

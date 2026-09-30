@@ -30,6 +30,8 @@ class VoiceOut(BaseModel):
     has_sample: bool
     duration_ms: int | None = None
     recorded_at: datetime | None = None
+    # Ya vio (y cerró) la invitación a grabarla: no se le vuelve a mostrar.
+    prompt_seen: bool = False
 
 
 async def _to_pcm16(data: bytes) -> bytes:
@@ -67,9 +69,19 @@ async def my_voice(user: User = Depends(get_current_user), db: AsyncSession = De
     sample = (
         await db.execute(select(UserVoiceSample).where(UserVoiceSample.user_id == user.id))
     ).scalar_one_or_none()
+    seen = user.voice_prompt_seen_at is not None
     if sample is None:
-        return VoiceOut(has_sample=False)
-    return VoiceOut(has_sample=True, duration_ms=sample.duration_ms, recorded_at=sample.updated_at)
+        return VoiceOut(has_sample=False, prompt_seen=seen)
+    return VoiceOut(has_sample=True, duration_ms=sample.duration_ms, recorded_at=sample.updated_at, prompt_seen=seen)
+
+
+@router.post("/prompt-seen", status_code=204)
+async def voice_prompt_seen(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """La invitación a grabar la voz se muestra una sola vez (al registrarse o
+    al volver a entrar, a quien no tiene muestra)."""
+    if user.voice_prompt_seen_at is None:
+        user.voice_prompt_seen_at = datetime.now(UTC)
+        await db.commit()
 
 
 @router.post("", response_model=VoiceOut)

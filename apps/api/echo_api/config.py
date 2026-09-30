@@ -101,6 +101,16 @@ class Settings(BaseSettings):
     deepseek_api_key: str = ""
     ollama_base_url: str = ""
 
+    # Mails del servidor (services/mailer.py): hoy solo el aviso a Becode de un
+    # pedido de plan. Sin SMTP_HOST no se manda nada (queda en el panel).
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    # Adónde llegan los pedidos de plan. Nunca se muestra en la web.
+    sales_email: str = "becodestudio@gmail.com"
+
     # Grabaciones (services/recording.py). Es espacio de paso: el audio se
     # sube al Drive de quien grabó y se borra; sin Drive queda para descargar
     # estas horas y después se borra solo.

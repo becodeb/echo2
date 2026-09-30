@@ -49,6 +49,23 @@ SCRIBE_ENTITIES_PER_HOUR = 0.07
 GROQ_MIN_BILLED_SECONDS = 10
 
 
+# LLM: dólares por millón de tokens (entrada, salida). Solo los precios
+# confirmados; un modelo que no está acá se anota con sus tokens y sin costo
+# ("precio desconocido" en el panel) en vez de inventar un número.
+LLM_PRICE_PER_MTOK = {
+    "gpt-4o-mini": (0.15, 0.60),
+    "gpt-4o": (2.50, 10.00),
+    "llama-3.3-70b-versatile": (0.59, 0.79),
+}
+
+
+def llm_cost(model: str | None, tokens_in: int, tokens_out: int) -> float | None:
+    price = LLM_PRICE_PER_MTOK.get(model or "")
+    if price is None:
+        return None
+    return round((tokens_in * price[0] + tokens_out * price[1]) / 1_000_000, 6)
+
+
 def month_start(now: datetime | None = None) -> datetime:
     """Primer instante del mes calendario en Argentina, en UTC."""
     local = (now or datetime.now(UTC)).astimezone(ARGENTINA)

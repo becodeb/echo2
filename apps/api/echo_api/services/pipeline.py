@@ -140,6 +140,7 @@ async def _run(meeting_id: uuid.UUID) -> None:
         if not meeting:
             return
         org_id = meeting.organization_id
+        created_by = meeting.created_by
         internal = meeting.kind == "interna"
         # Las internas solo arman acta si se pidió al crearlas (meta.minutes).
         wants_minutes = not internal or bool((meeting.meta or {}).get("minutes"))
@@ -174,7 +175,7 @@ async def _run(meeting_id: uuid.UUID) -> None:
         # Todo lo que sigue (insights, acta, resumen, memoria) usa este
         # provider: con él, ningún nombre le llega a la IA.
         async with SessionLocal() as db:
-            provider = await protect(db, org_id, provider, meeting_id)
+            provider = await protect(db, org_id, provider, meeting_id, created_by)
         # Nombres para las personas que la voz no reconoció, deducidos de la
         # conversación. Va antes de todo lo demás para que el acta y el
         # resumen ya digan quién dijo qué.

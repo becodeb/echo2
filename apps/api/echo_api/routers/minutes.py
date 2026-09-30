@@ -154,6 +154,7 @@ async def regenerate_minutes(
         ctx.org_id,
         get_llm_provider(llm_config.provider, llm_config.api_key, llm_config.model, llm_config.base_url),
         meeting.id,
+        ctx.user.id,
     )
 
     # La fila se marca como "generating" acá y no dentro de la tarea: si no,

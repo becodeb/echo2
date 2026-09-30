@@ -38,6 +38,9 @@ class User(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
     plan: Mapped[str] = mapped_column(String(30), default="base", server_default="base", nullable=False)
     # Topes propios que pisan los del plan; los pone un superadmin.
     limits: Mapped[dict | None] = mapped_column(JSONB)
+    # Cuándo vio (y cerró) la invitación a grabar su muestra de voz: se
+    # muestra una sola vez a quien no la tiene.
+    voice_prompt_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     memberships: Mapped[list["OrganizationMember"]] = relationship(back_populates="user")
 

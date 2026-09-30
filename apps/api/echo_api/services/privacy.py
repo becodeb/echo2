@@ -43,7 +43,7 @@ from dataclasses import dataclass, field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .llm.base import LLMProvider
+from .llm.base import LLMProvider, collect_usage
 
 log = logging.getLogger("echo.privacy")
 
@@ -300,11 +300,22 @@ class Pseudonymizer:
 class PrivateLLMProvider(LLMProvider):
     """Envuelve a cualquier provider: seudonimiza lo que sale, restaura lo que vuelve."""
 
-    def __init__(self, inner: LLMProvider, pseudonymizer: Pseudonymizer):
+    def __init__(
+        self,
+        inner: LLMProvider,
+        pseudonymizer: Pseudonymizer,
+        org_id: uuid.UUID | None = None,
+        meeting_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
+    ):
         self.inner = inner
         self.pseudonymizer = pseudonymizer
         self.name = inner.name
         self.model = getattr(inner, "model", inner.name)
+        # Para anotar los tokens en el panel de consumo (services/plans.py).
+        self.org_id = org_id
+        self.meeting_id = meeting_id
+        self.user_id = user_id
 
     async def chat(self, system, messages, temperature=0.2, max_tokens=4096) -> str:
         p = self.pseudonymizer
@@ -312,8 +323,36 @@ class PrivateLLMProvider(LLMProvider):
         safe_system = p.apply(system)
         if p.used:
             safe_system += PRIVACY_NOTE
-        answer = await self.inner.chat(safe_system, safe_messages, temperature, max_tokens)
+        with collect_usage() as used:
+            answer = await self.inner.chat(safe_system, safe_messages, temperature, max_tokens)
+        if used and self.org_id is not None:
+            await _record_llm_usage(used, self.org_id, self.meeting_id, self.user_id)
         return p.restore(answer)
+
+
+async def _record_llm_usage(
+    used: list[tuple[str, str, int, int]],
+    org_id: uuid.UUID,
+    meeting_id: uuid.UUID | None,
+    user_id: uuid.UUID | None,
+) -> None:
+    """Tokens de una llamada a la IA. Anotarlos nunca corta la respuesta."""
+    from ..db import SessionLocal
+    from .plans import llm_cost, record_usage
+
+    try:
+        async with SessionLocal() as db:
+            for provider, model, tokens_in, tokens_out in used:
+                cost = llm_cost(model, tokens_in, tokens_out)
+                await record_usage(
+                    db, kind="llm", provider=provider, model=model, unit="tokens",
+                    quantity=tokens_in + tokens_out, cost_usd=cost or 0.0,
+                    organization_id=org_id, user_id=user_id, meeting_id=meeting_id,
+                    meta={"tokens_in": tokens_in, "tokens_out": tokens_out, **({} if cost is not None else {"price_unknown": True})},
+                )
+            await db.commit()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("no se pudo anotar el consumo del LLM: %s", exc)
 
 
 # ── armado desde la base ─────────────────────────────────────────
@@ -427,10 +466,20 @@ async def build_pseudonymizer(
 
 
 async def protect(
-    db: AsyncSession, org_id: uuid.UUID, provider: LLMProvider, meeting_id: uuid.UUID | None = None
+    db: AsyncSession,
+    org_id: uuid.UUID,
+    provider: LLMProvider,
+    meeting_id: uuid.UUID | None = None,
+    user_id: uuid.UUID | None = None,
 ) -> LLMProvider:
-    """El provider que tienen que usar todos: nunca manda nombres afuera."""
-    return PrivateLLMProvider(provider, await build_pseudonymizer(db, org_id, meeting_id))
+    """El provider que tienen que usar todos: nunca manda nombres afuera.
+
+    `user_id` es a quién se le cuenta el consumo (quien pregunta en el chat,
+    quien grabó la reunión en el acta).
+    """
+    return PrivateLLMProvider(
+        provider, await build_pseudonymizer(db, org_id, meeting_id), org_id, meeting_id, user_id
+    )
 
 
 async def scrub_for_embeddings(

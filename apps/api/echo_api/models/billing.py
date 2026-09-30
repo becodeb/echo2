@@ -92,3 +92,20 @@ class UsageEvent(PKMixin, TimestampMixin, Base):
     # Créditos del plan Base que gastó (una reunión con personas: 1 o 2).
     credits: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     meta: Mapped[dict | None] = mapped_column(JSONB)
+
+
+class PlanRequest(PKMixin, TimestampMixin, Base):
+    """Alguien tocó "Suscribirme" o "Contact sales". Todavía no se cobra:
+    queda el pedido y se avisa a Becode, que contacta a la persona."""
+
+    __tablename__ = "plan_requests"
+    __table_args__ = (Index("ix_plan_requests_created", "created_at"),)
+
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="SET NULL")
+    )
+    plan: Mapped[str] = mapped_column(String(30), nullable=False)
+    # new | contacted | done | cancelled
+    status: Mapped[str] = mapped_column(String(20), default="new", server_default="new", nullable=False)
+    message: Mapped[str | None] = mapped_column(String(1000))

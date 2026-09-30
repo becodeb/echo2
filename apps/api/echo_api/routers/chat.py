@@ -308,6 +308,7 @@ async def _ask(
         ctx.org_id,
         get_llm_provider(llm_config.provider, llm_config.api_key, llm_config.model, llm_config.base_url),
         meeting_id,
+        ctx.user.id,
     )
     try:
         answer = await provider.chat(system, messages, temperature=llm_config.temperature)
