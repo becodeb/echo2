@@ -12,124 +12,212 @@
    "- Hola,",
    "- Hola,"
   ],
-  "excess_phrases": 22,
+  "excess_phrases": 30,
   "detail": [
    [
     "uno dos tres probando",
     23,
     0
+   ],
+   [
+    "hola sí",
+    1,
+    0
+   ],
+   [
+    "la profe si puedes arreglar porque como que está muy arriba",
+    1,
+    0
+   ],
+   [
+    "prueba uno dos tres",
+    1,
+    0
+   ],
+   [
+    "tá brón orm",
+    1,
+    0
+   ],
+   [
+    "hola prueba uno dos tres probando",
+    1,
+    0
+   ],
+   [
+    "probando hola",
+    1,
+    0
+   ],
+   [
+    "tá brón orm uno dos tres probando",
+    1,
+    0
    ]
   ],
+  "wer": 2.086206896551724,
+  "sub": 20,
+  "del": 6,
+  "ins": 95,
+  "ref_words": 58,
+  "hyp_words": 147,
+  "invented": [
+   "amén",
+   "prueba uno dos tres",
+   "tá brón orm",
+   "hola prueba uno dos tres probando",
+   "tá brón orm uno dos tres probando"
+  ],
+  "word_speaker_acc": 0.5769230769230769,
+  "turn_speaker_acc": 0.2857142857142857,
+  "mapping": {
+   "Persona 1": "A",
+   "Persona 2": "B"
+  },
+  "time_speaker_acc": 0.4666666666666667,
+  "per_person": {
+   "A": 0.65,
+   "B": 1.0,
+   "C": 0.0,
+   "D": 0.0,
+   "E": 0.0
+  },
+  "time_mapping": {
+   "Persona 1": "A",
+   "Persona 2": "B"
+  },
   "transcript": [
    [
     "Persona 1",
     0,
-    "Uno dos tres probando, uno dos tres probando, uno dos tres probando."
+    "Uno dos tres probando, uno dos tres probando, uno dos tres probando.",
+    null
    ],
    [
     "Persona 1",
     5000,
-    "Hola sí, uno, dos, tres, probando."
+    "Hola sí, uno, dos, tres, probando.",
+    null
    ],
    [
     "Persona 1",
     11000,
-    "Estamos probando."
+    "Estamos probando.",
+    null
    ],
    [
     "Persona 2",
     15000,
-    "Hola, la profe si puedes arreglar porque como que está muy arriba."
+    "Hola, la profe si puedes arreglar porque como que está muy arriba.",
+    null
    ],
    [
     "Persona 2",
     24000,
-    "Amén."
+    "Amén.",
+    null
    ],
    [
     "Persona 2",
     28000,
-    "Uno dos tres probando, uno dos tres probando, uno dos tres probando."
+    "Uno dos tres probando, uno dos tres probando, uno dos tres probando.",
+    null
    ],
    [
     null,
     32000,
-    "Uno dos tres probando, uno dos tres probando, uno dos tres probando."
+    "Uno dos tres probando, uno dos tres probando, uno dos tres probando.",
+    null
    ],
    [
     "Persona 1",
     37000,
-    "- Hola,"
+    "- Hola,",
+    null
    ],
    [
     "Persona 1",
     48000,
-    "- Hola,"
+    "- Hola,",
+    null
    ],
    [
     "Persona 2",
     53000,
-    "Uno dos tres probando,"
+    "Uno dos tres probando,",
+    null
    ],
    [
     "Persona 2",
     58000,
-    "Uno dos tres probando,"
+    "Uno dos tres probando,",
+    null
    ],
    [
     "Persona 2",
     63000,
-    "Uno dos tres probando,"
+    "Uno dos tres probando,",
+    null
    ],
    [
     "Persona 2",
     74000,
-    "Uno dos tres probando,"
+    "Uno dos tres probando,",
+    null
    ],
    [
     "Persona 2",
     83000,
-    "Uno dos tres probando."
+    "Uno dos tres probando.",
+    null
    ],
    [
     "Persona 2",
     90000,
-    "Hola"
+    "Hola",
+    null
    ],
    [
     null,
     98000,
-    "Prueba uno dos tres"
+    "Prueba uno dos tres",
+    null
    ],
    [
     "Persona 2",
     108000,
-    "Probando, probando, probando"
+    "Probando, probando, probando",
+    null
    ],
    [
     "Persona 1",
     113000,
-    "Hola?"
+    "Hola?",
+    null
    ],
    [
     "Persona 1",
     117000,
-    "Hola."
+    "Hola.",
+    null
    ],
    [
     "Persona 1",
     122000,
-    "Tá brón orm"
+    "Tá brón orm",
+    null
    ],
    [
     "Persona 1",
     126000,
-    "uno dos tres probando."
+    "uno dos tres probando.",
+    null
    ],
    [
     null,
     130000,
-    "Uno dos tres probando, uno dos tres probando, uno dos tres probando. - Hola, - Hola, Uno dos tres probando, Uno dos tres probando, Uno dos tres probando, Uno dos tres probando, Uno dos tres probando. Hola Prueba uno dos tres Probando, probando, probando Hola? Hola. Tá brón orm uno dos tres probando."
+    "Uno dos tres probando, uno dos tres probando, uno dos tres probando. - Hola, - Hola, Uno dos tres probando, Uno dos tres probando, Uno dos tres probando, Uno dos tres probando, Uno dos tres probando. Hola Prueba uno dos tres Probando, probando, probando Hola? Hola. Tá brón orm uno dos tres probando.",
+    null
    ]
   ]
  },
@@ -142,290 +230,399 @@
   "orphan_words_pct": 1.0,
   "canary": 0,
   "hallucinations": [],
-  "excess_phrases": 7,
+  "excess_phrases": 11,
   "detail": [
    [
     "estamos probando",
     3,
-    0
+    2
    ],
    [
     "ahora la prueba que sí puedes arreglar",
     3,
-    0
+    1
    ],
    [
     "porque como que está muy arriba",
     3,
-    0
+    1
    ],
    [
     "cómo van",
     2,
+    1
+   ],
+   [
+    "tienen que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "qué sucede",
+    1,
+    0
+   ],
+   [
+    "tienen que subir por ahí para atrás",
+    1,
+    0
+   ],
+   [
+    "tenemos que subir por allá para atrás para guardar el agua",
+    1,
     0
    ]
+  ],
+  "wer": 2.086206896551724,
+  "sub": 30,
+  "del": 0,
+  "ins": 91,
+  "ref_words": 58,
+  "hyp_words": 149,
+  "invented": [
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "tienen que subir por ahí",
+   "ok",
+   "vénganme",
+   "qué sucede",
+   "tienen que subir por ahí para atrás",
+   "tenemos que subir por allá para atrás para guardar el agua",
+   "si",
+   "luego hombre tiene que subir por aquí"
   ],
   "latency_ms": 12771,
   "transcript": [
    [
     null,
     0,
-    "1, 2, 3, probando. 1, 2, 3, probando. 1, 2, 3, probando."
+    "1, 2, 3, probando. 1, 2, 3, probando. 1, 2, 3, probando.",
+    5000
    ],
    [
     null,
     8000,
-    "Hola, sí. 1, 2, 3, probando. 1, 2, 3, probando."
+    "Hola, sí. 1, 2, 3, probando. 1, 2, 3, probando.",
+    12000
    ],
    [
     null,
     13000,
-    "Estamos probando."
+    "Estamos probando.",
+    15000
    ],
    [
     null,
     17000,
-    "Buenas. ¿Cómo van?"
+    "Buenas. ¿Cómo van?",
+    19000
    ],
    [
     null,
     20000,
-    "Ahora la prueba que sí puedes arreglar, porque como que está muy arriba."
+    "Ahora la prueba que sí puedes arreglar, porque como que está muy arriba.",
+    24000
    ],
    [
     null,
     24000,
-    "¡Cara!"
+    "¡Cara!",
+    25000
    ],
    [
     null,
     30000,
-    "1, 2, 3, probando."
+    "1, 2, 3, probando.",
+    33000
    ],
    [
     null,
     34000,
-    "1, 2, 3, probando."
+    "1, 2, 3, probando.",
+    36000
    ],
    [
     null,
     37000,
-    "¿Cómo van?"
+    "¿Cómo van?",
+    38000
    ],
    [
     null,
     39000,
-    "Ahora la prueba que sí puedes arreglar, porque como que está muy arriba."
+    "Ahora la prueba que sí puedes arreglar, porque como que está muy arriba.",
+    42000
    ],
    [
     null,
     43000,
-    "Ahora la prueba que sí puedes arreglar, porque como que está muy arriba."
+    "Ahora la prueba que sí puedes arreglar, porque como que está muy arriba.",
+    46000
    ],
    [
     null,
     47000,
-    "Hola."
+    "Hola.",
+    48000
    ],
    [
     null,
     48000,
-    "Hola."
+    "Hola.",
+    49000
    ],
    [
     null,
     49000,
-    "Tienen que subir por ahí."
+    "Tienen que subir por ahí.",
+    51000
    ],
    [
     null,
     51000,
-    "Sí, ok. Vénganme."
+    "Sí, ok. Vénganme.",
+    52000
    ],
    [
     null,
     54000,
-    "¿Qué sucede?"
+    "¿Qué sucede?",
+    56000
    ],
    [
     null,
     57000,
-    "Tienen que subir por ahí para atrás."
+    "Tienen que subir por ahí para atrás.",
+    59000
    ],
    [
     null,
     62000,
-    "Tenemos que subir por allá para atrás para guardar el agua."
+    "Tenemos que subir por allá para atrás para guardar el agua.",
+    65000
    ],
    [
     null,
     69000,
-    "Si."
+    "Si.",
+    70000
    ],
    [
     null,
     73000,
-    "Hola."
+    "Hola.",
+    74000
    ],
    [
     null,
     78000,
-    "Luego hombre tiene que subir por aquí."
+    "Luego hombre tiene que subir por aquí.",
+    81000
    ],
    [
     null,
     81000,
-    "Sí."
+    "Sí.",
+    82000
    ],
    [
     null,
     86000,
-    "Sí."
+    "Sí.",
+    87000
    ],
    [
     null,
     97000,
-    "Hola."
+    "Hola.",
+    98000
    ],
    [
     null,
     98000,
-    "Hola."
+    "Hola.",
+    99000
    ],
    [
     null,
     100000,
-    "Hola."
+    "Hola.",
+    101000
    ],
    [
     null,
     102000,
-    "Hola."
+    "Hola.",
+    103000
    ],
    [
     null,
     104000,
-    "Gracias."
+    "Gracias.",
+    105000
    ],
    [
     null,
     108000,
-    "Estamos probando."
+    "Estamos probando.",
+    109000
    ],
    [
     null,
     110000,
-    "Hola."
+    "Hola.",
+    111000
    ],
    [
     null,
     112000,
-    "Hola."
+    "Hola.",
+    113000
    ],
    [
     null,
     114000,
-    "Hola."
+    "Hola.",
+    115000
    ],
    [
     null,
     116000,
-    "Hola."
+    "Hola.",
+    117000
    ],
    [
     null,
     117000,
-    "Gracias."
+    "Gracias.",
+    118000
    ],
    [
     null,
     120000,
-    "Estamos probando."
+    "Estamos probando.",
+    121000
    ],
    [
     null,
     123000,
-    "Hola."
+    "Hola.",
+    124000
    ],
    [
     null,
     125000,
-    "Hola."
+    "Hola.",
+    126000
    ],
    [
     null,
     126000,
-    "Hola."
+    "Hola.",
+    127000
    ],
    [
     null,
     127000,
-    "Hola."
+    "Hola.",
+    128000
    ],
    [
     null,
     131000,
-    "Hola."
+    "Hola.",
+    132000
    ],
    [
     null,
     133000,
-    "Hola."
+    "Hola.",
+    134000
    ],
    [
     null,
     135000,
-    "Hola."
+    "Hola.",
+    136000
    ],
    [
     null,
     137000,
-    "Hola."
+    "Hola.",
+    138000
    ],
    [
     null,
     139000,
-    "Hola."
+    "Hola.",
+    140000
    ],
    [
     null,
     141000,
-    "Hola."
+    "Hola.",
+    142000
    ],
    [
     null,
     143000,
-    "Hola."
+    "Hola.",
+    144000
    ],
    [
     null,
     145000,
-    "Hola."
+    "Hola.",
+    146000
    ],
    [
     null,
     147000,
-    "Hola."
+    "Hola.",
+    148000
    ],
    [
     null,
     149000,
-    "Hola."
+    "Hola.",
+    150000
    ],
    [
     null,
     151000,
-    "Hola."
+    "Hola.",
+    152000
    ],
    [
     null,
     153000,
-    "Hola."
+    "Hola.",
+    154000
    ],
    [
     null,
     154000,
-    "Hola."
+    "Hola.",
+    155000
    ]
   ]
  },
@@ -440,112 +637,161 @@
   "hallucinations": [],
   "excess_phrases": 0,
   "detail": [],
+  "wer": 0.7241379310344828,
+  "sub": 33,
+  "del": 5,
+  "ins": 4,
+  "ref_words": 58,
+  "hyp_words": 57,
+  "invented": [
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "ah",
+   "ah",
+   "uy",
+   "contracts",
+   "gótico"
+  ],
   "latency_ms": 16275,
   "transcript": [
    [
     null,
     0,
-    "1, 2, 3, probando. 1, 2, 3, probando. 1, 2, 3, probando."
+    "1, 2, 3, probando. 1, 2, 3, probando. 1, 2, 3, probando.",
+    4000
    ],
    [
     null,
     8000,
-    "Hola, sí. 1, 2, 3, probando. 1, 2, 3, probando."
+    "Hola, sí. 1, 2, 3, probando. 1, 2, 3, probando.",
+    11000
    ],
    [
     null,
     13000,
-    "Estamos probando."
+    "Estamos probando.",
+    14000
    ],
    [
     null,
     17000,
-    "Buenas."
+    "Buenas.",
+    18000
    ],
    [
     null,
     20000,
-    "Ahora la prueba que sí puedes arreglar, porque como que está muy arriba."
+    "Ahora la prueba que sí puedes arreglar, porque como que está muy arriba.",
+    24000
    ],
    [
     null,
     24000,
-    "Ah, bien."
+    "Ah, bien.",
+    25000
    ],
    [
     null,
     31000,
-    "Ah."
+    "Ah.",
+    32000
    ],
    [
     null,
     36000,
-    "Va."
+    "Va.",
+    37000
    ],
    [
     null,
     48000,
-    "Hola. Hola."
+    "Hola. Hola.",
+    49000
    ],
    [
     null,
     50000,
-    "Uy, contracts."
+    "Uy, contracts.",
+    56500
    ],
    [
     null,
     56500,
-    "Bueno,"
+    "Bueno,",
+    62500
    ],
    [
     null,
     64500,
-    "es"
+    "es",
+    80500
    ],
    [
     null,
     83500,
-    "gótico,"
+    "gótico,",
+    84500
    ],
    [
     null,
     84500,
-    "bueno,"
+    "bueno,",
+    90500
    ],
    [
     null,
     91500,
-    "bueno,"
+    "bueno,",
+    97500
    ],
    [
     null,
     98500,
-    "bueno,"
+    "bueno,",
+    104500
    ],
    [
     null,
     105500,
-    "bueno,"
+    "bueno,",
+    113500
    ],
    [
     null,
     114500,
-    "bueno,"
+    "bueno,",
+    120500
    ],
    [
     null,
     121500,
-    "bueno,"
+    "bueno,",
+    127500
    ],
    [
     null,
     128500,
-    "bueno,"
+    "bueno,",
+    134500
    ],
    [
     null,
     135500,
-    "bueno,"
+    "bueno,",
+    141500
    ]
   ]
  },
@@ -558,165 +804,307 @@
   "orphan_words_pct": 1.0,
   "canary": 0,
   "hallucinations": [],
-  "excess_phrases": 1,
+  "excess_phrases": 8,
   "detail": [
    [
     "cómo va",
     2,
+    1
+   ],
+   [
+    "la prueba que sí puedes arreglar",
+    1,
+    0
+   ],
+   [
+    "tengo que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "pues ya",
+    1,
+    0
+   ],
+   [
+    "qué haces",
+    1,
+    0
+   ],
+   [
+    "a ver",
+    1,
+    0
+   ],
+   [
+    "qué está pasando ahí",
+    1,
+    0
+   ],
+   [
+    "me dije que ya no me lo iba a dar",
+    1,
     0
    ]
+  ],
+  "wer": 2.1206896551724137,
+  "sub": 31,
+  "del": 0,
+  "ins": 92,
+  "ref_words": 58,
+  "hyp_words": 150,
+  "invented": [
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "ah",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "tengo que subir por ahí",
+   "ok",
+   "véngame",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "pues ya",
+   "qué haces",
+   "a ver",
+   "qué está pasando ahí",
+   "me dije que ya no me lo iba a dar",
+   "1",
+   "2",
+   "3"
   ],
   "latency_ms": 15501,
   "transcript": [
    [
     null,
     790,
-    "1, 2, 3, probando. 1, 2, 3, probando. 1, 2, 3, probando."
+    "1, 2, 3, probando. 1, 2, 3, probando. 1, 2, 3, probando.",
+    4790
    ],
    [
     null,
     7790,
-    "Hola, sí. 1, 2, 3, probando. 1, 2, 3, probando."
+    "Hola, sí. 1, 2, 3, probando. 1, 2, 3, probando.",
+    11790
    ],
    [
     null,
     12790,
-    "Estamos probando."
+    "Estamos probando.",
+    14790
    ],
    [
     null,
     16790,
-    "Buenas. ¿Cómo va?"
+    "Buenas. ¿Cómo va?",
+    18790
    ],
    [
     null,
     19790,
-    "Cara, la prueba que sí puedes arreglar, porque como que está muy arriba."
+    "Cara, la prueba que sí puedes arreglar, porque como que está muy arriba.",
+    23790
    ],
    [
     null,
     23790,
-    "¿Cara? Ah, bien."
+    "¿Cara? Ah, bien.",
+    25790
    ],
    [
     null,
     30790,
-    "1, 2, 3, probando. 1, 2, 3, probando."
+    "1, 2, 3, probando. 1, 2, 3, probando.",
+    34790
    ],
    [
     null,
     35790,
-    "¿Cómo va?"
+    "¿Cómo va?",
+    37790
    ],
    [
     null,
     38790,
-    "1, 2, 3, probando. 1, 2, 3, probando."
+    "1, 2, 3, probando. 1, 2, 3, probando.",
+    41790
    ],
    [
     null,
     42790,
-    "1, 2, 3, probando. 1, 2, 3, probando."
+    "1, 2, 3, probando. 1, 2, 3, probando.",
+    44790
    ],
    [
     null,
     45790,
-    "Hola."
+    "Hola.",
+    46790
    ],
    [
     null,
     47790,
-    "Hola."
+    "Hola.",
+    48790
    ],
    [
     null,
     48790,
-    "Hola."
+    "Hola.",
+    49790
    ],
    [
     null,
     49790,
-    "Tengo que subir por ahí."
+    "Tengo que subir por ahí.",
+    50790
    ],
    [
     null,
     50790,
-    "Sí, ok. Véngame."
+    "Sí, ok. Véngame.",
+    52790
    ],
    [
     null,
     53790,
-    "1, 2, 3, probando. 1, 2, 3, probando."
+    "1, 2, 3, probando. 1, 2, 3, probando.",
+    57790
    ],
    [
     null,
     58790,
-    "1, 2, 3, probando. 1, 2, 3, probando."
+    "1, 2, 3, probando. 1, 2, 3, probando.",
+    62790
    ],
    [
     null,
     63790,
-    "1, 2, 3, probando. 1, 2, 3, probando."
+    "1, 2, 3, probando. 1, 2, 3, probando.",
+    66790
    ],
    [
     null,
     67790,
-    "1, 2, 3, probando. 1, 2, 3, probando."
+    "1, 2, 3, probando. 1, 2, 3, probando.",
+    69790
    ],
    [
     null,
     70790,
-    "Pues ya."
+    "Pues ya.",
+    72790
    ],
    [
     null,
     73790,
-    "¿Qué haces?"
+    "¿Qué haces?",
+    75790
    ],
    [
     null,
     76790,
-    "A ver, ¿qué está pasando ahí?"
+    "A ver, ¿qué está pasando ahí?",
+    78790
    ],
    [
     null,
     79790,
-    "Me dije que ya no me lo iba a dar."
+    "Me dije que ya no me lo iba a dar.",
+    81790
    ],
    [
     null,
     81790,
-    "No, no, no."
+    "No, no, no.",
+    83790
    ],
    [
     null,
     106790,
-    "1, 2, 3, probando, probando, probando."
+    "1, 2, 3, probando, probando, probando.",
+    109790
    ],
    [
     null,
     109790,
-    "Hola, hola, hola, hola."
+    "Hola, hola, hola, hola.",
+    112790
    ],
    [
     null,
     113790,
-    "Hola."
+    "Hola.",
+    114790
    ],
    [
     null,
     115790,
-    "Hola."
+    "Hola.",
+    116790
    ],
    [
     null,
     117790,
-    "Gracias."
+    "Gracias.",
+    118790
    ],
    [
     null,
     121790,
-    "No, probando."
+    "No, probando.",
+    122790
    ]
   ]
  },
@@ -729,165 +1117,244 @@
   "orphan_words_pct": 1.0,
   "canary": 0,
   "hallucinations": [],
-  "excess_phrases": 3,
+  "excess_phrases": 7,
   "detail": [
-   [
-    "estamos probando",
-    2,
-    0
-   ],
    [
     "cómo va",
     2,
-    0
+    1
    ],
    [
     "a mí",
     2,
     0
+   ],
+   [
+    "la prueba que sí puedes arreglar porque como que está muy arriba",
+    1,
+    0
+   ],
+   [
+    "tengo que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "quién es tu oponente",
+    1,
+    0
+   ],
+   [
+    "prueba 1",
+    1,
+    0
    ]
+  ],
+  "wer": 1.0689655172413792,
+  "sub": 29,
+  "del": 0,
+  "ins": 33,
+  "ref_words": 58,
+  "hyp_words": 91,
+  "invented": [
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "ah",
+   "tengo que subir por ahí",
+   "ok",
+   "véngame",
+   "ven",
+   "quién es tu oponente",
+   "a mí",
+   "a mí",
+   "tú",
+   "prueba 1",
+   "2",
+   "3",
+   "renzo"
   ],
   "latency_ms": 8595,
   "transcript": [
    [
     null,
     790,
-    "1, 2, 3, probando. 1, 2, 3, probando. 1, 2, 3, probando."
+    "1, 2, 3, probando. 1, 2, 3, probando. 1, 2, 3, probando.",
+    4790
    ],
    [
     null,
     7790,
-    "Hola, sí. 1, 2, 3, probando. 1, 2, 3, probando."
+    "Hola, sí. 1, 2, 3, probando. 1, 2, 3, probando.",
+    11790
    ],
    [
     null,
     12790,
-    "Estamos probando."
+    "Estamos probando.",
+    14790
    ],
    [
     null,
     16790,
-    "Buenas. ¿Cómo va?"
+    "Buenas. ¿Cómo va?",
+    18790
    ],
    [
     null,
     19790,
-    "Cara, la prueba que sí puedes arreglar porque como que está muy arriba."
+    "Cara, la prueba que sí puedes arreglar porque como que está muy arriba.",
+    23790
    ],
    [
     null,
     23790,
-    "¿Cara? Ah, bien."
+    "¿Cara? Ah, bien.",
+    25790
    ],
    [
     null,
     30790,
-    "Sí."
+    "Sí.",
+    31790
    ],
    [
     null,
     36790,
-    "¿Cómo va?"
+    "¿Cómo va?",
+    37790
    ],
    [
     null,
     45790,
-    "Hola."
+    "Hola.",
+    46790
    ],
    [
     null,
     47790,
-    "Hola."
+    "Hola.",
+    48790
    ],
    [
     null,
     48790,
-    "Hola."
+    "Hola.",
+    49790
    ],
    [
     null,
     49790,
-    "Tengo que subir por ahí."
+    "Tengo que subir por ahí.",
+    50790
    ],
    [
     null,
     50790,
-    "Sí, ok. Véngame."
+    "Sí, ok. Véngame.",
+    51790
    ],
    [
     null,
     54790,
-    "Sí, ven."
+    "Sí, ven.",
+    55790
    ],
    [
     null,
     60790,
-    "Buenas."
+    "Buenas.",
+    61790
    ],
    [
     null,
     72790,
-    "¿Quién es tu oponente?"
+    "¿Quién es tu oponente?",
+    73790
    ],
    [
     null,
     74790,
-    "A mí."
+    "A mí.",
+    75790
    ],
    [
     null,
     75790,
-    "A mí, ¿tú?"
+    "A mí, ¿tú?",
+    76790
    ],
    [
     null,
     85790,
-    "Bien."
+    "Bien.",
+    86790
    ],
    [
     null,
     90790,
-    "Hola."
+    "Hola.",
+    91790
    ],
    [
     null,
     96790,
-    "Hola."
+    "Hola.",
+    97790
    ],
    [
     null,
     106790,
-    "Prueba 1, 2, 3, probando, probando, probando, probando."
+    "Prueba 1, 2, 3, probando, probando, probando, probando.",
+    111790
    ],
    [
     null,
     114790,
-    "Sí, habla, habla. Hola."
+    "Sí, habla, habla. Hola.",
+    116790
    ],
    [
     null,
     116790,
-    "Hola."
+    "Hola.",
+    117790
    ],
    [
     null,
     117790,
-    "Renzo, hola."
+    "Renzo, hola.",
+    118790
    ],
    [
     null,
     118790,
-    "Hola."
+    "Hola.",
+    119790
    ],
    [
     null,
     119790,
-    "Gracias."
+    "Gracias.",
+    120790
    ],
    [
     null,
     123790,
-    "Estamos probando."
+    "Estamos probando.",
+    124790
    ]
   ]
  },
@@ -900,7 +1367,7 @@
   "orphan_words_pct": 1.0,
   "canary": 0,
   "hallucinations": [],
-  "excess_phrases": 151,
+  "excess_phrases": 160,
   "detail": [
    [
     "cómo estás",
@@ -916,14 +1383,215 @@
     "qué pasó",
     5,
     0
+   ],
+   [
+    "ahora la prueba es que si podés arreglar porque como que está muy arriba",
+    1,
+    0
+   ],
+   [
+    "cómo que tal",
+    1,
+    0
+   ],
+   [
+    "voy a tener que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "tú quieres",
+    1,
+    0
+   ],
+   [
+    "por qué te vas a poner esa",
+    1,
+    0
    ]
+  ],
+  "wer": 6.017241379310345,
+  "sub": 33,
+  "del": 0,
+  "ins": 316,
+  "ref_words": 58,
+  "hyp_words": 374,
+  "invented": [
+   "1",
+   "2",
+   "1",
+   "2",
+   "1",
+   "2",
+   "1",
+   "2",
+   "1",
+   "2",
+   "voy a tener que subir por ahí",
+   "ok",
+   "déjame",
+   "tú quieres",
+   "1",
+   "2",
+   "qué pasó",
+   "por qué te vas a poner esa",
+   "qué pasó",
+   "qué pasó",
+   "qué pasó",
+   "qué pasó",
+   "mira",
+   "todo para allá",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás"
   ],
   "latency_ms": 12371,
   "transcript": [
    [
     null,
     0,
-    "1, 2, 3 probando, 1, 2, 3 probando, 1, 2, 3 probando. Hola, sí, 1, 2, 3 probando, 1, 2, 3 probando. Estamos probando. Buenas, ¿cómo va? Ahora la prueba es que si podés arreglar porque como que está muy arriba. Cara. Dale. ¿Cómo que tal? Buenas. Hola. Voy a tener que subir por ahí. Sí, ok, déjame. ¿Tú quieres? 1, 2, 3 probando. ¿Qué pasó? ¿Por qué te vas a poner esa? ¿Qué pasó? ¿Qué pasó? ¿Qué pasó? ¿Qué pasó? Mira, todo para allá. Sí, sí, sí. ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás?"
+    "1, 2, 3 probando, 1, 2, 3 probando, 1, 2, 3 probando. Hola, sí, 1, 2, 3 probando, 1, 2, 3 probando. Estamos probando. Buenas, ¿cómo va? Ahora la prueba es que si podés arreglar porque como que está muy arriba. Cara. Dale. ¿Cómo que tal? Buenas. Hola. Voy a tener que subir por ahí. Sí, ok, déjame. ¿Tú quieres? 1, 2, 3 probando. ¿Qué pasó? ¿Por qué te vas a poner esa? ¿Qué pasó? ¿Qué pasó? ¿Qué pasó? ¿Qué pasó? Mira, todo para allá. Sí, sí, sí. ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás?",
+    null
    ]
   ]
  },
@@ -936,20 +1604,91 @@
   "orphan_words_pct": 1.0,
   "canary": 0,
   "hallucinations": [],
-  "excess_phrases": 1,
+  "excess_phrases": 8,
   "detail": [
    [
-    "estamos probando",
-    2,
+    "para la prueba",
+    1,
+    0
+   ],
+   [
+    "a ver si puedes arreglar",
+    1,
+    0
+   ],
+   [
+    "a ver",
+    1,
+    0
+   ],
+   [
+    "tenés que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "viene todo para allá",
+    1,
+    0
+   ],
+   [
+    "qué tal",
+    1,
+    0
+   ],
+   [
+    "muchísimas gracias",
+    1,
+    0
+   ],
+   [
+    "dicen hola",
+    1,
     0
    ]
+  ],
+  "wer": 0.9137931034482759,
+  "sub": 29,
+  "del": 0,
+  "ins": 24,
+  "ref_words": 58,
+  "hyp_words": 82,
+  "invented": [
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "para la prueba",
+   "a ver",
+   "puedo",
+   "tenés que subir por ahí",
+   "ok",
+   "déjame",
+   "viene todo para allá",
+   "qué tal",
+   "perfecto",
+   "muchísimas gracias",
+   "sherry",
+   "dicen hola"
   ],
   "latency_ms": 4656,
   "transcript": [
    [
     null,
     0,
-    "1, 2, 3, probando. 1, 2, 3, probando. 1, 2, 3, probando. Hola, sí. 1, 2, 3, probando. 1, 2, 3, probando. ¿Estamos probando? Buenas. ¿Cómo va? Para la prueba, a ver si puedes arreglar, porque como que está muy arriba. ¿Ahora? A ver. ¿Puedo? Buenas. Hola. Hola. Tenés que subir por ahí. Sí, ok, déjame. Viene todo para allá. Gracias. ¿Qué tal? Hola. Perfecto, muchísimas gracias. Probando, probando, probando, probando. Sherry, habla, habla, hola. Hola. Dicen hola. Hola. Gracias. Estamos probando."
+    "1, 2, 3, probando. 1, 2, 3, probando. 1, 2, 3, probando. Hola, sí. 1, 2, 3, probando. 1, 2, 3, probando. ¿Estamos probando? Buenas. ¿Cómo va? Para la prueba, a ver si puedes arreglar, porque como que está muy arriba. ¿Ahora? A ver. ¿Puedo? Buenas. Hola. Hola. Tenés que subir por ahí. Sí, ok, déjame. Viene todo para allá. Gracias. ¿Qué tal? Hola. Perfecto, muchísimas gracias. Probando, probando, probando, probando. Sherry, habla, habla, hola. Hola. Dicen hola. Hola. Gracias. Estamos probando.",
+    null
    ]
   ]
  },
@@ -962,20 +1701,92 @@
   "orphan_words_pct": 1.0,
   "canary": 0,
   "hallucinations": [],
-  "excess_phrases": 1,
+  "excess_phrases": 15,
   "detail": [
    [
     "hola hola",
     2,
     0
+   ],
+   [
+    "probando hola",
+    1,
+    0
+   ],
+   [
+    "probando estamos probando buenas",
+    1,
+    0
+   ],
+   [
+    "hola para la profe",
+    1,
+    0
+   ],
+   [
+    "si puedes arreglar porque como que está muy arriba",
+    1,
+    0
+   ],
+   [
+    "dale como que no se",
+    1,
+    0
+   ],
+   [
+    "hola hola vas a tener que huir por ahí sí",
+    1,
+    0
+   ],
+   [
+    "qué estás haciendo",
+    1,
+    0
    ]
+  ],
+  "wer": 1.1206896551724137,
+  "sub": 27,
+  "del": 2,
+  "ins": 36,
+  "ref_words": 58,
+  "hyp_words": 92,
+  "invented": [
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "hola para la profe",
+   "dale como que no se",
+   "hola hola vas a tener que huir por ahí sí",
+   "ok",
+   "déjame",
+   "qué estás haciendo",
+   "esto para allá",
+   "esto para allá sí hola perfecto",
+   "muchísimas gracias gracias prueba 1",
+   "2",
+   "3",
+   "probando probando chori",
+   "todo bien"
   ],
   "latency_ms": 5517,
   "transcript": [
    [
     null,
     0,
-    "1, 2, 3, probando, 1, 2, 3, probando, 1, 2, 3, probando\nHola, sí, 1, 2, 3, probando, 1, 2, 3, probando\nEstamos probando\nBuenas, hola\nPara la profe, si puedes arreglar porque como que está muy arriba\n¿Cara? Dale\nComo que no se...\nHola\nHola\nVas a tener que huir por ahí\nSí, ok, déjame\n¿Qué estás haciendo?\n¿Esto para allá?\nSí, esto para allá\nSí\nHola\nPerfecto, muchísimas gracias\nGracias\nPrueba 1, 2, 3, probando, probando, probando\nProbando\nChori, habla, habla, hola\nHola\n¿Todo bien? Hola\nHola, gracias\nEstamos probando"
+    "1, 2, 3, probando, 1, 2, 3, probando, 1, 2, 3, probando\nHola, sí, 1, 2, 3, probando, 1, 2, 3, probando\nEstamos probando\nBuenas, hola\nPara la profe, si puedes arreglar porque como que está muy arriba\n¿Cara? Dale\nComo que no se...\nHola\nHola\nVas a tener que huir por ahí\nSí, ok, déjame\n¿Qué estás haciendo?\n¿Esto para allá?\nSí, esto para allá\nSí\nHola\nPerfecto, muchísimas gracias\nGracias\nPrueba 1, 2, 3, probando, probando, probando\nProbando\nChori, habla, habla, hola\nHola\n¿Todo bien? Hola\nHola, gracias\nEstamos probando",
+    null
    ]
   ]
  },
@@ -988,25 +1799,84 @@
   "orphan_words_pct": 1.0,
   "canary": 0,
   "hallucinations": [],
-  "excess_phrases": 3,
+  "excess_phrases": 8,
   "detail": [
    [
     "estamos probando",
     3,
-    0
+    2
    ],
    [
     "muy bien",
     2,
     0
+   ],
+   [
+    "ahora la profe",
+    1,
+    0
+   ],
+   [
+    "si puedes arreglar porque como que está muy arriba",
+    1,
+    0
+   ],
+   [
+    "voy a tener que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "para allá",
+    1,
+    0
+   ],
+   [
+    "qué va a venir",
+    1,
+    0
    ]
+  ],
+  "wer": 1.0344827586206897,
+  "sub": 30,
+  "del": 2,
+  "ins": 28,
+  "ref_words": 58,
+  "hyp_words": 84,
+  "invented": [
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "ahora la profe",
+   "dame",
+   "voy a tener que subir por ahí",
+   "ok",
+   "déjame",
+   "para allá",
+   "qué va a venir",
+   "muy bien",
+   "muy bien",
+   "chori"
   ],
   "latency_ms": 5183,
   "transcript": [
    [
     null,
     0,
-    "1, 2, 3, probando, 1, 2, 3, probando, 1, 2, 3, probando. Hola, sí, 1, 2, 3, probando, 1, 2, 3, probando. Estamos probando. Buenas, hola. Ahora la profe, si puedes arreglar porque como que está muy arriba. Ahora, dame. Buenas. Hola. Voy a tener que subir por ahí. Sí, ok, déjame. Sí. Para allá. ¿Qué va a venir? Sí. Sí. Sí. Ahora. Sí. Muy bien. Ahora. Muy bien. Gracias. Gracias. Gracias. Estamos probando. Probando. Chori, habla, habla, hola. Hola. Hola. Gracias. Estamos probando."
+    "1, 2, 3, probando, 1, 2, 3, probando, 1, 2, 3, probando. Hola, sí, 1, 2, 3, probando, 1, 2, 3, probando. Estamos probando. Buenas, hola. Ahora la profe, si puedes arreglar porque como que está muy arriba. Ahora, dame. Buenas. Hola. Voy a tener que subir por ahí. Sí, ok, déjame. Sí. Para allá. ¿Qué va a venir? Sí. Sí. Sí. Ahora. Sí. Muy bien. Ahora. Muy bien. Gracias. Gracias. Gracias. Estamos probando. Probando. Chori, habla, habla, hola. Hola. Hola. Gracias. Estamos probando.",
+    null
    ]
   ]
  },
@@ -1019,155 +1889,257 @@
   "orphan_words_pct": 0.0,
   "canary": 1,
   "hallucinations": [],
-  "excess_phrases": 7,
+  "excess_phrases": 11,
   "detail": [
-   [
-    "tres probando",
-    5,
-    0
-   ],
    [
     "no me toca",
     4,
     0
+   ],
+   [
+    "para la profe si puedes arreglar porque como está muy arriba",
+    1,
+    0
+   ],
+   [
+    "son las 3",
+    1,
+    0
+   ],
+   [
+    "ya tenés que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "quién sigue",
+    1,
+    0
+   ],
+   [
+    "ahí no va a estar",
+    1,
+    0
+   ],
+   [
+    "prueba 1",
+    1,
+    0
+   ],
+   [
+    "están en sola",
+    1,
+    0
    ]
   ],
+  "wer": 0.9655172413793104,
+  "sub": 16,
+  "del": 5,
+  "ins": 35,
+  "ref_words": 58,
+  "hyp_words": 88,
+  "invented": [
+   "para la profe si puedes arreglar porque como está muy arriba",
+   "hello",
+   "everyone",
+   "son las 3",
+   "ya tenés que subir por ahí",
+   "ok",
+   "déjame",
+   "quién sigue",
+   "toma",
+   "ahí no va a estar",
+   "no me toca",
+   "no me toca",
+   "no me toca",
+   "no me toca",
+   "prueba 1",
+   "2",
+   "3"
+  ],
+  "word_speaker_acc": 0.8490566037735849,
+  "turn_speaker_acc": 0.6428571428571429,
+  "mapping": {
+   "A": "A",
+   "B": "B",
+   "C": "D"
+  },
+  "time_speaker_acc": 0.3244444444444444,
+  "per_person": {
+   "A": 0.43,
+   "B": 0.65,
+   "C": 0.07,
+   "D": 0.0,
+   "E": 0.0
+  },
+  "time_mapping": {
+   "A": "A",
+   "B": "B",
+   "C": "C"
+  },
   "latency_ms": 60030,
   "transcript": [
    [
     "A",
     1300,
-    "Uno,"
+    "Uno,",
+    1600
    ],
    [
     "A",
     1650,
-    "tres probando, uno, tres probando, uno,"
+    "tres probando, uno, tres probando, uno,",
+    3599
    ],
    [
     "A",
     3649,
-    "dos, tres probando."
+    "dos, tres probando.",
+    4550
    ],
    [
     "A",
     8450,
-    "Hola, sí, uno, tres probando, uno, tres probando."
+    "Hola, sí, uno, tres probando, uno, tres probando.",
+    11050
    ],
    [
     "A",
     13250,
-    "Estamos probando."
+    "Estamos probando.",
+    14150
    ],
    [
     "A",
     17200,
-    "Buenas, hola."
+    "Buenas, hola.",
+    18200
    ],
    [
     "B",
     19750,
-    "Para la profe si puedes arreglar porque como está muy arriba."
+    "Para la profe si puedes arreglar porque como está muy arriba.",
+    23650
    ],
    [
     "A",
     23650,
-    "Cara, ¿vale?"
+    "Cara, ¿vale?",
+    24900
    ],
    [
     "B",
     26548,
-    "Hello, everyone."
+    "Hello, everyone.",
+    27048
    ],
    [
     "A",
     45147,
-    "Sí, son las 3. Hola,"
+    "Sí, son las 3. Hola,",
+    47897
    ],
    [
     "A",
     47998,
-    "ya tenés que subir por ahí."
+    "ya tenés que subir por ahí.",
+    50548
    ],
    [
     "C",
     50648,
-    "Ok,"
+    "Ok,",
+    50948
    ],
    [
     "C",
     51098,
-    "déjame."
+    "déjame.",
+    51448
    ],
    [
     "B",
     53268,
-    "Sí."
+    "Sí.",
+    53418
    ],
    [
     "B",
     53868,
-    "¿Quién sigue?"
+    "¿Quién sigue?",
+    54968
    ],
    [
     "B",
     77492,
-    "Toma,"
+    "Toma,",
+    77892
    ],
    [
     "B",
     77942,
-    "ahí no va a estar,"
+    "ahí no va a estar,",
+    78892
    ],
    [
     "B",
     78992,
-    "no me toca,"
+    "no me toca,",
+    79492
    ],
    [
     "B",
     79592,
-    "no me toca, no me toca, no me toca."
+    "no me toca, no me toca, no me toca.",
+    81842
    ],
    [
     "A",
     107060,
-    "Prueba 1, 2, 3."
+    "Prueba 1, 2, 3.",
+    107910
    ],
    [
     "A",
     108160,
-    "Probando, probando, probando."
+    "Probando, probando, probando.",
+    109960
    ],
    [
     "A",
     114660,
-    "Sí, habla,"
+    "Sí, habla,",
+    115460
    ],
    [
     "A",
     115610,
-    "habla, hola."
+    "habla, hola.",
+    116660
    ],
    [
     "B",
     116660,
-    "Hola."
+    "Hola.",
+    117210
    ],
    [
     "A",
     118060,
-    "¿Están en sola?"
+    "¿Están en sola?",
+    118760
    ],
    [
     "A",
     120160,
-    "Hola,"
+    "Hola,",
+    120460
    ],
    [
     "A",
     120610,
-    "gracias."
+    "gracias.",
+    121160
    ]
   ]
  },
@@ -1180,200 +2152,310 @@
   "orphan_words_pct": 0.0,
   "canary": 1,
   "hallucinations": [],
-  "excess_phrases": 5,
+  "excess_phrases": 12,
   "detail": [
    [
-    "tres probando",
-    5,
+    "déjame cubrir por ahí",
+    1,
     0
    ],
    [
-    "estamos probando",
-    2,
+    "si deben",
+    1,
+    0
+   ],
+   [
+    "voy a hacer el programa para mostrarles a los asistentes",
+    1,
+    0
+   ],
+   [
+    "no te vayan a pasar",
+    1,
+    0
+   ],
+   [
+    "pero están los asistentes",
+    1,
+    0
+   ],
+   [
+    "ustedes no deben ver ya y vencer",
+    1,
+    0
+   ],
+   [
+    "solo te voy a enseñar",
+    1,
+    0
+   ],
+   [
+    "quienes toman ya",
+    1,
     0
    ]
   ],
+  "wer": 1.0689655172413792,
+  "sub": 0,
+  "del": 1,
+  "ins": 61,
+  "ref_words": 58,
+  "hyp_words": 118,
+  "invented": [
+   "okay",
+   "déjame cubrir por ahí",
+   "si deben",
+   "acabo",
+   "voy a hacer el programa para mostrarles a los asistentes",
+   "no te vayan a pasar",
+   "pero están los asistentes",
+   "ustedes no deben ver ya y vencer",
+   "solo te voy a enseñar",
+   "quienes toman ya",
+   "ah",
+   "pero la gente",
+   "a ver",
+   "tú",
+   "yo que sé",
+   "no lo he oído"
+  ],
+  "word_speaker_acc": 0.8245614035087719,
+  "turn_speaker_acc": 0.6428571428571429,
+  "mapping": {
+   "A": "A",
+   "B": "B",
+   "C": "D"
+  },
+  "time_speaker_acc": 0.4066666666666667,
+  "per_person": {
+   "A": 0.53,
+   "B": 0.7,
+   "C": 0.18,
+   "D": 0.0,
+   "E": 0.0
+  },
+  "time_mapping": {
+   "A": "A",
+   "B": "B",
+   "C": "C"
+  },
   "latency_ms": 63176,
   "transcript": [
    [
     "A",
     1300,
-    "Uno, tres probando, uno, tres probando, uno,"
+    "Uno, tres probando, uno, tres probando, uno,",
+    3649
    ],
    [
     "A",
     3750,
-    "dos, tres probando."
+    "dos, tres probando.",
+    4500
    ],
    [
     "A",
     8350,
-    "Hola, sí, uno, tres probando, uno, tres probando."
+    "Hola, sí, uno, tres probando, uno, tres probando.",
+    11000
    ],
    [
     "A",
     13250,
-    "Estamos probando."
+    "Estamos probando.",
+    14150
    ],
    [
     "A",
     17150,
-    "Buenas, ¿cómo va?"
+    "Buenas, ¿cómo va?",
+    18250
    ],
    [
     "B",
     19600,
-    "Ahora la pregunta es si puedes arreglar, porque como que está muy arriba."
+    "Ahora la pregunta es si puedes arreglar, porque como que está muy arriba.",
+    23750
    ],
    [
     "A",
     23750,
-    "¿Cara?"
+    "¿Cara?",
+    24100
    ],
    [
     "A",
     24400,
-    "¿Vale?"
+    "¿Vale?",
+    25000
    ],
    [
     "B",
     26484,
-    "No,"
+    "No,",
+    26784
    ],
    [
     "B",
     26834,
-    "no, no."
+    "no, no.",
+    27534
    ],
    [
     "C",
     48584,
-    "Okay,"
+    "Okay,",
+    48784
    ],
    [
     "C",
     48934,
-    "déjame cubrir por ahí."
+    "déjame cubrir por ahí.",
+    50534
    ],
    [
     "B",
     53268,
-    "Sí,"
+    "Sí,",
+    53418
    ],
    [
     "B",
     54218,
-    "si deben..."
+    "si deben...",
+    55318
    ],
    [
     "B",
     56668,
-    "Acabo, voy a hacer el programa para mostrarles a los asistentes."
+    "Acabo, voy a hacer el programa para mostrarles a los asistentes.",
+    61268
    ],
    [
     "B",
     61718,
-    "No te vayan a pasar, pero están los asistentes."
+    "No te vayan a pasar, pero están los asistentes.",
+    63968
    ],
    [
     "B",
     65117,
-    "Ustedes no deben ver ya y vencer."
+    "Ustedes no deben ver ya y vencer.",
+    66818
    ],
    [
     "B",
     66918,
-    "Solo te voy a enseñar."
+    "Solo te voy a enseñar.",
+    68118
    ],
    [
     "C",
     73068,
-    "Quienes toman ya."
+    "Quienes toman ya.",
+    73818
    ],
    [
     "B",
     73868,
-    "Ah,"
+    "Ah,",
+    74718
    ],
    [
     "B",
     74768,
-    "pero la gente..."
+    "pero la gente...",
+    75368
    ],
    [
     "C",
     75568,
-    "A ver,"
+    "A ver,",
+    75768
    ],
    [
     "C",
     75818,
-    "tú."
+    "tú.",
+    75918
    ],
    [
     "B",
     79956,
-    "Yo que sé,"
+    "Yo que sé,",
+    80506
    ],
    [
     "B",
     80556,
-    "no lo he oído."
+    "no lo he oído.",
+    81256
    ],
    [
     "C",
     85956,
-    "Tres."
+    "Tres.",
+    86306
    ],
    [
     "A",
     107732,
-    "Tres, hablando,"
+    "Tres, hablando,",
+    108882
    ],
    [
     "A",
     108932,
-    "hablando, hablando,"
+    "hablando, hablando,",
+    109832
    ],
    [
     "A",
     110082,
-    "hablando."
+    "hablando.",
+    111332
    ],
    [
     "B",
     111782,
-    "Un poquito más."
+    "Un poquito más.",
+    112582
    ],
    [
     "A",
     114832,
-    "Habla, habla, habla sola."
+    "Habla, habla, habla sola.",
+    116582
    ],
    [
     "B",
     116632,
-    "¿Hola?"
+    "¿Hola?",
+    117232
    ],
    [
     "A",
     118132,
-    "¿Estás sola?"
+    "¿Estás sola?",
+    118832
    ],
    [
     "A",
     119982,
-    "Hola,"
+    "Hola,",
+    120532
    ],
    [
     "A",
     120682,
-    "gracias."
+    "gracias.",
+    121232
    ],
    [
     "A",
     124782,
-    "Estamos probando."
+    "Estamos probando.",
+    125732
    ]
   ]
  },
@@ -1386,145 +2468,246 @@
   "orphan_words_pct": 0.0,
   "canary": 0,
   "hallucinations": [],
-  "excess_phrases": 1,
+  "excess_phrases": 14,
   "detail": [
    [
     "lo agarraste ahí",
     2,
     0
+   ],
+   [
+    "uno tres probando uno tres probando uno tres probando hola",
+    1,
+    0
+   ],
+   [
+    "si uno tres probando uno tres probando estamos",
+    1,
+    0
+   ],
+   [
+    "probando buenas",
+    1,
+    0
+   ],
+   [
+    "hola cara",
+    1,
+    0
+   ],
+   [
+    "a la profe si puedes arreglar porque como que está muy arriba",
+    1,
+    0
+   ],
+   [
+    "cómo se dice",
+    1,
+    0
+   ],
+   [
+    "deben de",
+    1,
+    0
    ]
   ],
+  "wer": 0.9482758620689655,
+  "sub": 22,
+  "del": 2,
+  "ins": 31,
+  "ref_words": 58,
+  "hyp_words": 87,
+  "invented": [
+   "uno tres probando uno tres probando uno tres probando hola",
+   "si uno tres probando uno tres probando estamos",
+   "probando buenas",
+   "cómo se dice",
+   "deben de",
+   "perdón",
+   "mire",
+   "todo va a pasar",
+   "lo agarraste ahí",
+   "lo agarraste ahí tú",
+   "toma país",
+   "no hay destino",
+   "por qué no es el país destino",
+   "prueba uno"
+  ],
+  "word_speaker_acc": 0.7678571428571429,
+  "turn_speaker_acc": 0.5714285714285714,
+  "mapping": {
+   "A": "A",
+   "B": "B"
+  },
+  "time_speaker_acc": 0.41333333333333333,
+  "per_person": {
+   "A": 0.62,
+   "B": 0.73,
+   "C": 0.0,
+   "D": 0.0,
+   "E": 0.0
+  },
+  "time_mapping": {
+   "A": "A",
+   "B": "B"
+  },
   "latency_ms": 48572,
   "transcript": [
    [
     "A",
     1290,
-    "uno tres probando uno tres probando uno tres probando hola"
+    "uno tres probando uno tres probando uno tres probando hola",
+    5689
    ],
    [
     "A",
     8840,
-    "si uno tres probando uno tres probando estamos"
+    "si uno tres probando uno tres probando estamos",
+    12990
    ],
    [
     "A",
     13690,
-    "probando buenas"
+    "probando buenas",
+    15940
    ],
    [
     "A",
     17590,
-    "hola cara"
+    "hola cara",
+    19240
    ],
    [
     "B",
     19389,
-    "A la profe si puedes arreglar porque como que está muy arriba."
+    "A la profe si puedes arreglar porque como que está muy arriba.",
+    23789
    ],
    [
     "A",
     24039,
-    "vale"
+    "vale",
+    24939
    ],
    [
     "B",
     26538,
-    "¿Cómo se dice?"
+    "¿Cómo se dice?",
+    27338
    ],
    [
     "B",
     53322,
-    "Sí,"
+    "Sí,",
+    53471
    ],
    [
     "B",
     53522,
-    "sí, sí,"
+    "sí, sí,",
+    54772
    ],
    [
     "B",
     54822,
-    "deben de..."
+    "deben de...",
+    55371
    ],
    [
     "B",
     56772,
-    "Perdón."
+    "Perdón.",
+    57371
    ],
    [
     "B",
     59172,
-    "Sí, sí, sí."
+    "Sí, sí, sí.",
+    61072
    ],
    [
     "A",
     72971,
-    "Mire,"
+    "Mire,",
+    73322
    ],
    [
     "A",
     73422,
-    "todo va a pasar."
+    "todo va a pasar.",
+    73772
    ],
    [
     "A",
     74672,
-    "Lo agarraste ahí,"
+    "Lo agarraste ahí,",
+    75372
    ],
    [
     "A",
     75422,
-    "lo agarraste ahí tú."
+    "lo agarraste ahí tú.",
+    75922
    ],
    [
     "B",
     77450,
-    "Toma país, no hay destino."
+    "Toma país, no hay destino.",
+    79100
    ],
    [
     "B",
     79900,
-    "¿Por qué no es el país destino?"
+    "¿Por qué no es el país destino?",
+    81299
    ],
    [
     "A",
     85900,
-    "Gracias."
+    "Gracias.",
+    86299
    ],
    [
     "A",
     107018,
-    "Prueba uno, tres,"
+    "Prueba uno, tres,",
+    107867
    ],
    [
     "A",
     108018,
-    "probando, probando, probando, probando."
+    "probando, probando, probando, probando.",
+    111418
    ],
    [
     "A",
     114817,
-    "¿Hola?"
+    "¿Hola?",
+    115468
    ],
    [
     "A",
     115868,
-    "¿Habla sola?"
+    "¿Habla sola?",
+    116468
    ],
    [
     "A",
     118118,
-    "¿Estás sola?"
+    "¿Estás sola?",
+    118768
    ],
    [
     "A",
     120668,
-    "Gracias."
+    "Gracias.",
+    121168
    ],
    [
     "A",
     124868,
-    "Estamos probando."
+    "Estamos probando.",
+    125668
    ]
   ]
  },
@@ -1537,7 +2720,7 @@
   "orphan_words_pct": 0.0,
   "canary": 0,
   "hallucinations": [],
-  "excess_phrases": 7,
+  "excess_phrases": 18,
   "detail": [
    [
     "3 probando",
@@ -1550,177 +2733,288 @@
     0
    ],
    [
-    "estamos probando",
-    2,
+    "ahora la prueba es que si puedes arreglar porque como que estás muy arriba",
+    1,
+    0
+   ],
+   [
+    "está bien",
+    1,
+    0
+   ],
+   [
+    "como quieres",
+    1,
+    0
+   ],
+   [
+    "de nuevo",
+    1,
+    0
+   ],
+   [
+    "usted no le debe pedir al vecino que no le diga nada",
+    1,
+    0
+   ],
+   [
+    "usted va a volver a tomar el peso y se va a salvar cualquier cosa",
+    1,
     0
    ]
   ],
+  "wer": 1.5517241379310345,
+  "sub": 25,
+  "del": 2,
+  "ins": 63,
+  "ref_words": 58,
+  "hyp_words": 119,
+  "invented": [
+   "1",
+   "2",
+   "1",
+   "2",
+   "1",
+   "2",
+   "1",
+   "2",
+   "1",
+   "2",
+   "está bien",
+   "como quieres",
+   "ok",
+   "déjame",
+   "de nuevo",
+   "qué pasa",
+   "qué pasa",
+   "qué pasa",
+   "usted no le debe pedir al vecino que no le diga nada",
+   "usted va a volver a tomar el peso y se va a salvar cualquier cosa",
+   "tocaba ahí",
+   "no aire para sentir",
+   "nunca te he visto a mi sin abrir",
+   "prueba",
+   "5"
+  ],
+  "word_speaker_acc": 0.8571428571428571,
+  "turn_speaker_acc": 0.7142857142857143,
+  "mapping": {
+   "A": "A",
+   "B": "B",
+   "C": "D"
+  },
+  "time_speaker_acc": 0.3933333333333333,
+  "per_person": {
+   "A": 0.56,
+   "B": 0.65,
+   "C": 0.1,
+   "D": 0.0,
+   "E": 0.0
+  },
+  "time_mapping": {
+   "A": "A",
+   "B": "B",
+   "C": "C"
+  },
   "latency_ms": 49362,
   "transcript": [
    [
     "A",
     1116,
-    "1, 2, 3 probando,"
+    "1, 2, 3 probando,",
+    2316
    ],
    [
     "A",
     2416,
-    "1,"
+    "1,",
+    2516
    ],
    [
     "A",
     2566,
-    "2, 3 probando,"
+    "2, 3 probando,",
+    3166
    ],
    [
     "A",
     3266,
-    "1, 2, 3 probando."
+    "1, 2, 3 probando.",
+    4516
    ],
    [
     "A",
     8416,
-    "Hola,"
+    "Hola,",
+    8816
    ],
    [
     "A",
     8866,
-    "sí, 1, 2, 3 probando, 1, 2, 3 probando."
+    "sí, 1, 2, 3 probando, 1, 2, 3 probando.",
+    11116
    ],
    [
     "A",
     13316,
-    "Estamos probando."
+    "Estamos probando.",
+    14216
    ],
    [
     "A",
     17116,
-    "Buenas, hola."
+    "Buenas, hola.",
+    18366
    ],
    [
     "B",
     19866,
-    "Ahora la prueba es que si puedes arreglar porque como que estás muy arriba"
+    "Ahora la prueba es que si puedes arreglar porque como que estás muy arriba",
+    23766
    ],
    [
     "A",
     23766,
-    "Cara, está bien."
+    "Cara, está bien.",
+    25066
    ],
    [
     "B",
     26538,
-    "¿Como quieres?"
+    "¿Como quieres?",
+    27038
    ],
    [
     "A",
     45238,
-    "Vale."
+    "Vale.",
+    45788
    ],
    [
     "C",
     48238,
-    "Hola."
+    "Hola.",
+    48638
    ],
    [
     "C",
     50638,
-    "Ok,"
+    "Ok,",
+    50937
    ],
    [
     "C",
     51088,
-    "déjame."
+    "déjame.",
+    51388
    ],
    [
     "B",
     53322,
-    "Sí,"
+    "Sí,",
+    53422
    ],
    [
     "B",
     53471,
-    "sí, de nuevo,"
+    "sí, de nuevo,",
+    55072
    ],
    [
     "B",
     55172,
-    "¿qué pasa?"
+    "¿qué pasa?",
+    57072
    ],
    [
     "B",
     60922,
-    "¿Qué pasa? ¿Qué pasa?"
+    "¿Qué pasa? ¿Qué pasa?",
+    62072
    ],
    [
     "B",
     65072,
-    "¿Usted no le debe pedir al vecino que no le diga nada?"
+    "¿Usted no le debe pedir al vecino que no le diga nada?",
+    67922
    ],
    [
     "B",
     69022,
-    "Usted va a volver a tomar el peso y se va a salvar cualquier cosa."
+    "Usted va a volver a tomar el peso y se va a salvar cualquier cosa.",
+    73522
    ],
    [
     "B",
     77450,
-    "Tocaba ahí, no aire para sentir."
+    "Tocaba ahí, no aire para sentir.",
+    79000
    ],
    [
     "B",
     79850,
-    "Nunca te he visto a mi sin abrir."
+    "Nunca te he visto a mi sin abrir.",
+    81400
    ],
    [
     "A",
     85950,
-    "Gracias."
+    "Gracias.",
+    86299
    ],
    [
     "A",
     107018,
-    "Prueba"
+    "Prueba",
+    107018
    ],
    [
     "B",
     107018,
-    "5."
+    "5.",
+    107367
    ],
    [
     "A",
     107367,
-    "unos tres, probando, probando, probando, probando."
+    "unos tres, probando, probando, probando, probando.",
+    111468
    ],
    [
     "A",
     115067,
-    "Habla, habla, hola."
+    "Habla, habla, hola.",
+    116718
    ],
    [
     "B",
     116718,
-    "Hola."
+    "Hola.",
+    117168
    ],
    [
     "A",
     118067,
-    "¿Están sola?"
+    "¿Están sola?",
+    118768
    ],
    [
     "A",
     120067,
-    "Hola."
+    "Hola.",
+    120418
    ],
    [
     "A",
     120617,
-    "Gracias."
+    "Gracias.",
+    121117
    ],
    [
     "A",
     124867,
-    "Estamos probando."
+    "Estamos probando.",
+    125617
    ]
   ]
  },
@@ -1733,7 +3027,7 @@
   "orphan_words_pct": 1.0,
   "canary": 12,
   "hallucinations": [],
-  "excess_phrases": 12,
+  "excess_phrases": 19,
   "detail": [
    [
     "uno dos tres probando",
@@ -1749,114 +3043,174 @@
     "uno dos tres",
     2,
     0
+   ],
+   [
+    "hola sí",
+    1,
+    0
+   ],
+   [
+    "apa ini",
+    1,
+    0
+   ],
+   [
+    "ta probando",
+    1,
+    0
+   ],
+   [
+    "uno dos tres probando uno dos tres probando",
+    1,
+    0
    ]
+  ],
+  "wer": 1.0862068965517242,
+  "sub": 37,
+  "del": 0,
+  "ins": 26,
+  "ref_words": 58,
+  "hyp_words": 84,
+  "invented": [
+   "uno dos tres",
+   "permítame subir por ahí",
+   "perdón",
+   "permítame subir por ahí",
+   "apa ini",
+   "permítame subir por ahí",
+   "uno dos tres",
+   "proba",
+   "proba",
+   "proba",
+   "uno dos tres probando uno dos tres probando"
   ],
   "chunks": 22,
   "transcript": [
    [
     null,
     0,
-    "Uno dos tres probando, uno dos tres probando."
+    "Uno dos tres probando, uno dos tres probando.",
+    null
    ],
    [
     null,
     5100,
-    "Hola sí, uno dos tres probando, uno dos tres probando."
+    "Hola sí, uno dos tres probando, uno dos tres probando.",
+    null
    ],
    [
     null,
     15400,
-    "Buenas, ¿hola?"
+    "Buenas, ¿hola?",
+    null
    ],
    [
     null,
     24600,
-    "uno dos tres probando"
+    "uno dos tres probando",
+    null
    ],
    [
     null,
     28400,
-    "Uno dos tres probando"
+    "Uno dos tres probando",
+    null
    ],
    [
     null,
     32200,
-    "Uno dos tres."
+    "Uno dos tres.",
+    null
    ],
    [
     null,
     37100,
-    "Uno dos tres probando."
+    "Uno dos tres probando.",
+    null
    ],
    [
     null,
     48300,
-    "Hola, permítame subir por ahí."
+    "Hola, permítame subir por ahí.",
+    null
    ],
    [
     null,
     53100,
-    "perdón"
+    "perdón",
+    null
    ],
    [
     null,
     58100,
-    "Permítame subir por ahí."
+    "Permítame subir por ahí.",
+    null
    ],
    [
     null,
     63800,
-    "Uno dos tres probando,"
+    "Uno dos tres probando,",
+    null
    ],
    [
     null,
     74100,
-    "Apa ini?"
+    "Apa ini?",
+    null
    ],
    [
     null,
     83600,
-    "Permítame subir por ahí"
+    "Permítame subir por ahí",
+    null
    ],
    [
     null,
     90200,
-    "Uno dos tres probando."
+    "Uno dos tres probando.",
+    null
    ],
    [
     null,
     98300,
-    "Uno dos tres"
+    "Uno dos tres",
+    null
    ],
    [
     null,
     108400,
-    "proba, proba, proba"
+    "proba, proba, proba",
+    null
    ],
    [
     null,
     113600,
-    "Hola?"
+    "Hola?",
+    null
    ],
    [
     null,
     117800,
-    "Buenas, hola?"
+    "Buenas, hola?",
+    null
    ],
    [
     null,
     122100,
-    "ta probando"
+    "ta probando",
+    null
    ],
    [
     null,
     126600,
-    "Hola, ¿hola? Uno dos tres probando uno dos tres probando."
+    "Hola, ¿hola? Uno dos tres probando uno dos tres probando.",
+    null
    ],
    [
     null,
     130400,
-    "Uno dos tres probando"
+    "Uno dos tres probando",
+    null
    ]
   ]
  },
@@ -1871,84 +3225,140 @@
   "hallucinations": [
    "Amen."
   ],
-  "excess_phrases": 1,
+  "excess_phrases": 7,
   "detail": [
    [
     "uno dos tres probando",
     2,
     0
+   ],
+   [
+    "hola sí",
+    1,
+    0
+   ],
+   [
+    "težak posao",
+    1,
+    0
+   ],
+   [
+    "apaí no je pastin",
+    1,
+    0
+   ],
+   [
+    "prea unas tres",
+    1,
+    0
+   ],
+   [
+    "tá brón orm",
+    1,
+    0
    ]
+  ],
+  "wer": 0.7068965517241379,
+  "sub": 18,
+  "del": 22,
+  "ins": 1,
+  "ref_words": 58,
+  "hyp_words": 37,
+  "invented": [
+   "amen",
+   "come",
+   "déjame",
+   "zievenen",
+   "težak posao",
+   "apaí no je pastin",
+   "habríamos",
+   "prea unas tres",
+   "tá brón orm"
   ],
   "transcript": [
    [
     null,
     0,
-    "Uno dos tres probando, uno dos tres probando."
+    "Uno dos tres probando, uno dos tres probando.",
+    null
    ],
    [
     null,
     5100,
-    "Hola sí, uno, tres, probando."
+    "Hola sí, uno, tres, probando.",
+    null
    ],
    [
     null,
     15400,
-    "Buenas, ¿hola?"
+    "Buenas, ¿hola?",
+    null
    ],
    [
     null,
     24600,
-    "Amen."
+    "Amen.",
+    null
    ],
    [
     null,
     32200,
-    "Come."
+    "Come.",
+    null
    ],
    [
     null,
     48300,
-    "Hola, déjame..."
+    "Hola, déjame...",
+    null
    ],
    [
     null,
     53100,
-    "Zievenen."
+    "Zievenen.",
+    null
    ],
    [
     null,
     58100,
-    "Težak posao."
+    "Težak posao.",
+    null
    ],
    [
     null,
     74100,
-    "Apaí no je pastin?"
+    "Apaí no je pastin?",
+    null
    ],
    [
     null,
     83600,
-    "¿Habríamos?"
+    "¿Habríamos?",
+    null
    ],
    [
     null,
     98300,
-    "prea unas tres"
+    "prea unas tres",
+    null
    ],
    [
     null,
     113600,
-    "Hola, hola."
+    "Hola, hola.",
+    null
    ],
    [
     null,
     117800,
-    "Hola, gracias."
+    "Hola, gracias.",
+    null
    ],
    [
     null,
     122100,
-    "Tá brón orm."
+    "Tá brón orm.",
+    null
    ]
   ]
  },
@@ -1961,7 +3371,7 @@
   "orphan_words_pct": 0.0,
   "canary": 0,
   "hallucinations": [],
-  "excess_phrases": 152,
+  "excess_phrases": 166,
   "detail": [
    [
     "cómo estás",
@@ -1982,94 +3392,7341 @@
     "dónde se puede hacer",
     2,
     0
+   ],
+   [
+    "ahora la prueba es que si podés arreglar porque como que está muy arriba",
+    1,
+    0
+   ],
+   [
+    "cómo que tal",
+    1,
+    0
+   ],
+   [
+    "voy a tener que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "tú quieres",
+    1,
+    0
    ]
   ],
+  "wer": 6.517241379310345,
+  "sub": 33,
+  "del": 0,
+  "ins": 345,
+  "ref_words": 58,
+  "hyp_words": 403,
+  "invented": [
+   "1",
+   "2",
+   "1",
+   "2",
+   "1",
+   "2",
+   "1",
+   "2",
+   "1",
+   "2",
+   "voy a tener que subir por ahí",
+   "ok",
+   "déjame",
+   "tú quieres",
+   "1",
+   "2",
+   "qué sucedió con la botella",
+   "dónde se puede hacer",
+   "dónde se puede hacer",
+   "toma para ahí",
+   "no hay para asimilación",
+   "porque yo no tengo mi teléfono",
+   "qué pasó",
+   "por qué te vas a poner esa",
+   "qué pasó",
+   "qué pasó",
+   "qué pasó",
+   "qué pasó",
+   "mira",
+   "todo para allá",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás",
+   "cómo estás"
+  ],
+  "word_speaker_acc": 0.8793103448275862,
+  "turn_speaker_acc": 0.7142857142857143,
+  "mapping": {
+   "persona_1": "A",
+   "persona_2": "B"
+  },
+  "time_speaker_acc": 0.5733333333333334,
+  "per_person": {
+   "A": 0.96,
+   "B": 0.0,
+   "C": 0.38,
+   "D": 0.0,
+   "E": 0.0
+  },
+  "time_mapping": {
+   "persona_1": "A",
+   "persona_2": "C"
+  },
   "note": "acuerdo 47%; texto final + voces",
   "transcript": [
    [
     "persona_1",
     1961,
-    "1, 2, 3 probando, 1, 2, 3 probando, 1, 2, 3 probando. Hola, sí, 1, 2, 3 probando, 1, 2, 3 probando. Estamos probando. Buenas, ¿cómo va?"
+    "1, 2, 3 probando, 1, 2, 3 probando, 1, 2, 3 probando. Hola, sí, 1, 2, 3 probando, 1, 2, 3 probando. Estamos probando. Buenas, ¿cómo va?",
+    20016
    ],
    [
     "persona_2",
     20016,
-    "Ahora la prueba es que si podés arreglar porque como que está muy arriba."
+    "Ahora la prueba es que si podés arreglar porque como que está muy arriba.",
+    23500
    ],
    [
     "persona_1",
     23500,
-    "Cara. Dale. ¿Cómo que tal?"
+    "Cara. Dale. ¿Cómo que tal?",
+    47647
    ],
    [
     "persona_1",
     47647,
-    "Buenas. Hola. Voy a tener que subir por ahí."
+    "Buenas. Hola. Voy a tener que subir por ahí.",
+    50090
    ],
    [
     "persona_2",
     50090,
-    "Sí, ok, déjame. ¿Tú quieres? 1, 2, 3 probando."
+    "Sí, ok, déjame. ¿Tú quieres? 1, 2, 3 probando.",
+    53818
    ],
    [
     "persona_1",
     53818,
-    "¿Qué sucedió con la botella?"
+    "¿Qué sucedió con la botella?",
+    59418
    ],
    [
     "persona_2",
     59418,
-    "¿Dónde se puede hacer?"
+    "¿Dónde se puede hacer?",
+    60968
    ],
    [
     "persona_2",
     60968,
-    "¿Dónde se puede hacer?"
+    "¿Dónde se puede hacer?",
+    77492
    ],
    [
     "persona_2",
     77492,
-    "Toma para ahí, no hay para asimilación."
+    "Toma para ahí, no hay para asimilación.",
+    79892
    ],
    [
     "persona_2",
     79892,
-    "Porque yo no tengo mi teléfono."
+    "Porque yo no tengo mi teléfono.",
+    107060
    ],
    [
     "persona_1",
     107060,
-    "¿Qué pasó? ¿Por qué te vas a poner esa? ¿Qué pasó? ¿Qué pasó? ¿Qué pasó? ¿Qué pasó? Mira, todo para allá. Sí, sí, sí. ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás?"
+    "¿Qué pasó? ¿Por qué te vas a poner esa? ¿Qué pasó? ¿Qué pasó? ¿Qué pasó? ¿Qué pasó? Mira, todo para allá. Sí, sí, sí. ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás?",
+    111510
    ],
    [
     "persona_1",
     111510,
-    "¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás?"
+    "¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás?",
+    111511
    ],
    [
     "persona_1",
     111511,
-    "¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás?"
+    "¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás?",
+    111512
    ],
    [
     "persona_1",
     111512,
-    "¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás?"
+    "¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás?",
+    111513
    ],
    [
     "persona_1",
     111513,
-    "¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás?"
+    "¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás? ¿Cómo estás?",
+    111514
    ],
    [
     "persona_1",
     111514,
-    "¿Cómo estás? ¿Cómo estás?"
+    "¿Cómo estás? ¿Cómo estás?",
+    115060
    ],
    [
     "persona_1",
     115060,
-    "Habla, habla sola,"
+    "Habla, habla sola,",
+    135300
+   ]
+  ]
+ },
+ {
+  "variant": "whisper-1/raw",
+  "run": 2,
+  "turns": 28,
+  "people": 0,
+  "orphan_turns": 28,
+  "orphan_words_pct": 1.0,
+  "canary": 0,
+  "hallucinations": [],
+  "excess_phrases": 9,
+  "detail": [
+   [
+    "qué es",
+    4,
+    0
+   ],
+   [
+    "cómo van",
+    2,
+    1
+   ],
+   [
+    "tendré que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "esto sí es de nuevo",
+    1,
+    0
+   ],
+   [
+    "quién es tu compañera",
+    1,
+    0
+   ],
+   [
+    "prueba 1",
+    1,
+    0
+   ]
+  ],
+  "wer": 1.103448275862069,
+  "sub": 30,
+  "del": 0,
+  "ins": 34,
+  "ref_words": 58,
+  "hyp_words": 92,
+  "invented": [
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "tendré que subir por ahí",
+   "ok",
+   "véngame",
+   "esto sí es de nuevo",
+   "qué es",
+   "qué es",
+   "qué es",
+   "quién es tu compañera",
+   "qué",
+   "qué es",
+   "prueba 1",
+   "2",
+   "3"
+  ],
+  "latency_ms": 10084,
+  "transcript": [
+   [
+    null,
+    0,
+    "1, 2, 3, probando. 1, 2, 3, probando. 1, 2, 3, probando.",
+    5000
+   ],
+   [
+    null,
+    8000,
+    "Hola, sí. 1, 2, 3, probando. 1, 2, 3, probando.",
+    12000
+   ],
+   [
+    null,
+    13000,
+    "Estamos probando.",
+    15000
+   ],
+   [
+    null,
+    17000,
+    "Buenas. ¿Cómo van?",
+    19000
+   ],
+   [
+    null,
+    20000,
+    "Ahora la prueba que sí puedes arreglar, porque como que está muy arriba.",
+    24000
+   ],
+   [
+    null,
+    24000,
+    "¡Cara!",
+    25000
+   ],
+   [
+    null,
+    30000,
+    "¿Cómo va?",
+    32000
+   ],
+   [
+    null,
+    45000,
+    "Hola.",
+    46000
+   ],
+   [
+    null,
+    47000,
+    "Hola.",
+    48000
+   ],
+   [
+    null,
+    48000,
+    "Hola.",
+    49000
+   ],
+   [
+    null,
+    49000,
+    "Tendré que subir por ahí.",
+    50000
+   ],
+   [
+    null,
+    50000,
+    "Sí, ok. Véngame.",
+    52000
+   ],
+   [
+    null,
+    54000,
+    "Esto sí es de nuevo.",
+    56000
+   ],
+   [
+    null,
+    61000,
+    "¿Qué es?",
+    62000
+   ],
+   [
+    null,
+    63000,
+    "¿Qué es?",
+    64000
+   ],
+   [
+    null,
+    65000,
+    "¿Qué es?",
+    66000
+   ],
+   [
+    null,
+    73000,
+    "¿Quién es tu compañera?",
+    74000
+   ],
+   [
+    null,
+    75000,
+    "¿Qué?",
+    76000
+   ],
+   [
+    null,
+    86000,
+    "¿Qué es?",
+    87000
+   ],
+   [
+    null,
+    90000,
+    "Hola.",
+    91000
+   ],
+   [
+    null,
+    97000,
+    "Hola.",
+    98000
+   ],
+   [
+    null,
+    107000,
+    "Prueba 1, 2, 3, probando, probando, probando, probando.",
+    112000
+   ],
+   [
+    null,
+    115000,
+    "Sí, hola, hola, hola.",
+    117000
+   ],
+   [
+    null,
+    117000,
+    "Hola.",
+    118000
+   ],
+   [
+    null,
+    118000,
+    "Hola.",
+    119000
+   ],
+   [
+    null,
+    120000,
+    "Hola.",
+    121000
+   ],
+   [
+    null,
+    121000,
+    "Gracias.",
+    122000
+   ],
+   [
+    null,
+    125000,
+    "Estamos probando.",
+    126000
+   ]
+  ]
+ },
+ {
+  "variant": "whisper-1/norm",
+  "run": 2,
+  "turns": 48,
+  "people": 0,
+  "orphan_turns": 48,
+  "orphan_words_pct": 1.0,
+  "canary": 0,
+  "hallucinations": [],
+  "excess_phrases": 15,
+  "detail": [
+   [
+    "si nos lo anime gritos",
+    5,
+    0
+   ],
+   [
+    "hay que salir por ahí",
+    1,
+    0
+   ],
+   [
+    "esto sí es un",
+    1,
+    0
+   ],
+   [
+    "qué bien",
+    1,
+    0
+   ],
+   [
+    "como dice",
+    1,
+    0
+   ],
+   [
+    "muchas gracias",
+    1,
+    0
+   ],
+   [
+    "me están mirando",
+    1,
+    0
+   ],
+   [
+    "qué escasez",
+    1,
+    0
+   ]
+  ],
+  "wer": 2.2413793103448274,
+  "sub": 29,
+  "del": 2,
+  "ins": 99,
+  "ref_words": 58,
+  "hyp_words": 155,
+  "invented": [
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "ah",
+   "1",
+   "2",
+   "3",
+   "hay que salir por ahí",
+   "ok",
+   "véngame",
+   "esto sí es un",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "2",
+   "3",
+   "3",
+   "4",
+   "5",
+   "probablemente",
+   "si nos lo anime gritos",
+   "probablemente",
+   "si nos lo anime gritos",
+   "probablemente",
+   "si nos lo anime gritos",
+   "si nos lo anime gritos",
+   "probablemente",
+   "oh",
+   "qué bien",
+   "como dice",
+   "van",
+   "perfecto",
+   "si nos lo anime gritos",
+   "probablemente",
+   "ah",
+   "sorpresa",
+   "me están mirando",
+   "qué escasez",
+   "por dios",
+   "prueba 1",
+   "2",
+   "3",
+   "oh",
+   "quién es hola"
+  ],
+  "latency_ms": 25671,
+  "transcript": [
+   [
+    null,
+    0,
+    "1, 2, 3, probando. 1, 2, 3, probando. 1, 2, 3, probando.",
+    4000
+   ],
+   [
+    null,
+    8000,
+    "Hola, sí. 1, 2, 3, probando. 1, 2, 3, probando.",
+    11000
+   ],
+   [
+    null,
+    13000,
+    "Estamos probando.",
+    14000
+   ],
+   [
+    null,
+    17000,
+    "Buenas.",
+    18000
+   ],
+   [
+    null,
+    20000,
+    "Ahora la prueba que sí puedes arreglar, porque como que está muy arriba.",
+    24000
+   ],
+   [
+    null,
+    24000,
+    "Ah, bien.",
+    25000
+   ],
+   [
+    null,
+    30000,
+    "Sí.",
+    31000
+   ],
+   [
+    null,
+    35000,
+    "1, 2, 3, probando.",
+    36000
+   ],
+   [
+    null,
+    40000,
+    "Hola.",
+    41000
+   ],
+   [
+    null,
+    42000,
+    "Hola.",
+    43000
+   ],
+   [
+    null,
+    44000,
+    "Hola.",
+    45000
+   ],
+   [
+    null,
+    47000,
+    "Hola.",
+    48000
+   ],
+   [
+    null,
+    48000,
+    "Hola.",
+    49000
+   ],
+   [
+    null,
+    49000,
+    "Hay que salir por ahí.",
+    50000
+   ],
+   [
+    null,
+    50000,
+    "Sí, ok. Véngame.",
+    51000
+   ],
+   [
+    null,
+    54000,
+    "Esto sí es un...",
+    55000
+   ],
+   [
+    null,
+    56000,
+    "1, 2, 3, probando.",
+    57000
+   ],
+   [
+    null,
+    58000,
+    "1, 2, 3, probando.",
+    59000
+   ],
+   [
+    null,
+    60000,
+    "1, 2, 3, probando.",
+    61000
+   ],
+   [
+    null,
+    65000,
+    "2, 3, probando.",
+    66000
+   ],
+   [
+    null,
+    68000,
+    "3, 4, 5, probablemente.",
+    70000
+   ],
+   [
+    null,
+    75000,
+    "Si nos lo anime gritos...",
+    77000
+   ],
+   [
+    null,
+    77000,
+    "...sí, probablemente.",
+    78000
+   ],
+   [
+    null,
+    80000,
+    "Si nos lo anime gritos...",
+    82000
+   ],
+   [
+    null,
+    84000,
+    "...sí, probablemente.",
+    85000
+   ],
+   [
+    null,
+    86000,
+    "Si nos lo anime gritos...",
+    87000
+   ],
+   [
+    null,
+    88000,
+    "...si nos lo anime gritos...",
+    89000
+   ],
+   [
+    null,
+    89000,
+    "...sí, probablemente.",
+    90000
+   ],
+   [
+    null,
+    93000,
+    "¡Oh!",
+    94000
+   ],
+   [
+    null,
+    94000,
+    "¡Qué bien!",
+    95000
+   ],
+   [
+    null,
+    96000,
+    "Gracias.",
+    97000
+   ],
+   [
+    null,
+    99000,
+    "Como dice, van...",
+    100000
+   ],
+   [
+    null,
+    100000,
+    "Perfecto, muchas gracias.",
+    102000
+   ],
+   [
+    null,
+    102000,
+    "Si nos lo anime gritos...",
+    104000
+   ],
+   [
+    null,
+    104000,
+    "...sí, probablemente.",
+    105000
+   ],
+   [
+    null,
+    105000,
+    "Ah, sorpresa, me están mirando.",
+    106000
+   ],
+   [
+    null,
+    106000,
+    "Qué escasez, por Dios.",
+    107000
+   ],
+   [
+    null,
+    107000,
+    "Prueba 1, 2, 3.",
+    108000
+   ],
+   [
+    null,
+    109000,
+    "Probando, probando, probando.",
+    111000
+   ],
+   [
+    null,
+    111000,
+    "Probando.",
+    112000
+   ],
+   [
+    null,
+    112000,
+    "¡Oh!",
+    113000
+   ],
+   [
+    null,
+    115000,
+    "Sí, hola, hola, hola.",
+    117000
+   ],
+   [
+    null,
+    117000,
+    "¿Hola?",
+    118000
+   ],
+   [
+    null,
+    118000,
+    "¿Quién es hola?",
+    119000
+   ],
+   [
+    null,
+    120000,
+    "Hola.",
+    121000
+   ],
+   [
+    null,
+    121000,
+    "Gracias.",
+    122000
+   ],
+   [
+    null,
+    125000,
+    "Estamos probando.",
+    126000
+   ],
+   [
+    null,
+    134000,
+    "Gracias.",
+    135000
+   ]
+  ]
+ },
+ {
+  "variant": "whisper-1/vad",
+  "run": 2,
+  "turns": 35,
+  "people": 0,
+  "orphan_turns": 35,
+  "orphan_words_pct": 1.0,
+  "canary": 0,
+  "hallucinations": [],
+  "excess_phrases": 9,
+  "detail": [
+   [
+    "cómo va",
+    2,
+    1
+   ],
+   [
+    "la prueba que sí puedes arreglar",
+    1,
+    0
+   ],
+   [
+    "tengo que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "usingadobe with helpless",
+    1,
+    0
+   ],
+   [
+    "3 probando",
+    1,
+    0
+   ],
+   [
+    "como ha venido셔서",
+    1,
+    0
+   ],
+   [
+    "ça va",
+    1,
+    0
+   ],
+   [
+    "300 francs",
+    1,
+    0
+   ]
+  ],
+  "wer": 2.0,
+  "sub": 32,
+  "del": 0,
+  "ins": 84,
+  "ref_words": 58,
+  "hyp_words": 142,
+  "invented": [
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "ah",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "tengo que subir por ahí",
+   "ok",
+   "véngame",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "usingadobe with helpless",
+   "1",
+   "2",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "como ha venido셔서",
+   "mama",
+   "ça va",
+   "300 francs",
+   "3 d un mot mod modo",
+   "1",
+   "2",
+   "3"
+  ],
+  "latency_ms": 17031,
+  "transcript": [
+   [
+    null,
+    790,
+    "1, 2, 3, probando. 1, 2, 3, probando. 1, 2, 3, probando.",
+    4790
+   ],
+   [
+    null,
+    7790,
+    "Hola, sí. 1, 2, 3, probando. 1, 2, 3, probando.",
+    11790
+   ],
+   [
+    null,
+    12790,
+    "Estamos probando.",
+    14790
+   ],
+   [
+    null,
+    16790,
+    "Buenas. ¿Cómo va?",
+    18790
+   ],
+   [
+    null,
+    19790,
+    "Cara, la prueba que sí puedes arreglar, porque como que está muy arriba.",
+    23790
+   ],
+   [
+    null,
+    23790,
+    "¿Cara? Ah, bien.",
+    25790
+   ],
+   [
+    null,
+    30790,
+    "1, 2, 3, probando. 1, 2, 3, probando.",
+    34790
+   ],
+   [
+    null,
+    35790,
+    "¿Cómo va?",
+    37790
+   ],
+   [
+    null,
+    38790,
+    "1, 2, 3, probando. 1, 2, 3, probando.",
+    41790
+   ],
+   [
+    null,
+    42790,
+    "1, 2, 3, probando. 1, 2, 3, probando.",
+    44790
+   ],
+   [
+    null,
+    45790,
+    "Hola.",
+    46790
+   ],
+   [
+    null,
+    47790,
+    "Hola.",
+    48790
+   ],
+   [
+    null,
+    48790,
+    "Hola.",
+    49790
+   ],
+   [
+    null,
+    49790,
+    "Tengo que subir por ahí.",
+    50790
+   ],
+   [
+    null,
+    50790,
+    "Sí, ok. Véngame.",
+    52790
+   ],
+   [
+    null,
+    53790,
+    "1, 2, 3, probando. 1, 2, 3, probando.",
+    57790
+   ],
+   [
+    null,
+    58790,
+    "1, 2, 3, probando.",
+    61790
+   ],
+   [
+    null,
+    62790,
+    "1, 2, 3, probando.",
+    64790
+   ],
+   [
+    null,
+    65790,
+    "1, 2, 3, probando.",
+    67790
+   ],
+   [
+    null,
+    69790,
+    "1, 2, 3, probando.",
+    71790
+   ],
+   [
+    null,
+    72790,
+    "usingAdobe with helpless.",
+    75790
+   ],
+   [
+    null,
+    76790,
+    "1, 2, 3 probando.",
+    79790
+   ],
+   [
+    null,
+    80790,
+    "1, 2, 3, probando.",
+    82790
+   ],
+   [
+    null,
+    83790,
+    "1, 2, 3, probando.",
+    86790
+   ],
+   [
+    null,
+    87790,
+    "Como ha venido셔서, Mama.",
+    89790
+   ],
+   [
+    null,
+    90790,
+    "😆",
+    91790
+   ],
+   [
+    null,
+    96790,
+    "Ça va?",
+    97790
+   ],
+   [
+    null,
+    99290,
+    "300 francs.",
+    100790
+   ],
+   [
+    null,
+    101790,
+    "3 d'un mot mod modo.",
+    103790
+   ],
+   [
+    null,
+    107790,
+    "1, 2, 3, probando.",
+    109790
+   ],
+   [
+    null,
+    114790,
+    "Hola!",
+    116790
+   ],
+   [
+    null,
+    117790,
+    "Hola.",
+    118790
+   ],
+   [
+    null,
+    119790,
+    "Hola.",
+    120790
+   ],
+   [
+    null,
+    120790,
+    "Gracias.",
+    121790
+   ],
+   [
+    null,
+    124790,
+    "Probando.",
+    125790
+   ]
+  ]
+ },
+ {
+  "variant": "whisper-1/vad+norm",
+  "run": 2,
+  "turns": 30,
+  "people": 0,
+  "orphan_turns": 30,
+  "orphan_words_pct": 1.0,
+  "canary": 0,
+  "hallucinations": [],
+  "excess_phrases": 5,
+  "detail": [
+   [
+    "cómo va",
+    2,
+    1
+   ],
+   [
+    "la prueba que sí puedes arreglar porque como que está muy arriba",
+    1,
+    0
+   ],
+   [
+    "tengo que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "quién es tu hermano",
+    1,
+    0
+   ],
+   [
+    "prueba 1",
+    1,
+    0
+   ]
+  ],
+  "wer": 1.0344827586206897,
+  "sub": 30,
+  "del": 0,
+  "ins": 30,
+  "ref_words": 58,
+  "hyp_words": 88,
+  "invented": [
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "ah",
+   "tengo que subir por ahí",
+   "ok",
+   "véngame",
+   "ven",
+   "quién es tu hermano",
+   "ramiro",
+   "prueba 1",
+   "2",
+   "3",
+   "renzo"
+  ],
+  "latency_ms": 6773,
+  "transcript": [
+   [
+    null,
+    790,
+    "1, 2, 3, probando. 1, 2, 3, probando. 1, 2, 3, probando.",
+    4790
+   ],
+   [
+    null,
+    7790,
+    "Hola, sí. 1, 2, 3, probando. 1, 2, 3, probando.",
+    11790
+   ],
+   [
+    null,
+    12790,
+    "Estamos probando.",
+    14790
+   ],
+   [
+    null,
+    16790,
+    "Buenas. ¿Cómo va?",
+    18790
+   ],
+   [
+    null,
+    19790,
+    "Cara, la prueba que sí puedes arreglar porque como que está muy arriba.",
+    23790
+   ],
+   [
+    null,
+    23790,
+    "¿Cara? Ah, bien.",
+    25790
+   ],
+   [
+    null,
+    30790,
+    "Sí.",
+    31790
+   ],
+   [
+    null,
+    36790,
+    "¿Cómo va?",
+    37790
+   ],
+   [
+    null,
+    45790,
+    "Hola.",
+    46790
+   ],
+   [
+    null,
+    47790,
+    "Hola.",
+    48790
+   ],
+   [
+    null,
+    48790,
+    "Hola.",
+    49790
+   ],
+   [
+    null,
+    49790,
+    "Tengo que subir por ahí.",
+    50790
+   ],
+   [
+    null,
+    50790,
+    "Sí, ok. Véngame.",
+    51790
+   ],
+   [
+    null,
+    54790,
+    "Sí, ven.",
+    55790
+   ],
+   [
+    null,
+    60790,
+    "Sí, claro.",
+    61790
+   ],
+   [
+    null,
+    72790,
+    "¿Quién es tu hermano?",
+    74790
+   ],
+   [
+    null,
+    75790,
+    "Ramiro.",
+    76790
+   ],
+   [
+    null,
+    85790,
+    "Sí.",
+    86790
+   ],
+   [
+    null,
+    90790,
+    "Hola.",
+    91790
+   ],
+   [
+    null,
+    96790,
+    "Hola.",
+    97790
+   ],
+   [
+    null,
+    106790,
+    "Prueba 1, 2, 3.",
+    107790
+   ],
+   [
+    null,
+    107790,
+    "Probando, probando, probando.",
+    109790
+   ],
+   [
+    null,
+    110790,
+    "Probando.",
+    111790
+   ],
+   [
+    null,
+    114790,
+    "Sí, habla, habla.",
+    115790
+   ],
+   [
+    null,
+    115790,
+    "Hola.",
+    116790
+   ],
+   [
+    null,
+    116790,
+    "Hola.",
+    117790
+   ],
+   [
+    null,
+    117790,
+    "Renzo, hola.",
+    118790
+   ],
+   [
+    null,
+    118790,
+    "Hola.",
+    119790
+   ],
+   [
+    null,
+    119790,
+    "Gracias.",
+    120790
+   ],
+   [
+    null,
+    124790,
+    "No, probando.",
+    125790
+   ]
+  ]
+ },
+ {
+  "variant": "gpt-4o-transcribe/raw",
+  "run": 2,
+  "turns": 1,
+  "people": 0,
+  "orphan_turns": 1,
+  "orphan_words_pct": 1.0,
+  "canary": 5,
+  "hallucinations": [],
+  "excess_phrases": 5,
+  "detail": [
+   [
+    "para la profe",
+    1,
+    0
+   ],
+   [
+    "si puedes arreglar",
+    1,
+    0
+   ],
+   [
+    "está bien",
+    1,
+    0
+   ],
+   [
+    "cómo que está",
+    1,
+    0
+   ],
+   [
+    "le tenés que subir por ahí",
+    1,
+    0
+   ]
+  ],
+  "wer": 17.155172413793103,
+  "sub": 24,
+  "del": 2,
+  "ins": 969,
+  "ref_words": 58,
+  "hyp_words": 1025,
+  "invented": [
+   "para la profe",
+   "está bien",
+   "cómo que está",
+   "le tenés que subir por ahí",
+   "ok",
+   "déjame"
+  ],
+  "latency_ms": 22553,
+  "transcript": [
+   [
+    null,
+    0,
+    "Uno, dos, tres, probando. Uno, dos, tres, probando. Uno, dos, tres, probando. Hola, sí. Uno, dos, tres, probando. Uno, dos, tres, probando. Estamos probando. Buenas. Hola. Para la profe, si puedes arreglar, porque como que está muy arriba. Cara. ¿Está bien? ¿Cómo que está? Buenas. Hola. Le tenés que subir por ahí. Sí, OK. Déjame. Sí. Sí, sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí. Sí, sí.",
+    null
+   ]
+  ]
+ },
+ {
+  "variant": "gpt-4o-transcribe/norm",
+  "run": 2,
+  "turns": 1,
+  "people": 0,
+  "orphan_turns": 1,
+  "orphan_words_pct": 1.0,
+  "canary": 0,
+  "hallucinations": [],
+  "excess_phrases": 5,
+  "detail": [
+   [
+    "todo para allá",
+    2,
+    0
+   ],
+   [
+    "ahora lo aprobé",
+    1,
+    0
+   ],
+   [
+    "pero si puedes arreglar",
+    1,
+    0
+   ],
+   [
+    "hay que subir por ahí",
+    1,
+    0
+   ]
+  ],
+  "wer": 4.017241379310345,
+  "sub": 35,
+  "del": 0,
+  "ins": 198,
+  "ref_words": 58,
+  "hyp_words": 256,
+  "invented": [
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "ahora lo aprobé",
+   "hay que subir por ahí",
+   "ok",
+   "déjame",
+   "mira",
+   "todo para allá",
+   "todo para allá"
+  ],
+  "latency_ms": 11466,
+  "transcript": [
+   [
+    null,
+    0,
+    "1, 2, 3, probando. 1, 2, 3, probando. 1, 2, 3, probando. Hola, sí, 1, 2, 3, probando. 1, 2, 3, probando. Estamos probando. Buenas. ¿Cómo va? Ahora lo aprobé, pero si puedes arreglar, porque como que está muy arriba. Ahora. Dale. Bien. Buenas. Hola. Hay que subir por ahí. Sí, ok, déjame. Mira, todo para allá. Sí, sí. Todo para allá. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando. Probando.",
+    null
+   ]
+  ]
+ },
+ {
+  "variant": "gpt-4o-transcribe/vad",
+  "run": 2,
+  "turns": 1,
+  "people": 0,
+  "orphan_turns": 1,
+  "orphan_words_pct": 1.0,
+  "canary": 0,
+  "hallucinations": [],
+  "excess_phrases": 5,
+  "detail": [
+   [
+    "probando a la profe si puedes arreglar porque como que está muy arriba",
+    1,
+    0
+   ],
+   [
+    "está bien",
+    1,
+    0
+   ],
+   [
+    "voy a tener que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "dios mío",
+    1,
+    0
+   ],
+   [
+    "muchísimas gracias",
+    1,
+    0
+   ]
+  ],
+  "wer": 0.8793103448275862,
+  "sub": 30,
+  "del": 1,
+  "ins": 20,
+  "ref_words": 58,
+  "hyp_words": 77,
+  "invented": [
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "está bien",
+   "voy a tener que subir por ahí",
+   "ok",
+   "déjame",
+   "oh",
+   "dios mío",
+   "perfecto",
+   "muchísimas gracias",
+   "chori"
+  ],
+  "latency_ms": 6203,
+  "transcript": [
+   [
+    null,
+    0,
+    "1, 2, 3, probando, 1, 2, 3, probando, 1, 2, 3, probando, hola, sí, 1, 2, 3, probando, 1, 2, 3, probando, estamos probando, buenas, hola. Probando a la profe si puedes arreglar porque como que está muy arriba. Cara, está bien. Hola. Buenas. Hola. Voy a tener que subir por ahí. Sí, ok, déjame. Oh, Dios mío. Hola. Perfecto, muchísimas gracias. Hola. Probando, probando, probando, probando. Probando. Chori, habla, habla, hola. Hola. Hola, gracias. Estamos probando.",
+    null
+   ]
+  ]
+ },
+ {
+  "variant": "gpt-4o-transcribe/vad+norm",
+  "run": 2,
+  "turns": 1,
+  "people": 0,
+  "orphan_turns": 1,
+  "orphan_words_pct": 1.0,
+  "canary": 5,
+  "hallucinations": [],
+  "excess_phrases": 3,
+  "detail": [
+   [
+    "ahora la profe sí puede sobrearreglar porque como que está muy arriba",
+    1,
+    0
+   ],
+   [
+    "tienen que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "dios mío",
+    1,
+    0
+   ]
+  ],
+  "wer": 17.20689655172414,
+  "sub": 25,
+  "del": 3,
+  "ins": 970,
+  "ref_words": 58,
+  "hyp_words": 1025,
+  "invented": [
+   "tienen que subir por ahí",
+   "ok",
+   "déjame",
+   "oh",
+   "dios mío"
+  ],
+  "latency_ms": 26094,
+  "transcript": [
+   [
+    null,
+    0,
+    "Uno, dos, tres, probando. Uno, dos, tres, probando. Uno, dos, tres, probando. Hola, sí, uno, dos, tres, probando. Uno, dos, tres, probando. Estamos probando. Buenas. Ahora la profe sí puede sobrearreglar porque como que está muy arriba. Buenas. Hola. Tienen que subir por ahí. Sí, ok, déjame. Sí. Oh, Dios mío. Hola. No, no, no, no. Sí. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no. No, no, no, no",
+    null
+   ]
+  ]
+ },
+ {
+  "variant": "gpt-4o-transcribe-diarize/raw",
+  "run": 2,
+  "turns": 27,
+  "people": 3,
+  "orphan_turns": 0,
+  "orphan_words_pct": 0.0,
+  "canary": 4,
+  "hallucinations": [],
+  "excess_phrases": 15,
+  "detail": [
+   [
+    "ustedes no me vayan a ir",
+    7,
+    0
+   ],
+   [
+    "aquí voy a explicar todo el documento",
+    2,
+    0
+   ],
+   [
+    "todo ahora la prueba se puede arreglar porque como está muy arriba",
+    1,
+    0
+   ],
+   [
+    "cómo lo ocurre",
+    1,
+    0
+   ],
+   [
+    "tendría que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "toca para irnos a repartir en el viaje",
+    1,
+    0
+   ],
+   [
+    "porque siempre toca abrir el avión",
+    1,
+    0
+   ],
+   [
+    "prueba 1",
+    1,
+    0
+   ]
+  ],
+  "wer": 1.8793103448275863,
+  "sub": 15,
+  "del": 4,
+  "ins": 90,
+  "ref_words": 58,
+  "hyp_words": 144,
+  "invented": [
+   "todo ahora la prueba se puede arreglar porque como está muy arriba",
+   "sabes",
+   "cómo lo ocurre",
+   "tendría que subir por ahí",
+   "ok",
+   "déjame",
+   "aquí voy a explicar todo el documento",
+   "yo voy a explicar todo el documento",
+   "ustedes no me vayan a ir",
+   "ustedes no me vayan a ir",
+   "ustedes no me vayan a ir",
+   "ustedes no se van a ir",
+   "ustedes no se van a ir",
+   "ustedes no se van a ir",
+   "ustedes no se van a ir",
+   "toca para irnos a repartir en el viaje",
+   "porque siempre toca abrir el avión",
+   "yes",
+   "prueba 1",
+   "2",
+   "3"
+  ],
+  "word_speaker_acc": 0.8518518518518519,
+  "turn_speaker_acc": 0.6428571428571429,
+  "mapping": {
+   "A": "A",
+   "B": "B",
+   "C": "D"
+  },
+  "time_speaker_acc": 0.42,
+  "per_person": {
+   "A": 0.58,
+   "B": 0.77,
+   "C": 0.1,
+   "D": 0.0,
+   "E": 0.0
+  },
+  "time_mapping": {
+   "A": "A",
+   "B": "B",
+   "C": "C"
+  },
+  "latency_ms": 51840,
+  "transcript": [
+   [
+    "A",
+    1300,
+    "Uno,",
+    1650
+   ],
+   [
+    "A",
+    1700,
+    "tres probando, uno,",
+    2500
+   ],
+   [
+    "A",
+    2600,
+    "dos, tres probando, uno,",
+    3650
+   ],
+   [
+    "A",
+    3700,
+    "dos, tres probando,",
+    4600
+   ],
+   [
+    "A",
+    8400,
+    "hola, sí, uno, dos, tres probando, uno,",
+    10450
+   ],
+   [
+    "A",
+    10500,
+    "dos, tres probando, estamos probando,",
+    14200
+   ],
+   [
+    "A",
+    14300,
+    "buenas,",
+    16550
+   ],
+   [
+    "A",
+    17700,
+    "hola, hola, cara,",
+    19200
+   ],
+   [
+    "B",
+    19200,
+    "¿Todo ahora la prueba se puede arreglar porque como está muy arriba?",
+    23750
+   ],
+   [
+    "A",
+    24200,
+    "¿sabes?",
+    25050
+   ],
+   [
+    "B",
+    26548,
+    "¿Cómo lo ocurre?",
+    27348
+   ],
+   [
+    "A",
+    48598,
+    "Vale, tendría que subir por ahí.",
+    50498
+   ],
+   [
+    "C",
+    50498,
+    "Ok, déjame.",
+    51447
+   ],
+   [
+    "B",
+    53268,
+    "sí, sí, sí, sí, sí,",
+    56268
+   ],
+   [
+    "B",
+    56568,
+    "aquí voy a explicar todo el documento,",
+    61168
+   ],
+   [
+    "B",
+    61268,
+    "yo voy a explicar todo el documento, ustedes no me vayan a ir, ustedes no me vayan a ir, ustedes no me vayan a ir, ustedes no se van a ir, ustedes no se van a ir, ustedes no se van a ir, ustedes no se van a ir.",
+    75368
+   ],
+   [
+    "B",
+    77492,
+    "Toca para irnos a repartir en el viaje.",
+    79592
+   ],
+   [
+    "B",
+    79992,
+    "Porque siempre toca abrir el avión.",
+    81592
+   ],
+   [
+    "A",
+    85942,
+    "Yes.",
+    86342
+   ],
+   [
+    "A",
+    107060,
+    "Prueba 1, 2, 3.",
+    108010
+   ],
+   [
+    "A",
+    108460,
+    "Probando, probando, probando.",
+    109910
+   ],
+   [
+    "B",
+    111960,
+    "Hola,",
+    112510
+   ],
+   [
+    "A",
+    115010,
+    "Habla, habla sola.",
+    116610
+   ],
+   [
+    "A",
+    118160,
+    "¿Estás sola?",
+    118960
+   ],
+   [
+    "A",
+    120060,
+    "Hola,",
+    120510
+   ],
+   [
+    "A",
+    120660,
+    "gracias.",
+    121260
+   ],
+   [
+    "A",
+    124860,
+    "Estamos probando.",
+    125760
+   ]
+  ]
+ },
+ {
+  "variant": "gpt-4o-transcribe-diarize/norm",
+  "run": 2,
+  "turns": 35,
+  "people": 3,
+  "orphan_turns": 0,
+  "orphan_words_pct": 0.0,
+  "canary": 0,
+  "hallucinations": [],
+  "excess_phrases": 15,
+  "detail": [
+   [
+    "3 probando",
+    4,
+    0
+   ],
+   [
+    "hola si 1",
+    1,
+    0
+   ],
+   [
+    "3 probando estamos",
+    1,
+    0
+   ],
+   [
+    "hola cara",
+    1,
+    0
+   ],
+   [
+    "ahora la prueba",
+    1,
+    0
+   ],
+   [
+    "si puedes arreglar porque como está muy arriba",
+    1,
+    0
+   ],
+   [
+    "qué tal",
+    1,
+    0
+   ],
+   [
+    "déjenme que voy a ir por ahí",
+    1,
+    0
+   ]
+  ],
+  "wer": 1.1724137931034482,
+  "sub": 33,
+  "del": 1,
+  "ins": 34,
+  "ref_words": 58,
+  "hyp_words": 91,
+  "invented": [
+   "1",
+   "2",
+   "1",
+   "2",
+   "1",
+   "2",
+   "2",
+   "1",
+   "2",
+   "3 probando estamos",
+   "ahora la prueba",
+   "qué tal",
+   "disculpa",
+   "perdón",
+   "perdón",
+   "déjenme que voy a ir por ahí",
+   "perdón",
+   "ok",
+   "déjame",
+   "mira",
+   "ahí está",
+   "maldita",
+   "de hecho",
+   "el espacio de la audiencia",
+   "ves",
+   "cómo te llamas"
+  ],
+  "word_speaker_acc": 0.7719298245614035,
+  "turn_speaker_acc": 0.6428571428571429,
+  "mapping": {
+   "A": "A",
+   "B": "B",
+   "@": "D"
+  },
+  "time_speaker_acc": 0.4488888888888889,
+  "per_person": {
+   "A": 0.58,
+   "B": 0.6,
+   "C": 0.32,
+   "D": 0.0,
+   "E": 0.0
+  },
+  "time_mapping": {
+   "@": "C",
+   "A": "A",
+   "B": "B"
+  },
+  "latency_ms": 52763,
+  "transcript": [
+   [
+    "A",
+    1300,
+    "1, 2, 3 probando, 1,",
+    2500
+   ],
+   [
+    "A",
+    2550,
+    "2, 3 probando, 1,",
+    3599
+   ],
+   [
+    "A",
+    3700,
+    "2, 3 probando",
+    4550
+   ],
+   [
+    "A",
+    8350,
+    "Hola si 1, 2, 3 probando, 1, 2, 3 probando Estamos",
+    12050
+   ],
+   [
+    "A",
+    13800,
+    "probando,",
+    14250
+   ],
+   [
+    "A",
+    14300,
+    "buenas",
+    15350
+   ],
+   [
+    "A",
+    17650,
+    "hola cara",
+    20150
+   ],
+   [
+    "B",
+    20150,
+    "Ahora la prueba, si puedes arreglar porque como está muy arriba.",
+    23800
+   ],
+   [
+    "B",
+    26484,
+    "¿Cómo?",
+    26784
+   ],
+   [
+    "B",
+    26834,
+    "¿Qué tal?",
+    27184
+   ],
+   [
+    "A",
+    45184,
+    "Disculpa, perdón.",
+    45934
+   ],
+   [
+    "A",
+    47384,
+    "Perdón.",
+    48084
+   ],
+   [
+    "@",
+    48084,
+    "Hola.",
+    48684
+   ],
+   [
+    "A",
+    48684,
+    "Déjenme que voy a ir por ahí.",
+    50484
+   ],
+   [
+    "@",
+    50484,
+    "Sí.",
+    50684
+   ],
+   [
+    "A",
+    50684,
+    "Perdón.",
+    50784
+   ],
+   [
+    "@",
+    50784,
+    "Ok,",
+    50984
+   ],
+   [
+    "@",
+    51084,
+    "déjame.",
+    53234
+   ],
+   [
+    "B",
+    53268,
+    "Sí,",
+    53418
+   ],
+   [
+    "B",
+    53568,
+    "sí, sí, sí.",
+    57018
+   ],
+   [
+    "A",
+    73218,
+    "Mira, ahí está,",
+    73818
+   ],
+   [
+    "A",
+    73868,
+    "la",
+    73968
+   ],
+   [
+    "B",
+    73968,
+    "Sí.",
+    74618
+   ],
+   [
+    "A",
+    74618,
+    "maldita.",
+    75868
+   ],
+   [
+    "B",
+    79956,
+    "De hecho,",
+    80406
+   ],
+   [
+    "B",
+    80506,
+    "el espacio de la audiencia...",
+    81906
+   ],
+   [
+    "A",
+    85856,
+    "¿Ves?",
+    86206
+   ],
+   [
+    "A",
+    107732,
+    "Atrás,",
+    107982
+   ],
+   [
+    "A",
+    108132,
+    "probando, probando, probando, probando.",
+    111482
+   ],
+   [
+    "B",
+    111882,
+    "¿Cómo te llamas?",
+    112832
+   ],
+   [
+    "A",
+    115032,
+    "Hola, hola, hola.",
+    117232
+   ],
+   [
+    "A",
+    118082,
+    "Hola, hola.",
+    119082
+   ],
+   [
+    "A",
+    120232,
+    "Hola,",
+    120532
+   ],
+   [
+    "A",
+    120632,
+    "gracias.",
+    121232
+   ],
+   [
+    "A",
+    124932,
+    "Estamos probando.",
+    125732
+   ]
+  ]
+ },
+ {
+  "variant": "gpt-4o-transcribe-diarize/vad",
+  "run": 2,
+  "turns": 38,
+  "people": 3,
+  "orphan_turns": 0,
+  "orphan_words_pct": 0.0,
+  "canary": 5,
+  "hallucinations": [],
+  "excess_phrases": 15,
+  "detail": [
+   [
+    "para la próxima si puedes arreglar porque como que está muy arriba",
+    1,
+    0
+   ],
+   [
+    "está bien",
+    1,
+    0
+   ],
+   [
+    "cómo lo vienes",
+    1,
+    0
+   ],
+   [
+    "dónde estoy",
+    1,
+    0
+   ],
+   [
+    "tenía que venir por ahí",
+    1,
+    0
+   ],
+   [
+    "si vienen",
+    1,
+    0
+   ],
+   [
+    "voy a tocar la puerta",
+    1,
+    0
+   ],
+   [
+    "debe ser la puerta de la casa",
+    1,
+    0
+   ]
+  ],
+  "wer": 1.3275862068965518,
+  "sub": 14,
+  "del": 4,
+  "ins": 59,
+  "ref_words": 58,
+  "hyp_words": 113,
+  "invented": [
+   "está bien",
+   "cómo lo vienes",
+   "dónde estoy",
+   "ah",
+   "tenía que venir por ahí",
+   "okay",
+   "déjame",
+   "si vienen",
+   "voy a tocar la puerta",
+   "debe ser la puerta de la casa",
+   "ustedes no deben venir",
+   "ah",
+   "ahí sí hay",
+   "toma ahí",
+   "no eres fácil ni nada",
+   "te voy a dejar con el video",
+   "prueba 1 3"
+  ],
+  "word_speaker_acc": 0.8518518518518519,
+  "turn_speaker_acc": 0.6428571428571429,
+  "mapping": {
+   "A": "A",
+   "B": "B",
+   "C": "D"
+  },
+  "time_speaker_acc": 0.3688888888888889,
+  "per_person": {
+   "A": 0.5,
+   "B": 0.68,
+   "C": 0.09,
+   "D": 0.0,
+   "E": 0.0
+  },
+  "time_mapping": {
+   "A": "A",
+   "B": "B",
+   "C": "C"
+  },
+  "latency_ms": 60769,
+  "transcript": [
+   [
+    "A",
+    1290,
+    "Uno,",
+    1640
+   ],
+   [
+    "A",
+    1690,
+    "dos, tres, probando. Uno, dos, tres, probando. Uno,",
+    3690
+   ],
+   [
+    "A",
+    3740,
+    "dos, tres, probando.",
+    4540
+   ],
+   [
+    "A",
+    8439,
+    "Hola, sí, uno,",
+    9240
+   ],
+   [
+    "A",
+    9290,
+    "dos, tres, probando.",
+    9840
+   ],
+   [
+    "A",
+    10090,
+    "Uno,",
+    10440
+   ],
+   [
+    "A",
+    10540,
+    "dos, tres, probando.",
+    11140
+   ],
+   [
+    "A",
+    13290,
+    "Estamos probando.",
+    14190
+   ],
+   [
+    "A",
+    17090,
+    "Buenas, ¿cómo va?",
+    18290
+   ],
+   [
+    "B",
+    19640,
+    "Para la próxima si puedes arreglar porque como que está muy arriba.",
+    23740
+   ],
+   [
+    "A",
+    23740,
+    "Cara,",
+    24090
+   ],
+   [
+    "A",
+    24190,
+    "está bien.",
+    25040
+   ],
+   [
+    "B",
+    26538,
+    "¿Cómo lo vienes?",
+    27288
+   ],
+   [
+    "A",
+    45288,
+    "¿Dónde estoy?",
+    45788
+   ],
+   [
+    "C",
+    48338,
+    "Hola.",
+    48438
+   ],
+   [
+    "A",
+    48438,
+    "Ah, tenía que venir por ahí.",
+    50538
+   ],
+   [
+    "C",
+    50588,
+    "Sí, okay,",
+    51038
+   ],
+   [
+    "C",
+    51138,
+    "déjame.",
+    51438
+   ],
+   [
+    "B",
+    53322,
+    "Sí, si vienen,",
+    55022
+   ],
+   [
+    "B",
+    55221,
+    "digamos,",
+    57322
+   ],
+   [
+    "B",
+    57371,
+    "voy a tocar la puerta.",
+    60522
+   ],
+   [
+    "B",
+    61022,
+    "Debe ser la puerta de la casa.",
+    62672
+   ],
+   [
+    "B",
+    64922,
+    "Ustedes no deben venir.",
+    66222
+   ],
+   [
+    "B",
+    74422,
+    "Ah, claro,",
+    74922
+   ],
+   [
+    "B",
+    75022,
+    "ahí sí hay.",
+    75372
+   ],
+   [
+    "B",
+    77450,
+    "Toma ahí,",
+    78200
+   ],
+   [
+    "B",
+    78250,
+    "no eres fácil ni nada.",
+    79350
+   ],
+   [
+    "B",
+    79850,
+    "Te voy a dejar con el video.",
+    81250
+   ],
+   [
+    "A",
+    85750,
+    "Gracias.",
+    86299
+   ],
+   [
+    "A",
+    107018,
+    "Prueba 1-3,",
+    107918
+   ],
+   [
+    "A",
+    108117,
+    "probando, probando, probando, probando.",
+    111567
+   ],
+   [
+    "A",
+    114867,
+    "Sí, habla,",
+    115518
+   ],
+   [
+    "A",
+    115668,
+    "habla,",
+    116168
+   ],
+   [
+    "A",
+    116317,
+    "hola.",
+    116718
+   ],
+   [
+    "B",
+    116718,
+    "¿Hola?",
+    117268
+   ],
+   [
+    "A",
+    118118,
+    "Estoy sola.",
+    118768
+   ],
+   [
+    "A",
+    120067,
+    "Hola,",
+    120518
+   ],
+   [
+    "A",
+    120668,
+    "gracias.",
+    121218
+   ]
+  ]
+ },
+ {
+  "variant": "gpt-4o-transcribe-diarize/vad+norm",
+  "run": 2,
+  "turns": 37,
+  "people": 3,
+  "orphan_turns": 0,
+  "orphan_words_pct": 0.0,
+  "canary": 0,
+  "hallucinations": [],
+  "excess_phrases": 15,
+  "detail": [
+   [
+    "3 probando",
+    5,
+    0
+   ],
+   [
+    "la prueba es si podés arreglar",
+    1,
+    0
+   ],
+   [
+    "a ver",
+    1,
+    0
+   ],
+   [
+    "cómo quieres",
+    1,
+    0
+   ],
+   [
+    "tener que venir por ahí",
+    1,
+    0
+   ],
+   [
+    "deben estar ahí",
+    1,
+    0
+   ],
+   [
+    "pero ya no hay nadie en la casa",
+    1,
+    0
+   ],
+   [
+    "ustedes no hay nadie en la casa",
+    1,
+    0
+   ]
+  ],
+  "wer": 1.3793103448275863,
+  "sub": 34,
+  "del": 0,
+  "ins": 46,
+  "ref_words": 58,
+  "hyp_words": 104,
+  "invented": [
+   "1",
+   "2",
+   "1",
+   "2",
+   "1",
+   "2",
+   "1",
+   "2",
+   "1",
+   "2",
+   "pará",
+   "pará",
+   "a ver",
+   "cómo quieres",
+   "tener que venir por ahí",
+   "ok",
+   "déjame",
+   "deben estar ahí",
+   "pero ya no hay nadie en la casa",
+   "probablemente",
+   "ustedes no hay nadie en la casa",
+   "mira",
+   "ahí va la llave",
+   "tapa",
+   "ah",
+   "ahí no hay pastines",
+   "ese es el pastín"
+  ],
+  "word_speaker_acc": 0.7241379310344828,
+  "turn_speaker_acc": 0.5714285714285714,
+  "mapping": {
+   "A": "A",
+   "B": "B",
+   "C": "D"
+  },
+  "time_speaker_acc": 0.3333333333333333,
+  "per_person": {
+   "A": 0.45,
+   "B": 0.65,
+   "C": 0.07,
+   "D": 0.0,
+   "E": 0.0
+  },
+  "time_mapping": {
+   "A": "A",
+   "B": "B",
+   "C": "C"
+  },
+  "latency_ms": 47286,
+  "transcript": [
+   [
+    "A",
+    1116,
+    "1, 2,",
+    1766
+   ],
+   [
+    "A",
+    1816,
+    "3 probando,",
+    2316
+   ],
+   [
+    "A",
+    2416,
+    "1, 2, 3 probando, 1, 2, 3 probando.",
+    4566
+   ],
+   [
+    "A",
+    8465,
+    "Hola,",
+    8866
+   ],
+   [
+    "A",
+    8916,
+    "sí, 1, 2, 3 probando, 1, 2, 3 probando.",
+    11166
+   ],
+   [
+    "A",
+    13266,
+    "Estamos probando.",
+    14216
+   ],
+   [
+    "A",
+    17216,
+    "Buenas, ¿cómo va?",
+    18316
+   ],
+   [
+    "B",
+    19816,
+    "Pará, pará, la prueba es si podés arreglar, porque como que estás muy arriba.",
+    23766
+   ],
+   [
+    "A",
+    23766,
+    "Cara.",
+    24116
+   ],
+   [
+    "A",
+    24466,
+    "¿A ver?",
+    25066
+   ],
+   [
+    "B",
+    26538,
+    "¿Cómo quieres?",
+    27238
+   ],
+   [
+    "C",
+    48538,
+    "Hola.",
+    48687
+   ],
+   [
+    "A",
+    48687,
+    "Tener que venir por ahí",
+    50488
+   ],
+   [
+    "C",
+    50488,
+    "Sí,",
+    50538
+   ],
+   [
+    "A",
+    50538,
+    "para",
+    50788
+   ],
+   [
+    "C",
+    50788,
+    "ok,",
+    50988
+   ],
+   [
+    "C",
+    51138,
+    "déjame.",
+    51437
+   ],
+   [
+    "B",
+    53322,
+    "Sí,",
+    53422
+   ],
+   [
+    "B",
+    53522,
+    "sí,",
+    54621
+   ],
+   [
+    "B",
+    54772,
+    "deben estar ahí.",
+    56072
+   ],
+   [
+    "B",
+    61021,
+    "Pero ya no hay nadie en la casa,",
+    62572
+   ],
+   [
+    "B",
+    62871,
+    "probablemente.",
+    63371
+   ],
+   [
+    "B",
+    64822,
+    "Ustedes no hay nadie en la casa.",
+    66671
+   ],
+   [
+    "A",
+    73122,
+    "Mira,",
+    73322
+   ],
+   [
+    "A",
+    73372,
+    "ahí va la llave.",
+    73822
+   ],
+   [
+    "B",
+    77450,
+    "Tapa",
+    77799
+   ],
+   [
+    "A",
+    77799,
+    "Ah,",
+    77850
+   ],
+   [
+    "B",
+    77850,
+    "ahí no hay pastines.",
+    79100
+   ],
+   [
+    "B",
+    80100,
+    "Ese es el pastín.",
+    81549
+   ],
+   [
+    "A",
+    107018,
+    "Probando, tres.",
+    107817
+   ],
+   [
+    "A",
+    108117,
+    "Probando,",
+    108918
+   ],
+   [
+    "A",
+    109018,
+    "probando,",
+    109367
+   ],
+   [
+    "A",
+    109418,
+    "probando.",
+    109918
+   ],
+   [
+    "B",
+    111968,
+    "Hola.",
+    112518
+   ],
+   [
+    "A",
+    114918,
+    "Hola, hola, hola.",
+    116668
+   ],
+   [
+    "A",
+    118067,
+    "¿Están solas?",
+    119018
+   ],
+   [
+    "A",
+    120617,
+    "Gracias.",
+    121168
+   ]
+  ]
+ },
+ {
+  "variant": "prod_live (simulado)",
+  "run": 2,
+  "turns": 22,
+  "people": 0,
+  "orphan_turns": 22,
+  "orphan_words_pct": 1.0,
+  "canary": 13,
+  "hallucinations": [],
+  "excess_phrases": 2,
+  "detail": [
+   [
+    "la profe sí puede",
+    1,
+    0
+   ],
+   [
+    "prueba uno",
+    1,
+    0
+   ]
+  ],
+  "wer": 0.9827586206896551,
+  "sub": 35,
+  "del": 0,
+  "ins": 22,
+  "ref_words": 58,
+  "hyp_words": 80,
+  "invented": [
+   "la profe sí puede",
+   "déjame",
+   "bienvenidos",
+   "prueba uno"
+  ],
+  "chunks": 22,
+  "transcript": [
+   [
+    null,
+    0,
+    "Uno, dos, tres, probando, uno, dos, tres, probando.",
+    null
+   ],
+   [
+    null,
+    5100,
+    "Hola, sí, uno, dos, tres, probando.",
+    null
+   ],
+   [
+    null,
+    11600,
+    "¿Me estamos probando?",
+    null
+   ],
+   [
+    null,
+    15400,
+    "Claro, la profe sí puede.",
+    null
+   ],
+   [
+    null,
+    24600,
+    "Uno, dos, tres, probando.",
+    null
+   ],
+   [
+    null,
+    28400,
+    "Uno, dos, tres, probando.",
+    null
+   ],
+   [
+    null,
+    32200,
+    "Uno, dos, tres, probando.",
+    null
+   ],
+   [
+    null,
+    37100,
+    "Uno, dos, tres, probando.",
+    null
+   ],
+   [
+    null,
+    48300,
+    "Hola, déjame",
+    null
+   ],
+   [
+    null,
+    53100,
+    "¡Bienvenidos!",
+    null
+   ],
+   [
+    null,
+    58100,
+    "Uno, dos, tres, probando.",
+    null
+   ],
+   [
+    null,
+    63800,
+    "Uno, dos, tres, probando.",
+    null
+   ],
+   [
+    null,
+    74100,
+    "obando.",
+    null
+   ],
+   [
+    null,
+    83600,
+    "Uno, dos, tres, probando.",
+    null
+   ],
+   [
+    null,
+    90200,
+    "Hola, sí, uno, dos, tres, probando.",
+    null
+   ],
+   [
+    null,
+    98300,
+    "Prueba uno, tres.",
+    null
+   ],
+   [
+    null,
+    108400,
+    "Probando, probando, probando,",
+    null
+   ],
+   [
+    null,
+    113600,
+    "Habla, habla, hola.",
+    null
+   ],
+   [
+    null,
+    117800,
+    "Hola, gracias.",
+    null
+   ],
+   [
+    null,
+    122100,
+    "probando",
+    null
+   ],
+   [
+    null,
+    126600,
+    "Uno, dos, tres, probando.",
+    null
+   ],
+   [
+    null,
+    130400,
+    "Uno, dos, tres, probando.",
+    null
+   ]
+  ]
+ },
+ {
+  "variant": "prod_live sin contexto",
+  "run": 2,
+  "turns": 16,
+  "people": 0,
+  "orphan_turns": 16,
+  "orphan_words_pct": 1.0,
+  "canary": 2,
+  "hallucinations": [
+   "Amen."
+  ],
+  "excess_phrases": 5,
+  "detail": [
+   [
+    "vitam ak random",
+    1,
+    0
+   ],
+   [
+    "vieni qua",
+    1,
+    0
+   ],
+   [
+    "apa yang ada pasti",
+    1,
+    0
+   ],
+   [
+    "prea unas tres",
+    1,
+    0
+   ],
+   [
+    "tam brałem",
+    1,
+    0
+   ]
+  ],
+  "wer": 0.7068965517241379,
+  "sub": 22,
+  "del": 19,
+  "ins": 0,
+  "ref_words": 58,
+  "hyp_words": 39,
+  "invented": [
+   "vitam ak random",
+   "boa",
+   "amen",
+   "spellend",
+   "komm",
+   "ok",
+   "déjame",
+   "vieni qua",
+   "apa yang ada pasti",
+   "prea unas tres",
+   "tam brałem"
+  ],
+  "transcript": [
+   [
+    null,
+    0,
+    "Uno, dos, tres, probando, uno, dos, tres, probando.",
+    null
+   ],
+   [
+    null,
+    5100,
+    "Hola, sí, uno, tres, probando.",
+    null
+   ],
+   [
+    null,
+    11600,
+    "Vitam ak random.",
+    null
+   ],
+   [
+    null,
+    15400,
+    "Buenas. Boa.",
+    null
+   ],
+   [
+    null,
+    24600,
+    "Amen.",
+    null
+   ],
+   [
+    null,
+    28400,
+    "spellend",
+    null
+   ],
+   [
+    null,
+    32200,
+    "Komm!",
+    null
+   ],
+   [
+    null,
+    37100,
+    "Hvala.",
+    null
+   ],
+   [
+    null,
+    48300,
+    "Ok, déjame.",
+    null
+   ],
+   [
+    null,
+    53100,
+    "Vieni qua.",
+    null
+   ],
+   [
+    null,
+    74100,
+    "Apa yang ada pasti.",
+    null
+   ],
+   [
+    null,
+    90200,
+    "Grazie.",
+    null
+   ],
+   [
+    null,
+    98300,
+    "Prea unas tres?",
+    null
+   ],
+   [
+    null,
+    113600,
+    "¿Hola?",
+    null
+   ],
+   [
+    null,
+    117800,
+    "Hola, gracias.",
+    null
+   ],
+   [
+    null,
+    122100,
+    "Tam brałem.",
+    null
+   ]
+  ]
+ },
+ {
+  "variant": "prod_final (simulado)",
+  "run": 2,
+  "turns": 22,
+  "people": 2,
+  "orphan_turns": 4,
+  "orphan_words_pct": 0.225,
+  "canary": 13,
+  "hallucinations": [],
+  "excess_phrases": 2,
+  "detail": [
+   [
+    "la profe sí puede",
+    1,
+    0
+   ],
+   [
+    "prueba uno",
+    1,
+    0
+   ]
+  ],
+  "wer": 0.9827586206896551,
+  "sub": 35,
+  "del": 0,
+  "ins": 22,
+  "ref_words": 58,
+  "hyp_words": 80,
+  "invented": [
+   "la profe sí puede",
+   "déjame",
+   "bienvenidos",
+   "prueba uno"
+  ],
+  "word_speaker_acc": 0.5689655172413793,
+  "turn_speaker_acc": 0.42857142857142855,
+  "mapping": {
+   "persona_1": "A",
+   "persona_2": "B"
+  },
+  "time_speaker_acc": 0.5777777777777777,
+  "per_person": {
+   "A": 0.87,
+   "B": 1.0,
+   "C": 0.0,
+   "D": 0.0,
+   "E": 0.0
+  },
+  "time_mapping": {
+   "persona_1": "A",
+   "persona_2": "B"
+  },
+  "note": "acuerdo 22%; RESPALDO: en vivo",
+  "transcript": [
+   [
+    "persona_1",
+    0,
+    "Uno, dos, tres, probando, uno, dos, tres, probando.",
+    5100
+   ],
+   [
+    "persona_1",
+    5100,
+    "Hola, sí, uno, dos, tres, probando.",
+    11600
+   ],
+   [
+    "persona_1",
+    11600,
+    "¿Me estamos probando?",
+    15400
+   ],
+   [
+    "persona_2",
+    15400,
+    "Claro, la profe sí puede.",
+    24600
+   ],
+   [
+    "persona_2",
+    24600,
+    "Uno, dos, tres, probando.",
+    28400
+   ],
+   [
+    "persona_2",
+    28400,
+    "Uno, dos, tres, probando.",
+    32200
+   ],
+   [
+    null,
+    32200,
+    "Uno, dos, tres, probando.",
+    37100
+   ],
+   [
+    null,
+    37100,
+    "Uno, dos, tres, probando.",
+    48300
+   ],
+   [
+    "persona_2",
+    48300,
+    "Hola, déjame",
+    53100
+   ],
+   [
+    "persona_2",
+    53100,
+    "¡Bienvenidos!",
+    58100
+   ],
+   [
+    "persona_2",
+    58100,
+    "Uno, dos, tres, probando.",
+    63800
+   ],
+   [
+    "persona_2",
+    63800,
+    "Uno, dos, tres, probando.",
+    74100
+   ],
+   [
+    "persona_2",
+    74100,
+    "obando.",
+    83600
+   ],
+   [
+    "persona_1",
+    83600,
+    "Uno, dos, tres, probando.",
+    90200
+   ],
+   [
+    null,
+    90200,
+    "Hola, sí, uno, dos, tres, probando.",
+    98300
+   ],
+   [
+    "persona_1",
+    98300,
+    "Prueba uno, tres.",
+    108400
+   ],
+   [
+    "persona_1",
+    108400,
+    "Probando, probando, probando,",
+    113600
+   ],
+   [
+    "persona_1",
+    113600,
+    "Habla, habla, hola.",
+    117800
+   ],
+   [
+    "persona_1",
+    117800,
+    "Hola, gracias.",
+    122100
+   ],
+   [
+    "persona_1",
+    122100,
+    "probando",
+    126600
+   ],
+   [
+    "persona_1",
+    126600,
+    "Uno, dos, tres, probando.",
+    130400
+   ],
+   [
+    null,
+    130400,
+    "Uno, dos, tres, probando.",
+    135300
+   ]
+  ]
+ },
+ {
+  "variant": "whisper-1/raw",
+  "run": 3,
+  "turns": 27,
+  "people": 0,
+  "orphan_turns": 27,
+  "orphan_words_pct": 1.0,
+  "canary": 0,
+  "hallucinations": [],
+  "excess_phrases": 8,
+  "detail": [
+   [
+    "cómo van",
+    2,
+    1
+   ],
+   [
+    "tengo que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "qué sucede",
+    1,
+    0
+   ],
+   [
+    "qué pasa",
+    1,
+    0
+   ],
+   [
+    "quién es tu abuela",
+    1,
+    0
+   ],
+   [
+    "no sé",
+    1,
+    0
+   ],
+   [
+    "a quién tú",
+    1,
+    0
+   ],
+   [
+    "prueba 1",
+    1,
+    0
+   ]
+  ],
+  "wer": 1.0517241379310345,
+  "sub": 30,
+  "del": 0,
+  "ins": 31,
+  "ref_words": 58,
+  "hyp_words": 89,
+  "invented": [
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "tengo que subir por ahí",
+   "ok",
+   "véngame",
+   "qué sucede",
+   "qué pasa",
+   "quién es tu abuela",
+   "sean",
+   "no sé",
+   "a quién tú",
+   "prueba 1",
+   "2",
+   "3"
+  ],
+  "latency_ms": 6304,
+  "transcript": [
+   [
+    null,
+    0,
+    "1, 2, 3, probando. 1, 2, 3, probando. 1, 2, 3, probando.",
+    5000
+   ],
+   [
+    null,
+    8000,
+    "Hola, sí. 1, 2, 3, probando. 1, 2, 3, probando.",
+    12000
+   ],
+   [
+    null,
+    13000,
+    "Estamos probando.",
+    15000
+   ],
+   [
+    null,
+    17000,
+    "Buenas. ¿Cómo van?",
+    19000
+   ],
+   [
+    null,
+    20000,
+    "Ahora la prueba que sí puedes arreglar, porque como que está muy arriba.",
+    24000
+   ],
+   [
+    null,
+    24000,
+    "¡Cara!",
+    25000
+   ],
+   [
+    null,
+    30000,
+    "¿Cómo va?",
+    32000
+   ],
+   [
+    null,
+    46000,
+    "Hola.",
+    47000
+   ],
+   [
+    null,
+    47000,
+    "Hola.",
+    48000
+   ],
+   [
+    null,
+    48000,
+    "Hola.",
+    49000
+   ],
+   [
+    null,
+    49000,
+    "Tengo que subir por ahí.",
+    51000
+   ],
+   [
+    null,
+    51000,
+    "Sí, ok. Véngame.",
+    53000
+   ],
+   [
+    null,
+    54000,
+    "¿Qué sucede?",
+    56000
+   ],
+   [
+    null,
+    61000,
+    "¿Qué pasa?",
+    63000
+   ],
+   [
+    null,
+    73000,
+    "¿Quién es tu abuela, Sean?",
+    75000
+   ],
+   [
+    null,
+    75000,
+    "No sé.",
+    76000
+   ],
+   [
+    null,
+    76000,
+    "¿A quién tú?",
+    78000
+   ],
+   [
+    null,
+    86000,
+    "Sí.",
+    87000
+   ],
+   [
+    null,
+    90000,
+    "Hola.",
+    91000
+   ],
+   [
+    null,
+    97000,
+    "Hola.",
+    98000
+   ],
+   [
+    null,
+    107000,
+    "Prueba 1, 2, 3, probando, probando, probando, probando.",
+    112000
+   ],
+   [
+    null,
+    115000,
+    "Sí, hola, hola, hola.",
+    117000
+   ],
+   [
+    null,
+    117000,
+    "Hola.",
+    118000
+   ],
+   [
+    null,
+    118000,
+    "Hola.",
+    119000
+   ],
+   [
+    null,
+    120000,
+    "Hola.",
+    121000
+   ],
+   [
+    null,
+    121000,
+    "Gracias.",
+    122000
+   ],
+   [
+    null,
+    125000,
+    "Estamos probando.",
+    127000
+   ]
+  ]
+ },
+ {
+  "variant": "whisper-1/norm",
+  "run": 3,
+  "turns": 38,
+  "people": 0,
+  "orphan_turns": 38,
+  "orphan_words_pct": 1.0,
+  "canary": 0,
+  "hallucinations": [],
+  "excess_phrases": 12,
+  "detail": [
+   [
+    "hay que ir por ahí",
+    1,
+    0
+   ],
+   [
+    "esto sí es",
+    1,
+    0
+   ],
+   [
+    "espérame kiri",
+    1,
+    0
+   ],
+   [
+    "es que normalmente a mí me parece que no me voy a inequalitiesar",
+    1,
+    0
+   ],
+   [
+    "tranquilo po school",
+    1,
+    0
+   ],
+   [
+    "tutiteldad van a crecer en viaje y vencido",
+    1,
+    0
+   ],
+   [
+    "que me va",
+    1,
+    0
+   ],
+   [
+    "day 1 el partid excellent",
+    1,
+    0
+   ]
+  ],
+  "wer": 2.293103448275862,
+  "sub": 30,
+  "del": 2,
+  "ins": 101,
+  "ref_words": 58,
+  "hyp_words": 157,
+  "invented": [
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "ah",
+   "ah",
+   "ah",
+   "ah",
+   "ah",
+   "ah",
+   "ah",
+   "ah",
+   "ah",
+   "ah",
+   "ah",
+   "ah",
+   "ah",
+   "ah",
+   "ah",
+   "ahí",
+   "ahí",
+   "ahí",
+   "ahí",
+   "ahí",
+   "ahí",
+   "ahí",
+   "ahí",
+   "ahí",
+   "hay que ir por ahí",
+   "ok",
+   "vengame",
+   "ok",
+   "esto sí es",
+   "eh",
+   "ah",
+   "espérame kiri",
+   "es que normalmente a mí me parece que no me voy a inequalitiesar",
+   "tranquilo po school",
+   "tutiteldad van a crecer en viaje y vencido",
+   "voy",
+   "voy",
+   "voy",
+   "voy",
+   "que me va",
+   "voy",
+   "ahí",
+   "ahí",
+   "ahí",
+   "0",
+   "1",
+   "2",
+   "day 1 el partid excellent",
+   "0",
+   "1",
+   "2",
+   "3",
+   "perfecto",
+   "muchísimas gracias",
+   "prueba 1",
+   "2",
+   "3",
+   "kiri",
+   "puedes hablar"
+  ],
+  "latency_ms": 18153,
+  "transcript": [
+   [
+    null,
+    0,
+    "1, 2, 3, probando. 1, 2, 3, probando. 1, 2, 3, probando.",
+    4000
+   ],
+   [
+    null,
+    8000,
+    "Hola, sí. 1, 2, 3, probando. 1, 2, 3, probando.",
+    11000
+   ],
+   [
+    null,
+    13000,
+    "Estamos probando.",
+    14000
+   ],
+   [
+    null,
+    17000,
+    "Buenas.",
+    18000
+   ],
+   [
+    null,
+    20000,
+    "Ahora la prueba que sí puedes arreglar, porque como que está muy arriba.",
+    24000
+   ],
+   [
+    null,
+    24000,
+    "Ah, bien.",
+    25000
+   ],
+   [
+    null,
+    30000,
+    "Ah, ah, ah, ah, ah, ah, ah.",
+    33000
+   ],
+   [
+    null,
+    35000,
+    "Ah, ah, ah, ah, ah, ah, ah.",
+    38000
+   ],
+   [
+    null,
+    41000,
+    "Ahí, ahí, ahí, ahí, ahí, ahí, ahí, ahí, ahí.",
+    44000
+   ],
+   [
+    null,
+    45000,
+    "Hola.",
+    46000
+   ],
+   [
+    null,
+    47000,
+    "Hola.",
+    48000
+   ],
+   [
+    null,
+    48000,
+    "Hola.",
+    49000
+   ],
+   [
+    null,
+    49000,
+    "Hay que ir por ahí.",
+    50000
+   ],
+   [
+    null,
+    50000,
+    "Sí, ok, vengame.",
+    52000
+   ],
+   [
+    null,
+    54000,
+    "Ok, esto sí es, eh.",
+    55000
+   ],
+   [
+    null,
+    55000,
+    "Ah, sí, espérame Kiri, es que normalmente a mí me parece que no me voy a inequalitiesar.",
+    62000
+   ],
+   [
+    null,
+    62000,
+    "Bueno, tranquilo po school, tutiteldad van a crecer en viaje y vencido.",
+    67000
+   ],
+   [
+    null,
+    67000,
+    "Voy, voy.",
+    68000
+   ],
+   [
+    null,
+    68000,
+    "Voy, voy.",
+    69000
+   ],
+   [
+    null,
+    69000,
+    "Que me va, voy.",
+    70000
+   ],
+   [
+    null,
+    70000,
+    "Ahí, ahí, ahí.",
+    71000
+   ],
+   [
+    null,
+    73000,
+    "0, 1, 2.",
+    74000
+   ],
+   [
+    null,
+    78000,
+    "Day 1 el partid excellent.",
+    81000
+   ],
+   [
+    null,
+    81000,
+    "0, 1, 2, 3.",
+    87000
+   ],
+   [
+    null,
+    97000,
+    "Ta-ra.",
+    98000
+   ],
+   [
+    null,
+    99000,
+    "Perfecto, muchísimas gracias.",
+    102000
+   ],
+   [
+    null,
+    107000,
+    "Prueba 1, 2, 3.",
+    108000
+   ],
+   [
+    null,
+    108000,
+    "Probando, probando, probando.",
+    110000
+   ],
+   [
+    null,
+    111000,
+    "Probando.",
+    112000
+   ],
+   [
+    null,
+    115000,
+    "Kiri, habla, habla.",
+    116000
+   ],
+   [
+    null,
+    116000,
+    "Hola.",
+    117000
+   ],
+   [
+    null,
+    117000,
+    "Hola.",
+    118000
+   ],
+   [
+    null,
+    118000,
+    "¿Puedes hablar?",
+    119000
+   ],
+   [
+    null,
+    120000,
+    "Hola.",
+    121000
+   ],
+   [
+    null,
+    121000,
+    "Gracias.",
+    122000
+   ],
+   [
+    null,
+    125000,
+    "Estamos probando.",
+    126000
+   ],
+   [
+    null,
+    128000,
+    "Gracias.",
+    129000
+   ],
+   [
+    null,
+    129000,
+    "Gracias.",
+    130000
+   ]
+  ]
+ },
+ {
+  "variant": "whisper-1/vad",
+  "run": 3,
+  "turns": 37,
+  "people": 0,
+  "orphan_turns": 37,
+  "orphan_words_pct": 1.0,
+  "canary": 0,
+  "hallucinations": [],
+  "excess_phrases": 15,
+  "detail": [
+   [
+    "cómo va",
+    2,
+    1
+   ],
+   [
+    "pero yo no he repartido nada",
+    2,
+    0
+   ],
+   [
+    "la prueba que sí puedes arreglar",
+    1,
+    0
+   ],
+   [
+    "hay que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "quién en el grupo ha venido al asean",
+    1,
+    0
+   ],
+   [
+    "a quién",
+    1,
+    0
+   ],
+   [
+    "a mí",
+    1,
+    0
+   ],
+   [
+    "tú no has repartido nada",
+    1,
+    0
+   ]
+  ],
+  "wer": 2.206896551724138,
+  "sub": 29,
+  "del": 0,
+  "ins": 99,
+  "ref_words": 58,
+  "hyp_words": 157,
+  "invented": [
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "ah",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "hay que subir por ahí",
+   "ok",
+   "véngame",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "quién en el grupo ha venido al asean",
+   "ah",
+   "a quién",
+   "a mí",
+   "bibio",
+   "pero yo no he repartido nada",
+   "tú no has repartido nada",
+   "pues yo no he repartido nada",
+   "cómo estás",
+   "perfecto",
+   "muchísimas gracias",
+   "qué pasa",
+   "qué estás haciendo",
+   "prueba 1",
+   "2",
+   "3",
+   "puedes hablar"
+  ],
+  "latency_ms": 10830,
+  "transcript": [
+   [
+    null,
+    790,
+    "1, 2, 3, probando. 1, 2, 3, probando. 1, 2, 3, probando.",
+    4790
+   ],
+   [
+    null,
+    7790,
+    "Hola, sí. 1, 2, 3, probando. 1, 2, 3, probando.",
+    11790
+   ],
+   [
+    null,
+    12790,
+    "Estamos probando.",
+    14790
+   ],
+   [
+    null,
+    16790,
+    "Buenas. ¿Cómo va?",
+    18790
+   ],
+   [
+    null,
+    19790,
+    "Cara, la prueba que sí puedes arreglar, porque como que está muy arriba.",
+    23790
+   ],
+   [
+    null,
+    23790,
+    "¿Cara? Ah, bien.",
+    25790
+   ],
+   [
+    null,
+    30790,
+    "1, 2, 3, probando. 1, 2, 3, probando.",
+    34790
+   ],
+   [
+    null,
+    35790,
+    "¿Cómo va?",
+    37790
+   ],
+   [
+    null,
+    38790,
+    "1, 2, 3, probando. 1, 2, 3, probando.",
+    42790
+   ],
+   [
+    null,
+    43790,
+    "1, 2, 3, probando. 1, 2, 3, probando.",
+    46790
+   ],
+   [
+    null,
+    47790,
+    "Hola. Hola.",
+    48790
+   ],
+   [
+    null,
+    48790,
+    "Hay que subir por ahí. Sí, ok. Véngame.",
+    51790
+   ],
+   [
+    null,
+    52790,
+    "1, 2, 3, probando. 1, 2, 3, probando.",
+    56790
+   ],
+   [
+    null,
+    56790,
+    "Buena.",
+    58790
+   ],
+   [
+    null,
+    60790,
+    "Bien.",
+    62790
+   ],
+   [
+    null,
+    71790,
+    "¿Quién en el grupo ha venido al ASEAN?",
+    74790
+   ],
+   [
+    null,
+    74790,
+    "Ah, ¿a quién? A mí, bibio.",
+    77790
+   ],
+   [
+    null,
+    77790,
+    "No, pero yo no he repartido nada.",
+    79790
+   ],
+   [
+    null,
+    79790,
+    "¿Tú no has repartido nada?",
+    81790
+   ],
+   [
+    null,
+    81790,
+    "Sí.",
+    82790
+   ],
+   [
+    null,
+    84790,
+    "Bueno, pues yo no he repartido nada.",
+    86790
+   ],
+   [
+    null,
+    86790,
+    "Sí.",
+    87790
+   ],
+   [
+    null,
+    96790,
+    "Hola.",
+    97790
+   ],
+   [
+    null,
+    98790,
+    "¿Cómo estás?",
+    99790
+   ],
+   [
+    null,
+    99790,
+    "Bien, bien.",
+    100790
+   ],
+   [
+    null,
+    100790,
+    "Perfecto, muchísimas gracias.",
+    102790
+   ],
+   [
+    null,
+    102790,
+    "Bien.",
+    103790
+   ],
+   [
+    null,
+    104790,
+    "¿Qué pasa? ¿Qué estás haciendo?",
+    106790
+   ],
+   [
+    null,
+    106790,
+    "Prueba 1, 2, 3.",
+    108790
+   ],
+   [
+    null,
+    108790,
+    "Probando, probando, probando.",
+    110790
+   ],
+   [
+    null,
+    110790,
+    "Probando.",
+    111790
+   ],
+   [
+    null,
+    114790,
+    "Sí, habla, habla. Hola.",
+    116790
+   ],
+   [
+    null,
+    116790,
+    "Hola.",
+    117790
+   ],
+   [
+    null,
+    117790,
+    "¿Puedes hablar?",
+    119790
+   ],
+   [
+    null,
+    119790,
+    "Hola.",
+    120790
+   ],
+   [
+    null,
+    120790,
+    "Gracias.",
+    121790
+   ],
+   [
+    null,
+    124790,
+    "Estamos probando.",
+    125790
+   ]
+  ]
+ },
+ {
+  "variant": "whisper-1/vad+norm",
+  "run": 3,
+  "turns": 40,
+  "people": 0,
+  "orphan_turns": 40,
+  "orphan_words_pct": 1.0,
+  "canary": 0,
+  "hallucinations": [],
+  "excess_phrases": 10,
+  "detail": [
+   [
+    "cómo va",
+    2,
+    1
+   ],
+   [
+    "qué tal",
+    2,
+    0
+   ],
+   [
+    "la prueba que sí puedes arreglar porque como que está muy arriba",
+    1,
+    0
+   ],
+   [
+    "tengo que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "quién es tu compañera",
+    1,
+    0
+   ],
+   [
+    "cómo te llamas",
+    1,
+    0
+   ],
+   [
+    "muchísimas gracias",
+    1,
+    0
+   ],
+   [
+    "prueba 1",
+    1,
+    0
+   ]
+  ],
+  "wer": 1.3275862068965518,
+  "sub": 31,
+  "del": 0,
+  "ins": 46,
+  "ref_words": 58,
+  "hyp_words": 104,
+  "invented": [
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "ah",
+   "tengo que subir por ahí",
+   "ok",
+   "véngame",
+   "ven",
+   "qué tal",
+   "quién es tu compañera",
+   "rami",
+   "qué tal",
+   "cómo te llamas",
+   "perfecto",
+   "muchísimas gracias",
+   "prueba 1",
+   "2",
+   "3",
+   "puedo escucharte"
+  ],
+  "latency_ms": 9118,
+  "transcript": [
+   [
+    null,
+    790,
+    "1, 2, 3, probando. 1, 2, 3, probando. 1, 2, 3, probando.",
+    4790
+   ],
+   [
+    null,
+    7790,
+    "Hola, sí. 1, 2, 3, probando. 1, 2, 3, probando.",
+    11790
+   ],
+   [
+    null,
+    12790,
+    "Estamos probando.",
+    14790
+   ],
+   [
+    null,
+    16790,
+    "Buenas. ¿Cómo va?",
+    18790
+   ],
+   [
+    null,
+    19790,
+    "Cara, la prueba que sí puedes arreglar porque como que está muy arriba.",
+    23790
+   ],
+   [
+    null,
+    23790,
+    "¿Cara? Ah, bien.",
+    25790
+   ],
+   [
+    null,
+    30790,
+    "Sí.",
+    31790
+   ],
+   [
+    null,
+    36790,
+    "¿Cómo va?",
+    37790
+   ],
+   [
+    null,
+    45790,
+    "Hola.",
+    46790
+   ],
+   [
+    null,
+    47790,
+    "Hola.",
+    48790
+   ],
+   [
+    null,
+    48790,
+    "Hola.",
+    49790
+   ],
+   [
+    null,
+    49790,
+    "Tengo que subir por ahí.",
+    50790
+   ],
+   [
+    null,
+    50790,
+    "Sí, ok. Véngame.",
+    51790
+   ],
+   [
+    null,
+    54790,
+    "Sí, ven.",
+    55790
+   ],
+   [
+    null,
+    60790,
+    "Bien.",
+    61790
+   ],
+   [
+    null,
+    62790,
+    "Buenas.",
+    63790
+   ],
+   [
+    null,
+    65790,
+    "Hola.",
+    66790
+   ],
+   [
+    null,
+    68790,
+    "¿Qué tal?",
+    69790
+   ],
+   [
+    null,
+    70790,
+    "Bien.",
+    71790
+   ],
+   [
+    null,
+    72790,
+    "¿Quién es tu compañera?",
+    74790
+   ],
+   [
+    null,
+    75790,
+    "Rami.",
+    76790
+   ],
+   [
+    null,
+    85790,
+    "Buenas.",
+    86790
+   ],
+   [
+    null,
+    87790,
+    "¿Qué tal?",
+    88790
+   ],
+   [
+    null,
+    88790,
+    "Hola.",
+    89790
+   ],
+   [
+    null,
+    90790,
+    "¿Cómo te llamas?",
+    91790
+   ],
+   [
+    null,
+    92790,
+    "Perfecto. Muchísimas gracias.",
+    94790
+   ],
+   [
+    null,
+    95790,
+    "Bien.",
+    96790
+   ],
+   [
+    null,
+    98790,
+    "Prueba 1, 2, 3.",
+    100790
+   ],
+   [
+    null,
+    100790,
+    "Probando, probando, probando.",
+    102790
+   ],
+   [
+    null,
+    103790,
+    "Probando.",
+    104790
+   ],
+   [
+    null,
+    107790,
+    "Sí. Hola, hola, hola.",
+    109790
+   ],
+   [
+    null,
+    109790,
+    "Hola.",
+    110790
+   ],
+   [
+    null,
+    111790,
+    "¿Puedo escucharte?",
+    112790
+   ],
+   [
+    null,
+    113790,
+    "Sí.",
+    114790
+   ],
+   [
+    null,
+    115790,
+    "Hola.",
+    116790
+   ],
+   [
+    null,
+    116790,
+    "Hola.",
+    117790
+   ],
+   [
+    null,
+    118790,
+    "Hola.",
+    119790
+   ],
+   [
+    null,
+    120790,
+    "Hola.",
+    121790
+   ],
+   [
+    null,
+    121790,
+    "Gracias.",
+    122790
+   ],
+   [
+    null,
+    125790,
+    "No, probando.",
+    128020
+   ]
+  ]
+ },
+ {
+  "variant": "gpt-4o-transcribe/raw",
+  "run": 3,
+  "turns": 1,
+  "people": 0,
+  "orphan_turns": 1,
+  "orphan_words_pct": 1.0,
+  "canary": 0,
+  "hallucinations": [],
+  "excess_phrases": 30,
+  "detail": [
+   [
+    "ahí va",
+    14,
+    0
+   ],
+   [
+    "está bien",
+    3,
+    0
+   ],
+   [
+    "ahí tengo",
+    2,
+    0
+   ],
+   [
+    "ahora la prueba",
+    1,
+    0
+   ],
+   [
+    "si puedes arreglar porque como que está muy arriba",
+    1,
+    0
+   ],
+   [
+    "qué tal",
+    1,
+    0
+   ],
+   [
+    "voy a tener que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "vamos a ir para allá",
+    1,
+    0
+   ]
+  ],
+  "wer": 2.0172413793103448,
+  "sub": 27,
+  "del": 2,
+  "ins": 88,
+  "ref_words": 58,
+  "hyp_words": 144,
+  "invented": [
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "ahora la prueba",
+   "qué tal",
+   "voy a tener que subir por ahí",
+   "ok",
+   "déjame",
+   "vamos a ir para allá",
+   "ah",
+   "ahí tengo",
+   "para ahí no",
+   "es el fácil",
+   "ahí está",
+   "pero está bien",
+   "está bien",
+   "ahí va",
+   "ahí va",
+   "ahí va",
+   "ahí va",
+   "ahí va",
+   "ahí va",
+   "ahí va",
+   "tiene todo para allá",
+   "ah",
+   "ahí tengo",
+   "ahí va",
+   "ahí va",
+   "ahí va",
+   "ahí va",
+   "ahí va",
+   "ahí va",
+   "están bien",
+   "están bien",
+   "ahí va",
+   "perfecto",
+   "muchísimas gracias",
+   "chori"
+  ],
+  "latency_ms": 5671,
+  "transcript": [
+   [
+    null,
+    0,
+    "1, 2, 3, probando, 1, 2, 3, probando, 1, 2, 3, probando. Hola, sí, 1, 2, 3, probando, 1, 2, 3, probando. Estamos probando. Buenas, hola. Ahora la prueba, si puedes arreglar porque como que está muy arriba. ¿Cara? ¿Vale? Buenas. Hola, ¿qué tal? Voy a tener que subir por ahí. Sí, ok, déjame. Vamos a ir para allá. Ah, claro, ahí tengo. No, para ahí no, es el fácil, ahí está. Pero está bien, está bien. Sí, sí, sí. Ahí va, ahí va. Ahí va, ahí va. Ahí va, sí. Ahí va, ahí va. ¿Tiene todo para allá? Ah, claro, ahí tengo. Sí, sí, sí. Ahí va, ahí va. Ahí va, ahí va. Ahí va, ahí va. ¿Están bien? ¿Están bien? Sí, sí, sí. Ahí va. Hola. Perfecto, muchísimas gracias. ¿Probando? ¿Probando? ¿Probando? ¿Probando? Chori, habla, habla, hola. Hola. Hola. Gracias. Estamos probando.",
+    null
+   ]
+  ]
+ },
+ {
+  "variant": "gpt-4o-transcribe/norm",
+  "run": 3,
+  "turns": 1,
+  "people": 0,
+  "orphan_turns": 1,
+  "orphan_words_pct": 1.0,
+  "canary": 0,
+  "hallucinations": [],
+  "excess_phrases": 8,
+  "detail": [
+   [
+    "3 probando",
+    5,
+    0
+   ],
+   [
+    "te voy a dar a la profe si puedes arreglar",
+    1,
+    0
+   ],
+   [
+    "tenés que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "tiene todo para allá",
+    1,
+    0
+   ]
+  ],
+  "wer": 17.32758620689655,
+  "sub": 38,
+  "del": 0,
+  "ins": 967,
+  "ref_words": 58,
+  "hyp_words": 1025,
+  "invented": [
+   "1",
+   "2",
+   "1",
+   "2",
+   "1",
+   "2",
+   "1",
+   "2",
+   "1",
+   "2",
+   "vamos",
+   "tenés que subir por ahí",
+   "ok",
+   "déjame",
+   "tiene todo para allá"
+  ],
+  "latency_ms": 23336,
+  "transcript": [
+   [
+    null,
+    0,
+    "1, 2, 3 probando, 1, 2, 3 probando, 1, 2, 3 probando, hola, sí, 1, 2, 3 probando, 1, 2, 3 probando, estamos probando, buenas, hola, te voy a dar a la profe si puedes arreglar, porque como que está muy arriba, cara, dale, vamos, bueno, hola, hola, tenés que subir por ahí, sí, ok, déjame, tiene todo para allá, claro, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí, sí",
+    null
+   ]
+  ]
+ },
+ {
+  "variant": "gpt-4o-transcribe/vad",
+  "run": 3,
+  "turns": 1,
+  "people": 0,
+  "orphan_turns": 1,
+  "orphan_words_pct": 1.0,
+  "canary": 0,
+  "hallucinations": [],
+  "excess_phrases": 11,
+  "detail": [
+   [
+    "voy a",
+    6,
+    0
+   ],
+   [
+    "la profe",
+    1,
+    0
+   ],
+   [
+    "si puedes arreglar",
+    1,
+    0
+   ],
+   [
+    "como que puedes",
+    1,
+    0
+   ],
+   [
+    "voy a tener que ir por ahí",
+    1,
+    0
+   ],
+   [
+    "estoy en el",
+    1,
+    0
+   ]
+  ],
+  "wer": 17.344827586206897,
+  "sub": 34,
+  "del": 3,
+  "ins": 969,
+  "ref_words": 58,
+  "hyp_words": 1024,
+  "invented": [
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "la profe",
+   "dame",
+   "como que puedes",
+   "voy a tener que ir por ahí",
+   "ok",
+   "déjame",
+   "estoy en el",
+   "voy a",
+   "voy a",
+   "voy a",
+   "voy a",
+   "voy a",
+   "voy a"
+  ],
+  "latency_ms": 24633,
+  "transcript": [
+   [
+    null,
+    0,
+    "1, 2, 3, probando, 1, 2, 3, probando, 1, 2, 3, probando. Hola, sí, 1, 2, 3, probando, 1, 2, 3, probando. Estamos probando. Buenas. Cara, la profe, si puedes arreglar, porque como que está muy arriba. Cara, dame. Como que puedes... Hola. Hola. Sí, voy a tener que ir por ahí. Sí, ok, déjame. Estoy en el... No, voy a... No, no, no. Voy a... Sí, voy a... Voy a... Voy a... Voy a... Sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí. Sí, sí, sí",
+    null
+   ]
+  ]
+ },
+ {
+  "variant": "gpt-4o-transcribe/vad+norm",
+  "run": 3,
+  "turns": 1,
+  "people": 0,
+  "orphan_turns": 1,
+  "orphan_words_pct": 1.0,
+  "canary": 5,
+  "hallucinations": [],
+  "excess_phrases": 490,
+  "detail": [
+   [
+    "lo tienes ahí",
+    485,
+    0
+   ],
+   [
+    "ahora la prueba",
+    1,
+    0
+   ],
+   [
+    "a ver si puedes arreglar",
+    1,
+    0
+   ],
+   [
+    "como que puedes",
+    1,
+    0
+   ],
+   [
+    "voy a tener que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "lo tengo",
+    1,
+    0
+   ]
+  ],
+  "wer": 25.586206896551722,
+  "sub": 25,
+  "del": 1,
+  "ins": 1458,
+  "ref_words": 58,
+  "hyp_words": 1515,
+  "invented": [
+   "ahora la prueba",
+   "como que puedes",
+   "voy a tener que subir por ahí",
+   "ok",
+   "déjame",
+   "lo tienes ahí",
+   "lo tengo",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí",
+   "lo tienes ahí"
+  ],
+  "latency_ms": 26070,
+  "transcript": [
+   [
+    null,
+    0,
+    "uno, dos, tres, probando, uno, dos, tres, probando, uno, dos, tres, probando, hola, sí, uno, dos, tres, probando, uno, dos, tres, probando, estamos probando, buenas, hola, ahora la prueba, a ver si puedes arreglar, porque como que está muy arriba, para, dale, como que puedes, va, buenas, hola, voy a tener que subir por ahí, sí, ok, déjame, lo tienes ahí, lo tengo, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí, lo tienes ahí",
+    null
+   ]
+  ]
+ },
+ {
+  "variant": "gpt-4o-transcribe-diarize/raw",
+  "run": 3,
+  "turns": 28,
+  "people": 3,
+  "orphan_turns": 0,
+  "orphan_words_pct": 0.0,
+  "canary": 1,
+  "hallucinations": [],
+  "excess_phrases": 7,
+  "detail": [
+   [
+    "toca lejos de los vecinos",
+    2,
+    0
+   ],
+   [
+    "ahora la prueba es si puedes arreglar porque como está muy arriba",
+    1,
+    0
+   ],
+   [
+    "está bien",
+    1,
+    0
+   ],
+   [
+    "tiene que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "prueba 1",
+    1,
+    0
+   ],
+   [
+    "estoy sola",
+    1,
+    0
+   ]
+  ],
+  "wer": 0.6724137931034483,
+  "sub": 17,
+  "del": 1,
+  "ins": 21,
+  "ref_words": 58,
+  "hyp_words": 78,
+  "invented": [
+   "está bien",
+   "oh",
+   "ah",
+   "tiene que subir por ahí",
+   "ok",
+   "déjame",
+   "toca lejos de los vecinos",
+   "toca lejos de los vecinos",
+   "prueba 1",
+   "2",
+   "3"
+  ],
+  "word_speaker_acc": 0.7719298245614035,
+  "turn_speaker_acc": 0.6428571428571429,
+  "mapping": {
+   "A": "A",
+   "B": "B",
+   "C": "D"
+  },
+  "time_speaker_acc": 0.35333333333333333,
+  "per_person": {
+   "A": 0.47,
+   "B": 0.65,
+   "C": 0.12,
+   "D": 0.0,
+   "E": 0.0
+  },
+  "time_mapping": {
+   "A": "A",
+   "B": "B",
+   "C": "C"
+  },
+  "latency_ms": 49730,
+  "transcript": [
+   [
+    "A",
+    1300,
+    "Uno,",
+    1650
+   ],
+   [
+    "A",
+    1700,
+    "tres probando, uno, tres probando, uno,",
+    3649
+   ],
+   [
+    "A",
+    3699,
+    "dos, tres probando.",
+    4600
+   ],
+   [
+    "A",
+    8350,
+    "Hola,",
+    8750
+   ],
+   [
+    "A",
+    8850,
+    "sí, uno, tres probando, uno, tres probando.",
+    11050
+   ],
+   [
+    "A",
+    13300,
+    "Estamos probando.",
+    14150
+   ],
+   [
+    "A",
+    17150,
+    "Buenas, ¿cómo va?",
+    18299
+   ],
+   [
+    "B",
+    19749,
+    "Ahora la prueba es si puedes arreglar porque como está muy arriba.",
+    23699
+   ],
+   [
+    "A",
+    23699,
+    "Cara.",
+    24049
+   ],
+   [
+    "A",
+    24499,
+    "¿Está bien?",
+    24999
+   ],
+   [
+    "B",
+    26548,
+    "Oh, bueno,",
+    27048
+   ],
+   [
+    "C",
+    47548,
+    "Hola.",
+    47848
+   ],
+   [
+    "A",
+    47848,
+    "Ah,",
+    48147
+   ],
+   [
+    "A",
+    48798,
+    "tiene que subir por ahí.",
+    50498
+   ],
+   [
+    "C",
+    50498,
+    "Ok,",
+    50998
+   ],
+   [
+    "C",
+    51098,
+    "déjame.",
+    51448
+   ],
+   [
+    "B",
+    53268,
+    "Sí,",
+    53518
+   ],
+   [
+    "B",
+    53568,
+    "sí, sí, sí.",
+    56218
+   ],
+   [
+    "B",
+    77492,
+    "Toca lejos de los vecinos,",
+    79042
+   ],
+   [
+    "B",
+    79392,
+    "toca lejos de los vecinos.",
+    81642
+   ],
+   [
+    "A",
+    107060,
+    "Prueba 1, 2, 3.",
+    107960
+   ],
+   [
+    "A",
+    108310,
+    "Probando,",
+    108910
+   ],
+   [
+    "A",
+    109010,
+    "probando, probando.",
+    110010
+   ],
+   [
+    "B",
+    111860,
+    "¿Hola?",
+    112410
+   ],
+   [
+    "A",
+    115160,
+    "Habla sola.",
+    116510
+   ],
+   [
+    "A",
+    118260,
+    "¿Estoy sola?",
+    118810
+   ],
+   [
+    "A",
+    120810,
+    "Gracias.",
+    121260
+   ],
+   [
+    "A",
+    124960,
+    "Estamos probando.",
+    125710
+   ]
+  ]
+ },
+ {
+  "variant": "gpt-4o-transcribe-diarize/norm",
+  "run": 3,
+  "turns": 28,
+  "people": 3,
+  "orphan_turns": 0,
+  "orphan_words_pct": 0.0,
+  "canary": 1,
+  "hallucinations": [],
+  "excess_phrases": 10,
+  "detail": [
+   [
+    "para la prueba que si puedes arreglar porque como estamos muy arriba",
+    1,
+    0
+   ],
+   [
+    "qué tal",
+    1,
+    0
+   ],
+   [
+    "a ver",
+    1,
+    0
+   ],
+   [
+    "no sé",
+    1,
+    0
+   ],
+   [
+    "y suponemos que se ha perdido",
+    1,
+    0
+   ],
+   [
+    "usted no es de la",
+    1,
+    0
+   ],
+   [
+    "la nueva serie de la oficina",
+    1,
+    0
+   ],
+   [
+    "no sé si estamos viviendo",
+    1,
+    0
+   ]
+  ],
+  "wer": 0.896551724137931,
+  "sub": 19,
+  "del": 2,
+  "ins": 31,
+  "ref_words": 58,
+  "hyp_words": 87,
+  "invented": [
+   "boa",
+   "para la prueba que si puedes arreglar porque como estamos muy arriba",
+   "qué tal",
+   "ok",
+   "déjame",
+   "a ver",
+   "no sé",
+   "y suponemos que se ha perdido",
+   "usted no es de la",
+   "ok",
+   "la nueva serie de la oficina",
+   "no sé si estamos viviendo",
+   "otra vez",
+   "se oye"
+  ],
+  "word_speaker_acc": 0.75,
+  "turn_speaker_acc": 0.5714285714285714,
+  "mapping": {
+   "A": "A",
+   "B": "B",
+   "C": "D"
+  },
+  "time_speaker_acc": 0.3977777777777778,
+  "per_person": {
+   "A": 0.56,
+   "B": 0.67,
+   "C": 0.1,
+   "D": 0.0,
+   "E": 0.0
+  },
+  "time_mapping": {
+   "A": "A",
+   "B": "B",
+   "C": "C"
+  },
+  "latency_ms": 54461,
+  "transcript": [
+   [
+    "A",
+    1300,
+    "Uno, tres probando, uno, tres probando, uno,",
+    3649
+   ],
+   [
+    "A",
+    3750,
+    "dos, tres probando.",
+    4550
+   ],
+   [
+    "A",
+    8350,
+    "Hola,",
+    8750
+   ],
+   [
+    "A",
+    8850,
+    "sí, uno, tres probando, uno, tres probando.",
+    11100
+   ],
+   [
+    "A",
+    13250,
+    "Estamos probando.",
+    14150
+   ],
+   [
+    "A",
+    17150,
+    "Buenas.",
+    17650
+   ],
+   [
+    "A",
+    17850,
+    "Boa.",
+    18250
+   ],
+   [
+    "B",
+    19800,
+    "Para la prueba que si puedes arreglar porque como estamos muy arriba.",
+    23800
+   ],
+   [
+    "A",
+    23800,
+    "Cara.",
+    24050
+   ],
+   [
+    "A",
+    24500,
+    "Vale.",
+    24850
+   ],
+   [
+    "B",
+    26484,
+    "Bueno, ¿qué tal?",
+    27284
+   ],
+   [
+    "C",
+    48134,
+    "Hola.",
+    48684
+   ],
+   [
+    "C",
+    50834,
+    "Ok,",
+    51084
+   ],
+   [
+    "C",
+    51134,
+    "déjame.",
+    51484
+   ],
+   [
+    "B",
+    53268,
+    "Sí, sí, a ver,",
+    54918
+   ],
+   [
+    "B",
+    55068,
+    "no sé,",
+    57318
+   ],
+   [
+    "B",
+    59568,
+    "y suponemos que se ha perdido.",
+    61068
+   ],
+   [
+    "B",
+    64318,
+    "Usted no es de la",
+    65968
+   ],
+   [
+    "B",
+    74368,
+    "Ok,",
+    74818
+   ],
+   [
+    "B",
+    74868,
+    "la nueva serie de la oficina.",
+    79368
+   ],
+   [
+    "B",
+    79956,
+    "No sé si estamos viviendo.",
+    81256
+   ],
+   [
+    "A",
+    107732,
+    "Otra vez.",
+    108032
+   ],
+   [
+    "A",
+    108332,
+    "Hola, hola, hola, hola.",
+    110132
+   ],
+   [
+    "A",
+    111832,
+    "¿Se oye? ¿Habla, habla,",
+    114082
+   ],
+   [
+    "A",
+    116182,
+    "hola?",
+    116632
+   ],
+   [
+    "A",
+    118382,
+    "Hola, hola.",
+    118982
+   ],
+   [
+    "A",
+    120682,
+    "Gracias.",
+    121182
+   ],
+   [
+    "A",
+    124932,
+    "Estamos probando.",
+    125732
+   ]
+  ]
+ },
+ {
+  "variant": "gpt-4o-transcribe-diarize/vad",
+  "run": 3,
+  "turns": 28,
+  "people": 3,
+  "orphan_turns": 0,
+  "orphan_words_pct": 0.0,
+  "canary": 1,
+  "hallucinations": [],
+  "excess_phrases": 9,
+  "detail": [
+   [
+    "espero que puedan ser de nuevo",
+    2,
+    0
+   ],
+   [
+    "ahora la pregunta es si puedes arreglar porque como que estamos muy arriba",
+    1,
+    0
+   ],
+   [
+    "hola buenos días",
+    1,
+    0
+   ],
+   [
+    "hola hola sí ok déjame ir por ahí",
+    1,
+    0
+   ],
+   [
+    "ok déjame",
+    1,
+    0
+   ],
+   [
+    "ahí lo de los pacientes",
+    1,
+    0
+   ],
+   [
+    "prueba unos tres",
+    1,
+    0
+   ],
+   [
+    "estoy sola",
+    1,
+    0
+   ]
+  ],
+  "wer": 0.8275862068965517,
+  "sub": 17,
+  "del": 1,
+  "ins": 30,
+  "ref_words": 58,
+  "hyp_words": 87,
+  "invented": [
+   "hola buenos días",
+   "hola hola sí ok déjame ir por ahí",
+   "ok déjame",
+   "espero que puedan ser de nuevo",
+   "espero que puedan ser de nuevo",
+   "toma",
+   "ahí lo de los pacientes",
+   "prueba unos tres"
+  ],
+  "word_speaker_acc": 0.7719298245614035,
+  "turn_speaker_acc": 0.6428571428571429,
+  "mapping": {
+   "A": "A",
+   "B": "B",
+   "C": "D"
+  },
+  "time_speaker_acc": 0.45555555555555555,
+  "per_person": {
+   "A": 0.55,
+   "B": 0.7,
+   "C": 0.36,
+   "D": 0.0,
+   "E": 0.0
+  },
+  "time_mapping": {
+   "A": "A",
+   "B": "B",
+   "C": "C"
+  },
+  "latency_ms": 46189,
+  "transcript": [
+   [
+    "A",
+    1290,
+    "Uno,",
+    1639
+   ],
+   [
+    "A",
+    1689,
+    "tres probando,",
+    2340
+   ],
+   [
+    "A",
+    2389,
+    "uno, tres probando, uno, dos, tres probando.",
+    4539
+   ],
+   [
+    "A",
+    8489,
+    "Hola, sí, uno, tres probando,",
+    9839
+   ],
+   [
+    "A",
+    9939,
+    "uno, tres probando.",
+    11039
+   ],
+   [
+    "A",
+    13189,
+    "Estamos probando.",
+    14240
+   ],
+   [
+    "A",
+    17290,
+    "Buenas, hola.",
+    18340
+   ],
+   [
+    "B",
+    19490,
+    "Ahora la pregunta es si puedes arreglar porque como que estamos muy arriba.",
+    23639
+   ],
+   [
+    "A",
+    23639,
+    "Cara,",
+    24039
+   ],
+   [
+    "A",
+    24139,
+    "dale.",
+    24839
+   ],
+   [
+    "B",
+    26538,
+    "hola buenos días",
+    27388
+   ],
+   [
+    "C",
+    47488,
+    "hola hola sí ok déjame ir por ahí",
+    50488
+   ],
+   [
+    "C",
+    50838,
+    "ok déjame",
+    51438
+   ],
+   [
+    "B",
+    53322,
+    "Sí,",
+    53371
+   ],
+   [
+    "B",
+    53471,
+    "espero que puedan ser de nuevo.",
+    55221
+   ],
+   [
+    "B",
+    61072,
+    "Espero que puedan ser de nuevo.",
+    62422
+   ],
+   [
+    "B",
+    77450,
+    "Toma,",
+    77950
+   ],
+   [
+    "B",
+    78000,
+    "ahí lo de los pacientes.",
+    79350
+   ],
+   [
+    "A",
+    107018,
+    "Prueba unos tres,",
+    107918
+   ],
+   [
+    "A",
+    108117,
+    "probando, probando, probando,",
+    110067
+   ],
+   [
+    "A",
+    110117,
+    "probando.",
+    111468
+   ],
+   [
+    "B",
+    111867,
+    "Hola.",
+    114117
+   ],
+   [
+    "A",
+    114668,
+    "Sí, habla,",
+    115567
+   ],
+   [
+    "A",
+    115668,
+    "habla sola.",
+    116567
+   ],
+   [
+    "A",
+    118067,
+    "¿Estoy sola?",
+    118817
+   ],
+   [
+    "A",
+    120018,
+    "Hola.",
+    120518
+   ],
+   [
+    "A",
+    120718,
+    "Gracias.",
+    121218
+   ],
+   [
+    "A",
+    124867,
+    "Estamos probando.",
+    125718
+   ]
+  ]
+ },
+ {
+  "variant": "gpt-4o-transcribe-diarize/vad+norm",
+  "run": 3,
+  "turns": 32,
+  "people": 4,
+  "orphan_turns": 0,
+  "orphan_words_pct": 0.0,
+  "canary": 5,
+  "hallucinations": [],
+  "excess_phrases": 10,
+  "detail": [
+   [
+    "a ver",
+    2,
+    0
+   ],
+   [
+    "si uno",
+    1,
+    0
+   ],
+   [
+    "la prueba es que si puedes arreglar porque como que está muy arriba",
+    1,
+    0
+   ],
+   [
+    "está bien",
+    1,
+    0
+   ],
+   [
+    "cómo lo que haces",
+    1,
+    0
+   ],
+   [
+    "ahora tenés que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "tapan ahí y no hagan ni nada",
+    1,
+    0
+   ],
+   [
+    "prueba unos tres",
+    1,
+    0
+   ]
+  ],
+  "wer": 2.9310344827586206,
+  "sub": 16,
+  "del": 1,
+  "ins": 153,
+  "ref_words": 58,
+  "hyp_words": 210,
+  "invented": [
+   "pará",
+   "pará",
+   "está bien",
+   "cómo lo que haces",
+   "ahora tenés que subir por ahí",
+   "ok",
+   "déjame",
+   "ey",
+   "a ver",
+   "a ver",
+   "tapan ahí y no hagan ni nada",
+   "prueba unos tres"
+  ],
+  "word_speaker_acc": 0.8070175438596491,
+  "turn_speaker_acc": 0.6428571428571429,
+  "mapping": {
+   "A": "A",
+   "B": "B",
+   "@": "D",
+   "C": "E"
+  },
+  "time_speaker_acc": 0.3466666666666667,
+  "per_person": {
+   "A": 0.48,
+   "B": 0.67,
+   "C": 0.06,
+   "D": 0.0,
+   "E": 0.0
+  },
+  "time_mapping": {
+   "@": "D",
+   "A": "A",
+   "B": "B",
+   "C": "C"
+  },
+  "latency_ms": 53134,
+  "transcript": [
+   [
+    "A",
+    1166,
+    "Uno, dos, tres, probando. Uno, dos, tres, probando.",
+    3165
+   ],
+   [
+    "A",
+    3266,
+    "Uno,",
+    3665
+   ],
+   [
+    "A",
+    3766,
+    "dos, tres, probando.",
+    4566
+   ],
+   [
+    "A",
+    8366,
+    "Hola, si uno,",
+    9216
+   ],
+   [
+    "A",
+    9266,
+    "dos, tres, probando.",
+    9866
+   ],
+   [
+    "A",
+    10116,
+    "Uno, dos, tres, probando.",
+    11066
+   ],
+   [
+    "A",
+    13266,
+    "Estamos probando.",
+    14166
+   ],
+   [
+    "A",
+    17315,
+    "Buenas.",
+    17765
+   ],
+   [
+    "A",
+    17865,
+    "¿Cómo va?",
+    18216
+   ],
+   [
+    "B",
+    19766,
+    "Pará, pará, la prueba es que si puedes arreglar porque como que está muy arriba.",
+    23716
+   ],
+   [
+    "A",
+    23716,
+    "¿Para?",
+    24115
+   ],
+   [
+    "A",
+    24565,
+    "Está bien.",
+    25065
+   ],
+   [
+    "B",
+    26538,
+    "¿Cómo lo que haces?",
+    27338
+   ],
+   [
+    "A",
+    48538,
+    "Ahora tenés que subir por ahí",
+    50488
+   ],
+   [
+    "C",
+    50738,
+    "Ok,",
+    50988
+   ],
+   [
+    "C",
+    51088,
+    "déjame.",
+    51438
+   ],
+   [
+    "B",
+    53322,
+    "¡Ey!",
+    53572
+   ],
+   [
+    "B",
+    53871,
+    "A ver, sí,",
+    54672
+   ],
+   [
+    "B",
+    54822,
+    "a ver, no, no,",
+    55721
+   ],
+   [
+    "B",
+    55971,
+    "no, no, no, no, no, no, no, no, no, no,",
+    58221
+   ],
+   [
+    "@",
+    58221,
+    "no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no, no",
+    77022
+   ],
+   [
+    "B",
+    77450,
+    "¡Tapan ahí y no hagan ni nada!",
+    79299
+   ],
+   [
+    "A",
+    107018,
+    "Prueba unos tres.",
+    107968
+   ],
+   [
+    "A",
+    108218,
+    "Probando, probando, probando.",
+    109918
+   ],
+   [
+    "A",
+    110817,
+    "Probando.",
+    111418
+   ],
+   [
+    "A",
+    114668,
+    "¿Sí?",
+    115018
+   ],
+   [
+    "A",
+    115118,
+    "¿Habla sola?",
+    116468
+   ],
+   [
+    "B",
+    116718,
+    "Hola.",
+    117218
+   ],
+   [
+    "A",
+    118118,
+    "¿Soy sola?",
+    118868
+   ],
+   [
+    "A",
+    119968,
+    "Hola.",
+    120468
+   ],
+   [
+    "A",
+    120618,
+    "Gracias.",
+    121168
+   ],
+   [
+    "A",
+    124817,
+    "Estamos probando.",
+    125668
+   ]
+  ]
+ },
+ {
+  "variant": "prod_live (simulado)",
+  "run": 3,
+  "turns": 22,
+  "people": 0,
+  "orphan_turns": 22,
+  "orphan_words_pct": 1.0,
+  "canary": 9,
+  "hallucinations": [],
+  "excess_phrases": 18,
+  "detail": [
+   [
+    "ti estamos probando",
+    11,
+    2
+   ],
+   [
+    "uno dos tres probando",
+    7,
+    0
+   ],
+   [
+    "hola sí uno dos tres probando",
+    1,
+    0
+   ],
+   [
+    "tá probando",
+    1,
+    0
+   ]
+  ],
+  "wer": 1.0344827586206897,
+  "sub": 35,
+  "del": 0,
+  "ins": 25,
+  "ref_words": 58,
+  "hyp_words": 83,
+  "invented": [
+   "context",
+   "déjame"
+  ],
+  "chunks": 22,
+  "transcript": [
+   [
+    null,
+    0,
+    "Uno dos tres probando, uno dos tres probando.",
+    null
+   ],
+   [
+    null,
+    5100,
+    "Hola sí uno dos tres probando, uno dos tres probando.",
+    null
+   ],
+   [
+    null,
+    11600,
+    "Ti estamos probando?",
+    null
+   ],
+   [
+    null,
+    15400,
+    "Buenas, hola.",
+    null
+   ],
+   [
+    null,
+    24600,
+    "Estamos probando? Buenas, hola.",
+    null
+   ],
+   [
+    null,
+    28400,
+    "Uno dos tres probando, uno dos tres probando.",
+    null
+   ],
+   [
+    null,
+    32200,
+    "context:",
+    null
+   ],
+   [
+    null,
+    37100,
+    "Ti estamos probando? Buenas, hola.",
+    null
+   ],
+   [
+    null,
+    48300,
+    "Hola, déjame.",
+    null
+   ],
+   [
+    null,
+    53100,
+    "Ti estamos probando?",
+    null
+   ],
+   [
+    null,
+    58100,
+    "Ti estamos probando?",
+    null
+   ],
+   [
+    null,
+    63800,
+    "Ti estamos probando?",
+    null
+   ],
+   [
+    null,
+    74100,
+    "Ti estamos probando?",
+    null
+   ],
+   [
+    null,
+    83600,
+    "Ti estamos probando?",
+    null
+   ],
+   [
+    null,
+    90200,
+    "Ti estamos probando?",
+    null
+   ],
+   [
+    null,
+    98300,
+    "Uno, dos, tres.",
+    null
+   ],
+   [
+    null,
+    108400,
+    "Probando? Buenas,",
+    null
+   ],
+   [
+    null,
+    113600,
+    "Hola?",
+    null
+   ],
+   [
+    null,
+    117800,
+    "Uno dos tres probando, uno dos tres probando.",
+    null
+   ],
+   [
+    null,
+    122100,
+    "Tá probando.",
+    null
+   ],
+   [
+    null,
+    126600,
+    "Ti estamos probando?",
+    null
+   ],
+   [
+    null,
+    130400,
+    "Ti estamos probando?",
+    null
+   ]
+  ]
+ },
+ {
+  "variant": "prod_live sin contexto",
+  "run": 3,
+  "turns": 17,
+  "people": 0,
+  "orphan_turns": 17,
+  "orphan_words_pct": 1.0,
+  "canary": 3,
+  "hallucinations": [
+   "Amen."
+  ],
+  "excess_phrases": 10,
+  "detail": [
+   [
+    "uno dos tres probando",
+    2,
+    0
+   ],
+   [
+    "vi tam akravandom",
+    1,
+    0
+   ],
+   [
+    "itziaren lagunak",
+    1,
+    0
+   ],
+   [
+    "sino ba sila",
+    1,
+    0
+   ],
+   [
+    "kilat bansha",
+    1,
+    0
+   ],
+   [
+    "apa yang ada pasti",
+    1,
+    0
+   ],
+   [
+    "mientras tanto",
+    1,
+    0
+   ],
+   [
+    "prea unas tres",
+    1,
+    0
+   ]
+  ],
+  "wer": 0.7413793103448276,
+  "sub": 30,
+  "del": 13,
+  "ins": 0,
+  "ref_words": 58,
+  "hyp_words": 45,
+  "invented": [
+   "vi tam akravandom",
+   "amen",
+   "spillet",
+   "panas",
+   "déjame",
+   "itziaren lagunak",
+   "sino ba sila",
+   "kilat bansha",
+   "apa yang ada pasti",
+   "mientras tanto",
+   "prea unas tres",
+   "tá brón orm"
+  ],
+  "transcript": [
+   [
+    null,
+    0,
+    "Uno dos tres probando, uno dos tres probando.",
+    null
+   ],
+   [
+    null,
+    5100,
+    "Hola, sí, uno, dos, tres, probando.",
+    null
+   ],
+   [
+    null,
+    11600,
+    "Vi tam akravandom.",
+    null
+   ],
+   [
+    null,
+    15400,
+    "Buenas, ¿hola?",
+    null
+   ],
+   [
+    null,
+    24600,
+    "Amen.",
+    null
+   ],
+   [
+    null,
+    28400,
+    "spillet.",
+    null
+   ],
+   [
+    null,
+    37100,
+    "Panas.",
+    null
+   ],
+   [
+    null,
+    48300,
+    "Déjame.",
+    null
+   ],
+   [
+    null,
+    53100,
+    "Itziaren lagunak.",
+    null
+   ],
+   [
+    null,
+    58100,
+    "Sino ba sila?",
+    null
+   ],
+   [
+    null,
+    63800,
+    "Kilat Bansha.",
+    null
+   ],
+   [
+    null,
+    74100,
+    "apa yang ada pasti?",
+    null
+   ],
+   [
+    null,
+    83600,
+    "Mientras tanto,",
+    null
+   ],
+   [
+    null,
+    98300,
+    "Prea unas tres?",
+    null
+   ],
+   [
+    null,
+    113600,
+    "Hola, hola.",
+    null
+   ],
+   [
+    null,
+    117800,
+    "Hola.",
+    null
+   ],
+   [
+    null,
+    122100,
+    "Tá brón orm.",
+    null
+   ]
+  ]
+ },
+ {
+  "variant": "prod_final (simulado)",
+  "run": 3,
+  "turns": 6,
+  "people": 3,
+  "orphan_turns": 0,
+  "orphan_words_pct": 0.0,
+  "canary": 0,
+  "hallucinations": [],
+  "excess_phrases": 30,
+  "detail": [
+   [
+    "ahí va",
+    14,
+    0
+   ],
+   [
+    "está bien",
+    3,
+    0
+   ],
+   [
+    "ahí tengo",
+    2,
+    0
+   ],
+   [
+    "ahora la prueba",
+    1,
+    0
+   ],
+   [
+    "si puedes arreglar porque como que está muy arriba",
+    1,
+    0
+   ],
+   [
+    "qué tal",
+    1,
+    0
+   ],
+   [
+    "voy a tener que subir por ahí",
+    1,
+    0
+   ],
+   [
+    "vamos a ir para allá",
+    1,
+    0
+   ]
+  ],
+  "wer": 2.0172413793103448,
+  "sub": 27,
+  "del": 2,
+  "ins": 88,
+  "ref_words": 58,
+  "hyp_words": 144,
+  "invented": [
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "1",
+   "2",
+   "3",
+   "ahora la prueba",
+   "qué tal",
+   "voy a tener que subir por ahí",
+   "ok",
+   "déjame",
+   "vamos a ir para allá",
+   "ah",
+   "ahí tengo",
+   "para ahí no",
+   "es el fácil",
+   "ahí está",
+   "pero está bien",
+   "está bien",
+   "ahí va",
+   "ahí va",
+   "ahí va",
+   "ahí va",
+   "ahí va",
+   "ahí va",
+   "ahí va",
+   "tiene todo para allá",
+   "ah",
+   "ahí tengo",
+   "ahí va",
+   "ahí va",
+   "ahí va",
+   "ahí va",
+   "ahí va",
+   "ahí va",
+   "están bien",
+   "están bien",
+   "ahí va",
+   "perfecto",
+   "muchísimas gracias",
+   "chori"
+  ],
+  "word_speaker_acc": 0.6964285714285714,
+  "turn_speaker_acc": 0.5,
+  "mapping": {
+   "persona_1": "A",
+   "persona_2": "B",
+   "persona_3": "D"
+  },
+  "time_speaker_acc": 0.6288888888888889,
+  "per_person": {
+   "A": 0.92,
+   "B": 0.57,
+   "C": 0.38,
+   "D": 0.0,
+   "E": 0.0
+  },
+  "time_mapping": {
+   "persona_1": "A",
+   "persona_2": "B",
+   "persona_3": "C"
+  },
+  "note": "acuerdo 62%; texto final + voces",
+  "transcript": [
+   [
+    "persona_1",
+    1700,
+    "1, 2, 3, probando, 1, 2, 3, probando, 1, 2, 3, probando. Hola, sí, 1, 2, 3, probando, 1, 2, 3, probando. Estamos probando. Buenas, hola.",
+    21550
+   ],
+   [
+    "persona_2",
+    21550,
+    "Ahora la prueba, si puedes arreglar porque como que está muy arriba. ¿Cara? ¿Vale? Buenas. Hola, ¿qué tal?",
+    48914
+   ],
+   [
+    "persona_1",
+    48914,
+    "Voy a tener que subir por ahí.",
+    50181
+   ],
+   [
+    "persona_3",
+    50181,
+    "Sí, ok, déjame. Vamos a ir para allá. Ah, claro, ahí tengo.",
+    77698
+   ],
+   [
+    "persona_2",
+    77698,
+    "No, para ahí no, es el fácil, ahí está. Pero está bien, está bien. Sí, sí, sí. Ahí va, ahí va. Ahí va, ahí va. Ahí va, sí. Ahí va, ahí va. ¿Tiene todo para allá? Ah, claro, ahí tengo. Sí, sí, sí. Ahí va, ahí va. Ahí va, ahí va. Ahí va, ahí va. ¿Están bien? ¿Están bien? Sí, sí, sí. Ahí va. Hola. Perfecto, muchísimas gracias.",
+    108110
+   ],
+   [
+    "persona_1",
+    108110,
+    "¿Probando? ¿Probando? ¿Probando? ¿Probando? Chori, habla, habla, hola. Hola. Hola. Gracias. Estamos probando.",
+    135300
    ]
   ]
  }

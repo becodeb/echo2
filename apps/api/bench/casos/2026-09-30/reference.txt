@@ -1,0 +1,16 @@
+# Referencia 2026-09-30, marcada por Bauti escuchando el audio: [inicio-fin] PERSONA: texto
+# 00:44-00:53: hablan A y C (sin texto transcripto); cuenta solo para quién habló.
+[00:01-00:04] A: Uno, tres probando, uno, tres probando, uno, dos, tres probando.
+[00:08-00:10] A: Hola, sí, uno, tres probando, uno, tres probando.
+[00:12-00:14] A: Estamos probando.
+[00:17-00:18] A: Buenas, ¿cómo va?
+[00:19-00:24] B: Ahora la pregunta es si puedes arreglar, porque como que está muy arriba.
+[00:24-00:25] A: ¿Cara? ¿Vale?
+[00:44-00:48] C:
+[00:48-00:53] C:
+[01:48-01:50] A: Tres, hablando, hablando, hablando, hablando.
+[01:51-01:53] A: Un poquito más.
+[01:54-01:57] D: Habla, habla, habla sola. ¿Hola?
+[01:58-01:59] A: ¿Estás sola? Hola,
+[02:00-02:01] E: Hola, gracias.
+[02:05-02:06] A: Estamos probando.

@@ -20,6 +20,7 @@ class Turn:
     speaker: str | None
     start_ms: int
     text: str
+    end_ms: int | None = None  # sin fin: hasta que empieza el turno siguiente
 
 
 # ── Texto ────────────────────────────────────────────────────────
@@ -217,6 +218,46 @@ def speakers(ref_turns: list[Turn], hyp_turns: list[Turn]) -> dict:
     }
 
 
+def _timeline(turns: list[Turn], step: int = 100) -> dict[int, str | None]:
+    """Quién habla cada `step` ms según los turnos (sin fin: hasta el siguiente)."""
+    out: dict[int, str | None] = {}
+    ordered = sorted(turns, key=lambda t: t.start_ms)
+    for index, turn in enumerate(ordered):
+        end = turn.end_ms or (ordered[index + 1].start_ms if index + 1 < len(ordered) else turn.start_ms + 3000)
+        for t in range(turn.start_ms - turn.start_ms % step, end, step):
+            if t >= turn.start_ms:
+                out.setdefault(t, turn.speaker)
+    return out
+
+
+def speaker_time(ref_turns: list[Turn], hyp_turns: list[Turn]) -> dict:
+    """Parte del tiempo hablado (según la referencia) en que el transcript tiene a la persona correcta.
+
+    Parecido a la tasa de error de diarización: cada 100 ms de la referencia se
+    compara con quién dice el transcript que hablaba, con la mejor
+    correspondencia entre etiquetas. Sin persona en el transcript = error.
+    """
+    ref = {t: s for t, s in _timeline(ref_turns).items() if s}
+    hyp = _timeline([t for t in hyp_turns if t.speaker])
+    confusion = Counter((s, hyp.get(t)) for t, s in ref.items())
+    ref_labels = sorted({s for s in ref.values()})
+    hyp_labels = sorted({s for s in hyp.values() if s})
+    best, best_map = -1, {}
+    size = min(len(ref_labels), len(hyp_labels))
+    for chosen in itertools.permutations(hyp_labels, size):
+        for refs in itertools.permutations(ref_labels, size):
+            mapping = dict(zip(chosen, refs))
+            score = sum(confusion.get((r, h), 0) for h, r in mapping.items())
+            if score > best:
+                best, best_map = score, mapping
+    per_person = {}
+    for label in ref_labels:
+        total = sum(1 for s in ref.values() if s == label)
+        ok = sum(1 for t, s in ref.items() if s == label and best_map.get(hyp.get(t)) == label)
+        per_person[label] = round(ok / total, 2)
+    return {"time_speaker_acc": max(best, 0) / max(len(ref), 1), "per_person": per_person, "time_mapping": best_map}
+
+
 def summary(ref_turns: list[Turn] | None, hyp_turns: list[Turn]) -> dict:
     """Todas las métricas de un transcript. Sin referencia, solo las que no la necesitan."""
     labels = {t.speaker for t in hyp_turns if t.speaker}
@@ -236,12 +277,13 @@ def summary(ref_turns: list[Turn] | None, hyp_turns: list[Turn]) -> dict:
         out["invented"] = invented(ref_turns, hyp_turns)
         if labels:
             out.update(speakers(ref_turns, hyp_turns))
+            out.update(speaker_time(ref_turns, hyp_turns))
     return out
 
 
 # ── Lectura de transcripts ───────────────────────────────────────
 
-_LINE = re.compile(r"^\**\[(\d+):(\d+)(?::(\d+))?(?:\s*-\s*[\d:]+)?\]\s*([^:]+?)\s*:\**\s*(.*)$")
+_LINE = re.compile(r"^\**\[(\d+):(\d+)(?::(\d+))?(?:\s*-\s*(\d+):(\d+))?\]\s*([^:]+?)\s*:\**\s*(.*)$")
 
 
 def parse_transcript(text: str) -> list[Turn]:
@@ -259,9 +301,11 @@ def parse_transcript(text: str) -> list[Turn]:
             if turns:
                 turns[-1].text += " " + line
             continue
-        a, b, c, who, body = match.groups()
+        a, b, c, ea, eb, who, body = match.groups()
         seconds = int(a) * 3600 + int(b) * 60 + int(c) if c else int(a) * 60 + int(b)
+        # "[mm:ss-mm:ss]": el fin es inclusivo al segundo.
+        end = (int(ea) * 60 + int(eb) + 1) * 1000 if ea else None
         who = who.strip().strip("*").strip()
         speaker = None if who.lower() in {"hablante", "?", ""} else who
-        turns.append(Turn(speaker, seconds * 1000, body.strip().strip("*").strip()))
+        turns.append(Turn(speaker, seconds * 1000, body.strip().strip("*").strip(), end))
     return turns

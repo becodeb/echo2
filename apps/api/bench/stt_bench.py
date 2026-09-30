@@ -174,7 +174,7 @@ def to_turns(body: dict, mapping) -> list[Turn]:
         for seg in segments:
             text = (seg.get("text") or "").strip()
             if text:
-                turns.append(Turn(seg.get("speaker"), unmap(int(float(seg.get("start") or 0) * 1000), mapping), text))
+                turns.append(Turn(seg.get("speaker"), unmap(int(float(seg.get("start") or 0) * 1000), mapping), text, unmap(int(float(seg.get("end") or 0) * 1000), mapping) or None))
         return turns
     return [Turn(None, 0, (body.get("text") or "").strip())]
 
@@ -259,7 +259,7 @@ async def prod_final(client, sem, pcm: np.ndarray, language: str, vocabulary: li
         final, note = d.fallback_pieces(live_rows, part, 0, end_ms), note + "RESPALDO: en vivo"
     # Lo "dicho después del audio de trabajo" se agrega sin persona.
     final += [(None, t, s, e) for s, e, t in live_rows if s >= end_ms]
-    return [Turn(label, start, text) for label, text, start, _ in final], note
+    return [Turn(label, start, text, end) for label, text, start, end in final], note
 
 
 # ── Corrida ──────────────────────────────────────────────────────
@@ -295,7 +295,7 @@ async def main() -> None:
 
     def record(name: str, run: int, turns: list[Turn], extra: dict | None = None) -> None:
         row = {"variant": name, "run": run, **metrics.summary(reference, turns), **(extra or {})}
-        row["transcript"] = [(t.speaker, t.start_ms, t.text) for t in turns]
+        row["transcript"] = [(t.speaker, t.start_ms, t.text, t.end_ms) for t in turns]
         results.append(row)
         print(f"  {name} #{run}: {len(turns)} turnos", flush=True)
 
@@ -349,12 +349,12 @@ async def main() -> None:
 
 
 def print_table(results: list[dict], with_ref: bool) -> None:
-    head = ["variante", "run", "WER", "ins", "frases de más", "\"uno dos tres probando\"", "personas", "persona ok (palabras)", "persona ok (turnos)", "turnos sin persona", "alucinaciones"]
+    head = ["variante", "run", "WER", "ins", "frases de más", "\"uno dos tres probando\"", "personas", "persona ok (palabras)", "persona ok (turnos)", "persona ok (tiempo)", "turnos sin persona", "alucinaciones"]
     print("\n| " + " | ".join(head) + " |")
     print("|" + "---|" * len(head))
     for row in results:
         if "error" in row:
-            print(f"| {row['variant']} | {row['run']} | error API | | | | | | | | |")
+            print(f"| {row['variant']} | {row['run']} | error API | | | | | | | | | |")
             continue
         hall = len(row["hallucinations"]) + len(row.get("invented", []))
         print(
@@ -370,6 +370,7 @@ def print_table(results: list[dict], with_ref: bool) -> None:
                     str(row["people"]),
                     fmt_pct(row.get("word_speaker_acc")),
                     fmt_pct(row.get("turn_speaker_acc")),
+                    fmt_pct(row.get("time_speaker_acc")),
                     f"{row['orphan_turns']} ({row['orphan_words_pct'] * 100:.0f}% palabras)",
                     str(hall),
                 ]
