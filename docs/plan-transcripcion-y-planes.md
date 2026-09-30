@@ -55,6 +55,13 @@ Tests: `docker compose up -d db` y, en `apps/api`,
 
 Bauti pidió **no gastar más tokens de OpenAI en pruebas**: probar con Groq/ElevenLabs.
 
+**Si trabajás en otra PC** (no en la que se armó el banco): `apps/api/bench/.env`,
+`apps/api/bench/.cache` y los audios de prueba no están en git (tienen keys y
+voces, una de una alumna). Pedile a Bauti que te copie `bench/.env` (o que te
+pase las keys de prueba de Groq y ElevenLabs) y los dos mp3 de la sección 2. Sin
+`.cache`, el banco vuelve a pedir a las APIs: **no correr las variantes de
+OpenAI** (`--only` con las de Groq/ElevenLabs).
+
 ---
 
 ## 2. Lo que se midió (banco `apps/api/bench/`)
