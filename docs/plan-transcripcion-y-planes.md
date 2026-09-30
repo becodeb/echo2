@@ -155,23 +155,37 @@ ElevenLabs** (ni al agente de voz). Ver pregunta P1.
 
 ---
 
-## 5. Planes y créditos (propuesta, falta cerrar con Bauti: sección 8)
+## 5. Planes y créditos (cerrado con Bauti el 30/9)
 
-- **Base (gratis, para colegios y docentes)**: en vivo y pasada final con Groq,
-  sin separar personas (salvo llamadas de Meet/Zoom, que se separan por canal).
-  Reuniones ilimitadas (con un tope anti-abuso). Incluye **4 reuniones por mes
-  con personas** (créditos), que la persona activa al crear la reunión cuando la
-  necesita. Crédito simple: **1 reunión = 1 crédito** (hasta 1 h; más larga, 2).
-- **Premium (organización)**: pasada final siempre con ElevenLabs (si no hay
-  menores). Precio a definir.
+- **Base (gratis, docentes y cualquiera)**: en vivo y pasada final con Groq, sin
+  separar personas (salvo llamadas de Meet/Zoom, que se separan por canal).
+  Reuniones sin límite de producto. **4 créditos por mes POR DOCENTE**: cada
+  crédito es una reunión "con personas" (ElevenLabs al finalizar), que la
+  persona activa al crear la reunión solo cuando la necesita. 1 reunión = 1
+  crédito (una de más de 1 h, 2). Se renuevan cada mes, no se acumulan.
+- **Colegios / instituciones (premium)**: ~US$ 65/mes por institución; pasada
+  final siempre con ElevenLabs (salvo reuniones con menores). En la UI **no se
+  muestra el precio ni el mail**: botón **"Contact sales"**.
 - **Individual US$ 5/mes**: 5 h de reuniones al mes con todo (Groq en vivo +
   ElevenLabs al finalizar). Costo nuestro: ~US$ 1,30 + LLM + comisión de cobro.
-- **Individual US$ 10/mes**: lo anterior + **hablar por voz con el asistente de
-  Echo** (ElevenLabs Agents: US$ 0,08/min + el LLM aparte; el Starter trae 75
-  min/mes para toda la cuenta). Con tope de minutos (p. ej. 30 min/mes ≈ US$ 2,40).
-  **Solo individuales, nunca organizaciones.** Solo mayores de 18.
-- Medir consumo real por sede y por persona (horas de Groq y ElevenLabs, minutos
-  de voz) desde el día 1: tabla de uso mensual.
+- **Individual US$ 10/mes**: lo anterior + **conversación por voz con el
+  asistente de Echo** (speech-to-speech). ElevenLabs Agents (US$ 0,08/min + LLM
+  aparte) con la voz del modelo **Eleven v4** de ElevenLabs (el nuevo; confirmar
+  en la doc de Agents que se puede usar ahí y su latencia; si no, Flash). Elegir
+  una voz linda en castellano rioplatense de su biblioteca. Tope de minutos por
+  mes (proponer 30 min ≈ US$ 2,40). **Solo cuentas individuales, nunca
+  organizaciones**, solo mayores de 18.
+- **Northfield School**: todo habilitado, sin pagar.
+- **Topes contra abuso**: sin valor fijo en el código; los define un superadmin
+  (`SUPERADMIN_EMAILS`: becodestudio@gmail.com y gonibauti@gmail.com) por plan,
+  por organización o por usuario, desde el panel de admin.
+- **Cobro**: todavía no hay (probablemente MercadoPago más adelante). **No crear
+  links de pago.** Los botones "Suscribirme" / "Contact sales" registran el
+  pedido (quién, qué plan, cuándo) y **avisan a Becode** (notificación a los
+  superadmins y mail a becodestudio@gmail.com desde el servidor), sin mostrar el
+  mail en la UI. A la persona se le confirma "te contactamos".
+- **Uso y costo desde el día 1** (ver tarea 11): segundos de audio por
+  proveedor/modelo, minutos de voz, tokens de LLM, en dólares.
 
 ---
 
@@ -200,14 +214,42 @@ ElevenLabs** (ni al agente de voz). Ver pregunta P1.
    por proveedor, minutos de voz), exención de Northfield, límites.
 7. **Crear reunión** (`apps/web/src/components/NewMeetingModal.tsx`): mostrar
    claramente qué va a hacer la IA en esta reunión según plan y créditos:
-   transcripción, quién habló (sí/no, gasta 1 crédito), acta, tareas con
-   responsables, chat con la IA, voz. Checkbox "¿hablan alumnos/menores?" (P1).
+   transcripción, quién habló (sí/no, gasta 1 crédito, cuántos quedan), acta,
+   tareas con responsables, chat con la IA, voz. Toggle **"Hablan alumnos
+   (menores de 18)"**, **desactivado por defecto** (el 90% de las reuniones son
+   sin menores); activado, la reunión no va a ElevenLabs y se explica por qué.
 8. **Zoom/Meet/grabación de pantalla**: probar con una llamada real que el
    estéreo (micrófono/sistema) + Scribe separan bien; que la mezcla a mono de
    `recording.py` no pierda a quien habla bajo.
 9. **Cobros** (P3) y **agente de voz** para el plan de US$ 10 (P4), al final.
 10. **Banco**: agregar Groq y ElevenLabs como variantes de `stt_bench.py` y el
     caso 27/9; correrlo antes y después de cada cambio de la pasada final.
+11. **Panel de consumo**: por usuario (cuánto gastó de cada modelo: Groq,
+    Scribe, Agents, LLM, en horas/minutos y US$), por organización (sus admins
+    ven a cada miembro) y global para los superadmins de Becode (todas las
+    organizaciones y los individuales, incluidos los que están en una
+    organización pero pagan un plan individual). Filtros por mes.
+12. **Página de planes/billing**: tarjetas Gratis, Individual US$ 5, Individual +
+    voz US$ 10 e Instituciones ("Contact sales"), con los créditos que quedan.
+    Botones según la sección 5 (sin links de pago; avisan a Becode).
+13. **Muestra de voz**: pedirla en el registro (después de crear la cuenta) y,
+    para quien no la tiene, un anuncio **una sola vez** al volver a entrar
+    (guardar que ya lo vio). Reusar "Mi voz" (`routers/my_voice.py`, migración
+    0015) y usarlas como voces conocidas en la pasada final.
+14. **Legal en la landing**: términos y privacidad claros: qué proveedores
+    procesan el audio (Groq, ElevenLabs, el LLM), que no se usa para entrenar
+    (ElevenLabs: desactivado en la cuenta el 30/9; Groq/LLM: **verificar en sus
+    políticas antes de afirmarlo**), qué se guarda y cuánto, reuniones con
+    menores, consentimiento/aviso de grabación a las familias. Recomendar que
+    lo revise un abogado.
+
+### Estética (tareas 7, 11, 12, 13)
+
+Bauti quiere la estética de ElevenLabs (elevenlabs.io/app): todo redondeado,
+tarjetas con bordes suaves, mucho aire, transiciones y animaciones cuidadas en
+cada click, cambios de estado fluidos (skeletons, fades, contadores que se
+animan). Mirar cómo muestran planes, créditos y consumo en su app y su página de
+precios, e inspirarse fuerte en eso, adaptado a los colores de Echo.
 
 Criterio de terminado: las dos reuniones de prueba procesadas de punta a punta en
 local con las keys de prueba dan transcript sin duplicados ni "Hablante", con
@@ -218,24 +260,27 @@ Bauti confirma antes del deploy.
 
 ## 7. Cosas que Bauti tiene que hacer en las cuentas (no las hace la IA)
 
-- ElevenLabs: desactivar el uso para entrenamiento (Perfil → Terms and privacy →
-  Data use) y borrar del historial de Speech to Text las pruebas con el audio
-  del 30/9 (tenía la voz de una alumna).
+- ElevenLabs: uso para entrenamiento **ya desactivado** (30/9). Falta borrar del
+  historial de Speech to Text las pruebas con el audio del 30/9 (tenía la voz de
+  una alumna).
 - Groq: activar Zero Data Retention (Settings → Data Controls). Para cargar
   saldo, pasar al plan pago desde Settings → Billing cuando haga falta.
 
 ---
 
-## 8. Preguntas abiertas (contestarlas antes de las tareas 6-9)
+## 8. Decisiones de Bauti (30/9) y lo que falta
 
-- **P1. Menores**: ¿en qué reuniones hablan alumnos? Propuesta: checkbox al crear
-  ("hablan alumnos/menores de 18"), marcado por defecto en reuniones con
-  familias; si está marcado, pasada final con Groq (sin personas) o con
-  AssemblyAI (separa personas, sin cláusula de menores, TTL 1 día).
-- **P2. Créditos**: ¿son por docente o por colegio? ¿4 por mes?
-- **P3. Cobro**: ¿MercadoPago (pesos) o Stripe/Lemon Squeezy (dólares)?
-  ¿Existen hoy usuarios individuales sin colegio, o hay que crear ese tipo de cuenta?
-- **P4. Agente de voz**: ¿qué LLM ("V4 Flash": DeepSeek V4 Flash, Gemini Flash,
-  GPT mini)? ¿Cuántos minutos por mes en el plan de US$ 10?
-- **P5. Premium para colegios**: ¿precio? ¿qué incluye además de las personas?
-- **P6. "Groq infinito"**: ¿tope anti-abuso (horas/mes por docente)?
+Respondidas:
+- Menores: toggle al crear, **desactivado por defecto**; activado → sin ElevenLabs
+  (pasada final con Groq, sin personas).
+- Créditos: **4 por mes por docente**.
+- Colegios: ~US$ 65/mes por institución, en la UI solo "Contact sales".
+- Cobro: todavía nada; botones que avisan a Becode, sin links de pago.
+- Voz: modelo **Eleven v4** de ElevenLabs para la conversación por voz.
+- Topes: los pone un superadmin desde el panel, sin número fijo en el código.
+- ElevenLabs: Bauti ya desactivó "Improve the models for everyone" (entrenamiento).
+
+Pendientes (preguntar cuando llegue esa tarea):
+- ¿Existen hoy usuarios sin organización, o hay que crear la cuenta individual?
+- Minutos de voz por mes en el plan de US$ 10 (propuesta: 30).
+- Qué LLM usa el agente de voz (el más barato que funcione bien en castellano).
