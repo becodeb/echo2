@@ -23,6 +23,10 @@ export function Footer() {
   return (
     <footer className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-10 text-sm text-ink-500 md:px-12">
       <span className="font-semibold tracking-tight text-ink-950">Echo</span>
+      <nav className="flex gap-5" aria-label="Legal">
+        <Link to="/legal/privacidad" className="hover:text-ink-900">Privacidad</Link>
+        <Link to="/legal/terminos" className="hover:text-ink-900">Términos</Link>
+      </nav>
       <span>La reunión termina. Echo recuerda.</span>
     </footer>
   );

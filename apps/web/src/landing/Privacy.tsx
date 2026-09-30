@@ -7,8 +7,8 @@ const FACTS = [
     text: "Un servicio local transcribe con tu propio motor de voz (Parakeet, whisper.cpp). El audio no sale de la máquina.",
   },
   {
-    title: "En modo cloud, cifrado y descartado",
-    text: "Viaja al motor que configures y se borra al transcribir. La interfaz siempre muestra qué modo está activo.",
+    title: "En la nube, sin nombres para la IA",
+    text: "El audio viaja cifrado al servicio que lo transcribe, y a la IA le llega el texto con los nombres reemplazados.",
   },
   {
     title: "Claves cifradas",
@@ -21,13 +21,16 @@ export function Privacy() {
     <Reveal className="bg-ink-950 text-[#fafbfc]">
       <div className="mx-auto grid max-w-6xl gap-12 px-6 py-24 md:grid-cols-12 md:px-12 md:py-32">
         <div className="md:col-span-7">
-          <h2 className="text-4xl font-semibold tracking-tighter md:text-6xl">El audio no se guarda.</h2>
+          <h2 className="text-4xl font-semibold tracking-tighter md:text-6xl">Echo no se queda con el audio.</h2>
           <p className="mt-6 max-w-md text-lg leading-relaxed text-ink-300">
-            Se usa mientras se procesa la reunión y se borra al terminar. Lo único que persiste es
+            Se usa mientras se procesa la reunión y Echo lo borra al terminar. Lo que queda es
             texto. Importa cuando en la reunión hay familias y alumnos.
           </p>
+          <a href="/legal/privacidad" className="mt-4 inline-block text-sm font-medium text-ink-300 underline underline-offset-4 hover:text-white">
+            Quién procesa cada cosa y cuánto se guarda
+          </a>
           <p className="mt-10 font-mono text-sm text-ink-400 md:text-base">
-            micrófono → motor de voz → texto → audio borrado
+            micrófono → motor de voz → texto → audio borrado en Echo
           </p>
         </div>
         <ul className="space-y-8 md:col-span-5">

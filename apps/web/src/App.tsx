@@ -30,6 +30,7 @@ const ActaPrint = lazy(() => import("./pages/ActaPrint"));
 const ChooseLevel = lazy(() => import("./pages/ChooseLevel"));
 const Plans = lazy(() => import("./pages/Plans"));
 const Usage = lazy(() => import("./pages/Usage"));
+const Legal = lazy(() => import("./pages/Legal"));
 
 function FullLoader() {
   return (
@@ -49,6 +50,18 @@ export default function App() {
       <Suspense fallback={<FullLoader />}>
         <Routes>
           <Route path="/s/:token" element={<SharedView />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+
+  // Privacidad y términos: públicos, con o sin sesión.
+  if (location.pathname.startsWith("/legal")) {
+    return (
+      <Suspense fallback={<div className="min-h-dvh bg-[#fafbfc]" />}>
+        <Routes>
+          <Route path="/legal/:doc" element={<Legal />} />
+          <Route path="*" element={<Navigate to="/legal/privacidad" replace />} />
         </Routes>
       </Suspense>
     );

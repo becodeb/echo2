@@ -65,6 +65,11 @@ export default function Register() {
             </Button>
           </form>
           <GoogleButton label="Crear cuenta con Google" />
+          <p className="mt-4 text-center text-xs leading-relaxed text-ink-400">
+            Al crear la cuenta aceptás los{" "}
+            <Link to="/legal/terminos" className="font-medium text-ink-600 hover:text-ink-900">términos</Link> y la{" "}
+            <Link to="/legal/privacidad" className="font-medium text-ink-600 hover:text-ink-900">política de privacidad</Link>.
+          </p>
         </div>
         <p className="mt-4 text-center text-sm text-ink-500">
           ¿Ya tenés cuenta?{" "}
