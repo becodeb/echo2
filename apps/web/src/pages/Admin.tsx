@@ -5,7 +5,7 @@ import type { AdminOrgOut, ServerAIOut, ServerAITestOut } from "../api/types";
 import { Select } from "../components/Select";
 import { useAuth } from "../state/auth";
 import { Badge, Button, Card, EmptyState, Input, Spinner } from "../components/ui";
-import { GlobalUsage, OrgPlanControl, PlanRequests, PlansEditor, UserPlans } from "./admin/AdminBilling";
+import { GlobalUsage, OrgPlanControl, PlanRequests, PlansEditor, UserPlans, VoiceAgentCard } from "./admin/AdminBilling";
 
 const TABS = [
   { id: "organizaciones", label: "Organizaciones" },
@@ -430,6 +430,7 @@ export default function Admin() {
             </p>
             <PlansEditor />
             <UserPlans />
+            <VoiceAgentCard />
           </div>
         )}
         {tab === "pedidos" && <PlanRequests />}

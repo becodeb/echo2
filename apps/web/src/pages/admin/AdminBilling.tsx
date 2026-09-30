@@ -340,3 +340,35 @@ export function GlobalUsage() {
     </div>
   );
 }
+
+/** Crea (o actualiza) el agente de la conversación por voz en ElevenLabs, con la key de la instalación. */
+export function VoiceAgentCard() {
+  const setup = useMutation({
+    mutationFn: () =>
+      api<{ agent_id: string; voice_id: string; llm: string }>("/api/admin/voice-agent", { method: "POST", skipOrg: true }),
+  });
+  return (
+    <section className="rounded-3xl border border-ink-100 bg-white p-5">
+      <h3 className="text-[15px] font-semibold text-ink-900">Agente de voz</h3>
+      <p className="mt-0.5 text-xs leading-relaxed text-ink-400">
+        La conversación por voz del plan Individual + voz. Tocalo una vez para crearlo, y de nuevo cuando cambie la voz
+        (ELEVENLABS_AGENT_VOICE_ID) o el prompt: actualiza el mismo agente.
+      </p>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <Button onClick={() => setup.mutate()} disabled={setup.isPending} className="rounded-full">
+          {setup.isPending ? <Spinner /> : "Crear o actualizar el agente"}
+        </Button>
+        {setup.isSuccess && (
+          <span className="text-sm text-emerald-600">
+            Listo · {setup.data.agent_id} · {setup.data.llm}
+          </span>
+        )}
+        {setup.isError && (
+          <span className="text-sm text-red-600">
+            {setup.error instanceof Error ? setup.error.message : "No se pudo crear"}
+          </span>
+        )}
+      </div>
+    </section>
+  );
+}
