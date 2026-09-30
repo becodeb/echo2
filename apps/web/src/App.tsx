@@ -28,6 +28,8 @@ const Reports = lazy(() => import("./pages/Reports"));
 const Landing = lazy(() => import("./pages/Landing"));
 const ActaPrint = lazy(() => import("./pages/ActaPrint"));
 const ChooseLevel = lazy(() => import("./pages/ChooseLevel"));
+const Plans = lazy(() => import("./pages/Plans"));
+const Usage = lazy(() => import("./pages/Usage"));
 
 function FullLoader() {
   return (
@@ -125,6 +127,8 @@ export default function App() {
           <Route path="/ask" element={<AskEcho />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/settings/*" element={<Settings />} />
+          <Route path="/plans" element={<Plans />} />
+          <Route path="/usage" element={<Usage />} />
           {/* El panel de superadmin no existe para el resto: sin la ruta, /admin
               cae en el catch-all y vuelve al inicio. */}
           {user.is_superadmin && <Route path="/admin" element={<Admin />} />}

@@ -9,6 +9,8 @@ import { useSeesInternal } from "../state/internalGroups";
 import { Avatar } from "./ui";
 import { EchoFace } from "./EchoFace";
 import { AnnouncementPopup } from "./AnnouncementPopup";
+import { VoicePrompt } from "./VoicePrompt";
+import { CreditDots, effectivePlan, PLAN_NAME, useBilling } from "./billing";
 import { CommandPalette } from "./CommandPalette";
 import { Select } from "./Select";
 
@@ -118,6 +120,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="border-t border-ink-100 p-3">
+          <PlanCard onNavigate={() => setMobileNav(false)} />
           {user?.is_superadmin && (
             <NavLink
               to="/admin"
@@ -129,9 +132,21 @@ export function Layout({ children }: { children: ReactNode }) {
               }
             >
               <NavIcon d="M12 3 4 7v6c0 4.4 3.4 7.6 8 8 4.6-.4 8-3.6 8-8V7l-8-4z" />
-              Organizaciones
+              Panel de Becode
             </NavLink>
           )}
+          <NavLink
+            to="/usage"
+            onClick={() => setMobileNav(false)}
+            className={({ isActive }) =>
+              `mb-1 flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium ${
+                isActive ? "bg-ink-100 text-ink-900" : "text-ink-500 hover:bg-ink-50"
+              }`
+            }
+          >
+            <NavIcon d="M4 20V10m6 10V4m6 16v-7M3 20h18" />
+            Consumo
+          </NavLink>
           <NavLink
             to="/settings"
             onClick={() => setMobileNav(false)}
@@ -213,6 +228,49 @@ export function Layout({ children }: { children: ReactNode }) {
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <AnnouncementPopup />
+      <VoicePrompt />
+    </div>
+  );
+}
+
+/**
+ * El plan y los créditos del mes, siempre a mano: cada punto es una reunión
+ * con quién habló. Lleva a Planes; "Consumo" al detalle de lo que se usó.
+ */
+function PlanCard({ onNavigate }: { onNavigate: () => void }) {
+  const { data: billing } = useBilling();
+  const navigate = useNavigate();
+  if (!billing) return <div className="mb-2 h-[62px] animate-pulse rounded-2xl bg-ink-50" />;
+  const plan = effectivePlan(billing);
+  const people = billing.people;
+  const credits = people.mode !== "always" && people.credits_per_month != null;
+  return (
+    <div className="mb-2 rounded-2xl border border-ink-100 bg-ink-50/60 p-3">
+      <button
+        type="button"
+        onClick={() => {
+          onNavigate();
+          navigate("/plans");
+        }}
+        className="flex w-full items-center justify-between gap-2 text-left"
+      >
+        <span className="text-xs font-semibold text-ink-800">{PLAN_NAME[plan] ?? plan}</span>
+        {credits ? (
+          <CreditDots total={people.credits_per_month ?? 0} left={people.credits_left ?? 0} size="sm" />
+        ) : (
+          <span className="text-[11px] font-medium text-ink-400">Quién habló incluido</span>
+        )}
+      </button>
+      <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-ink-400">
+        <span className="truncate">
+          {credits ? `${people.credits_left} de ${people.credits_per_month} este mes` : "Todas las reuniones"}
+        </span>
+        {plan === "base" && (
+          <NavLink to="/plans" onClick={onNavigate} className="shrink-0 font-semibold text-ink-700 hover:text-ink-900">
+            Mejorar
+          </NavLink>
+        )}
+      </div>
     </div>
   );
 }

@@ -89,3 +89,23 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .echo-eye, .echo-pupils, .recording-dot, .animate-fade-up, .animate-slide-in { animation: none !important; }
 }
+
+/* Créditos que se van a gastar en la reunión nueva: laten suave. */
+@keyframes credit-spend {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(99 102 241 / 0.45); }
+  50% { box-shadow: 0 0 0 4px rgb(99 102 241 / 0); }
+}
+.credit-spend { animation: credit-spend 1.6s ease-in-out infinite; }
+/* Algo que aparece o se va dentro de una tarjeta: alto y opacidad a la vez. */
+.reveal-grid {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 320ms cubic-bezier(0.32, 0.72, 0, 1), opacity 220ms ease;
+}
+.reveal-grid[data-open="true"] { grid-template-rows: 1fr; opacity: 1; }
+.reveal-grid > * { overflow: hidden; min-height: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .credit-spend { animation: none; }
+  .reveal-grid { transition: none; }
+}

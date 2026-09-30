@@ -22,6 +22,10 @@ export interface AdminOrgOut {
   uses_own_key: boolean;
   /** Dominios o emails que se unen sin invitación. */
   join_rules: string[];
+  /** Plan (base | institucion | cortesia) y topes propios. */
+  plan: string;
+  is_personal: boolean;
+  limits: Record<string, number>;
 }
 
 export interface OrgOut {
@@ -29,6 +33,8 @@ export interface OrgOut {
   name: string;
   slug: string;
   role: string;
+  /** Cuenta individual: organización de una sola persona. */
+  is_personal?: boolean;
 }
 
 export interface SessionOut {
@@ -67,6 +73,11 @@ export interface MeetingOut {
   processing_state: Record<string, unknown>;
   meta: {
     visibility?: string;
+    /** Se pidió separar quién habló / hablan menores (NewMeetingModal). */
+    people?: boolean;
+    minors?: boolean;
+    /** pending: ElevenLabs falló y se reintenta solo (services/diarization.py). */
+    people_status?: "pending" | "done" | "failed" | "skipped";
     timeline?: { at_ms: number; label: string }[];
     next_steps?: string[];
     mentions?: Record<string, unknown>;

@@ -106,6 +106,16 @@ export default function MeetingDetail() {
             ` · ${meeting.participants.map((participant) => participant.name).join(", ")}`}
         </p>
         {!internal && <ClassificationPanel meetingId={meeting.id} />}
+        {meeting.meta?.people_status === "pending" && (
+          <p className="animate-fade-up mt-3 flex items-center gap-2 rounded-2xl bg-ink-50 px-3.5 py-2.5 text-sm text-ink-600">
+            <Spinner className="h-3.5 w-3.5 shrink-0 text-ink-400" />
+            Todavía estamos separando quién habló. El transcript se actualiza solo cuando termine; no gasta créditos
+            hasta entonces.
+          </p>
+        )}
+        {meeting.meta?.minors && (
+          <p className="mt-3 text-xs text-ink-400">Hablan menores de 18: esta reunión se transcribió sin separar quién habló.</p>
+        )}
         {aiSkipped && (
           <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
             El análisis con IA se salteó porque no hay un modelo configurado.{" "}

@@ -5,6 +5,15 @@ import type { AdminOrgOut, ServerAIOut, ServerAITestOut } from "../api/types";
 import { Select } from "../components/Select";
 import { useAuth } from "../state/auth";
 import { Badge, Button, Card, EmptyState, Input, Spinner } from "../components/ui";
+import { GlobalUsage, OrgPlanControl, PlanRequests, PlansEditor, UserPlans } from "./admin/AdminBilling";
+
+const TABS = [
+  { id: "organizaciones", label: "Organizaciones" },
+  { id: "planes", label: "Planes y topes" },
+  { id: "pedidos", label: "Pedidos" },
+  { id: "consumo", label: "Consumo" },
+] as const;
+type Tab = (typeof TABS)[number]["id"];
 
 /**
  * Panel de superadmin: todas las organizaciones de la instalación y la IA de
@@ -94,6 +103,7 @@ function OrgRow({ org }: { org: AdminOrgOut }) {
         </div>
       </div>
 
+      <OrgPlanControl org={org} />
       <JoinRules org={org} />
 
       <p className="text-sm text-ink-500">
@@ -383,6 +393,53 @@ function ServerDefaultCard() {
 }
 
 export default function Admin() {
+  const [tab, setTabState] = useState<Tab>(() => {
+    const hash = window.location.hash.replace("#", "");
+    return (TABS.find((item) => item.id === hash)?.id ?? "organizaciones") as Tab;
+  });
+  const setTab = (next: Tab) => {
+    setTabState(next);
+    window.history.replaceState(null, "", `#${next}`);
+  };
+
+  return (
+    <div className="mx-auto max-w-5xl px-6 py-10">
+      <h1 className="text-2xl font-semibold tracking-tight text-ink-900">Panel de Becode</h1>
+      <nav className="mt-5 flex flex-wrap gap-1 rounded-full bg-ink-100 p-1 sm:inline-flex" aria-label="Secciones del panel">
+        {TABS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setTab(item.id)}
+            aria-current={tab === item.id ? "page" : undefined}
+            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-200 ${
+              tab === item.id ? "bg-white text-ink-900 shadow-[0_1px_3px_rgba(0,0,0,0.12)]" : "text-ink-500 hover:text-ink-800"
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </nav>
+      <div key={tab} className="animate-fade-up mt-6">
+        {tab === "organizaciones" && <Organizations />}
+        {tab === "planes" && (
+          <div className="space-y-4">
+            <p className="text-sm text-ink-500">
+              Los topes de cada plan. Una organización o una persona pueden tener los suyos (en su tarjeta o en planes
+              individuales). Vacío = sin tope.
+            </p>
+            <PlansEditor />
+            <UserPlans />
+          </div>
+        )}
+        {tab === "pedidos" && <PlanRequests />}
+        {tab === "consumo" && <GlobalUsage />}
+      </div>
+    </div>
+  );
+}
+
+function Organizations() {
   const { data: orgs, isLoading, isError, error } = useQuery({
     queryKey: ["admin-orgs"],
     queryFn: () => api<AdminOrgOut[]>("/api/admin/organizations", { skipOrg: true }),
@@ -411,10 +468,9 @@ export default function Admin() {
   const sinIA = (orgs ?? []).filter((org) => !org.llm_provider).length;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5 px-6 py-10">
+    <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink-900">Organizaciones</h1>
-        <p className="mt-1 text-sm text-ink-500">
+        <p className="text-sm text-ink-500">
           Todas las organizaciones de esta instalación y el modelo de IA que usa cada una.
         </p>
       </div>

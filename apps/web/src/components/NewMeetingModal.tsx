@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import type { Audience, FamilyOut, MeetingOut } from "../api/types";
 import { AUDIENCES } from "./ClassificationPanel";
 import { FamilySelect } from "./FamilySelect";
+import { MeetingAiPlan } from "./MeetingAiPlan";
 import { RecordToggle } from "./RecordToggle";
 import { Select } from "./Select";
 import { SegmentedToggle, Switch } from "./Toggles";
@@ -53,6 +54,9 @@ export function NewMeetingModal({
   const [language, setLanguage] = useState(() => localStorage.getItem("echo_pref_lang") ?? "es");
   const [participants, setParticipants] = useState("");
   const [recordAudio, setRecordAudio] = useState(false);
+  // Quién habló (gasta un crédito en el plan Gratis) y si hablan menores.
+  const [people, setPeople] = useState(false);
+  const [minors, setMinors] = useState(false);
   // Familia
   const [familyId, setFamilyId] = useState("");
   const [audience, setAudience] = useState<Audience | "">("");
@@ -100,6 +104,8 @@ export function NewMeetingModal({
         language,
         record_audio: recordAudio,
         participants: participantList,
+        people: people && !minors,
+        minors,
       };
       const meeting = await api<MeetingOut>("/api/meetings", {
         method: "POST",
@@ -122,6 +128,7 @@ export function NewMeetingModal({
     },
     onSuccess: (meeting) => {
       localStorage.setItem("echo_pref_lang", language);
+      queryClient.invalidateQueries({ queryKey: ["billing"] });
       queryClient.invalidateQueries({ queryKey: ["meetings"] });
       queryClient.invalidateQueries({ queryKey: ["families"] });
       // El modal no se desmonta: que la próxima reunión arranque en blanco.
@@ -130,6 +137,8 @@ export function NewMeetingModal({
       setFamilyId("");
       setAudience("");
       setRecordAudio(false);
+      setPeople(false);
+      setMinors(false);
       setWantsMinutes(false);
       setProjectId("");
       onClose();
@@ -243,6 +252,14 @@ export function NewMeetingModal({
           </label>
         )}
         <RecordToggle checked={recordAudio} onChange={setRecordAudio} />
+        <MeetingAiPlan
+          people={people}
+          onPeople={setPeople}
+          minors={minors}
+          onMinors={setMinors}
+          minutes={kind === "familia" || wantsMinutes}
+          enabled={open}
+        />
         {create.isError && (
           <p className="text-sm text-red-600">
             {create.error instanceof Error ? create.error.message : "Error al crear"}
