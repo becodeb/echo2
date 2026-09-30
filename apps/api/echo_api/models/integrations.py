@@ -85,6 +85,9 @@ class ServerAISettings(PKMixin, TimestampMixin, Base):
     llm_model: Mapped[str | None] = mapped_column(String(120))
     llm_api_key_enc: Mapped[str | None] = mapped_column(Text)
     llm_base_url: Mapped[str | None] = mapped_column(String(300))
+    # Agente de ElevenLabs para la conversación por voz (services/voice_agent.py):
+    # lo crea un superadmin desde el panel, con la key de la instalación.
+    voice_agent_id: Mapped[str | None] = mapped_column(String(80))
     updated_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id")
     )

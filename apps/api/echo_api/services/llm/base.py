@@ -15,6 +15,8 @@ import time
 
 import httpx
 
+from ..stt.base import post_with_rate_limit
+
 log = logging.getLogger("echo.llm")
 
 
@@ -157,8 +159,10 @@ class OpenAICompatibleProvider(LLMProvider):
         started = time.monotonic()
         try:
             async with httpx.AsyncClient(timeout=180) as client:
-                response = await client.post(
-                    f"{self.base_url}/chat/completions", json=payload, headers=headers
+                # Un 429 (Groq gratis: pocos pedidos por minuto) se espera y se
+                # reintenta en vez de perder el acta o la respuesta.
+                response = await post_with_rate_limit(
+                    client, f"{self.base_url}/chat/completions", json=payload, headers=headers
                 )
         except httpx.HTTPError as exc:
             raise LLMError(f"Error de red con {self.name}: {exc}") from exc

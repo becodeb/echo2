@@ -92,6 +92,8 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     # ElevenLabs Scribe: pasada final con quién habló (services/stt/elevenlabs.py).
     elevenlabs_api_key: str = ""
+    # Voz del agente de conversación (services/voice_agent.py). Vacío = la de fábrica.
+    elevenlabs_agent_voice_id: str = ""
     deepgram_api_key: str = ""
     openrouter_api_key: str = ""
     orcarouter_api_key: str = ""

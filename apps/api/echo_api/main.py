@@ -64,6 +64,7 @@ def _include_optional_routers() -> None:
         "admin",
         "admin_billing",
         "billing",
+        "voice",
         "families",
         "attachments",
         "drive",

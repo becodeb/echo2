@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import type { ChatOut } from "../api/types";
 import { Button, EmptyState, formatMs } from "../components/ui";
 import { EchoFace } from "../components/EchoFace";
+import { VoiceChatButton } from "../components/VoiceChat";
 import { AnswerText } from "../components/AnswerText";
 
 const SUGGESTIONS = [
@@ -62,6 +63,9 @@ export default function AskEcho() {
 
   return (
     <div className="mx-auto flex h-full max-w-3xl flex-col px-6 py-6">
+      <div className="flex justify-end">
+        <VoiceChatButton />
+      </div>
       <div ref={scrollRef} className="flex-1 space-y-5 overflow-y-auto py-4">
         {messages.length === 0 && (
           <div className="pt-[10vh]">
