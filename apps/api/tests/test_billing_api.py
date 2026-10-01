@@ -185,6 +185,7 @@ def test_voice_invitation_is_shown_once(client):
     auth = {"Authorization": f"Bearer {session['access_token']}"}
     assert client.get("/api/me/voice", headers=auth).json() == {
         "has_sample": False, "duration_ms": None, "recorded_at": None, "prompt_seen": False,
+        "learn_from_meetings": True, "learned_count": 0, "warning": None,
     }
     assert client.post("/api/me/voice/prompt-seen", headers=auth).status_code == 204
     assert client.get("/api/me/voice", headers=auth).json()["prompt_seen"] is True

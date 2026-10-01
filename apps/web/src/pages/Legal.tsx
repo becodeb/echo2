@@ -201,11 +201,31 @@ function Privacy() {
         </ul>
       </Section>
 
-      <Section title="Mi voz">
+      <Section title="Mi voz (reconocimiento por voz)">
         <p>
-          Si grabás tu voz en Mi voz, la muestra se guarda en el servidor de Echo y no se manda a otros servicios. Podés
-          borrarla cuando quieras desde Ajustes → Mi voz, y se borra también si das de baja tu cuenta.
+          Si grabás tu voz en Mi voz, Echo la usa para poner tu nombre en las reuniones en lugar de "Persona 1". Es un
+          dato biométrico, así que te contamos exactamente qué pasa:
         </p>
+        <ul>
+          <li>
+            De la muestra se calcula una <strong>huella de voz</strong> (una lista de números que describe cómo suena tu
+            voz). Se calcula en el servidor de Echo: ni la muestra ni la huella se mandan a otros servicios.
+          </li>
+          <li>
+            Después de cada reunión de tu organización, Echo compara la huella con la de cada persona que habló. Solo pone
+            tu nombre si la coincidencia es alta; si tiene dudas, lo deja como sugerencia para confirmar. De las demás
+            personas de la reunión no se guarda ninguna huella.
+          </li>
+          <li>
+            <strong>Mejorar el reconocimiento con mis reuniones</strong> viene activado al grabar tu voz: cuando Echo te
+            reconoce con seguridad, suma lo aprendido a tu huella. Lo podés apagar en Mi voz, y al apagarlo se olvida lo
+            aprendido.
+          </li>
+          <li>
+            La muestra y la huella se guardan hasta que las borres desde Ajustes → Mi voz, y se borran también si das de
+            baja tu cuenta.
+          </li>
+        </ul>
       </Section>
 
       <Section title="Qué guarda Echo y por cuánto tiempo">
@@ -213,7 +233,7 @@ function Privacy() {
           <li><strong>El texto de las reuniones</strong> (transcript, acta, tareas): hasta que la institución o quien la creó lo borre.</li>
           <li><strong>El audio de trabajo</strong> se borra cuando termina de procesarse la reunión. Si la transcripción completa o la separación de quién habló falló, se guarda una copia comprimida hasta 48 horas para reintentarlo, y después se borra.</li>
           <li><strong>La grabación completa</strong>, solo si se eligió grabar la reunión: va al Google Drive de quien grabó; si no tiene Drive conectado, queda para descargar 48 horas y se borra.</li>
-          <li><strong>La muestra de voz</strong>, hasta que la borres.</li>
+          <li><strong>La muestra de voz y su huella</strong>, hasta que las borres.</li>
         </ul>
       </Section>
 

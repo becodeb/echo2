@@ -10,3 +10,4 @@ coverage
 .env
 Dockerfile
 .dockerignore
+models

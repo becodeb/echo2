@@ -10,15 +10,11 @@
 | Contraseñas | Argon2id |
 | Refresh token de Google Drive | Uno por organización, cifrado en reposo con la misma `ENCRYPTION_KEY` (`OrgGoogleDrive.refresh_token_enc`). El access token se canjea en cada operación y vive solo en memoria. Scope mínimo `drive.file` |
 | Google Login | **No persiste ningún token.** Pide `access_type=online` y guarda únicamente el `google_sub` en el usuario |
+| Mi voz (biometría) | `user_voice_samples`: la muestra (WAV, hasta 10 s) y su huella (`sample_embedding`, `embedding`, 256 floats de WeSpeaker ResNet34). La graba la propia persona con consentimiento explícito; la huella se calcula en el servidor (`services/voiceprint.py`, ONNX en CPU), nunca sale a terceros. Se compara con la de cada persona que habló después de la pasada final; de quien no grabó su voz no se guarda ninguna huella. "Mejorar con mis reuniones" (§7.4) promedia la huella con reconocimientos seguros; apagarlo vuelve a la muestra. Borrar Mi voz o la cuenta borra todo. |
 
-> **Voice profiles: no están en esta tabla a propósito.** El modelo
-> `SpeakerProfile` (embedding de voz + `consent_at`) existe en
-> `models/meetings.py` y la migración crea la tabla, pero **ningún código la
-> lee ni la escribe**: no hay endpoint para dar de alta un perfil ni nada que
-> calcule ese embedding. Es una tabla vacía. Listarla como dato sensible
-> tratado sería describir una feature que no existe — y de paso sugerir que
-> Echo guarda biometría de voz, cosa que hoy no hace. Si algún día se
-> implementa, vuelve a la tabla con su fila.
+
+> `SpeakerProfile` (tabla `speaker_profiles`) sigue sin usarse: Mi voz vive
+> en `user_voice_samples`.
 
 ## Autenticación y sesiones
 

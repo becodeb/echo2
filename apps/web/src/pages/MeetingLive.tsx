@@ -75,6 +75,22 @@ export default function MeetingLive() {
   const [level, setLevel] = useState(0);
   const [micDevices, setMicDevices] = useState<MediaDeviceInfo[]>([]);
   const [deviceId, setDeviceId] = useState<string>(() => localStorage.getItem("echo_pref_mic") ?? "");
+  // Consejo "Hola, soy…" (§7.3): se ve al empezar hasta que se cierra.
+  const [helloTipHidden, setHelloTipHidden] = useState(() => {
+    try {
+      return localStorage.getItem("echo_tip_hola_soy") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const hideHelloTip = () => {
+    setHelloTipHidden(true);
+    try {
+      localStorage.setItem("echo_tip_hola_soy", "1");
+    } catch {
+      // Sin almacenamiento: se oculta igual hasta recargar.
+    }
+  };
   const [captureSystem, setCaptureSystem] = useState(false);
   const [bridge, setBridge] = useState<BridgeHealth | null | "checking">("checking");
   const [engine, setEngine] = useState<EngineMode>("cloud");
@@ -789,6 +805,23 @@ export default function MeetingLive() {
           </span>
         )}
       </header>
+
+      {!helloTipHidden && !meeting.meta?.minors && elapsedMs < 5 * 60 * 1000 && (
+        <div className="flex items-center gap-3 border-b border-accent-100 bg-accent-50 px-6 py-2.5 text-sm text-accent-700">
+          <p className="min-w-0 flex-1">
+            Para que Echo sepa quién es quién, que cada uno diga <strong>«Hola, soy…»</strong> al empezar.
+          </p>
+          <button
+            onClick={hideHelloTip}
+            className="-mr-2 grid h-11 w-11 shrink-0 place-items-center rounded-full text-accent-600 hover:bg-accent-100"
+            aria-label="Cerrar el consejo"
+          >
+            <svg viewBox="0 0 16 16" className="h-4 w-4" aria-hidden>
+              <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* Errores del servidor durante la grabación (ej. stt_not_configured).
           Sin esto la reunión graba en silencio y el transcript queda vacío. */}

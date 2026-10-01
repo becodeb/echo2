@@ -1,17 +1,17 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, NavLink, Navigate, Route, Routes, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { DriveStatusOut, MyDriveOut, ReasonOut } from "../api/types";
 import { Select } from "../components/Select";
 import { Switch } from "../components/Toggles";
+import { VoiceRecorder, type MyVoice } from "../components/VoiceRecorder";
 import { Badge, Button, Card, Input, Modal, Spinner } from "../components/ui";
 import { useAuth } from "../state/auth";
 import { LEVEL_LABEL, useMyAccess, type Level, type LevelAccess } from "../state/access";
 import { ACTA_ENTREVISTA_COLEGIO } from "../lib/actaTemplates";
 import { LetterheadSection } from "./settings/LetterheadSection";
 import { CreateOrJoin } from "./OnboardingOrg";
-import { micErrorMessage } from "../lib/micError";
 
 const SECTIONS = [
   { path: "org", label: "Organización" },
@@ -1258,172 +1258,105 @@ function MyDriveSection() {
   );
 }
 
-interface VoiceOut {
-  has_sample: boolean;
-  duration_ms: number | null;
-  recorded_at: string | null;
-}
-
-const VOICE_SECONDS = 10;
-
 /**
  * Mi voz: una muestra corta para que, en las reuniones, el transcript diga el
- * nombre de la persona en vez de "Persona 2" (services/diarization.py).
+ * nombre de la persona en vez de "Persona 2" (services/speaker_names.py).
  */
 function MyVoiceSection() {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [consent, setConsent] = useState(false);
-  const [recording, setRecording] = useState(false);
-  const [left, setLeft] = useState(VOICE_SECONDS);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const recorder = useRef<MediaRecorder | null>(null);
+  const [rerecord, setRerecord] = useState(false);
 
   const { data: voice, isLoading } = useQuery({
     queryKey: ["my-voice"],
-    queryFn: () => api<VoiceOut>("/api/me/voice", { skipOrg: true }),
+    queryFn: () => api<MyVoice>("/api/me/voice", { skipOrg: true }),
   });
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["my-voice"] });
   const remove = useMutation({
     mutationFn: () => api("/api/me/voice", { method: "DELETE", skipOrg: true }),
     onSuccess: () => {
       setConfirmDelete(false);
-      return queryClient.invalidateQueries({ queryKey: ["my-voice"] });
+      return refresh();
     },
   });
-
-  useEffect(() => () => recorder.current?.stream.getTracks().forEach((track) => track.stop()), []);
-
-  const upload = async (blob: Blob) => {
-    setSaving(true);
-    try {
-      const form = new FormData();
-      const extension = blob.type.includes("mp4") ? "m4a" : blob.type.includes("ogg") ? "ogg" : "webm";
-      form.append("audio", blob, `voz.${extension}`);
-      form.append("consent", "true");
-      await api<VoiceOut>("/api/me/voice", { method: "POST", body: form, skipOrg: true });
-      await queryClient.invalidateQueries({ queryKey: ["my-voice"] });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo guardar la muestra");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const start = async () => {
-    setError(null);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true },
-      });
-      const chunks: Blob[] = [];
-      const media = new MediaRecorder(stream);
-      recorder.current = media;
-      media.ondataavailable = (event) => event.data.size && chunks.push(event.data);
-      media.onstop = () => {
-        stream.getTracks().forEach((track) => track.stop());
-        setRecording(false);
-        void upload(new Blob(chunks, { type: media.mimeType || "audio/webm" }));
-      };
-      media.start();
-      setRecording(true);
-      setLeft(VOICE_SECONDS);
-      const started = Date.now();
-      const tick = window.setInterval(() => {
-        const remaining = VOICE_SECONDS - Math.floor((Date.now() - started) / 1000);
-        setLeft(Math.max(0, remaining));
-        if (remaining <= 0 || media.state !== "recording") {
-          window.clearInterval(tick);
-          if (media.state === "recording") media.stop();
-        }
-      }, 250);
-    } catch (err) {
-      setError(micErrorMessage(err));
-    }
-  };
+  const learning = useMutation({
+    mutationFn: (learn: boolean) =>
+      api("/api/me/voice", { method: "PATCH", skipOrg: true, body: JSON.stringify({ learn_from_meetings: learn }) }),
+    onSuccess: refresh,
+  });
 
   if (isLoading) {
     return <div className="flex justify-center py-10 text-ink-300"><Spinner className="h-5 w-5" /></div>;
   }
 
-  const firstName = (user?.name ?? "").split(" ")[0] || "…";
-
   return (
-    <Card className="space-y-4">
-      <div>
-        <h2 className="text-[15px] font-semibold text-ink-900">Mi voz</h2>
-        <p className="mt-1 text-sm text-ink-500">
-          Grabá tu voz una vez, durante 10 segundos, y Echo te va a reconocer en las reuniones: en el
-          transcript y en el acta aparece tu nombre en lugar de «Persona 1».
-        </p>
-      </div>
+    <div className="space-y-5">
+      <Card className="space-y-4">
+        <div>
+          <h2 className="text-[15px] font-semibold text-ink-900">Mi voz</h2>
+          <p className="mt-1 text-sm text-ink-500">
+            Grabá tu voz una vez, 10 segundos, y Echo te va a reconocer en las reuniones: en el transcript y en el acta
+            aparece tu nombre en lugar de «Persona 1». Se procesa en el servidor de Echo y no se manda a nadie más.
+          </p>
+        </div>
 
-      {voice?.has_sample && !recording && (
-        <div className="flex flex-wrap items-center gap-3 rounded-lg bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800">
-          <span className="min-w-0 flex-1">
+        {voice?.has_sample && (
+          <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
             Tu voz está guardada
-            {voice.recorded_at && ` desde el ${new Date(voice.recorded_at).toLocaleDateString("es")}`}.
-          </span>
-          {confirmDelete ? (
-            <span className="flex items-center gap-2 text-xs">
-              <span className="text-ink-600">¿Borrar tu voz? Echo deja de reconocerte.</span>
-              <button
-                onClick={() => remove.mutate()}
-                disabled={remove.isPending}
-                className="rounded-full bg-red-600 px-3 py-1.5 font-medium text-white hover:bg-red-700"
-              >
-                Sí, borrar
-              </button>
-              <button onClick={() => setConfirmDelete(false)} className="px-2 py-1.5 font-medium text-ink-500">
-                Cancelar
-              </button>
-            </span>
-          ) : (
-            <button
-              onClick={() => setConfirmDelete(true)}
-              className="text-xs font-medium text-emerald-700 hover:text-red-600"
-            >
-              Borrar mi voz
-            </button>
-          )}
-        </div>
-      )}
+            {voice.recorded_at && ` desde el ${new Date(voice.recorded_at).toLocaleDateString("es-AR")}`}.
+            {(voice.learned_count ?? 0) > 0 &&
+              ` Echo ya la mejoró con ${voice.learned_count} reunión${voice.learned_count === 1 ? "" : "es"}.`}
+          </div>
+        )}
 
-      <div className="space-y-3 rounded-xl border border-ink-100 p-4">
-        <p className="text-sm text-ink-600">Cuando toques grabar, leé en voz alta, con tu tono normal:</p>
-        <blockquote className="rounded-lg bg-ink-50 px-3 py-2.5 text-[15px] leading-relaxed text-ink-800">
-          «Hola, soy {firstName}. Estoy grabando mi voz para que Echo me reconozca en las reuniones del
-          colegio. Después de cada reunión, el resumen va a decir quién dijo cada cosa.»
-        </blockquote>
-        <label className="flex items-start gap-2 text-sm text-ink-600">
-          <input
-            type="checkbox"
-            checked={consent}
-            onChange={(event) => setConsent(event.target.checked)}
-            className="mt-0.5 rounded border-ink-300"
+        {voice?.has_sample && (
+          <Switch
+            checked={voice.learn_from_meetings ?? true}
+            onChange={(learn) => learning.mutate(learn)}
+            label="Mejorar el reconocimiento con mis reuniones"
+            hint={
+              voice.learn_from_meetings ?? true
+                ? "Cuando Echo te reconoce con seguridad, suma lo aprendido a tu huella de voz."
+                : "Apagado: Echo usa solo tu grabación. Lo aprendido se olvidó."
+            }
           />
-          <span>
-            Autorizo a Echo a guardar esta muestra de mi voz y a usarla solo para reconocerme en las
-            reuniones. La puedo borrar cuando quiera.
-          </span>
-        </label>
-        <div className="flex flex-wrap items-center gap-3">
-          {recording ? (
-            <Button variant="danger" onClick={() => recorder.current?.stop()}>
-              <span className="recording-dot h-2 w-2 rounded-full bg-white" /> Grabando… {left} s · Listo
-            </Button>
-          ) : (
-            <Button onClick={start} disabled={!consent || saving}>
-              {saving ? <Spinner /> : voice?.has_sample ? "Grabar de nuevo" : "Grabar mi voz"}
-            </Button>
-          )}
-          {!consent && !recording && (
-            <span className="text-xs text-ink-400">Marcá la autorización para poder grabar.</span>
-          )}
-        </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-      </div>
-    </Card>
+        )}
+
+        {voice?.has_sample && !rerecord ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setRerecord(true)}
+              className="min-h-11 rounded-full bg-ink-100 px-4 text-sm font-medium text-ink-800 hover:bg-ink-200"
+            >
+              Grabar de nuevo
+            </button>
+            {confirmDelete ? (
+              <span className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-ink-600">¿Borrar tu voz? Echo deja de reconocerte.</span>
+                <button
+                  onClick={() => remove.mutate()}
+                  disabled={remove.isPending}
+                  className="min-h-11 rounded-full bg-red-600 px-4 font-medium text-white hover:bg-red-700"
+                >
+                  Sí, borrar
+                </button>
+                <button onClick={() => setConfirmDelete(false)} className="min-h-11 px-3 font-medium text-ink-500">
+                  Cancelar
+                </button>
+              </span>
+            ) : (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="min-h-11 rounded-full px-4 text-sm font-medium text-red-600 hover:bg-red-50"
+              >
+                Borrar mi voz
+              </button>
+            )}
+          </div>
+        ) : (
+          <VoiceRecorder onSaved={() => setRerecord(false)} />
+        )}
+      </Card>
+    </div>
   );
 }

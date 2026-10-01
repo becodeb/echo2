@@ -122,6 +122,12 @@ class Speaker(PKMixin, TimestampMixin, Base):
     color: Mapped[str] = mapped_column(String(16), default="#64748b")
     # sugerencia de voice profile: {profile_id, person_name, confidence}
     identity_suggestion: Mapped[dict | None] = mapped_column(JSONB)
+    # La persona de la reunión es este usuario (por su voz, porque lo dijo o a mano).
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    # Cómo se supo el nombre: voz | dijo | ia | manual.
+    name_source: Mapped[str | None] = mapped_column(String(20))
 
     meeting: Mapped["Meeting"] = relationship(back_populates="speakers")
 

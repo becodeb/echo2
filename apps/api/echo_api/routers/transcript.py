@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
 from ..deps import OrgContext, can_edit_meeting, get_meeting_or_404, get_org_context
-from ..models import SegmentRevision, Speaker, TranscriptSegment
+from ..models import OrganizationMember, SegmentRevision, Speaker, TranscriptSegment
 from ..services.audit import audit
 
 router = APIRouter(prefix="/api/meetings/{meeting_id}", tags=["transcript"])
@@ -168,6 +168,9 @@ async def segment_history(
 
 class SpeakerRenameIn(BaseModel):
     display_name: str = Field(min_length=1, max_length=200)
+    # Al confirmar una sugerencia ("¿Es Laura?"), la persona queda vinculada a
+    # ese usuario de la organización.
+    user_id: uuid.UUID | None = None
 
 
 @router.patch("/speakers/{speaker_id}")
@@ -189,6 +192,18 @@ async def rename_speaker(
     if not speaker:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Hablante no encontrado")
     speaker.display_name = data.display_name.strip()
+    speaker.name_source = "manual"
+    speaker.identity_suggestion = None
+    speaker.user_id = None
+    if data.user_id is not None:
+        member = (
+            await db.execute(
+                select(OrganizationMember.user_id).where(
+                    OrganizationMember.organization_id == ctx.org_id, OrganizationMember.user_id == data.user_id
+                )
+            )
+        ).scalar_one_or_none()
+        speaker.user_id = member
     await audit(db, ctx.org_id, ctx.user.id, "speaker.rename", "speaker", str(speaker.id))
     await db.commit()
     return {"id": str(speaker.id), "label": speaker.label, "display_name": speaker.display_name}

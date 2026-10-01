@@ -9,9 +9,8 @@ resultado reemplaza al texto en vivo. Una sola fuente por reunión
   services/plans.py): ElevenLabs Scribe v2 sobre el audio entero. Cada
   palabra trae su tiempo y su persona, así que texto y personas salen del
   MISMO resultado y los turnos se arman de las palabras. Ninguna palabra
-  queda sin persona. Las personas del colegio que grabaron su voz (Ajustes →
-  Mi voz) van delante del audio, separadas por silencios: la persona que
-  Scribe oye en la muestra de alguien es ese alguien, y sale con su nombre.
+  queda sin persona. Después, services/speaker_names.py pone los nombres: lo
+  que cada uno dijo ("hola, soy...") y su voz comparada con "Mi voz".
 - **Sin personas** (Base sin pedirlo, sin créditos, o con menores de 18):
   Groq whisper-large-v3-turbo sobre el audio entero, en partes de 10 min.
 
@@ -30,16 +29,14 @@ audio): queda el texto en vivo, se guarda una copia comprimida del audio
 (como mucho 48 h) y `retry_pending_text` la vuelve a mandar a Groq más tarde.
 Quien grabó recibe un aviso.
 
-`name_speakers` le pide después a la IA que deduzca quién es cada persona sin
-nombre ("Mamá de Pedro"). Si no está segura, queda como sugerencia.
+`name_speakers` le pide después a la IA que deduzca quién es cada persona que
+siga sin nombre, con una lista cerrada de roles ("Mamá de Pedro"). Si no está
+segura, queda sin nombre.
 """
 import asyncio
-import io
 import logging
 import re
 import uuid
-import wave
-from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -55,21 +52,19 @@ from ..models import (
     Meeting,
     MeetingParticipant,
     Notification,
-    OrganizationMember,
     Speaker,
     TranscriptSegment,
     UsageEvent,
     User,
-    UserVoiceSample,
 )
-from . import plans
+from . import plans, speaker_names
 from .ai_settings import get_vocabulary, resolve_stt
 from .recording import pcm_path, recordings_dir
+from .speaker_names import Naming
 from .stt.base import (
     SCRIBE_MODEL,
     SttResult,
     SttSegment,
-    SttWord,
     get_stt_provider,
     pcm16_to_wav,
 )
@@ -89,30 +84,12 @@ BYTES_PER_MS = 32  # PCM16 mono 16 kHz
 PART_MS = 10 * 60 * 1000  # 10 min de WAV ≈ 19 MB, bajo el límite de 25 MB de Groq
 MIN_AUDIO_MS = 5000
 MIN_PART_MS = 3000
-# Muestras de voz conocidas delante del audio: como mucho estas, separadas
-# por este silencio (así Scribe no pega dos muestras en una persona).
-MAX_KNOWN_VOICES = 4
-VOICE_GAP_MS = 1500
-# Una persona es "la de la muestra" si ocupa al menos esto de sus palabras.
-VOICE_MATCH_SHARE = 0.6
 # Reintentos de la separación cuando ElevenLabs falló.
 MAX_PEOPLE_ATTEMPTS = 6
 RETRY_EVERY_SECONDS = 15 * 60
-# Las muestras de "Mi voz" delante del audio: apagado. En la reunión del 27/9
-# partió a Bautista en dos personas y no nombró a nadie (sin la muestra salía
-# 3 de 3); en la del 30/9 ayudó. Hasta probarlo con más reuniones, no se usa.
-KNOWN_VOICES_IN_FINAL_PASS = False
 SPEAKER_COLORS = ["#6366f1", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6"]
 
 Row = tuple[str | None, str, int, int]  # (persona, texto, inicio, fin)
-
-
-@dataclass
-class KnownVoice:
-    label: str
-    user_id: uuid.UUID
-    name: str
-    wav: bytes
 
 
 def _normalize(text: str) -> str:
@@ -143,76 +120,21 @@ def _clean_rows(segments: list[SttSegment], language: str | None) -> list[Row]:
     return rows
 
 
-def voice_prefix(voices: list[KnownVoice]) -> tuple[bytes, list[tuple[KnownVoice, int, int]]]:
-    """Las muestras de voz conocidas en fila, con silencio entre ellas.
-
-    Devuelve el PCM a poner delante de la reunión y dónde quedó cada muestra.
-    """
-    gap = bytes(VOICE_GAP_MS * BYTES_PER_MS)
-    pcm = bytearray()
-    windows: list[tuple[KnownVoice, int, int]] = []
-    for voice in voices[:MAX_KNOWN_VOICES]:
-        samples = _wav_pcm(voice.wav)
-        if not samples:
-            continue
-        pcm += gap
-        start = len(pcm) // BYTES_PER_MS
-        pcm += samples
-        windows.append((voice, start, len(pcm) // BYTES_PER_MS))
-    if windows:
-        pcm += gap
-    return bytes(pcm), windows
-
-
-def _wav_pcm(data: bytes) -> bytes:
-    """PCM16 mono 16 kHz de una muestra de voz (las guarda así routers/my_voice.py)."""
-    try:
-        with wave.open(io.BytesIO(data)) as reader:
-            if reader.getframerate() != SAMPLE_RATE or reader.getsampwidth() != 2 or reader.getnchannels() != 1:
-                return b""
-            return reader.readframes(reader.getnframes())
-    except (wave.Error, EOFError):
-        return b""
-
-
-def assign_known_voices(
-    words: list[SttWord], windows: list[tuple[KnownVoice, int, int]], offset_ms: int
-) -> tuple[list[SttWord], dict[str, KnownVoice]]:
-    """Saca las muestras del principio y dice qué persona de Scribe es cada una.
-
-    Una persona de Scribe es la de una muestra si la mayoría de las palabras
-    dichas en esa muestra son suyas, y si no la reclamó ya otra muestra (dos
-    voces parecidas pegadas en una persona no se nombran: mejor sin nombre
-    que con el equivocado).
-    """
-    known: dict[str, KnownVoice] = {}
-    claimed: set[str] = set()
-    for voice, start, end in windows:
-        inside = [word.speaker for word in words if start <= word.start_ms < end + 300 and word.speaker]
-        if not inside:
-            continue
-        best = max(set(inside), key=inside.count)
-        if inside.count(best) / len(inside) < VOICE_MATCH_SHARE:
-            continue
-        if best in claimed:
-            known.pop(best, None)
-            continue
-        claimed.add(best)
-        known[best] = voice
-    meeting_words = [
-        SttWord(word.text, word.start_ms - offset_ms, word.end_ms - offset_ms, word.speaker, word.logprob)
-        for word in words
-        if word.start_ms >= offset_ms
-    ]
-    return meeting_words, known
-
-
-def rows_from_scribe(
-    result: SttResult, language: str | None, windows: list[tuple[KnownVoice, int, int]], offset_ms: int
-) -> tuple[list[Row], dict[str, KnownVoice]]:
+def rows_from_scribe(result: SttResult, language: str | None) -> list[Row]:
     """Turnos con persona a partir de las palabras de Scribe."""
-    words, known = assign_known_voices(result.words, windows, offset_ms)
-    return _clean_rows(group_words(words), language), known
+    return _clean_rows(group_words(result.words), language)
+
+
+def _pcm_array(path: Path) -> np.ndarray | None:
+    """El audio de trabajo como int16 sin cargarlo entero en memoria."""
+    try:
+        return np.memmap(path, dtype=np.int16, mode="r") if path.stat().st_size >= 2 else None
+    except (OSError, ValueError):
+        return None
+
+
+async def _names(meeting_id: uuid.UUID, rows: list[Row], pcm_file: Path) -> dict[str, Naming]:
+    return await speaker_names.resolve(meeting_id, rows, _pcm_array(pcm_file))
 
 
 # ── Llamadas a los proveedores ───────────────────────────────────
@@ -286,42 +208,6 @@ def _groq_key(config) -> str:
     if config is not None and config.provider == "groq":
         return config.api_key
     return get_settings().groq_api_key
-
-
-async def _known_voices(db, meeting: Meeting) -> list[KnownVoice]:
-    """Personas del colegio que grabaron su voz y probablemente están en la reunión."""
-    participants = (
-        (await db.execute(select(MeetingParticipant).where(MeetingParticipant.meeting_id == meeting.id)))
-        .scalars()
-        .all()
-    )
-    wanted: list[uuid.UUID] = [meeting.created_by]
-    wanted += [p.user_id for p in participants if p.user_id]
-    names = {p.name.strip().lower() for p in participants if p.name}
-    if names:
-        members = (
-            await db.execute(
-                select(User.id, User.name)
-                .join(OrganizationMember, OrganizationMember.user_id == User.id)
-                .where(OrganizationMember.organization_id == meeting.organization_id)
-            )
-        ).all()
-        wanted += [user_id for user_id, name in members if (name or "").strip().lower() in names]
-    unique = list(dict.fromkeys(wanted))
-    rows = (
-        await db.execute(
-            select(UserVoiceSample, User)
-            .join(User, User.id == UserVoiceSample.user_id)
-            .where(UserVoiceSample.user_id.in_(unique))
-        )
-    ).all()
-    by_user = {user.id: (sample, user) for sample, user in rows}
-    voices = []
-    for user_id in unique:
-        if user_id in by_user and len(voices) < MAX_KNOWN_VOICES:
-            sample, user = by_user[user_id]
-            voices.append(KnownVoice(f"voz_{len(voices) + 1}", user.id, user.name, sample.audio_wav))
-    return voices
 
 
 async def _vocabulary(db, meeting: Meeting) -> list[str]:
@@ -417,11 +303,6 @@ async def diarize_meeting(meeting_id: uuid.UUID) -> bool:
         await db.commit()
         config = await resolve_stt(db, meeting.organization_id)
         vocabulary = await _vocabulary(db, meeting)
-        known = (
-            await _known_voices(db, meeting)
-            if decision.provider == "elevenlabs" and KNOWN_VOICES_IN_FINAL_PASS
-            else []
-        )
         language = meeting.language if meeting.language and meeting.language != "auto" else "es"
 
     live = await _live_rows(meeting_id)
@@ -431,12 +312,11 @@ async def diarize_meeting(meeting_id: uuid.UUID) -> bool:
     after = _after_audio(live, total_ms)
 
     if decision.provider == "elevenlabs":
-        people = await _people_pass(
-            meeting_id, path, language, vocabulary, known, decision, organization_id, created_by, total_ms, hold_id
+        rows = await _people_pass(
+            meeting_id, path, language, vocabulary, decision, organization_id, created_by, total_ms, hold_id
         )
-        if people is not None:
-            rows, voices = people
-            await _replace_transcript(meeting_id, rows + after, voices)
+        if rows is not None:
+            await _replace_transcript(meeting_id, rows + after, await _names(meeting_id, rows, path))
             return True
 
     # Sin personas (o ElevenLabs falló): texto de Groq, sin etiquetar a nadie.
@@ -624,43 +504,27 @@ async def _people_pass(
     path: Path,
     language: str,
     vocabulary: list[str],
-    known: list[KnownVoice],
     decision: "plans.FinalPass",
     organization_id: uuid.UUID,
     created_by: uuid.UUID,
     total_ms: int,
     hold_id: uuid.UUID | None = None,
-) -> tuple[list[Row], dict[str, KnownVoice]] | None:
+) -> list[Row] | None:
     """Scribe sobre la reunión entera.
 
     None = no hay personas: falló y quedó pendiente de reintento (con los
     créditos reservados), o no se pudo / no devolvió nada (créditos devueltos).
     """
-    prefix, windows = voice_prefix(known)
-    offset_ms = len(prefix) // BYTES_PER_MS
-    folder = recordings_dir()
-    prefix_file = folder / f"{meeting_id}.voices.pcm"
     audio = people_path(meeting_id)
     try:
-        sources = [path]
-        if prefix:
-            prefix_file.write_bytes(prefix)
-            sources = [prefix_file, path]
-        await _encode_mp3(sources, audio)
+        await _encode_mp3([path], audio)
     except Exception as exc:  # noqa: BLE001 - sin mp3 no hay pasada con personas
         log.warning("no se pudo preparar el audio de %s para ElevenLabs: %s", meeting_id, exc)
         audio.unlink(missing_ok=True)
         await _release_hold(hold_id)
         return None
-    finally:
-        prefix_file.unlink(missing_ok=True)
 
     retry = {
-        "offset_ms": offset_ms,
-        "voices": [
-            {"label": voice.label, "user_id": str(voice.user_id), "name": voice.name, "start_ms": start, "end_ms": end}
-            for voice, start, end in windows
-        ],
         "credits": decision.credits,
         "covered_by": decision.covered_by,
         "total_ms": total_ms,
@@ -674,7 +538,7 @@ async def _people_pass(
         await _update_meta(meeting_id, people_status="pending", people_retry=retry)
         return None
     audio.unlink(missing_ok=True)
-    rows, voices = rows_from_scribe(result, language, windows, offset_ms)
+    rows = rows_from_scribe(result, language)
     if not rows:
         # Scribe no oyó nada: no se borra el texto en vivo ni se cobra.
         log.warning("ElevenLabs devolvió una transcripción vacía en %s", meeting_id)
@@ -682,7 +546,7 @@ async def _people_pass(
         await _update_meta(meeting_id, people_status="failed", people_retry=None)
         return None
     await _charge(meeting_id, organization_id, created_by, retry, result)
-    return rows, voices
+    return rows
 
 
 async def _charge(
@@ -692,7 +556,7 @@ async def _charge(
 
     Los créditos ya estaban reservados al decidir: la reserva pasa a ser el consumo.
     """
-    seconds = (retry["total_ms"] + retry["offset_ms"]) / 1000
+    seconds = (retry["total_ms"] + int(retry.get("offset_ms") or 0)) / 1000
     cost = plans.stt_cost("elevenlabs", SCRIBE_MODEL, seconds, keyterms=True, entities=True)
     async with SessionLocal() as db:
         hold = await db.get(UsageEvent, uuid.UUID(retry["hold_id"])) if retry.get("hold_id") else None
@@ -779,18 +643,26 @@ async def retry_pending_people() -> int:
             else:
                 await _update_meta(meeting_id, people_retry={**retry, "attempts": attempts})
             continue
-        audio.unlink(missing_ok=True)
-        windows = [
-            (KnownVoice(v["label"], uuid.UUID(v["user_id"]), v["name"], b""), v["start_ms"], v["end_ms"])
-            for v in retry.get("voices") or []
-        ]
-        rows, voices = rows_from_scribe(result, language, windows, int(retry.get("offset_ms") or 0))
+        rows = rows_from_scribe(result, language)
         if not rows:
+            audio.unlink(missing_ok=True)
             await _release_hold(retry.get("hold_id"))
             await _update_meta(meeting_id, people_status="failed", people_retry=None)
             continue
+        # Los nombres por voz necesitan el audio: se descomprime la copia, se
+        # usa y se borra junto con ella.
+        pcm = audio.with_name(f"{meeting_id}.people.pcm")
+        try:
+            await _decode_mp3(audio, pcm)
+            names = await _names(meeting_id, rows, pcm)
+        except Exception as exc:  # noqa: BLE001 - sin nombres por voz, sigue igual
+            log.warning("sin nombres por voz en el reintento de %s: %s", meeting_id, exc)
+            names = {}
+        finally:
+            pcm.unlink(missing_ok=True)
+            audio.unlink(missing_ok=True)
         after = _after_audio(await _live_rows(meeting_id), int(retry.get("total_ms") or 0))
-        if not await _replace_transcript(meeting_id, rows + after, voices, only_if_unedited=True):
+        if not await _replace_transcript(meeting_id, rows + after, names, only_if_unedited=True):
             # Lo corrigieron a mano mientras ElevenLabs procesaba.
             await _release_hold(retry.get("hold_id"))
             await _update_meta(meeting_id, people_status="skipped", people_retry=None)
@@ -846,7 +718,7 @@ async def retry_loop(interval_seconds: int = RETRY_EVERY_SECONDS) -> None:
 
 
 async def _replace_transcript(
-    meeting_id: uuid.UUID, final: list[Row], known: dict[str, KnownVoice], only_if_unedited: bool = False
+    meeting_id: uuid.UUID, final: list[Row], names: dict[str, Naming], only_if_unedited: bool = False
 ) -> bool:
     """Reemplaza el transcript en vivo por el final, con sus personas.
 
@@ -876,13 +748,18 @@ async def _replace_transcript(
         for label, *_ in final:
             if label is None or label in speakers:
                 continue
-            voice = known.get(label)
-            if voice is None:
-                unnamed += 1
+            naming = names.get(label)
+            unnamed += 1
+            accepted = naming is not None and naming.accepted
             speakers[label] = Speaker(
                 meeting_id=meeting_id,
-                label=(voice.name if voice else f"Persona {unnamed}")[:60],
-                display_name=voice.name if voice else None,
+                label=f"Persona {unnamed}",
+                display_name=naming.name[:200] if accepted else None,
+                user_id=naming.user_id if accepted else None,
+                name_source=naming.source if accepted else None,
+                identity_suggestion=(
+                    naming.suggestion() if naming is not None and (not accepted or naming.extra) else None
+                ),
                 color=SPEAKER_COLORS[len(speakers) % len(SPEAKER_COLORS)],
             )
             db.add(speakers[label])
@@ -914,11 +791,27 @@ def _mentioned(name: str, heard: set[str]) -> bool:
     """Alguna palabra del nombre (de 3+ letras) se dijo en la reunión."""
     return any(len(word) >= 3 and word in heard for word in _normalize(name).split())
 
-NAMING_SYSTEM = """Identificás a las personas que hablan en la transcripción de una reunión de un colegio.
+# Los únicos roles que puede poner la IA (sin "persona del ambiente" ni
+# "personal del colegio"): un rol inventado confunde más que "Persona 1".
+ROLES = (
+    "directora", "director", "vicedirectora", "vicedirector", "secretaria", "secretario",
+    "coordinadora", "coordinador", "docente", "maestra", "maestro", "profesora", "profesor",
+    "preceptora", "preceptor", "psicopedagoga", "psicopedagogo", "psicóloga", "psicólogo",
+    "orientadora", "orientador", "fonoaudióloga", "acompañante terapéutica", "madre", "padre",
+    "tutora", "tutor", "abuela", "abuelo", "alumna", "alumno",
+)
+_ROLE = re.compile(
+    r"^(?:(?:" + "|".join(ROLES) + r")(?: de [a-záéíóúñ]+)?|(?:mamá|papá|madre|padre|abuela|abuelo|tutora|tutor|"
+    r"hermana|hermano) de .{2,60})$",
+    re.IGNORECASE,
+)
+
+NAMING_SYSTEM = f"""Identificás a las personas que hablan en la transcripción de una reunión de un colegio.
 Usá solo lo que surge de la conversación y del contexto. Nunca inventes nombres: si nadie dice
 cómo se llama una persona y no es inequívoco por el contexto, dejá "name" en null.
-"role" es un rol corto en castellano (directora, docente, maestra de inglés, madre de Pedro,
-padre, psicopedagoga, coordinadora...) o null si no se sabe."""
+"role" tiene que ser uno de estos, o null si no es claro: {", ".join(ROLES)}; también
+"<rol> de <materia o nombre>" (maestra de inglés, mamá de [ALUMNO_1]). Nunca otro rol.
+Si no estás seguro, null en los dos."""
 
 
 async def name_speakers(meeting_id: uuid.UUID, provider) -> int:
@@ -950,7 +843,7 @@ async def name_speakers(meeting_id: uuid.UUID, provider) -> int:
         creator = await db.get(User, meeting.created_by)
         context = [f"Reunión: {meeting.title}"]
         if creator:
-            context.append(f"La grabó: {creator.name} (personal del colegio)")
+            context.append(f"La grabó: {creator.name}")
         if participants:
             context.append(
                 "Participantes anotados: "
@@ -1000,12 +893,18 @@ async def name_speakers(meeting_id: uuid.UUID, provider) -> int:
             speaker.label: speaker
             for speaker in (await db.execute(select(Speaker).where(Speaker.meeting_id == meeting_id))).scalars()
         }
+        roles = [str(entry.get("role") or "").strip().lower() for entry in entries]
         for entry in entries:
             speaker = by_label.get(str(entry.get("label") or ""))
             if speaker is None or speaker.display_name:
                 continue
             name = (entry.get("name") or "").strip() or None
             role = (entry.get("role") or "").strip() or None
+            if role and not _ROLE.match(role):
+                role = None
+            if role and not name and roles.count(role.lower()) > 1:
+                # Dos "docente" no dicen quién es quién: mejor sin nombre.
+                role = None
             try:
                 confidence = float(entry.get("confidence") or 0)
             except (TypeError, ValueError):
@@ -1021,8 +920,10 @@ async def name_speakers(meeting_id: uuid.UUID, provider) -> int:
                 confidence = min(confidence, 0.74)
             if confidence >= 0.75:
                 speaker.display_name = shown[:200]
+                speaker.name_source = "ia"
                 count += 1
-            elif confidence >= 0.4:
+            elif confidence >= 0.4 and not speaker.identity_suggestion:
+                # Una sugerencia por voz vale más que la de la IA: no se pisa.
                 speaker.identity_suggestion = {"person_name": shown[:200], "confidence": round(confidence, 2), "source": "ia"}
         await db.commit()
     return count

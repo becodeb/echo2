@@ -83,6 +83,9 @@ class SpeakerOut(BaseModel):
     display_name: str | None
     color: str
     identity_suggestion: dict | None
+    user_id: uuid.UUID | None = None
+    # Cómo se supo el nombre: voz | dijo | ia | manual.
+    name_source: str | None = None
 
     class Config:
         from_attributes = True

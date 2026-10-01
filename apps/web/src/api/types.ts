@@ -55,7 +55,18 @@ export interface SpeakerOut {
   label: string;
   display_name: string | null;
   color: string;
-  identity_suggestion: { profile_id?: string; person_name?: string; confidence?: number } | null;
+  identity_suggestion: {
+    person_name?: string;
+    confidence?: number;
+    user_id?: string | null;
+    /** voz | dijo | ia */
+    source?: string;
+    /** Dijo un nombre pero la voz parece de otra persona: para revisar. */
+    voice_says?: string;
+  } | null;
+  user_id?: string | null;
+  /** Cómo se supo el nombre: voz | dijo | ia | manual. */
+  name_source?: string | null;
 }
 
 export interface MeetingOut {

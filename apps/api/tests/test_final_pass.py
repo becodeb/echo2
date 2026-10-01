@@ -20,7 +20,6 @@ from test_speakers import _tone
 from echo_api.config import get_settings
 from echo_api.services import diarization
 from echo_api.services import recording as rec
-from echo_api.services.stt.base import SttWord
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -129,8 +128,11 @@ def test_meeting_of_the_27th_comes_out_with_its_three_people(client, monkeypatch
     # El nombre de quien grabó va como término del diccionario.
     assert "Bautista Goñi" in form["keyterms"]
     rows, meeting = _transcript(client, user, meeting_id)
+    # Quien grabó dijo "yo soy Bautista Goñi": sale con su nombre. Vanina y "el
+    # Choto" no son de la organización ni están anotados: siguen sin nombre.
     assert [name for name, _ in rows] == [
-        "Persona 1", "Persona 2", "Persona 1", "Persona 3", "Persona 1", "Persona 3", "Persona 1", "Persona 2",
+        "Bautista Goñi", "Persona 2", "Bautista Goñi", "Persona 3", "Bautista Goñi", "Persona 3", "Bautista Goñi",
+        "Persona 2",
     ]
     assert rows[1] == ("Persona 2", "Hola, hola, hola, soy Vanina.")
     assert rows[5] == ("Persona 3", "El Choto.")
@@ -337,71 +339,6 @@ def test_the_last_credit_is_spent_once_when_two_meetings_end_together(client, mo
 def test_lines_after_the_audio_keep_no_live_label():
     live = [(0, 1000, "dentro", "speaker_1"), (30000, 31000, "después", "speaker_1")]
     assert diarization._after_audio(live, 20000) == [(None, "después", 30000, 31000)]
-
-
-def test_the_voice_sample_in_front_names_that_person():
-    voice = diarization.KnownVoice("voz_1", uuid.uuid4(), "Mariana Gibson", b"")
-    other = diarization.KnownVoice("voz_2", uuid.uuid4(), "Laura Pérez", b"")
-    windows = [(voice, 1500, 6500), (other, 8000, 13000)]
-    words = [
-        SttWord("Hola", 2000, 2500, "speaker_1"), SttWord("soy", 2600, 2900, "speaker_1"),
-        SttWord("Mariana", 3000, 3500, "speaker_1"),
-        # La segunda muestra cayó en la misma persona: no se nombra a nadie por ella.
-        SttWord("Soy", 8500, 9000, "speaker_1"), SttWord("Laura", 9000, 9500, "speaker_1"),
-        SttWord("Buenos", 15000, 15400, "speaker_2"), SttWord("días.", 15400, 15800, "speaker_2"),
-        SttWord("Hola.", 16000, 16400, "speaker_1"),
-    ]
-    meeting_words, known = diarization.assign_known_voices(words, windows, 14500)
-    assert known == {}
-    assert [(w.text, w.start_ms) for w in meeting_words] == [("Buenos", 500), ("días.", 900), ("Hola.", 1500)]
-
-    words[3] = SttWord("Soy", 8500, 9000, "speaker_3")
-    words[4] = SttWord("Laura", 9000, 9500, "speaker_3")
-    _, known = diarization.assign_known_voices(words, windows, 14500)
-    assert {label: v.name for label, v in known.items()} == {"speaker_1": "Mariana Gibson", "speaker_3": "Laura Pérez"}
-
-
-def test_known_voices_are_off_in_the_final_pass():
-    # En la reunión del 27/9 empeoraba la separación: apagado hasta probarlo más.
-    assert diarization.KNOWN_VOICES_IN_FINAL_PASS is False
-
-
-def test_known_voice_goes_in_front_of_the_meeting_audio(client, monkeypatch):
-    import io
-    import wave
-
-    _setup(monkeypatch, "2026-09-27")
-    monkeypatch.setattr(diarization, "KNOWN_VOICES_IN_FINAL_PASS", True)
-    user, meeting_id = _meeting(client, 20.4, [(0, 20400, "hola", None)], people=True)
-    buffer = io.BytesIO()
-    with wave.open(buffer, "wb") as out:
-        out.setnchannels(1)
-        out.setsampwidth(2)
-        out.setframerate(16000)
-        out.writeframes(_tone(5.0))
-    saved = client.post(
-        "/api/me/voice", files={"audio": ("voz.wav", buffer.getvalue(), "audio/wav")}, data={"consent": "true"},
-        headers={"Authorization": f"Bearer {user.token}"},
-    )
-    assert saved.status_code == 200, saved.text
-    # Scribe oye primero la muestra (1,5 s de silencio, la voz, 1,5 s) y después la reunión:
-    # la persona de la muestra es la speaker_0 del fixture (Bautista).
-    fixture = _fixture("scribe_2026-09-27.json")
-    shift = (1.5 + 5.0 + 1.5)
-    for word in fixture["words"]:
-        word["start"] += shift
-        word["end"] += shift
-    fixture["words"][:0] = [
-        {"text": "Hola,", "start": 2.0, "end": 2.4, "type": "word", "speaker_id": fixture["words"][0]["speaker_id"]},
-        {"text": "soy", "start": 2.5, "end": 2.8, "type": "word", "speaker_id": fixture["words"][0]["speaker_id"]},
-    ]
-    _FakeApis.scribe = fixture
-    assert asyncio.run(diarization.diarize_meeting(meeting_id)) is True
-    monkeypatch.undo()
-    rows, _ = _transcript(client, user, meeting_id)
-    assert rows[0] == ("Bautista Goñi", "Hola, sí, ¿quién es? Yo soy-- hola, yo soy Bautista Goñi.")
-    assert {name for name, _ in rows} == {"Bautista Goñi", "Persona 1", "Persona 2"}
-    _cleanup(meeting_id)
 
 
 def test_an_imported_audio_goes_through_the_final_pass(client, monkeypatch, tmp_path):

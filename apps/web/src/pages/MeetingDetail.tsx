@@ -585,14 +585,15 @@ function SpeakerEditor({ meeting, onChanged }: { meeting: MeetingOut; onChanged:
 
   if (meeting.speakers.length === 0) return null;
 
-  const rename = async (speakerId: string) => {
+  const rename = async (speakerId: string, displayName = name, userId: string | null = null) => {
     await api(`/api/meetings/${meeting.id}/speakers/${speakerId}`, {
       method: "PATCH",
-      body: JSON.stringify({ display_name: name }),
+      body: JSON.stringify({ display_name: displayName, user_id: userId }),
     });
     setRenaming(null);
     onChanged();
   };
+  const byVoice = meeting.speakers.some((speaker) => speaker.name_source === "voz");
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -627,17 +628,51 @@ function SpeakerEditor({ meeting, onChanged }: { meeting: MeetingOut; onChanged:
             >
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: speaker.color }} />
               {speaker.display_name || speaker.label}
-              {speaker.identity_suggestion?.person_name && !speaker.display_name && (
-                <span className="text-ink-400">
-                  ¿{speaker.identity_suggestion.person_name}?{" "}
-                  {Math.round((speaker.identity_suggestion.confidence ?? 0) * 100)}%
-                </span>
-              )}
+              {speaker.name_source === "voz" && <VoiceMark title="Reconocida por su voz (Mi voz)" />}
+              {speaker.name_source === "dijo" && <span className="text-ink-400" title="Lo dijo al empezar">· lo dijo</span>}
             </button>
+          )}
+          {renaming !== speaker.id && !speaker.display_name && speaker.identity_suggestion?.person_name && (
+            <button
+              onClick={() =>
+                rename(
+                  speaker.id,
+                  speaker.identity_suggestion?.person_name ?? "",
+                  speaker.identity_suggestion?.user_id ?? null,
+                )
+              }
+              className="ml-1 inline-flex min-h-8 items-center gap-1 rounded-full bg-accent-50 px-2.5 py-1 text-xs font-medium text-accent-700 hover:bg-accent-100"
+              title="Confirmar"
+            >
+              ¿Es {speaker.identity_suggestion.person_name}? Sí
+            </button>
+          )}
+          {speaker.identity_suggestion?.voice_says && (
+            <span className="ml-1 text-xs text-amber-700">(la voz parece de {speaker.identity_suggestion.voice_says})</span>
           )}
         </span>
       ))}
+      {byVoice && (
+        <span className="basis-full text-xs text-ink-400">
+          <VoiceMark /> = reconocida por su voz. Si algo está mal, tocá el nombre y corregilo.
+        </span>
+      )}
     </div>
+  );
+}
+
+function VoiceMark({ title }: { title?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className="inline h-3.5 w-3.5 text-accent-600" aria-label={title ?? "por su voz"} role="img">
+      {title && <title>{title}</title>}
+      <path
+        d="M2 8h1.5M5 5v6M8 3v10M11 5.5v5M14 8h-1.5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        fill="none"
+      />
+    </svg>
   );
 }
 

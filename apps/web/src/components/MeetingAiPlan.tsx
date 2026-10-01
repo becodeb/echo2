@@ -47,6 +47,8 @@ export function MeetingAiPlan({
   }
 
   const { features } = billing;
+  const separates =
+    !minors && billing.people.available && (billing.people.mode === "always" || (billing.people.mode !== "none" && people));
   return (
     <section
       className="overflow-hidden rounded-2xl border border-ink-100 bg-white"
@@ -112,6 +114,12 @@ export function MeetingAiPlan({
           />
         )}
       </ul>
+      {separates && (
+        <p className="border-t border-ink-100 bg-accent-50/60 px-4 py-2.5 text-xs text-accent-700">
+          Para que Echo ponga los nombres, que cada uno diga <strong>«Hola, soy…»</strong> al empezar. Quien grabó su
+          voz en Mi voz aparece con su nombre solo.
+        </p>
+      )}
       <div className="border-t border-ink-100 px-4 py-3">
         <Toggle
           checked={minors}
@@ -128,8 +136,7 @@ export function MeetingAiPlan({
   );
 }
 
-const NO_AI =
-  "Falta configurar la IA de la organización (Ajustes → IA y transcripción).";
+const NO_AI = "La IA no está disponible por ahora.";
 
 function PeopleRow({
   billing,
