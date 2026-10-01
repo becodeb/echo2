@@ -189,7 +189,7 @@ export function CompareTable({ plans }: { plans: PublicPlan[] }) {
   const specs = planSpecs(plans);
   const rows = compareRows(plans);
   return (
-    <div className="overflow-x-auto rounded-3xl border border-ink-100 bg-white">
+    <div className="relative overflow-x-auto rounded-3xl border border-ink-100 bg-white">
       <table className="w-full min-w-[640px] text-left text-sm">
         <caption className="sr-only">Comparar planes</caption>
         <thead>
