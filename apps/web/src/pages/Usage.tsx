@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { SegmentedToggle } from "../components/Toggles";
-import { AnimatedNumber, formatAudio, formatTokens, formatUSD, Shimmer } from "../components/billing";
+import { Link } from "react-router-dom";
+import { AnimatedNumber, formatAudio, formatTokens, formatUSD, renewsLabel, Shimmer, useBilling } from "../components/billing";
 import { currentMonth } from "../lib/months";
 
 export { currentMonth };
@@ -196,9 +197,93 @@ function sum(lines: UsageLine[]) {
   return [...merged.values()].sort((a, b) => b.cost_usd - a.cost_usd);
 }
 
+/** Una barra de "cuánto queda": verde con aire, ámbar cuando falta poco. */
+function LeftBar({ used, total }: { used: number; total: number }) {
+  const share = total > 0 ? Math.min(1, Math.max(0, used / total)) : 0;
+  return (
+    <div className="mt-3 h-2 overflow-hidden rounded-full bg-ink-100" aria-hidden>
+      <div
+        className={`h-full rounded-full transition-[width] duration-700 ${share > 0.85 ? "bg-amber-500" : "bg-ink-900"}`}
+        style={{ width: `${Math.round(share * 100)}%` }}
+      />
+    </div>
+  );
+}
+
+/** Lo que le queda a la persona este mes (§4.9): quién habló y voz, con barras. */
+function WhatIsLeft() {
+  const { data: billing } = useBilling();
+  const { data: voice } = useQuery({
+    queryKey: ["voice-status"],
+    queryFn: () => api<{ allowed: boolean; seconds_total: number | null; seconds_left: number | null; seconds_used: number }>(
+      "/api/voice/status",
+    ),
+  });
+  if (!billing) return <Shimmer className="h-[132px]" />;
+  const people = billing.people;
+  const userPlan = billing.plans.find((plan) => plan.code === billing.user_plan);
+  const hoursTotal = userPlan?.limits.people_hours_per_month;
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div className="rounded-3xl border border-ink-100 bg-white p-5">
+        <p className="text-xs font-medium text-ink-400">Quién habló</p>
+        {people.mode === "always" && people.source === "individual" && people.people_hours_left != null && hoursTotal ? (
+          <>
+            <p className="mt-2 text-[22px] font-semibold tracking-tight text-ink-900">
+              Te quedan {formatHours(people.people_hours_left)}
+            </p>
+            <LeftBar used={hoursTotal - people.people_hours_left} total={hoursTotal} />
+            <p className="mt-2 text-xs text-ink-500">De {hoursTotal} h este mes. Se renuevan el {renewsLabel(billing.renews_at)}.</p>
+          </>
+        ) : people.mode === "always" ? (
+          <p className="mt-2 text-[17px] font-semibold tracking-tight text-ink-900">En todas tus reuniones</p>
+        ) : (
+          <>
+            <p className="mt-2 text-[22px] font-semibold tracking-tight text-ink-900">
+              Te quedan {people.credits_left ?? 0} {people.credits_left === 1 ? "reunión" : "reuniones"}
+            </p>
+            <LeftBar used={(people.credits_per_month ?? 0) - (people.credits_left ?? 0)} total={people.credits_per_month ?? 0} />
+            <p className="mt-2 text-xs text-ink-500">
+              De {people.credits_per_month} este mes (una de más de 1 h usa dos). Se renuevan el {renewsLabel(billing.renews_at)}.
+            </p>
+          </>
+        )}
+      </div>
+      <div className="rounded-3xl border border-ink-100 bg-white p-5">
+        <p className="text-xs font-medium text-ink-400">Hablar con Echo</p>
+        {voice?.allowed && voice.seconds_total != null && voice.seconds_left != null ? (
+          <>
+            <p className="mt-2 text-[22px] font-semibold tracking-tight text-ink-900">
+              Te quedan {Math.floor(voice.seconds_left / 60)} min
+            </p>
+            <LeftBar used={voice.seconds_total - voice.seconds_left} total={voice.seconds_total} />
+            <p className="mt-2 text-xs text-ink-500">De {Math.round(voice.seconds_total / 60)} min este mes.</p>
+          </>
+        ) : voice?.allowed ? (
+          <p className="mt-2 text-[17px] font-semibold tracking-tight text-ink-900">Sin tope</p>
+        ) : (
+          <p className="mt-2 text-sm text-ink-600">
+            Viene en el plan Individual + voz.{" "}
+            <Link to="/plans" className="font-medium text-ink-900 underline-offset-2 hover:underline">
+              Ver planes
+            </Link>
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function formatHours(hours: number): string {
+  if (hours >= 1) return `${hours.toLocaleString("es-AR", { maximumFractionDigits: 1 })} h`;
+  return `${Math.round(hours * 60)} min`;
+}
+
 export default function Usage() {
-  const { activeOrg } = useAuth();
+  const { activeOrg, user } = useAuth();
   const isAdmin = activeOrg?.role === "owner" || activeOrg?.role === "admin";
+  // Dólares y tokens: para quien administra un colegio (o Becode), no para cada persona.
+  const showMoney = !!user?.is_superadmin || (isAdmin && !activeOrg?.is_personal);
   const [month, setMonth] = useState(currentMonth);
   const [scope, setScope] = useState<"me" | "org">("me");
   const effectiveScope = isAdmin && !activeOrg?.is_personal ? scope : "me";
@@ -245,6 +330,18 @@ export default function Usage() {
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[0, 1, 2, 3].map((index) => <Shimmer key={index} className="h-[104px]" />)}
           </div>
+        ) : !showMoney ? (
+          <div className="space-y-3">
+            <WhatIsLeft />
+            <div className="grid grid-cols-2 gap-3">
+              <Stat label="Audio transcripto">
+                <AnimatedNumber value={audio} format={formatAudio} />
+              </Stat>
+              <Stat label="Reuniones con quién habló">
+                <AnimatedNumber value={data.total_credits} />
+              </Stat>
+            </div>
+          </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Stat label="Costo estimado">
@@ -263,10 +360,12 @@ export default function Usage() {
         )}
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1.2fr]">
-          <section className="rounded-3xl border border-ink-100 bg-white p-6">
-            <h2 className="mb-5 text-[15px] font-semibold text-ink-900">Por servicio</h2>
-            {isLoading ? <Shimmer className="h-40" /> : <Breakdown lines={lines} />}
-          </section>
+          {showMoney && (
+            <section className="rounded-3xl border border-ink-100 bg-white p-6">
+              <h2 className="mb-5 text-[15px] font-semibold text-ink-900">Por servicio</h2>
+              {isLoading ? <Shimmer className="h-40" /> : <Breakdown lines={lines} />}
+            </section>
+          )}
           {effectiveScope === "org" && data && (
             <section className="rounded-3xl border border-ink-100 bg-white p-6">
               <h2 className="mb-5 text-[15px] font-semibold text-ink-900">Por persona</h2>
@@ -274,15 +373,12 @@ export default function Usage() {
             </section>
           )}
           {effectiveScope === "me" && (
-            <section className="rounded-3xl border border-ink-100 bg-ink-50/50 p-6 text-sm leading-relaxed text-ink-500">
+            <section className="rounded-3xl border border-ink-100 bg-ink-50/50 p-6 text-sm leading-relaxed text-ink-500 lg:col-span-2">
               <h2 className="mb-3 text-[15px] font-semibold text-ink-900">Cómo se cuenta</h2>
               <p>
-                Cada minuto de audio que Echo transcribe y cada pedido a la IA tiene un costo. Lo mostramos en dólares,
-                al precio de cada servicio, para que sepas qué se usa y cuánto.
-              </p>
-              <p className="mt-3">
-                Una reunión con quién habló gasta un crédito (dos si dura más de una hora). La IA de un modelo sin precio
-                publicado se cuenta en tokens.
+                Todas las reuniones se transcriben. En el plan Gratis, separar quién habló usa una reunión de las del mes
+                (dos si dura más de una hora); en los planes pagos se cuenta en horas. La voz de Echo se cuenta en
+                minutos. Todo se renueva el 1° de cada mes.
               </p>
             </section>
           )}
