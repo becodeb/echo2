@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { AdminOrgOut, ServerAIOut, ServerAITestOut } from "../api/types";
@@ -398,12 +398,14 @@ export default function Admin() {
     const hash = window.location.hash.replace("#", "");
     return (TABS.find((item) => item.id === hash)?.id ?? "organizaciones") as Tab;
   });
+  // Por el router (no con history directo): así un link a otra pestaña del
+  // panel (por ejemplo, una notificación de un pedido) con el panel ya abierto
+  // también la cambia, aunque la página no se monte de nuevo.
+  const navigate = useNavigate();
   const setTab = (next: Tab) => {
     setTabState(next);
-    window.history.replaceState(null, "", `#${next}`);
+    navigate({ hash: next }, { replace: true });
   };
-  // Un link a otra pestaña del panel (por ejemplo, una notificación de un
-  // pedido) con el panel ya abierto: solo cambia el #, la página no se monta de nuevo.
   const { hash } = useLocation();
   useEffect(() => {
     const target = TABS.find((item) => item.id === hash.replace("#", ""));
