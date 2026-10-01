@@ -42,6 +42,7 @@ const KIND_LABEL: Record<string, string> = {
   stt_final: "Al terminar",
   llm: "IA",
   voice: "Voz",
+  embeddings: "Índice del chat",
 };
 
 const PROVIDER_LABEL: Record<string, string> = {

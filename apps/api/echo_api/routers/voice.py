@@ -123,14 +123,30 @@ async def _already_recorded(db: AsyncSession, conversation_id: str) -> bool:
     ).first() is not None
 
 
+def _llm_price(details: dict) -> float | None:
+    """Lo que ElevenLabs cobró aparte por el LLM del agente, si lo informa."""
+    price = ((details.get("metadata") or {}).get("charging") or {}).get("llm_price")
+    return float(price) if isinstance(price, int | float) and not isinstance(price, bool) else None
+
+
 async def _record(
-    db: AsyncSession, conversation_id: str, seconds: float, user_id: uuid.UUID, org_id: uuid.UUID | None, source: str
+    db: AsyncSession,
+    conversation_id: str,
+    seconds: float,
+    user_id: uuid.UUID,
+    org_id: uuid.UUID | None,
+    source: str,
+    details: dict | None = None,
 ) -> None:
+    llm_usd = _llm_price(details or {})
     await plans.record_usage(
         db, kind="voice", provider="elevenlabs", model=voice_agent.TTS_MODEL, unit="voice_seconds",
-        quantity=round(seconds, 1), cost_usd=voice_agent.voice_cost(seconds),
+        quantity=round(seconds, 1), cost_usd=voice_agent.voice_cost(seconds) + (llm_usd or 0.0),
         organization_id=org_id, user_id=user_id,
-        meta={"conversation_id": conversation_id, "measured_by": source, "llm": voice_agent.AGENT_LLM},
+        meta={
+            "conversation_id": conversation_id, "measured_by": source, "llm": voice_agent.AGENT_LLM,
+            **({"llm_usd": llm_usd} if llm_usd is not None else {}),
+        },
     )
 
 
@@ -169,7 +185,7 @@ async def end_session(data: EndIn, ctx: OrgContext = Depends(get_org_context), d
     if details.get("status") not in ("done", "failed") or seconds is None:
         # Todavía abierta: anotar ahora dejaría gratis el resto de la charla.
         return EndOut(seconds=0, seconds_left=left(), pending=True)
-    await _record(db, data.conversation_id, float(seconds), ctx.user.id, ctx.org_id, "elevenlabs")
+    await _record(db, data.conversation_id, float(seconds), ctx.user.id, ctx.org_id, "elevenlabs", details)
     await db.commit()
     return EndOut(seconds=float(seconds), seconds_left=left(float(seconds)))
 
@@ -203,7 +219,7 @@ async def reconcile_voice_usage() -> int:
                 continue
             if await db.get(User, user_id) is None:
                 continue
-            await _record(db, conversation_id, float(seconds), user_id, org_id, "conciliacion")
+            await _record(db, conversation_id, float(seconds), user_id, org_id, "conciliacion", details)
             await db.commit()
             recorded += 1
     return recorded

@@ -58,6 +58,18 @@ LLM_PRICE_PER_MTOK = {
 }
 
 
+# Embeddings (índice del chat), US$ por millón de tokens.
+EMBEDDING_PRICE_PER_MTOK = {
+    "text-embedding-3-small": 0.02,
+    "text-embedding-3-large": 0.13,
+}
+
+
+def embedding_cost(model: str | None, tokens: int) -> float | None:
+    price = EMBEDDING_PRICE_PER_MTOK.get(model or "")
+    return None if price is None else round(tokens * price / 1_000_000, 6)
+
+
 def llm_cost(model: str | None, tokens_in: int, tokens_out: int) -> float | None:
     price = LLM_PRICE_PER_MTOK.get(model or "")
     if price is None:

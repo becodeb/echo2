@@ -235,3 +235,27 @@ async def _count_requests(user_id: str) -> int:
 
     async with SessionLocal() as db:
         return (await db.execute(select(func.count()).where(PlanRequest.user_id == uuid.UUID(user_id)))).scalar_one()
+
+
+def test_the_chat_index_is_recorded_as_usage(client):
+    from echo_api.services.ai_settings import EmbeddingsConfig
+    from echo_api.services.rag import embed_meeting_segments
+
+    user = EchoTestUser(client, org_name=f"Colegio {uuid.uuid4().hex[:4]}")
+    meeting_id = client.post("/api/meetings", json={"title": "Índice", "level": "primaria"}, headers=user.headers).json()["id"]
+    _sql("INSERT INTO transcript_segments (id, meeting_id, organization_id, seq, start_ms, end_ms, text, is_final,"
+         " edited, created_at, updated_at) VALUES (:id, :m, :o, 1, 0, 1000, :t, true, false, now(), now())",
+         id=str(uuid.uuid4()), m=meeting_id, o=user.org_id, t="x" * 400)
+    config = EmbeddingsConfig(provider="fake", model="text-embedding-3-small", api_key="x")
+    assert asyncio.run(embed_meeting_segments(uuid.UUID(meeting_id), config)) == 1
+
+    async def usage():
+        from sqlalchemy import select
+
+        from echo_api.models import UsageEvent
+
+        async with SessionLocal() as db:
+            return (await db.execute(select(UsageEvent).where(UsageEvent.meeting_id == uuid.UUID(meeting_id)))).scalars().all()
+
+    [event] = asyncio.run(usage())
+    assert (event.kind, event.unit, event.quantity, str(event.user_id)) == ("embeddings", "tokens", 100, user.user_id)

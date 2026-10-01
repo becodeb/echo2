@@ -41,7 +41,8 @@ class _FakeElevenLabs:
             cid = url.rsplit("/", 1)[-1]
             state, secs, owner, org = _FakeElevenLabs.conversations[cid]
             return httpx.Response(200, json={
-                "agent_id": "agent_echo", "status": state, "metadata": {"call_duration_secs": secs},
+                "agent_id": "agent_echo", "status": state,
+                "metadata": {"call_duration_secs": secs, "charging": {"llm_price": 0.004}},
                 "conversation_initiation_client_data": {"dynamic_variables": {"echo_user": owner, "echo_org": org}},
             }, request=request)
         if "/convai/agents/" in url:
@@ -57,6 +58,18 @@ class _FakeElevenLabs:
     async def patch(self, url, headers=None, json=None):
         _FakeElevenLabs.calls.append(("PATCH", url, json))
         return httpx.Response(200, json={}, request=httpx.Request("PATCH", url))
+
+
+def _sql_rows(statement: str, **params) -> list[tuple]:
+    from sqlalchemy import text
+
+    from echo_api.db import SessionLocal
+
+    async def run():
+        async with SessionLocal() as db:
+            return [tuple(row) for row in (await db.execute(text(statement), params)).all()]
+
+    return asyncio.run(run())
 
 
 def _setup(monkeypatch):
@@ -104,6 +117,9 @@ def test_an_open_conversation_is_not_charged_until_it_ends(client, monkeypatch):
     _FakeElevenLabs.conversations["conv_1"] = ("done", 125, user.user_id, user.org_id)
     ended = client.post("/api/voice/sessions/end", json={"conversation_id": "conv_1"}, headers=user.headers)
     assert ended.json() == {"seconds": 125.0, "seconds_left": 30 * 60 - 125, "pending": False}
+    # El LLM del agente, que ElevenLabs cobra aparte, entra en el costo.
+    [(cost, meta)] = _sql_rows("SELECT cost_usd, meta FROM usage_events WHERE user_id = :u AND kind = 'voice'", u=user.user_id)
+    assert meta["llm_usd"] == 0.004 and float(cost) == round(voice_agent.voice_cost(125) + 0.004, 6)
     again = client.post("/api/voice/sessions/end", json={"conversation_id": "conv_1"}, headers=user.headers)
     assert again.json()["seconds"] == 0
 

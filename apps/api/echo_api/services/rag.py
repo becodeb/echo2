@@ -51,7 +51,29 @@ async def embed_meeting_segments(meeting_id: uuid.UUID, config: EmbeddingsConfig
                 segment.embedding = vector
             total += len(batch)
             await db.commit()
+        await _record_embeddings(db, meeting_id, config, sum(len(segment.text) for segment in rows))
         return total
+
+
+async def _record_embeddings(db, meeting_id: uuid.UUID, config: EmbeddingsConfig, characters: int) -> None:
+    """Anota el consumo del índice (panel de consumo). Los tokens se estiman
+    (~4 caracteres por token): la API no los devuelve por tramo."""
+    from .plans import embedding_cost, record_usage
+
+    tokens = max(1, characters // 4)
+    cost = embedding_cost(config.model, tokens)
+    try:
+        meeting = await db.get(Meeting, meeting_id)
+        await record_usage(
+            db, kind="embeddings", provider=config.provider, model=config.model, unit="tokens",
+            quantity=tokens, cost_usd=cost or 0.0,
+            organization_id=meeting.organization_id if meeting else None,
+            user_id=meeting.created_by if meeting else None, meeting_id=meeting_id,
+            meta={"estimated": True, **({} if cost is not None else {"price_unknown": True})},
+        )
+        await db.commit()
+    except Exception as exc:  # noqa: BLE001 - anotar el consumo nunca corta el índice
+        log.warning("no se pudo anotar el consumo de embeddings de %s: %s", meeting_id, exc)
 
 
 def _scope_filters(
