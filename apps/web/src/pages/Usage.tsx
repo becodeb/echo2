@@ -307,7 +307,7 @@ export function PeopleTable({ people }: { people: PersonUsage[] }) {
               type="button"
               onClick={() => setOpen(expanded ? null : key)}
               aria-expanded={expanded}
-              className="flex w-full items-center gap-3 rounded-xl py-3 text-left transition-colors hover:bg-ink-50/70"
+              className="flex w-full items-center gap-3 rounded-2xl py-3 text-left transition-colors hover:bg-ink-50/70"
             >
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-ink-800">{person.name}</p>

@@ -56,7 +56,7 @@ export function Switch({
   hint?: string;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-xl border border-ink-100 bg-white px-4 py-3">
+    <div className="flex items-center justify-between gap-4 rounded-2xl border border-ink-100 bg-white px-4 py-3">
       <div className="min-w-0">
         <p className="text-sm font-medium text-ink-800">{label}</p>
         {hint && <p className="mt-0.5 text-xs text-ink-400">{hint}</p>}

@@ -95,7 +95,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 function Provider({ name, what, facts }: { name: string; what: string; facts: string[] }) {
   return (
-    <div className="rounded-2xl border border-ink-100 bg-white p-5">
+    <div className="rounded-3xl border border-ink-100 bg-white p-5">
       <p className="text-[15px] font-semibold text-ink-900">{name}</p>
       <p className="mt-0.5 text-sm text-ink-500">{what}</p>
       <ul className="mt-3 space-y-1.5 text-sm">
@@ -251,7 +251,7 @@ function Privacy() {
           La institución que usa Echo es responsable de avisar que la reunión se graba y transcribe, y de contar con el
           consentimiento de las familias y de quienes participan. Un aviso posible, al empezar:
         </p>
-        <blockquote className="rounded-2xl border-l-4 border-ink-900 bg-white px-5 py-4 text-ink-700">
+        <blockquote className="rounded-3xl border-l-4 border-ink-900 bg-white px-5 py-4 text-ink-700">
           "Vamos a transcribir esta reunión con Echo para armar el acta. Echo no se queda con el audio, y los nombres
           no se comparten con la inteligencia artificial. ¿Están de acuerdo?"
         </blockquote>

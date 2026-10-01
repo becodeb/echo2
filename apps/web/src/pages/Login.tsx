@@ -48,9 +48,9 @@ export default function Login() {
           <h1 className="text-2xl font-semibold tracking-tight text-ink-900">Echo</h1>
           <p className="text-sm text-ink-500">La reunión termina. Echo recuerda.</p>
         </div>
-        <div className="rounded-2xl border border-ink-100 bg-white p-6 shadow-sm">
+        <div className="rounded-3xl border border-ink-100 bg-white p-6 shadow-sm">
           {oauthError && (
-            <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{oauthError}</p>
+            <p className="mb-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{oauthError}</p>
           )}
           <form onSubmit={submit} className="space-y-4">
             <Input

@@ -85,7 +85,7 @@ export function FamilySelect({
         // Un div y no un <form>: puede quedar dentro del formulario de otra
         // cosa, y un form anidado mandaría el de afuera con el Enter.
         <div
-          className="animate-fade-up space-y-3 rounded-lg border border-ink-100 bg-ink-50 p-3"
+          className="animate-fade-up space-y-3 rounded-xl border border-ink-100 bg-ink-50 p-3"
           onKeyDown={(event) => {
             if (event.key === "Enter") {
               event.preventDefault();

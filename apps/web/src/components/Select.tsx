@@ -225,7 +225,7 @@ export function Select({
       id={`${listId}-trigger`}
       aria-label={label ? undefined : ariaLabel}
       aria-labelledby={label ? `${listId}-label ${listId}-trigger` : undefined}
-      className={`flex w-full min-w-0 items-center gap-2 rounded-lg border bg-white text-left transition-colors focus:outline-none focus-visible:border-accent-500 focus-visible:ring-2 focus-visible:ring-accent-500/20 disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`flex w-full min-w-0 items-center gap-2 rounded-full border bg-white text-left transition-colors focus:outline-none focus-visible:border-accent-500 focus-visible:ring-2 focus-visible:ring-accent-500/20 disabled:cursor-not-allowed disabled:opacity-50 ${
         open ? "border-accent-500 ring-2 ring-accent-500/20" : "border-ink-200 hover:border-ink-300"
       } ${small ? "px-2.5 py-1 text-xs" : "px-3 py-2 text-sm"}`}
     >
@@ -252,7 +252,7 @@ export function Select({
           <div
             ref={popoverRef}
             onKeyDown={onKeyDown}
-            className="animate-fade-up fixed z-[60] flex flex-col overflow-hidden rounded-xl border border-ink-100 bg-white shadow-[0_12px_32px_-8px_rgba(16,24,40,0.18),0_2px_6px_rgba(16,24,40,0.06)]"
+            className="animate-fade-up fixed z-[60] flex flex-col overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-[0_12px_32px_-8px_rgba(16,24,40,0.18),0_2px_6px_rgba(16,24,40,0.06)]"
             style={{
               left: position.left,
               width: position.width,
@@ -302,7 +302,7 @@ export function Select({
                     aria-selected={isSelected}
                     onPointerMove={() => setActive(index)}
                     onClick={() => choose(option)}
-                    className={`flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm ${
+                    className={`flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm ${
                       index === active ? "bg-ink-50" : ""
                     } ${option.value === "" ? "text-ink-500" : "text-ink-800"}`}
                   >
@@ -340,7 +340,7 @@ export function Select({
                     close(false);
                     action.onClick(current);
                   }}
-                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-accent-600 hover:bg-accent-500/5"
+                  className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-sm font-medium text-accent-600 hover:bg-accent-500/5"
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
                     <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />

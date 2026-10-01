@@ -63,7 +63,7 @@ export function GoogleButton({ label }: { label: string }) {
       </div>
       <a
         href="/api/auth/google/start"
-        className="inline-flex w-full items-center justify-center gap-2.5 rounded-lg border border-ink-200 bg-white px-3.5 py-2 text-sm font-medium text-ink-800 transition-colors hover:bg-ink-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
+        className="inline-flex w-full items-center justify-center gap-2.5 rounded-xl border border-ink-200 bg-white px-3.5 py-2 text-sm font-medium text-ink-800 transition-colors hover:bg-ink-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
       >
         <GoogleLogo />
         {label}

@@ -131,7 +131,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
       className={({ isActive }) => {
         const active =
           item.to === "/internal" ? isActive || inInternal : item.to === "/meetings" ? isActive && !inInternal : isActive;
-        return `flex items-center gap-2.5 rounded-xl px-2.5 py-[10px] text-[15px] font-medium transition-colors duration-150 md:py-[7px] md:text-[14px] ${
+        return `flex items-center gap-2.5 rounded-2xl px-2.5 py-[10px] text-[15px] font-medium transition-colors duration-150 md:py-[7px] md:text-[14px] ${
           collapsed ? "md:justify-center md:px-0" : ""
         } ${active ? "bg-ink-100 text-ink-900" : "text-ink-600 hover:bg-ink-50 hover:text-ink-900"}`;
       }}
@@ -171,7 +171,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
               voice.open();
             }}
             title={collapsed ? "Hablar con Echo" : undefined}
-            className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-[10px] text-[15px] font-medium text-ink-600 transition-colors duration-150 hover:bg-ink-50 hover:text-ink-900 md:py-[7px] md:text-[14px] ${
+            className={`flex w-full items-center gap-2.5 rounded-2xl px-2.5 py-[10px] text-[15px] font-medium text-ink-600 transition-colors duration-150 hover:bg-ink-50 hover:text-ink-900 md:py-[7px] md:text-[14px] ${
               collapsed ? "md:justify-center md:px-0" : ""
             }`}
           >
@@ -202,7 +202,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
       {/* Contenido: con el panel de preguntas abierto se vuelve una tarjeta, como en ElevenLabs. */}
       <div
         className={`flex min-w-0 flex-1 flex-col bg-[#fafbfc] transition-[margin,border-radius,box-shadow] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
-          askOpen ? "md:my-2 md:overflow-hidden md:rounded-2xl md:border md:border-ink-200/70 md:shadow-[0_1px_3px_rgba(16,24,40,0.06),0_12px_32px_-16px_rgba(16,24,40,0.18)]" : ""
+          askOpen ? "md:my-2 md:overflow-hidden md:rounded-3xl md:border md:border-ink-200/70 md:shadow-[0_1px_3px_rgba(16,24,40,0.06),0_12px_32px_-16px_rgba(16,24,40,0.18)]" : ""
         }`}
       >
         <header className="flex items-center gap-1 border-b border-ink-100 bg-white px-3 py-2 md:hidden">
@@ -410,7 +410,7 @@ function ProfileMenu() {
     navigate(to);
   };
   const item =
-    "flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-ink-700 transition-colors hover:bg-ink-50 hover:text-ink-900";
+    "flex w-full items-center gap-2.5 rounded-2xl px-2.5 py-2 text-left text-sm text-ink-700 transition-colors hover:bg-ink-50 hover:text-ink-900";
 
   return (
     <div ref={ref} className="relative">
@@ -422,15 +422,15 @@ function ProfileMenu() {
         aria-label="Tu cuenta"
         className="flex h-9 w-9 items-center justify-center rounded-full ring-1 ring-ink-200 transition-shadow hover:ring-ink-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
       >
-        <Avatar name={user.name} color={user.avatar_color} size={30} />
+        <Avatar name={user.name} color={user.avatar_color} src={user.avatar_url} size={30} />
       </button>
       {open && (
         <div
           role="menu"
-          className="animate-fade-up absolute right-0 top-11 z-50 w-72 overflow-hidden rounded-2xl border border-ink-100 bg-white p-1.5 shadow-[0_16px_48px_-12px_rgba(20,24,36,0.25)]"
+          className="animate-fade-up absolute right-0 top-11 z-50 w-72 overflow-hidden rounded-3xl border border-ink-100 bg-white p-1.5 shadow-[0_16px_48px_-12px_rgba(20,24,36,0.25)]"
         >
           <div className="flex items-center gap-3 px-2.5 pb-3 pt-2">
-            <Avatar name={user.name} color={user.avatar_color} size={36} />
+            <Avatar name={user.name} color={user.avatar_color} src={user.avatar_url} size={36} />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-ink-900">{user.name}</p>
               <p className="truncate text-xs text-ink-400">{user.email}</p>
@@ -501,7 +501,7 @@ function PlanCard({ onNavigate }: { onNavigate: () => void }) {
   const { data: billing } = useBilling();
   const { user } = useAuth();
   const navigate = useNavigate();
-  if (!billing) return <div className="mb-2 h-[62px] animate-pulse rounded-2xl bg-ink-50" />;
+  if (!billing) return <div className="mb-2 h-[62px] animate-pulse rounded-3xl bg-ink-50" />;
   // Las cuentas de Becode tienen todo habilitado: no es "Gratis" ni hay que mejorar nada.
   const plan = user?.is_superadmin ? "becode" : effectivePlan(billing);
   const people = billing.people;
@@ -513,7 +513,7 @@ function PlanCard({ onNavigate }: { onNavigate: () => void }) {
         onNavigate();
         navigate("/plans");
       }}
-      className="mb-2 block w-full rounded-2xl border border-ink-100 bg-white p-3 text-left shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-shadow hover:shadow-[0_4px_16px_-8px_rgba(16,24,40,0.2)]"
+      className="mb-2 block w-full rounded-3xl border border-ink-100 bg-white p-3 text-left shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-shadow hover:shadow-[0_4px_16px_-8px_rgba(16,24,40,0.2)]"
     >
       <span className="flex items-center justify-between gap-2">
         <span className="truncate text-xs font-semibold text-ink-800">{PLAN_NAME[plan] ?? plan}</span>

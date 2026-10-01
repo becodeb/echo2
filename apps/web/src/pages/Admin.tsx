@@ -227,7 +227,7 @@ function JoinRules({ org }: { org: AdminOrgOut }) {
   }
 
   return (
-    <div className="space-y-2 rounded-lg border border-ink-100 bg-ink-50 p-3">
+    <div className="space-y-2 rounded-xl border border-ink-100 bg-ink-50 p-3">
       <label className="block">
         <span className="mb-1.5 block text-sm font-medium text-ink-700">Quién se une sin invitación</span>
         <textarea
@@ -235,7 +235,7 @@ function JoinRules({ org }: { org: AdminOrgOut }) {
           onChange={(event) => setDraft(event.target.value)}
           rows={3}
           placeholder={"northfield.edu.ar\nmariana.gibson@gmail.com"}
-          className="w-full rounded-lg border border-ink-200 bg-white px-3 py-2 font-mono text-sm text-ink-900 placeholder:text-ink-400 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20"
+          className="w-full rounded-xl border border-ink-200 bg-white px-3 py-2 font-mono text-sm text-ink-900 placeholder:text-ink-400 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20"
         />
       </label>
       <p className="text-xs text-ink-400">
@@ -320,14 +320,14 @@ function ServerDefaultCard() {
       </div>
 
       {defaults?.source === "entorno" && (
-        <p className="rounded-lg bg-ink-50 px-3 py-2 text-sm text-ink-600">
+        <p className="rounded-xl bg-ink-50 px-3 py-2 text-sm text-ink-600">
           Hoy sale de las variables de entorno del servidor
           {defaults.llm_provider && <> (<span className="font-medium">{defaults.llm_provider}</span>)</>}.
           Lo que cargues acá pasa a mandar.
         </p>
       )}
       {defaults?.source === "sin_configurar" && (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
           No hay ningún modelo por defecto: ninguna organización sin configuración propia puede
           generar actas.
         </p>
@@ -372,7 +372,7 @@ function ServerDefaultCard() {
 
       {test && (
         <div
-          className={`rounded-lg px-3 py-2 text-sm ${
+          className={`rounded-xl px-3 py-2 text-sm ${
             test.ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"
           }`}
         >
@@ -489,7 +489,7 @@ function Organizations() {
       <ServerDefaultCard />
 
       {sinIA > 0 && (
-        <div className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
           {sinIA === 1
             ? "Hay 1 organización sin ningún modelo de IA disponible: sus actas no se van a generar."
             : `Hay ${sinIA} organizaciones sin ningún modelo de IA disponible: sus actas no se van a generar.`}

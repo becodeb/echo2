@@ -60,7 +60,7 @@ export function InterviewReview({ meetingId, minutes, fields }: {
   if (!editing) {
     return (
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center gap-3 rounded-xl bg-emerald-50 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-emerald-50 px-4 py-3">
           <span className="text-sm font-medium text-emerald-800">
             {minutes.number != null ? `Acta N.º ${minutes.number} confirmada` : "Acta confirmada"}
             {minutes.approved_at ? ` el ${new Date(minutes.approved_at).toLocaleString("es")}` : ""}.
@@ -73,7 +73,7 @@ export function InterviewReview({ meetingId, minutes, fields }: {
           </div>
         </div>
         {letterhead && (
-          <div className="overflow-x-auto rounded-xl bg-ink-100 p-4">
+          <div className="overflow-x-auto rounded-2xl bg-ink-100 p-4">
             <InterviewSheet fields={fields} letterhead={letterhead} number={minutes.number} />
           </div>
         )}
@@ -126,7 +126,7 @@ export function InterviewReview({ meetingId, minutes, fields }: {
           value={form.desarrollo}
           onChange={(e) => set("desarrollo")(e.target.value)}
           rows={14}
-          className="w-full rounded-lg border border-ink-200 p-3 text-sm leading-relaxed text-ink-900 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20"
+          className="w-full rounded-xl border border-ink-200 p-3 text-sm leading-relaxed text-ink-900 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20"
         />
       </label>
 

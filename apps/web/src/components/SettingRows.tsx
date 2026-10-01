@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 
 export function SettingsGroup({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`divide-y divide-ink-100 overflow-hidden rounded-2xl border border-ink-100 bg-white ${className}`}>
+    <div className={`divide-y divide-ink-100 overflow-hidden rounded-3xl border border-ink-100 bg-white ${className}`}>
       {children}
     </div>
   );
@@ -92,7 +92,7 @@ export function ChoiceCards<T extends string>({
             aria-checked={selected}
             disabled={option.disabled}
             onClick={() => onChange(option.value)}
-            className={`rounded-xl border px-3.5 py-3 text-left transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 ${
+            className={`rounded-2xl border px-3.5 py-3 text-left transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 ${
               selected
                 ? "border-ink-900 bg-white shadow-[0_0_0_1px_var(--color-ink-900)]"
                 : "border-ink-100 bg-ink-50/60 hover:border-ink-200 hover:bg-white"

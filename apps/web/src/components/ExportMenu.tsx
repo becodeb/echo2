@@ -86,7 +86,7 @@ export function ExportMenu({
       {open && (
         <div
           role="menu"
-          className="absolute right-0 z-30 mt-1 w-64 rounded-xl border border-ink-100 bg-white p-1.5 shadow-lg"
+          className="absolute right-0 z-30 mt-1 w-64 rounded-2xl border border-ink-100 bg-white p-1.5 shadow-lg"
         >
           {FORMATS.map((item) => (
             <button
@@ -95,7 +95,7 @@ export function ExportMenu({
               type="button"
               disabled={busy}
               onClick={() => download.mutate(item.fmt)}
-              className="flex w-full flex-col rounded-lg px-3 py-2 text-left hover:bg-ink-50 disabled:opacity-50"
+              className="flex w-full flex-col rounded-xl px-3 py-2 text-left hover:bg-ink-50 disabled:opacity-50"
             >
               <span className="text-sm font-medium text-ink-800">{item.label}</span>
               <span className="text-xs text-ink-400">{item.hint}</span>
@@ -109,7 +109,7 @@ export function ExportMenu({
                     href={docUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="block rounded-lg px-3 py-2 text-sm font-medium text-accent-600 hover:bg-ink-50"
+                    className="block rounded-xl px-3 py-2 text-sm font-medium text-accent-600 hover:bg-ink-50"
                   >
                     Documento creado: abrir en Google Docs ↗
                   </a>
@@ -119,7 +119,7 @@ export function ExportMenu({
                     role="menuitem"
                     disabled={busy}
                     onClick={() => googleDoc.mutate()}
-                    className="flex w-full flex-col rounded-lg px-3 py-2 text-left hover:bg-ink-50 disabled:opacity-50"
+                    className="flex w-full flex-col rounded-xl px-3 py-2 text-left hover:bg-ink-50 disabled:opacity-50"
                   >
                     <span className="flex items-center gap-2 text-sm font-medium text-ink-800">
                       Documento de Google {googleDoc.isPending && <Spinner className="h-3.5 w-3.5" />}
@@ -130,7 +130,7 @@ export function ExportMenu({
               ) : (
                 <Link
                   to="/settings/my-drive"
-                  className="block rounded-lg px-3 py-2 text-sm text-ink-500 hover:bg-ink-50"
+                  className="block rounded-xl px-3 py-2 text-sm text-ink-500 hover:bg-ink-50"
                 >
                   <span className="font-medium text-accent-600">Conectá tu Drive</span> para crear un Documento de
                   Google

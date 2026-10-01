@@ -46,7 +46,7 @@ export default function ChooseLevel() {
           <p className="text-sm text-ink-500">¿De qué nivel sos? Podés marcar más de uno.</p>
         </div>
 
-        <div className="space-y-2 rounded-2xl border border-ink-100 bg-white p-3 shadow-sm">
+        <div className="space-y-2 rounded-3xl border border-ink-100 bg-white p-3 shadow-sm">
           {LEVELS.map((level) => {
             const active = chosen.has(level.value);
             return (
@@ -55,7 +55,7 @@ export default function ChooseLevel() {
                 type="button"
                 onClick={() => toggle(level.value)}
                 aria-pressed={active}
-                className={`flex w-full items-center justify-between rounded-xl border px-4 py-3.5 text-left transition-colors ${
+                className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3.5 text-left transition-colors ${
                   active ? "border-ink-900 bg-ink-900 text-white" : "border-ink-100 text-ink-900 hover:border-ink-300 hover:bg-ink-50"
                 }`}
               >

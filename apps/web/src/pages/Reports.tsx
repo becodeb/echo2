@@ -152,7 +152,7 @@ export default function Reports() {
       </div>
 
       {data.totals.unclassified > 0 && (
-        <div className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
           {data.totals.unclassified === 1
             ? "Hay 1 reunión sin familia, motivo o gravedad: no entra en los cortes de abajo."
             : `Hay ${data.totals.unclassified} reuniones sin familia, motivo o gravedad: no entran completas en los cortes de abajo.`}
@@ -245,15 +245,15 @@ export default function Reports() {
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-lg bg-emerald-50 px-4 py-3">
+          <div className="rounded-xl bg-emerald-50 px-4 py-3">
             <p className="text-xl font-semibold text-emerald-700">{data.attendance.complete}</p>
             <p className="text-sm text-emerald-800">Vinieron todos</p>
           </div>
-          <div className="rounded-lg bg-amber-50 px-4 py-3">
+          <div className="rounded-xl bg-amber-50 px-4 py-3">
             <p className="text-xl font-semibold text-amber-700">{data.attendance.incomplete}</p>
             <p className="text-sm text-amber-800">Faltó alguno</p>
           </div>
-          <div className="rounded-lg bg-ink-50 px-4 py-3">
+          <div className="rounded-xl bg-ink-50 px-4 py-3">
             <p className="text-xl font-semibold text-ink-700">{data.attendance.unknown}</p>
             <p className="text-sm text-ink-600">Sin registrar</p>
           </div>

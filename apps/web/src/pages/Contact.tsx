@@ -96,7 +96,7 @@ export default function Contact() {
                 required
                 rows={5}
                 maxLength={4000}
-                className="w-full rounded-2xl border border-ink-200 bg-white px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20"
+                className="w-full rounded-3xl border border-ink-200 bg-white px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20"
                 placeholder={
                   topic === "privacidad"
                     ? "Ej.: quiero saber qué datos tienen de mí / quiero que borren mi cuenta."

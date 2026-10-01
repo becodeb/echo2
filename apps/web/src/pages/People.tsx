@@ -9,6 +9,7 @@ interface Person {
   name: string;
   email: string;
   avatar_color: string;
+  avatar_url?: string | null;
   job_title: string | null;
   role: string;
   meeting_count: number;
@@ -31,7 +32,7 @@ export default function People() {
         {people?.map((person) => (
           <Link key={person.id} to={`/people/${person.id}`}>
             <Card className="flex items-center gap-4 transition-shadow hover:shadow-md">
-              <Avatar name={person.name} color={person.avatar_color} size={44} />
+              <Avatar name={person.name} color={person.avatar_color} src={person.avatar_url} size={44} />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium text-ink-900">{person.name}</p>
                 <p className="truncate text-xs text-ink-400">{person.job_title ?? person.email}</p>

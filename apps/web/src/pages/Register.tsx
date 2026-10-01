@@ -39,7 +39,7 @@ export default function Register() {
           <span className="text-ink-900"><EchoFace mood="done" size={44} /></span>
           <h1 className="text-2xl font-semibold tracking-tight text-ink-900">Crear cuenta</h1>
         </div>
-        <div className="rounded-2xl border border-ink-100 bg-white p-6 shadow-sm">
+        <div className="rounded-3xl border border-ink-100 bg-white p-6 shadow-sm">
           <form onSubmit={submit} className="space-y-4">
             <Input label="Nombre" required value={name} onChange={(event) => setName(event.target.value)} />
             <Input

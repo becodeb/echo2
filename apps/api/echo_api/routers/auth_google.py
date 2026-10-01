@@ -76,6 +76,14 @@ def _decode_id_token(id_token: str) -> dict | None:
         return None
 
 
+def google_picture(claims: dict) -> str | None:
+    """La foto del perfil de Google, solo si es una URL https de Google."""
+    picture = str(claims.get("picture") or "")
+    if picture.startswith("https://") and ".googleusercontent.com/" in picture and len(picture) <= 600:
+        return picture
+    return None
+
+
 def _claims_are_valid(claims: dict, settings: Settings) -> bool:
     if claims.get("iss") not in VALID_ISSUERS:
         return False
@@ -196,6 +204,9 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
 
     if not user.is_active or user.deleted_at is not None:
         return _back_to_login(settings, "cuenta_deshabilitada")
+
+    # La foto de Google, de nuevo en cada login (si la cambió, se ve la nueva).
+    user.avatar_url = google_picture(claims)
 
     refresh = await _issue_refresh(db, user, request)
     await join_domain_organizations(db, user)

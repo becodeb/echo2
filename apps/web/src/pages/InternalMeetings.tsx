@@ -183,13 +183,13 @@ function ManageGroupsModal({
           Las reuniones de un grupo las ven solo sus integrantes, incluso para los admins de la sede.
           Sumar o sacar a alguien queda registrado.
         </p>
-        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+        {error && <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
         {groups.map((group) => {
           const inGroup = new Set(group.members.map((member) => member.user_id));
           const candidates = (members ?? []).filter((member) => !inGroup.has(member.user_id));
           return (
-            <div key={group.id} className="space-y-2 rounded-xl border border-ink-100 p-4">
+            <div key={group.id} className="space-y-2 rounded-2xl border border-ink-100 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="font-semibold text-ink-900">
                   {group.name}{" "}

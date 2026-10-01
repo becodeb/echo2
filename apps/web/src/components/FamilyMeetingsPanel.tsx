@@ -99,7 +99,7 @@ function Chip({
 
 function Stat({ value, label, children }: { value: ReactNode; label: string; children?: ReactNode }) {
   return (
-    <div className="min-w-0 rounded-xl border border-ink-100 bg-ink-50/60 px-3 py-2.5">
+    <div className="min-w-0 rounded-2xl border border-ink-100 bg-ink-50/60 px-3 py-2.5">
       <p className="truncate text-lg font-semibold text-ink-900">{value}</p>
       <p className="truncate text-xs text-ink-500">{label}</p>
       {children}
@@ -114,7 +114,7 @@ function MeetingRow({ meeting }: { meeting: FamilyMeetingOut }) {
     <li>
       <Link
         to={`/meetings/${meeting.id}`}
-        className="group flex gap-3 rounded-xl border border-ink-100 bg-white p-3.5 transition-colors hover:border-ink-200 hover:bg-ink-50/50"
+        className="group flex gap-3 rounded-2xl border border-ink-100 bg-white p-3.5 transition-colors hover:border-ink-200 hover:bg-ink-50/50"
       >
         <span
           aria-hidden
@@ -375,7 +375,7 @@ export function FamilyMeetingsPanel({ family, onClose }: { family: FamilyOut; on
             </div>
             <button
               onClick={onClose}
-              className="shrink-0 rounded-lg p-2 text-ink-400 hover:bg-ink-100 hover:text-ink-700"
+              className="shrink-0 rounded-xl p-2 text-ink-400 hover:bg-ink-100 hover:text-ink-700"
               aria-label="Cerrar"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -424,13 +424,13 @@ export function FamilyMeetingsPanel({ family, onClose }: { family: FamilyOut; on
               </div>
 
               {/* Filtros */}
-              <div className="space-y-3 rounded-xl border border-ink-100 p-3">
+              <div className="space-y-3 rounded-2xl border border-ink-100 p-3">
                 <input
                   type="search"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Buscar en títulos, motivos, resúmenes y asistentes…"
-                  className="w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-base text-ink-900 placeholder:text-ink-400 sm:text-sm focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20"
+                  className="w-full rounded-xl border border-ink-200 bg-white px-3 py-2 text-base text-ink-900 placeholder:text-ink-400 sm:text-sm focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20"
                 />
 
                 <div className="flex flex-wrap gap-1.5">
@@ -449,7 +449,7 @@ export function FamilyMeetingsPanel({ family, onClose }: { family: FamilyOut; on
                         value={from}
                         max={to || undefined}
                         onChange={(event) => setFrom(event.target.value)}
-                        className="w-full min-w-0 rounded-lg border border-ink-200 bg-white px-2.5 py-1.5 text-base text-ink-900 sm:text-sm focus:border-accent-500 focus:outline-none"
+                        className="w-full min-w-0 rounded-xl border border-ink-200 bg-white px-2.5 py-1.5 text-base text-ink-900 sm:text-sm focus:border-accent-500 focus:outline-none"
                       />
                     </label>
                     <label className="block min-w-0">
@@ -459,7 +459,7 @@ export function FamilyMeetingsPanel({ family, onClose }: { family: FamilyOut; on
                         value={to}
                         min={from || undefined}
                         onChange={(event) => setTo(event.target.value)}
-                        className="w-full min-w-0 rounded-lg border border-ink-200 bg-white px-2.5 py-1.5 text-base text-ink-900 sm:text-sm focus:border-accent-500 focus:outline-none"
+                        className="w-full min-w-0 rounded-xl border border-ink-200 bg-white px-2.5 py-1.5 text-base text-ink-900 sm:text-sm focus:border-accent-500 focus:outline-none"
                       />
                     </label>
                   </div>

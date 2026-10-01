@@ -54,6 +54,7 @@ class UserOut(BaseModel):
     email: str
     name: str
     avatar_color: str
+    avatar_url: str | None = None
     job_title: str | None
     locale: str
     is_superadmin: bool

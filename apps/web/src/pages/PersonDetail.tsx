@@ -8,6 +8,7 @@ interface PersonDetailData {
   name: string;
   email: string;
   avatar_color: string;
+  avatar_url?: string | null;
   job_title: string | null;
   role: string;
   meetings: { id: string; title: string; status: string; started_at: string | null }[];
@@ -32,7 +33,7 @@ export default function PersonDetail() {
   return (
     <div className="mx-auto max-w-4xl px-6 py-10">
       <header className="mb-8 flex items-center gap-4">
-        <Avatar name={person.name} color={person.avatar_color} size={56} />
+        <Avatar name={person.name} color={person.avatar_color} src={person.avatar_url} size={56} />
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-ink-900">{person.name}</h1>
           <p className="text-sm text-ink-500">

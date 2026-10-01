@@ -42,7 +42,7 @@ export function OrgPlanControl({ org }: { org: AdminOrgOut }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-orgs"] }),
   });
   return (
-    <div className="flex flex-wrap items-end gap-3 rounded-2xl bg-ink-50/70 p-3">
+    <div className="flex flex-wrap items-end gap-3 rounded-3xl bg-ink-50/70 p-3">
       <div className="w-48">
         <Select
           label="Plan"
@@ -232,7 +232,7 @@ export function PlanRequests() {
   return (
     <ul className="space-y-2">
       {requests.map((request) => (
-        <li key={request.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-ink-100 bg-white px-4 py-3">
+        <li key={request.id} className="flex flex-wrap items-center gap-3 rounded-3xl border border-ink-100 bg-white px-4 py-3">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-ink-800">
               {request.user_name} · <span className="text-ink-500">{PLAN_NAME[request.plan] ?? request.plan}</span>
@@ -367,11 +367,11 @@ export function VoiceAgentCard() {
       <h3 className="text-[15px] font-semibold text-ink-900">Agente de voz</h3>
       <p className="mt-0.5 text-xs leading-relaxed text-ink-400">
         La conversación por voz del plan Individual + voz. Tocalo una vez para crearlo, y de nuevo cuando cambie la voz
-        (ELEVENLABS_AGENT_VOICE_ID) o el prompt: actualiza el mismo agente.
+        (ELEVENLABS_AGENT_VOICE_ID) o el prompt: actualiza los mismos agentes (uno por duración de charla).
       </p>
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <Button onClick={() => setup.mutate()} disabled={setup.isPending} className="rounded-full">
-          {setup.isPending ? <Spinner /> : "Crear o actualizar el agente"}
+          {setup.isPending ? <Spinner /> : "Crear o actualizar los agentes"}
         </Button>
         {setup.isSuccess && (
           <span className="text-sm text-emerald-600">

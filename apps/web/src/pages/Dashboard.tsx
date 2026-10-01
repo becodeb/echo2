@@ -53,7 +53,7 @@ export default function Dashboard() {
         </div>
         <button
           onClick={() => navigate("/meetings?new=1")}
-          className="inline-flex items-center gap-2 rounded-xl bg-ink-900 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-ink-700"
+          className="inline-flex items-center gap-2 rounded-2xl bg-ink-900 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-ink-700"
         >
           <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
             <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -171,7 +171,7 @@ export default function Dashboard() {
                   <Link
                     key={project.id}
                     to={`/projects/${project.id}`}
-                    className="inline-flex items-center gap-2 rounded-lg border border-ink-150 border-ink-200 bg-white px-3 py-1.5 text-sm font-medium text-ink-700 hover:border-ink-300"
+                    className="inline-flex items-center gap-2 rounded-xl border border-ink-150 border-ink-200 bg-white px-3 py-1.5 text-sm font-medium text-ink-700 hover:border-ink-300"
                   >
                     <span className="h-2 w-2 rounded-full" style={{ backgroundColor: project.color }} />
                     {project.name}

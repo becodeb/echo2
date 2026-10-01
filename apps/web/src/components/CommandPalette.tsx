@@ -101,7 +101,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="animate-fade-up w-full max-w-xl overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-2xl">
+      <div className="animate-fade-up w-full max-w-xl overflow-hidden rounded-3xl border border-ink-100 bg-white shadow-2xl">
         <input
           ref={inputRef}
           value={query}
@@ -132,7 +132,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
               <button
                 onClick={action.run}
                 onMouseEnter={() => setSelected(index)}
-                className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm ${
+                className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm ${
                   index === selected ? "bg-ink-100 text-ink-900" : "text-ink-700"
                 }`}
               >

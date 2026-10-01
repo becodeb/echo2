@@ -28,6 +28,7 @@ class MemberOut(BaseModel):
     name: str
     email: str
     avatar_color: str
+    avatar_url: str | None = None
     job_title: str | None
     role: str
 
@@ -49,6 +50,7 @@ async def list_members(ctx: OrgContext = Depends(get_org_context), db: AsyncSess
             name=u.name,
             email=u.email,
             avatar_color=u.avatar_color,
+            avatar_url=u.avatar_url,
             job_title=u.job_title,
             role=m.role,
         )

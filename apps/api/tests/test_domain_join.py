@@ -180,3 +180,16 @@ def test_auto_join_domain_map_ignores_malformed_entries_and_allows_several_campu
         " @Northfield.edu.ar = northfield-1 , roto, =x, y= , northfield.edu.ar=northfield-2",
     )
     assert settings.auto_join_domain_map == {"northfield.edu.ar": ["northfield-1", "northfield-2"]}
+
+
+def test_the_google_photo_is_kept_only_if_it_comes_from_google(client):
+    from echo_api.routers.auth_google import google_picture
+
+    assert google_picture({"picture": "https://lh3.googleusercontent.com/a/abc=s96-c"}).startswith("https://lh3.")
+    for bad in ({}, {"picture": "http://lh3.googleusercontent.com/a"}, {"picture": "https://evil.com/x.googleusercontent.com.png"},
+                {"picture": "javascript:alert(1)"}):
+        assert google_picture(bad) is None, bad
+    user = EchoTestUser(client, org_name=f"Colegio {uuid.uuid4().hex[:4]}")
+    _sql("UPDATE users SET avatar_url = 'https://lh3.googleusercontent.com/a/x' WHERE id = :id", id=user.user_id)
+    members = client.get("/api/org/members", headers=user.headers).json()
+    assert members[0]["avatar_url"] == "https://lh3.googleusercontent.com/a/x"

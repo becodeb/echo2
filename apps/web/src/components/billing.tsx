@@ -166,5 +166,5 @@ export function renewsLabel(iso: string): string {
 
 /** Skeleton redondeado para mientras carga. */
 export function Shimmer({ className = "" }: { className?: string }) {
-  return <span className={`block animate-pulse rounded-xl bg-ink-100 ${className}`} />;
+  return <span className={`block animate-pulse rounded-2xl bg-ink-100 ${className}`} />;
 }

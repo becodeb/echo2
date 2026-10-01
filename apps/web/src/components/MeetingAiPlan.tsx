@@ -36,7 +36,7 @@ export function MeetingAiPlan({
   if (isLoading || !billing) {
     return (
       <div
-        className="space-y-2 rounded-2xl border border-ink-100 p-4"
+        className="space-y-2 rounded-3xl border border-ink-100 p-4"
         aria-busy="true"
       >
         <Shimmer className="h-4 w-40" />
@@ -51,7 +51,7 @@ export function MeetingAiPlan({
     !minors && billing.people.available && (billing.people.mode === "always" || (billing.people.mode !== "none" && people));
   return (
     <section
-      className="overflow-hidden rounded-2xl border border-ink-100 bg-white"
+      className="overflow-hidden rounded-3xl border border-ink-100 bg-white"
       aria-label="Lo que va a hacer Echo"
     >
       <header className="flex items-center justify-between gap-3 border-b border-ink-100 bg-ink-50/60 px-4 py-2.5">

@@ -90,7 +90,7 @@ function CampusChoice({ options }: { options: JoinOptions }) {
 
   if (options.requires_google) {
     return (
-      <div className="space-y-3 rounded-2xl border border-ink-100 bg-white p-6 shadow-sm">
+      <div className="space-y-3 rounded-3xl border border-ink-100 bg-white p-6 shadow-sm">
         <p className="text-sm text-ink-700">
           Para entrar a <span className="font-medium">{options.organizations.map((org) => org.name).join(" o ")}</span>{" "}
           tenés que usar el botón de Google con tu cuenta institucional. Así Echo confirma que el email
@@ -119,13 +119,13 @@ function CampusChoice({ options }: { options: JoinOptions }) {
   };
 
   return (
-    <div className="space-y-2 rounded-2xl border border-ink-100 bg-white p-3 shadow-sm">
+    <div className="space-y-2 rounded-3xl border border-ink-100 bg-white p-3 shadow-sm">
       {options.organizations.map((org) => (
         <button
           key={org.id}
           onClick={() => void join(org.id)}
           disabled={joining !== null}
-          className="flex w-full items-center justify-between gap-3 rounded-xl border border-ink-100 px-4 py-3.5 text-left transition-colors hover:border-ink-300 hover:bg-ink-50 disabled:opacity-60"
+          className="flex w-full items-center justify-between gap-3 rounded-2xl border border-ink-100 px-4 py-3.5 text-left transition-colors hover:border-ink-300 hover:bg-ink-50 disabled:opacity-60"
         >
           <span className="font-medium text-ink-900">{org.name}</span>
           {joining === org.id ? (
@@ -176,7 +176,7 @@ export function CreateOrJoin({ mode, onMode }: { mode: "create" | "join"; onMode
 
   return (
     <>
-      <div className="mb-4 flex rounded-lg bg-ink-100 p-1">
+      <div className="mb-4 flex rounded-xl bg-ink-100 p-1">
         {(["create", "join"] as const).map((option) => (
           <button
             key={option}
@@ -190,7 +190,7 @@ export function CreateOrJoin({ mode, onMode }: { mode: "create" | "join"; onMode
         ))}
       </div>
 
-      <form onSubmit={submit} className="space-y-4 rounded-2xl border border-ink-100 bg-white p-6 shadow-sm">
+      <form onSubmit={submit} className="space-y-4 rounded-3xl border border-ink-100 bg-white p-6 shadow-sm">
         {mode === "create" ? (
           <Input
             label="Nombre de la organización"

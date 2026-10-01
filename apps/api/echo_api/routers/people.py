@@ -66,6 +66,7 @@ async def list_people(ctx: OrgContext = Depends(get_org_context), db: AsyncSessi
                 "name": user.name,
                 "email": user.email,
                 "avatar_color": user.avatar_color,
+                "avatar_url": user.avatar_url,
                 "job_title": user.job_title,
                 "role": role,
                 "meeting_count": meeting_count or 0,
@@ -149,6 +150,7 @@ async def person_detail(
         "name": user.name,
         "email": user.email,
         "avatar_color": user.avatar_color,
+        "avatar_url": user.avatar_url,
         "job_title": user.job_title,
         "role": role,
         "meetings": [

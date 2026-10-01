@@ -26,6 +26,8 @@ class User(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
     google_sub: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     avatar_color: Mapped[str] = mapped_column(String(16), default="#6366f1")
+    # Foto de la cuenta de Google (se refresca en cada login); sin foto, iniciales.
+    avatar_url: Mapped[str | None] = mapped_column(String(600))
     job_title: Mapped[str | None] = mapped_column(String(200))
     locale: Mapped[str] = mapped_column(String(10), default="es")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

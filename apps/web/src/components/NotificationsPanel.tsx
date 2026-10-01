@@ -103,7 +103,7 @@ export function NotificationsPanel({ onClose, className = "" }: { onClose: () =>
       role="dialog"
       aria-label="Notificaciones"
       // Se abre ahí mismo, colgando de la campanita (en el celular, de lado a lado).
-      className={`notif-pop fixed inset-x-2 top-14 z-50 flex max-h-[80dvh] flex-col overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-[0_20px_56px_-16px_rgba(20,24,36,0.32)] md:inset-x-auto md:top-[52px] md:max-h-[72vh] md:w-[420px] ${className}`}
+      className={`notif-pop fixed inset-x-2 top-14 z-50 flex max-h-[80dvh] flex-col overflow-hidden rounded-3xl border border-ink-100 bg-white shadow-[0_20px_56px_-16px_rgba(20,24,36,0.32)] md:inset-x-auto md:top-[52px] md:max-h-[72vh] md:w-[420px] ${className}`}
     >
       <div className="flex min-h-0 flex-1 flex-col">
         <header className="flex items-center gap-3 border-b border-ink-100 px-5 py-4">

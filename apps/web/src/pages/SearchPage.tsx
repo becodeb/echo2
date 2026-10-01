@@ -39,7 +39,7 @@ export default function SearchPage() {
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Buscar en todas las reuniones…"
           autoFocus
-          className="w-full rounded-2xl border border-ink-200 bg-white px-5 py-3.5 text-lg shadow-sm focus:border-accent-500 focus:outline-none"
+          className="w-full rounded-3xl border border-ink-200 bg-white px-5 py-3.5 text-lg shadow-sm focus:border-accent-500 focus:outline-none"
         />
         {data && !data.semantic_enabled && (
           <p className="mt-2 text-xs text-ink-400">

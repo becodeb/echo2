@@ -138,7 +138,7 @@ export function VoiceRecorder({ onSaved, compact = false }: { onSaved?: (voice: 
       {(stage === "idle" || stage === "recording") && (
         <>
           <p className="text-sm text-ink-600">Cuando toques grabar, leé en voz alta, con tu tono normal:</p>
-          <blockquote className="rounded-2xl bg-ink-50 px-4 py-3 text-[15px] leading-relaxed text-ink-800">
+          <blockquote className="rounded-3xl bg-ink-50 px-4 py-3 text-[15px] leading-relaxed text-ink-800">
             «Hola, soy {firstName}. Estoy grabando mi voz para que Echo me reconozca en mis reuniones. Así, en cada
             resumen, va a figurar quién dijo cada cosa.»
           </blockquote>
@@ -220,11 +220,11 @@ export function VoiceRecorder({ onSaved, compact = false }: { onSaved?: (voice: 
 
       {stage === "saved" && (
         <div className="space-y-3">
-          <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+          <p className="rounded-3xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
             ¡Listo! Desde la próxima reunión, Echo te reconoce por tu voz.
           </p>
           {warning && (
-            <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <div className="flex flex-wrap items-center gap-3 rounded-3xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
               <span className="min-w-0 flex-1">{warning}</span>
               <button onClick={again} className="min-h-11 rounded-full bg-white px-4 font-medium text-amber-900">
                 Grabar de nuevo

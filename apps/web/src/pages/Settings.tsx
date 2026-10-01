@@ -46,7 +46,7 @@ export default function Settings() {
               key={section.path}
               to={section.path}
               className={({ isActive }) =>
-                `whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium ${
+                `whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium ${
                   isActive ? "bg-ink-100 text-ink-900" : "text-ink-500 hover:bg-ink-50"
                 }`
               }
@@ -184,7 +184,7 @@ function OrgSection() {
           </p>
         )}
         {lastInviteToken && (
-          <div className="mt-3 rounded-lg bg-ink-50 p-3 text-sm">
+          <div className="mt-3 rounded-xl bg-ink-50 p-3 text-sm">
             <p className="mb-1 font-medium text-ink-700">Invitación creada. Compartí este código:</p>
             <code className="break-all text-xs text-ink-600">{lastInviteToken}</code>
             <p className="mt-1 text-xs text-ink-400">
@@ -286,7 +286,7 @@ function DictionarySection() {
           value={term}
           onChange={(event) => setTerm(event.target.value)}
           placeholder="ej: DOE, Testra, Typely"
-          className="min-w-[180px] flex-1 rounded-lg border border-ink-200 px-3 py-2 text-sm focus:border-accent-500 focus:outline-none"
+          className="min-w-[180px] flex-1 rounded-xl border border-ink-200 px-3 py-2 text-sm focus:border-accent-500 focus:outline-none"
         />
         <Select
           ariaLabel="Tipo"
@@ -380,7 +380,7 @@ function TemplateSection() {
           value={body}
           onChange={(event) => setBody(event.target.value)}
           rows={20}
-          className="w-full rounded-lg border border-ink-200 p-4 font-mono text-sm leading-relaxed focus:border-accent-500 focus:outline-none"
+          className="w-full rounded-xl border border-ink-200 p-4 font-mono text-sm leading-relaxed focus:border-accent-500 focus:outline-none"
         />
         <div className="flex items-center gap-3">
           <Button onClick={() => save.mutate()} disabled={save.isPending}>
@@ -634,7 +634,7 @@ function PrivacySection() {
           )}
         </div>
         {confirming && (
-          <div className="mt-4 rounded-2xl bg-red-50 p-4 text-sm text-red-900">
+          <div className="mt-4 rounded-3xl bg-red-50 p-4 text-sm text-red-900">
             <p className="font-medium">¿Pedir la baja de tu cuenta?</p>
             <p className="mt-1 text-red-800">
               Becode borra tu cuenta y tus datos personales dentro de los 5 días hábiles. Las reuniones que hiciste para
@@ -655,7 +655,7 @@ function PrivacySection() {
           </div>
         )}
         {deletion?.requested_at && (
-          <p className="mt-4 rounded-2xl bg-ink-50 px-4 py-3 text-sm text-ink-600">
+          <p className="mt-4 rounded-3xl bg-ink-50 px-4 py-3 text-sm text-ink-600">
             Pediste la baja el {new Date(deletion.requested_at).toLocaleDateString("es-AR")}. Becode la procesa dentro de
             los 5 días hábiles y te avisa por mail.
           </p>
@@ -968,13 +968,13 @@ function NumberingSection() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:max-w-md">
-        <div className="rounded-lg bg-ink-50 px-4 py-3">
+        <div className="rounded-xl bg-ink-50 px-4 py-3">
           <p className="text-xs text-ink-500">Última asignada</p>
           <p className="text-xl font-semibold tabular-nums text-ink-900">
             {numbering.last_assigned != null ? `N.º ${numbering.last_assigned}` : "—"}
           </p>
         </div>
-        <div className="rounded-lg bg-ink-50 px-4 py-3">
+        <div className="rounded-xl bg-ink-50 px-4 py-3">
           <p className="text-xs text-ink-500">Próxima</p>
           <p className="text-xl font-semibold tabular-nums text-ink-900">N.º {numbering.next_number}</p>
         </div>
@@ -1077,15 +1077,15 @@ function DriveSection() {
       </div>
 
       {oauthError && (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{oauthError}</p>
+        <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{oauthError}</p>
       )}
       {justConnected && drive?.connected && (
-        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+        <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
           Drive conectado.
         </p>
       )}
       {drive?.last_error && (
-        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
           Última subida fallida: {drive.last_error}
         </p>
       )}
@@ -1192,12 +1192,12 @@ function MyDriveSection() {
         </p>
       </div>
 
-      {oauthError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{oauthError}</p>}
+      {oauthError && <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{oauthError}</p>}
       {justConnected && drive?.connected && (
-        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">Drive conectado.</p>
+        <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">Drive conectado.</p>
       )}
       {drive?.last_error && (
-        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
           Última subida fallida: {drive.last_error}
         </p>
       )}
@@ -1301,7 +1301,7 @@ function MyVoiceSection() {
         </div>
 
         {voice?.has_sample && (
-          <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <div className="rounded-3xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
             Tu voz está guardada
             {voice.recorded_at && ` desde el ${new Date(voice.recorded_at).toLocaleDateString("es-AR")}`}.
             {(voice.learned_count ?? 0) > 0 &&

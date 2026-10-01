@@ -208,7 +208,7 @@ function Welcome({ onPick, wide }: { onPick: (question: string) => void; wide: b
       <p className="mt-1.5 text-[15px] leading-relaxed text-ink-500">
         Echo busca en todas tus reuniones y te dice de cuál sale cada respuesta.
       </p>
-      <div className="mt-6 overflow-hidden rounded-2xl border border-ink-100 bg-white">
+      <div className="mt-6 overflow-hidden rounded-3xl border border-ink-100 bg-white">
         {SUGGESTIONS.map((suggestion, index) => (
           <button
             key={suggestion}

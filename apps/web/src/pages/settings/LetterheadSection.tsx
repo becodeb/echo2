@@ -77,7 +77,7 @@ export function LetterheadSection() {
 
       <div className="space-y-4">
         <div className="flex items-start gap-4">
-          <div className="flex h-20 w-32 shrink-0 items-center justify-center rounded-lg border border-dashed border-ink-200 bg-ink-50">
+          <div className="flex h-20 w-32 shrink-0 items-center justify-center rounded-xl border border-dashed border-ink-200 bg-ink-50">
             {form.logo_data_url ? (
               <img src={form.logo_data_url} alt="Logo" className="max-h-16 max-w-[7rem] object-contain" />
             ) : (
@@ -85,7 +85,7 @@ export function LetterheadSection() {
             )}
           </div>
           <div className="space-y-2">
-            <label className="inline-flex cursor-pointer items-center rounded-lg bg-ink-100 px-3.5 py-2 text-sm font-medium text-ink-800 hover:bg-ink-200">
+            <label className="inline-flex cursor-pointer items-center rounded-xl bg-ink-100 px-3.5 py-2 text-sm font-medium text-ink-800 hover:bg-ink-200">
               {form.logo_data_url ? "Cambiar logo" : "Subir logo"}
               <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden" onChange={onLogo} />
             </label>
@@ -106,7 +106,7 @@ export function LetterheadSection() {
             onChange={(event) => setLinesText(event.target.value)}
             rows={4}
             placeholder={"Dirección General de Cultura y Educación\nRegión 11\nDistrito Escobar"}
-            className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm leading-relaxed focus:border-accent-500 focus:outline-none"
+            className="w-full rounded-xl border border-ink-200 px-3 py-2 text-sm leading-relaxed focus:border-accent-500 focus:outline-none"
           />
         </label>
 
@@ -134,7 +134,7 @@ export function LetterheadSection() {
             onChange={(event) => setSignaturesText(event.target.value)}
             rows={3}
             placeholder={"Firma docente\nFirma familia"}
-            className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm leading-relaxed focus:border-accent-500 focus:outline-none"
+            className="w-full rounded-xl border border-ink-200 px-3 py-2 text-sm leading-relaxed focus:border-accent-500 focus:outline-none"
           />
         </label>
 

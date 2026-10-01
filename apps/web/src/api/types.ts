@@ -3,6 +3,7 @@ export interface UserOut {
   email: string;
   name: string;
   avatar_color: string;
+  avatar_url?: string | null;
   job_title: string | null;
   locale: string;
   /** Superadmin de la instalación: ve todas las organizaciones, no solo las suyas. */

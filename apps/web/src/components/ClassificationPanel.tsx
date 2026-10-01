@@ -156,7 +156,7 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
     const nothingSet =
       !classification?.family_id && !classification?.reason_id && !classification?.severity;
     return (
-      <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-ink-100 bg-white px-4 py-3">
+      <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-ink-100 bg-white px-4 py-3">
         {nothingSet ? (
           <span className="text-sm text-ink-500">Esta reunión no está clasificada.</span>
         ) : (
@@ -207,7 +207,7 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
   }
 
   return (
-    <div className="mt-4 space-y-4 rounded-lg border border-ink-100 bg-white px-4 py-4">
+    <div className="mt-4 space-y-4 rounded-xl border border-ink-100 bg-white px-4 py-4">
       <Select
         label="¿Con quién fue?"
         value={audience}
@@ -259,7 +259,7 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
           <button
             type="button"
             onClick={() => setSeverity("")}
-            className={`rounded-lg border px-3 py-1.5 text-sm ${
+            className={`rounded-xl border px-3 py-1.5 text-sm ${
               severity === "" ? "border-ink-900 bg-ink-900 text-white" : "border-ink-200 text-ink-600"
             }`}
           >
@@ -270,7 +270,7 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
               key={item.value}
               type="button"
               onClick={() => setSeverity(item.value)}
-              className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm ${
+              className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-sm ${
                 severity === item.value
                   ? "border-ink-900 bg-ink-900 text-white"
                   : "border-ink-200 text-ink-600"

@@ -54,7 +54,7 @@ export default function Tasks() {
     <div className="mx-auto max-w-4xl px-6 py-10">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight text-ink-900">Mi trabajo</h1>
-        <div className="flex rounded-lg bg-ink-100 p-1">
+        <div className="flex rounded-xl bg-ink-100 p-1">
           {(["mine", "all"] as const).map((option) => (
             <button
               key={option}

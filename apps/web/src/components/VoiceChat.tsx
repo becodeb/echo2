@@ -388,7 +388,7 @@ export function VoiceChat({ onClose }: { onClose: () => void }) {
         {active && lastLine && (
           <p
             key={lastLine}
-            className="animate-fade-up max-w-md rounded-2xl border border-ink-200/80 bg-white/90 px-4 py-2.5 text-[15px] leading-relaxed text-ink-700 shadow-sm backdrop-blur"
+            className="animate-fade-up max-w-md rounded-3xl border border-ink-200/80 bg-white/90 px-4 py-2.5 text-[15px] leading-relaxed text-ink-700 shadow-sm backdrop-blur"
           >
             {lastLine}
           </p>
@@ -445,7 +445,7 @@ export function VoiceChat({ onClose }: { onClose: () => void }) {
         )}
 
         {error && (
-          <p role="alert" className="max-w-sm rounded-2xl border border-red-200 bg-white px-4 py-2.5 text-sm text-red-700 shadow-sm">
+          <p role="alert" className="max-w-sm rounded-3xl border border-red-200 bg-white px-4 py-2.5 text-sm text-red-700 shadow-sm">
             {error}{" "}
             <button type="button" onClick={() => void loadStatus()} className="font-semibold underline underline-offset-2">
               Probar de nuevo

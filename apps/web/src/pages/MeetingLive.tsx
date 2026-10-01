@@ -964,7 +964,7 @@ export default function MeetingLive() {
               </div>
 
               {homeScreenApp && (
-                <div className="w-full space-y-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left text-sm text-amber-900">
+                <div className="w-full space-y-2 rounded-3xl border border-amber-200 bg-amber-50 p-4 text-left text-sm text-amber-900">
                   <p>
                     <strong>Estás en la app instalada.</strong> Acá el iPhone corta el micrófono si
                     bloqueás la pantalla o cambiás de app (desde Safari no pasa).
@@ -983,7 +983,7 @@ export default function MeetingLive() {
               {/* Abajo y fijo en el celular, como la barra de acción de ElevenLabs. */}
               <div className="sticky bottom-0 -mx-6 w-[calc(100%+3rem)] bg-gradient-to-t from-[#fafbfc] via-[#fafbfc] to-transparent px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 sm:static sm:mx-0 sm:w-full sm:bg-none sm:p-0">
                 {error && (
-                  <p role="alert" className="animate-fade-up mb-3 rounded-xl bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
+                  <p role="alert" className="animate-fade-up mb-3 rounded-2xl bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
                     {error}
                   </p>
                 )}
@@ -1057,10 +1057,10 @@ export default function MeetingLive() {
             )}
 
             {warning && (
-              <p className="mt-4 rounded-lg bg-amber-50 p-2.5 text-xs text-amber-700">{warning}</p>
+              <p className="mt-4 rounded-xl bg-amber-50 p-2.5 text-xs text-amber-700">{warning}</p>
             )}
             {!wsConnected && recording && (
-              <p className="mt-4 rounded-lg bg-red-50 p-2.5 text-xs text-red-700">
+              <p className="mt-4 rounded-xl bg-red-50 p-2.5 text-xs text-red-700">
                 Reconectando con el servidor… el transcript confirmado no se pierde.
               </p>
             )}
@@ -1161,7 +1161,7 @@ export default function MeetingLive() {
             onChange={(event) => setNoteText(event.target.value)}
             autoFocus
             rows={3}
-            className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm focus:border-accent-500 focus:outline-none"
+            className="w-full rounded-xl border border-ink-200 px-3 py-2 text-sm focus:border-accent-500 focus:outline-none"
             placeholder="Escribí el contenido…"
           />
           <div className="flex justify-end gap-2">

@@ -103,14 +103,14 @@ export default function MeetingDetail() {
         </p>
         {!internal && <ClassificationPanel meetingId={meeting.id} />}
         {meeting.meta?.people_status === "pending" && (
-          <p className="animate-fade-up mt-3 flex items-center gap-2 rounded-2xl bg-ink-50 px-3.5 py-2.5 text-sm text-ink-600">
+          <p className="animate-fade-up mt-3 flex items-center gap-2 rounded-3xl bg-ink-50 px-3.5 py-2.5 text-sm text-ink-600">
             <Spinner className="h-3.5 w-3.5 shrink-0 text-ink-400" />
             Todavía estamos separando quién habló. El transcript se actualiza solo cuando termine; no gasta créditos
             hasta entonces.
           </p>
         )}
         {meeting.meta?.text_status === "pending" && (
-          <p className="animate-fade-up mt-3 flex items-center gap-2 rounded-2xl bg-ink-50 px-3.5 py-2.5 text-sm text-ink-600">
+          <p className="animate-fade-up mt-3 flex items-center gap-2 rounded-3xl bg-ink-50 px-3.5 py-2.5 text-sm text-ink-600">
             <Spinner className="h-3.5 w-3.5 shrink-0 text-ink-400" />
             La transcripción completa se demora: por ahora ves el texto tomado en vivo. Echo lo reintenta solo y te
             avisa cuando esté.
@@ -120,7 +120,7 @@ export default function MeetingDetail() {
           <p className="mt-3 text-xs text-ink-400">Hablan menores de 18: esta reunión se transcribió sin separar quién habló.</p>
         )}
         {aiSkipped && (
-          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
+          <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-700">
             El análisis con IA se salteó porque el servicio de IA no estaba disponible en ese momento.
           </p>
         )}
@@ -499,7 +499,7 @@ function TranscriptTab({
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Buscar en el transcript…"
-          className="w-64 rounded-lg border border-ink-200 px-3 py-1.5 text-sm focus:border-accent-500 focus:outline-none"
+          className="w-64 rounded-xl border border-ink-200 px-3 py-1.5 text-sm focus:border-accent-500 focus:outline-none"
         />
         {lowConfidence > 0 && (
           <Badge tone="amber">{lowConfidence} fragmentos podrían necesitar revisión</Badge>
@@ -519,7 +519,7 @@ function TranscriptTab({
             <div
               key={segment.id}
               id={`seg-${segment.id}`}
-              className={`group rounded-lg px-3 py-2 transition-colors ${highlighted ? "bg-accent-500/10" : "hover:bg-ink-50"}`}
+              className={`group rounded-xl px-3 py-2 transition-colors ${highlighted ? "bg-accent-500/10" : "hover:bg-ink-50"}`}
             >
               <div className="mb-0.5 flex items-baseline gap-2 text-xs">
                 <span className="font-mono tabular-nums text-ink-400">{formatMs(segment.start_ms)}</span>
@@ -562,7 +562,7 @@ function TranscriptTab({
             value={editText}
             onChange={(event) => setEditText(event.target.value)}
             rows={4}
-            className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm focus:border-accent-500 focus:outline-none"
+            className="w-full rounded-xl border border-ink-200 px-3 py-2 text-sm focus:border-accent-500 focus:outline-none"
           />
           <p className="text-xs text-ink-400">
             La versión original se conserva en el historial del fragmento.
@@ -796,7 +796,7 @@ function MinutesTab({ meetingId, minutesTitle }: { meetingId: string; minutesTit
     return (
       <div className="space-y-4">
         {generating && !generationFailed && (
-          <div className="flex items-center gap-2 rounded-lg bg-ink-50 px-4 py-3 text-sm text-ink-600">
+          <div className="flex items-center gap-2 rounded-xl bg-ink-50 px-4 py-3 text-sm text-ink-600">
             <Spinner /> Echo está redactando una versión nueva…
           </div>
         )}
@@ -842,18 +842,18 @@ function MinutesTab({ meetingId, minutesTitle }: { meetingId: string; minutesTit
   return (
     <div className="space-y-4">
       {generationFailed && (
-        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
           <span className="font-medium">No se pudo regenerar el acta.</span>{" "}
           {minutes.generation_error} Abajo seguís viendo la última versión que sí se generó.
         </div>
       )}
       {generating && !generationFailed && (
-        <div className="flex items-center gap-2 rounded-lg bg-ink-50 px-4 py-3 text-sm text-ink-600">
+        <div className="flex items-center gap-2 rounded-xl bg-ink-50 px-4 py-3 text-sm text-ink-600">
           <Spinner /> Echo está redactando una versión nueva…
         </div>
       )}
       {verifying && !generating && (
-        <div className="flex items-center gap-2 rounded-lg bg-ink-50 px-4 py-3 text-sm text-ink-600">
+        <div className="flex items-center gap-2 rounded-xl bg-ink-50 px-4 py-3 text-sm text-ink-600">
           <Spinner /> El acta ya está lista. Echo sigue verificando cada afirmación contra el transcript…
         </div>
       )}
@@ -914,7 +914,7 @@ function MinutesTab({ meetingId, minutesTitle }: { meetingId: string; minutesTit
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             rows={24}
-            className="w-full rounded-lg border border-ink-200 p-4 font-mono text-sm leading-relaxed focus:border-accent-500 focus:outline-none"
+            className="w-full rounded-xl border border-ink-200 p-4 font-mono text-sm leading-relaxed focus:border-accent-500 focus:outline-none"
           />
           <div className="mt-3 flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setEditing(false)}>Cancelar</Button>
@@ -1057,7 +1057,7 @@ function ChatTab({ meetingId, onJump }: { meetingId: string; onJump: (ms: number
         {messages.map((message, index) => (
           <div key={index} className={message.role === "user" ? "flex justify-end" : "flex justify-start"}>
             <div
-              className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed ${
+              className={`max-w-[85%] rounded-3xl px-4 py-2.5 text-[15px] leading-relaxed ${
                 message.role === "user" ? "bg-ink-900 text-white" : "bg-ink-50 text-ink-900"
               }`}
             >
@@ -1101,7 +1101,7 @@ function ChatTab({ meetingId, onJump }: { meetingId: string; onJump: (ms: number
           value={input}
           onChange={(event) => setInput(event.target.value)}
           placeholder="Preguntá algo sobre esta reunión…"
-          className="flex-1 rounded-xl border border-ink-200 px-4 py-2.5 text-sm focus:border-accent-500 focus:outline-none"
+          className="flex-1 rounded-2xl border border-ink-200 px-4 py-2.5 text-sm focus:border-accent-500 focus:outline-none"
         />
         <Button type="submit" disabled={ask.isPending || !input.trim()}>Enviar</Button>
       </form>
@@ -1200,7 +1200,7 @@ function ShareButton({ meetingId }: { meetingId: string }) {
               const url = `${location.origin}/s/${link.token}`;
               return (
                 <div key={link.id} className="mb-2 flex items-center gap-2">
-                  <input readOnly value={url} className="min-w-0 flex-1 rounded-lg border border-ink-200 bg-ink-50 px-3 py-1.5 text-xs text-ink-600" />
+                  <input readOnly value={url} className="min-w-0 flex-1 rounded-xl border border-ink-200 bg-ink-50 px-3 py-1.5 text-xs text-ink-600" />
                   <Button
                     variant="soft"
                     onClick={() => {

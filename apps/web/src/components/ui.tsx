@@ -1,4 +1,4 @@
-import { type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, useEffect } from "react";
+import { type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, useEffect, useState } from "react";
 import { EchoFace, type EchoMood } from "./EchoFace";
 
 export function Button({
@@ -7,7 +7,7 @@ export function Button({
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "danger" | "soft" }) {
   const base =
-    "inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500";
+    "inline-flex min-h-10 items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500";
   const variants = {
     primary: "bg-ink-900 text-white hover:bg-ink-700",
     soft: "bg-ink-100 text-ink-800 hover:bg-ink-200",
@@ -26,7 +26,7 @@ export function Input({
     <label className="block">
       {label && <span className="mb-1.5 block text-sm font-medium text-ink-700">{label}</span>}
       <input
-        className={`w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 ${className}`}
+        className={`w-full rounded-full border border-ink-200 bg-white px-4 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 ${className}`}
         {...props}
       />
     </label>
@@ -35,7 +35,7 @@ export function Input({
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-xl border border-ink-100 bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] ${className}`}>
+    <div className={`rounded-3xl border border-ink-100/80 bg-white p-6 shadow-[0_1px_2px_rgba(16,24,40,0.03)] ${className}`}>
       {children}
     </div>
   );
@@ -134,13 +134,13 @@ export function Modal({
       aria-label={title}
     >
       <div
-        className={`animate-fade-up mb-4 w-full ${wide ? "max-w-3xl" : "max-w-lg"} rounded-2xl border border-ink-100 bg-white p-5 shadow-xl sm:p-6`}
+        className={`animate-fade-up mb-4 w-full ${wide ? "max-w-3xl" : "max-w-lg"} rounded-3xl border border-ink-100 bg-white p-5 shadow-xl sm:p-7`}
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-ink-900">{title}</h2>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-700"
+            className="rounded-full p-2 text-ink-400 hover:bg-ink-100 hover:text-ink-700"
             aria-label="Cerrar"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -154,12 +154,40 @@ export function Modal({
   );
 }
 
-export function Avatar({ name, color, size = 28 }: { name: string; color: string; size?: number }) {
+/** La foto de la cuenta de Google si hay; si no (o si no carga), las iniciales. */
+export function Avatar({
+  name,
+  color,
+  size = 28,
+  src,
+}: {
+  name: string;
+  color: string;
+  size?: number;
+  src?: string | null;
+}) {
+  const [broken, setBroken] = useState(false);
   const initials = name
     .split(" ")
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? "")
     .join("");
+  if (src && !broken) {
+    return (
+      <img
+        src={src}
+        alt=""
+        width={size}
+        height={size}
+        // Google no sirve la foto si le llega el referer de otro sitio.
+        referrerPolicy="no-referrer"
+        onError={() => setBroken(true)}
+        className="inline-block shrink-0 rounded-full bg-ink-100 object-cover"
+        style={{ width: size, height: size }}
+        aria-hidden
+      />
+    );
+  }
   return (
     <span
       className="inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-white"
