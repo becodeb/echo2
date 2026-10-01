@@ -332,3 +332,19 @@ def test_imports_count_and_respect_the_audio_hours(client):
     sent = client.post(f"/api/meetings/{imported}/import", files={"file": ("a.mp3", b"ID3", "audio/mpeg")},
                        headers=user.headers)
     assert sent.status_code == 429 and "audio" in sent.json()["detail"]
+
+
+def test_every_model_echo_uses_has_a_price():
+    """Un modelo sin precio sale "sin precio" en el Panel de Becode: no puede pasar."""
+    from echo_api.services import voice_agent
+    from echo_api.services.ai_settings import _default_model
+    from echo_api.services.stt.base import GROQ_MODEL, SCRIBE_MODEL
+
+    for provider in ("openai", "groq"):
+        assert plans.llm_cost(_default_model(provider), 1000, 1000) is not None, provider
+    assert plans.llm_cost(voice_agent.AGENT_LLM, 1000, 1000) is not None
+    assert plans.embedding_cost("text-embedding-3-small", 1000) is not None
+    assert plans.stt_cost("groq", GROQ_MODEL, 3600) == 0.04
+    assert plans.stt_cost("elevenlabs", SCRIBE_MODEL, 3600) == 0.22
+    assert plans.stt_cost("elevenlabs", SCRIBE_MODEL, 3600, keyterms=True, entities=True) == 0.34
+    assert voice_agent.voice_cost(60) == 0.08

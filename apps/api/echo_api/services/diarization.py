@@ -563,6 +563,7 @@ async def _people_pass(
         return None
 
     retry = {
+        "keyterms": bool(vocabulary),
         "credits": decision.credits,
         "covered_by": decision.covered_by,
         "total_ms": total_ms,
@@ -595,7 +596,8 @@ async def _charge(
     Los créditos ya estaban reservados al decidir: la reserva pasa a ser el consumo.
     """
     seconds = (retry["total_ms"] + int(retry.get("offset_ms") or 0)) / 1000
-    cost = plans.stt_cost("elevenlabs", SCRIBE_MODEL, seconds, keyterms=True, entities=True)
+    # El diccionario (keyterms) se cobra solo si se mandó alguno.
+    cost = plans.stt_cost("elevenlabs", SCRIBE_MODEL, seconds, keyterms=retry.get("keyterms", True), entities=True)
     async with SessionLocal() as db:
         hold = await db.get(UsageEvent, uuid.UUID(retry["hold_id"])) if retry.get("hold_id") else None
         if hold is not None:

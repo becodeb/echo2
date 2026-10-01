@@ -31,8 +31,17 @@ from ..models.billing import PLAN_BASE
 
 ARGENTINA = timezone(timedelta(hours=-3))
 
-# Precios de los proveedores, en dólares (30/9/2026). Son costos nuestros, no
-# topes: sirven para el panel de consumo.
+# Precios de los proveedores, en dólares. Son costos nuestros, no topes:
+# sirven para el panel de consumo. Verificados el 1/10/2026 en:
+# - Groq: console.groq.com/docs/model/whisper-large-v3-turbo ($0,04/h) y
+#   console.groq.com/docs/model/openai/gpt-oss-120b ($0,15 / $0,60 por Mtok).
+# - ElevenLabs: elevenlabs.io/pricing/api (Scribe v2 $0,22/h; keyterms
+#   +$0,05/h; entidades +$0,07/h; Agents $0,08/min sin el LLM).
+# - OpenAI: developers.openai.com/api/docs/pricing (gpt-6-luna contexto corto
+#   $0,10 / $0,50; text-embedding-3-small $0,02).
+# - Google: ai.google.dev/gemini-api/docs/pricing (gemini-3.5-flash-lite
+#   $0,30 / $2,50), el LLM del agente de voz que ElevenLabs cobra aparte.
+# test_plans.py falla si un modelo que Echo usa no tiene precio.
 PRICE_PER_HOUR = {
     ("groq", "whisper-large-v3-turbo"): 0.04,
     ("groq", "whisper-large-v3"): 0.111,
@@ -53,6 +62,10 @@ GROQ_MIN_BILLED_SECONDS = 10
 # confirmados; un modelo que no está acá se anota con sus tokens y sin costo
 # ("precio desconocido" en el panel) en vez de inventar un número.
 LLM_PRICE_PER_MTOK = {
+    # Contexto corto (lo que usan el acta y el chat); el largo cuesta el doble.
+    "gpt-6-luna": (0.10, 0.50),
+    "openai/gpt-oss-120b": (0.15, 0.60),
+    "gemini-3.5-flash-lite": (0.30, 2.50),
     "gpt-4o-mini": (0.15, 0.60),
     "gpt-4o": (2.50, 10.00),
 }
