@@ -78,7 +78,11 @@ def agent_config(voice_id: str | None = None, llm: str = AGENT_LLM) -> dict:
             "agent": {
                 "language": "es",
                 "first_message": FIRST_MESSAGE,
-                "dynamic_variables": {"dynamic_variable_placeholders": {"user_name": ""}},
+                # echo_user y echo_org: para anotar el consumo desde el servidor
+                # aunque el navegador no avise al cortar (reconcile_usage).
+                "dynamic_variables": {
+                    "dynamic_variable_placeholders": {"user_name": "", "echo_user": "", "echo_org": ""}
+                },
                 "prompt": {
                     "prompt": PROMPT,
                     "llm": llm,
@@ -87,18 +91,51 @@ def agent_config(voice_id: str | None = None, llm: str = AGENT_LLM) -> dict:
                     "built_in_tools": {"end_call": {"name": "end_call", "type": "system", "params": {"system_tool_type": "end_call"}}},
                 },
             },
-            "tts": {"model_id": TTS_MODEL, "voice_id": voice_id or get_settings().elevenlabs_agent_voice_id or DEFAULT_VOICE_ID},
+            "tts": {"model_id": TTS_MODEL, "voice_id": voice_id or current_voice_id()},
             "conversation": {"max_duration_seconds": MAX_CONVERSATION_SECONDS},
         },
     }
+
+
+def current_voice_id() -> str:
+    return get_settings().elevenlabs_agent_voice_id or DEFAULT_VOICE_ID
 
 
 def _headers() -> dict:
     return {"xi-api-key": get_settings().elevenlabs_api_key}
 
 
+async def ensure_voice(voice_id: str) -> None:
+    """Agrega la voz de la biblioteca a la cuenta si todavía no está.
+
+    Una voz de la biblioteca que no está en "Mis voces" puede no andar en
+    un agente: la conversación se cortaba apenas empezaba.
+    """
+    root = "https://api.elevenlabs.io/v1"
+    async with httpx.AsyncClient(timeout=60) as client:
+        mine = await client.get(f"{root}/voices/{voice_id}", headers=_headers())
+        if mine.status_code == 200:
+            return
+        found = await client.get(f"{root}/shared-voices", headers=_headers(), params={"search": voice_id, "page_size": 5})
+        found.raise_for_status()
+        shared = next((v for v in found.json().get("voices") or [] if v.get("voice_id") == voice_id), None)
+        if shared is None:
+            raise RuntimeError(f"La voz {voice_id} no está en la biblioteca de ElevenLabs")
+        added = await client.post(
+            f"{root}/voices/add/{shared['public_owner_id']}/{voice_id}",
+            headers=_headers(),
+            json={"new_name": f"Echo · {shared.get('name', 'voz')}"[:60]},
+        )
+        if added.status_code >= 400:
+            raise RuntimeError(f"No se pudo agregar la voz a la cuenta: {added.text[:200]}")
+
+
 async def create_or_update_agent(agent_id: str | None = None, voice_id: str | None = None, llm: str = AGENT_LLM) -> str:
     """Crea el agente de Echo (o lo actualiza si ya existe). Devuelve su id."""
+    try:
+        await ensure_voice(voice_id or current_voice_id())
+    except Exception as exc:  # noqa: BLE001 - se sigue: el agente igual puede andar
+        log.warning("voz: no se pudo preparar la voz del agente: %s", exc)
     async with httpx.AsyncClient(timeout=60) as client:
         if agent_id:
             response = await client.patch(f"{API}/agents/{agent_id}", headers=_headers(), json=agent_config(voice_id, llm))
@@ -122,6 +159,47 @@ async def conversation_details(conversation_id: str) -> dict:
         response = await client.get(f"{API}/conversations/{conversation_id}", headers=_headers())
         response.raise_for_status()
         return response.json()
+
+
+async def agent_status(agent_id: str | None) -> tuple[bool, str]:
+    """(anda, detalle) para el panel de Becode."""
+    if not get_settings().elevenlabs_api_key:
+        return False, "Falta ELEVENLABS_API_KEY en el servidor."
+    if not agent_id:
+        return False, "Todavía no se creó el agente."
+    async with httpx.AsyncClient(timeout=30) as client:
+        response = await client.get(f"{API}/agents/{agent_id}", headers=_headers())
+    if response.status_code >= 400:
+        return False, f"ElevenLabs respondió {response.status_code}: {response.text[:200]}"
+    config = (response.json().get("conversation_config") or {})
+    tts = config.get("tts") or {}
+    llm = ((config.get("agent") or {}).get("prompt") or {}).get("llm")
+    return True, f"Voz {tts.get('voice_id')} · {tts.get('model_id')} · {llm}"
+
+
+async def recent_conversations(agent_id: str, pages: int = 3) -> list[dict]:
+    """Las últimas conversaciones del agente (más nuevas primero)."""
+    out: list[dict] = []
+    cursor = None
+    async with httpx.AsyncClient(timeout=30) as client:
+        for _ in range(pages):
+            params = {"agent_id": agent_id, "page_size": 100}
+            if cursor:
+                params["cursor"] = cursor
+            response = await client.get(f"{API}/conversations", headers=_headers(), params=params)
+            response.raise_for_status()
+            data = response.json()
+            out += data.get("conversations") or []
+            cursor = data.get("next_cursor")
+            if not data.get("has_more") or not cursor:
+                break
+    return out
+
+
+def conversation_owner(details: dict) -> tuple[str | None, str | None]:
+    """(user_id, org_id) que el navegador mandó al abrir la conversación."""
+    variables = ((details.get("conversation_initiation_client_data") or {}).get("dynamic_variables")) or {}
+    return variables.get("echo_user") or None, variables.get("echo_org") or None
 
 
 def voice_cost(seconds: float) -> float:

@@ -82,6 +82,9 @@ CÓMO RAZONAR:
 class ChatIn(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
     history: list[dict] = Field(default_factory=list, max_length=12)
+    # Pregunta que hace el agente de voz (ElevenLabs): sin reuniones donde
+    # hablan menores, que no van a ElevenLabs (docs/plan-transcripcion-y-planes.md §4).
+    voice: bool = False
 
 
 class SourceOut(BaseModel):
@@ -250,6 +253,7 @@ async def _ask(
     question: str,
     history: list[dict],
     meeting_id: uuid.UUID | None,
+    exclude_minors: bool = False,
 ) -> ChatOut:
     llm_config = await resolve_llm(db, ctx.org_id)
     if llm_config is None:
@@ -262,6 +266,25 @@ async def _ask(
     # En el chat de una reunión ya se verificó el acceso a esa reunión; en el
     # global, el transcript se busca solo entre las que puede ver.
     visible_ids = None if meeting_id else await visible_meeting_id_list(db, scope)
+    if exclude_minors and meeting_id is None:
+        if visible_ids is None:
+            visible_ids = list(
+                (
+                    await db.execute(
+                        select(Meeting.id).where(Meeting.organization_id == ctx.org_id, Meeting.deleted_at.is_(None))
+                    )
+                ).scalars()
+            )
+        with_minors = set(
+            (
+                await db.execute(
+                    select(Meeting.id).where(
+                        Meeting.id.in_(visible_ids or [uuid.uuid4()]), Meeting.meta["minors"].astext == "true"
+                    )
+                )
+            ).scalars()
+        )
+        visible_ids = [mid for mid in visible_ids if mid not in with_minors]
     chunks = await retrieve_context(
         db, ctx.org_id, question, embeddings_config, meeting_id=meeting_id, limit=12,
         visible_ids=visible_ids,
@@ -355,4 +378,4 @@ async def global_chat(
 ):
     settings = get_settings()
     rate_limit(f"chat:{ctx.user.id}", settings.rate_limit_chat_per_minute)
-    return await _ask(db, ctx, data.question, data.history, None)
+    return await _ask(db, ctx, data.question, data.history, None, exclude_minors=data.voice)
