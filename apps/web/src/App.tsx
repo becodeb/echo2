@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "./state/auth";
 import { useMyAccess } from "./state/access";
@@ -9,28 +9,55 @@ import Register from "./pages/Register";
 import OnboardingOrg from "./pages/OnboardingOrg";
 import Dashboard from "./pages/Dashboard";
 
-const MeetingLive = lazy(() => import("./pages/MeetingLive"));
-const MeetingDetail = lazy(() => import("./pages/MeetingDetail"));
-const Meetings = lazy(() => import("./pages/Meetings"));
-const InternalMeetings = lazy(() => import("./pages/InternalMeetings"));
-const Projects = lazy(() => import("./pages/Projects"));
-const ProjectDetail = lazy(() => import("./pages/ProjectDetail"));
-const People = lazy(() => import("./pages/People"));
-const PersonDetail = lazy(() => import("./pages/PersonDetail"));
-const Tasks = lazy(() => import("./pages/Tasks"));
-const AskEcho = lazy(() => import("./pages/AskEcho"));
-const SearchPage = lazy(() => import("./pages/SearchPage"));
-const Settings = lazy(() => import("./pages/Settings"));
-const SharedView = lazy(() => import("./pages/SharedView"));
-const Admin = lazy(() => import("./pages/Admin"));
-const Families = lazy(() => import("./pages/Families"));
-const Reports = lazy(() => import("./pages/Reports"));
-const Landing = lazy(() => import("./pages/Landing"));
-const ActaPrint = lazy(() => import("./pages/ActaPrint"));
-const ChooseLevel = lazy(() => import("./pages/ChooseLevel"));
-const Plans = lazy(() => import("./pages/Plans"));
-const Usage = lazy(() => import("./pages/Usage"));
-const Legal = lazy(() => import("./pages/Legal"));
+const loadMeetingLive = () => import("./pages/MeetingLive");
+const MeetingLive = lazy(loadMeetingLive);
+const loadMeetingDetail = () => import("./pages/MeetingDetail");
+const MeetingDetail = lazy(loadMeetingDetail);
+const loadMeetings = () => import("./pages/Meetings");
+const Meetings = lazy(loadMeetings);
+const loadInternalMeetings = () => import("./pages/InternalMeetings");
+const InternalMeetings = lazy(loadInternalMeetings);
+const loadProjects = () => import("./pages/Projects");
+const Projects = lazy(loadProjects);
+const loadProjectDetail = () => import("./pages/ProjectDetail");
+const ProjectDetail = lazy(loadProjectDetail);
+const loadPeople = () => import("./pages/People");
+const People = lazy(loadPeople);
+const loadPersonDetail = () => import("./pages/PersonDetail");
+const PersonDetail = lazy(loadPersonDetail);
+const loadTasks = () => import("./pages/Tasks");
+const Tasks = lazy(loadTasks);
+const loadAskEcho = () => import("./pages/AskEcho");
+const AskEcho = lazy(loadAskEcho);
+const loadSearchPage = () => import("./pages/SearchPage");
+const SearchPage = lazy(loadSearchPage);
+const loadSettings = () => import("./pages/Settings");
+const Settings = lazy(loadSettings);
+const loadSharedView = () => import("./pages/SharedView");
+const SharedView = lazy(loadSharedView);
+const loadAdmin = () => import("./pages/Admin");
+const Admin = lazy(loadAdmin);
+const loadFamilies = () => import("./pages/Families");
+const Families = lazy(loadFamilies);
+const loadReports = () => import("./pages/Reports");
+const Reports = lazy(loadReports);
+const loadLanding = () => import("./pages/Landing");
+const Landing = lazy(loadLanding);
+const loadActaPrint = () => import("./pages/ActaPrint");
+const ActaPrint = lazy(loadActaPrint);
+const loadChooseLevel = () => import("./pages/ChooseLevel");
+const ChooseLevel = lazy(loadChooseLevel);
+const loadPlans = () => import("./pages/Plans");
+const Plans = lazy(loadPlans);
+const loadUsage = () => import("./pages/Usage");
+const Usage = lazy(loadUsage);
+const loadLegal = () => import("./pages/Legal");
+const Legal = lazy(loadLegal);
+
+// Las páginas se bajan de a una la primera vez que se abren, y mientras tanto
+// la pantalla quedaba vacía: al cambiar de sección "se teletransportaba". Con
+// la sesión abierta se bajan todas en segundo plano, así cambiar es inmediato.
+const PAGE_LOADERS = [loadMeetingLive, loadMeetingDetail, loadMeetings, loadInternalMeetings, loadProjects, loadProjectDetail, loadPeople, loadPersonDetail, loadTasks, loadAskEcho, loadSearchPage, loadSettings, loadAdmin, loadFamilies, loadReports, loadChooseLevel, loadPlans, loadUsage, loadLegal];
 
 function FullLoader() {
   return (
@@ -44,6 +71,16 @@ export default function App() {
   const { loading, user, organizations } = useAuth();
   const location = useLocation();
   const myAccess = useMyAccess();
+
+  useEffect(() => {
+    if (!user) return;
+    const prefetch = () => PAGE_LOADERS.forEach((load) => void load().catch(() => {}));
+    const idle = (window as Window & { requestIdleCallback?: (cb: () => void, options?: { timeout: number }) => number })
+      .requestIdleCallback;
+    // Con tope: en una pestaña de fondo el navegador puede no estar nunca "ocioso".
+    if (idle) idle(prefetch, { timeout: 4000 });
+    else window.setTimeout(prefetch, 1500);
+  }, [user]);
 
   if (location.pathname.startsWith("/s/")) {
     return (
@@ -123,7 +160,9 @@ export default function App() {
 
   return (
     <Layout>
-      <Suspense fallback={<FullLoader />}>
+      {/* Sin la carita a pantalla completa: dentro del marco, un instante en blanco
+          se ve como parte de la transición. */}
+      <Suspense fallback={<div className="h-full" />}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/meetings" element={<Meetings />} />

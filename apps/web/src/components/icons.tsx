@@ -14,7 +14,7 @@ function Svg({ children, size = 18 }: { children: ReactNode; size?: number }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.6"
+      strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden
@@ -50,12 +50,13 @@ export type IconName =
 export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   switch (name) {
     case "home":
+      // Como el de ElevenLabs: una casita de esquinas muy redondeadas, techo
+      // suave y la puerta como una línea abajo (cuadrícula de 18, trazo 1,5).
       return (
-        <Svg size={size}>
-          <path d="M4 10.4 11.2 4.6a1.3 1.3 0 0 1 1.6 0L20 10.4" />
-          <path d="M6 9v9.5A1.5 1.5 0 0 0 7.5 20h9a1.5 1.5 0 0 0 1.5-1.5V9" />
-          <path d="M10 20v-4.5a2 2 0 0 1 4 0V20" />
-        </Svg>
+        <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M5.8 12.2h6.4" />
+          <path d="M2.8 7.8c0-.9.4-1.7 1.1-2.3l3.6-2.9a2.4 2.4 0 0 1 3 0l3.6 2.9c.7.6 1.1 1.4 1.1 2.3v3.6c0 2.1-1.7 3.8-3.8 3.8H6.6c-2.1 0-3.8-1.7-3.8-3.8V7.8z" />
+        </svg>
       );
     case "meetings":
       return (

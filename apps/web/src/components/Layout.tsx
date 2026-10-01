@@ -205,7 +205,12 @@ export function Layout({ children }: { children: ReactNode }) {
             Estás viendo {activeOrg?.name} como superadmin. Queda registrado en su historial.
           </div>
         )}
-        <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto">
+          {/* Cada sección entra con un fundido corto en vez de aparecer de golpe. */}
+          <div key={location.pathname} className="page-in h-full">
+            {children}
+          </div>
+        </main>
       </div>
 
       {/* Panel de preguntas: al costado en la computadora, pantalla completa en el celular. */}
