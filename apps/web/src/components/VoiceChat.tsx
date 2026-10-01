@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import type { VoiceConversation } from "@elevenlabs/client";
 import { api, ApiError } from "../api/client";
-import { useBilling } from "./billing";
 import { EchoOrb, type OrbState } from "./EchoOrb";
 import { micErrorMessage } from "../lib/micError";
 
@@ -44,35 +42,6 @@ function micError(error: unknown): string {
  * se resuelve acá con el mismo "Preguntale a Echo" (con seudonimización y sin
  * las reuniones donde hablan menores).
  */
-export function VoiceChatButton() {
-  const { data: billing } = useBilling();
-  const [open, setOpen] = useState(false);
-  const close = useCallback(() => setOpen(false), []);
-  if (!billing) return null;
-  if (!billing.features.voice) {
-    return (
-      <Link
-        to="/plans"
-        className="inline-flex items-center gap-2 rounded-full border border-ink-200 bg-white px-3.5 py-1.5 text-sm font-medium text-ink-600 transition-colors hover:border-ink-300 hover:text-ink-900"
-      >
-        <MicIcon /> Hablale a Echo con el plan + voz
-      </Link>
-    );
-  }
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 rounded-full bg-ink-900 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-ink-700 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
-      >
-        <MicIcon /> Hablar con Echo
-      </button>
-      {open && <VoiceChat onClose={close} />}
-    </>
-  );
-}
-
 export function VoiceChat({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
   const [phase, setPhase] = useState<Phase>("idle");
@@ -297,14 +266,5 @@ export function VoiceChat({ onClose }: { onClose: () => void }) {
         )}
       </div>
     </div>
-  );
-}
-
-function MicIcon({ size = 15 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
-      <rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M5 11a7 7 0 0 0 14 0M12 18v3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
   );
 }
