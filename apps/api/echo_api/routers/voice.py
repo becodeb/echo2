@@ -23,7 +23,7 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -42,6 +42,9 @@ router = APIRouter(tags=["voice"])
 RECONCILE_EVERY_SECONDS = 600
 # Una sesión que nadie cerró deja de contar como abierta esto después de su tope.
 OPEN_GRACE_SECONDS = 120
+# Lo que dura un link firmado de ElevenLabs: mientras tanto, una sesión que se
+# cortó sin conversación todavía podría usarse.
+SIGNED_URL_SECONDS = 15 * 60
 # Lock de Postgres para crear los agentes de a uno (dos charlas a la vez no
 # crean dos agentes).
 AGENTS_LOCK = 0x45_43_48_4F_56  # "ECHOV"
@@ -120,6 +123,23 @@ class SessionOut(BaseModel):
     dynamic_variables: dict[str, str]
 
 
+async def _reserved_seconds(db: AsyncSession, user_id: uuid.UUID) -> float:
+    """Los minutos de las sesiones entregadas que todavía no se concilian y
+    cuyo link sigue vivo: cortar antes de conectar no libera esos minutos, si
+    no abrir y cortar daría varios links de 10 minutos a la vez."""
+    since = datetime.now(UTC) - timedelta(seconds=SIGNED_URL_SECONDS)
+    reserved = (
+        await db.execute(
+            select(func.coalesce(func.sum(VoiceSession.allowed_seconds), 0)).where(
+                VoiceSession.user_id == user_id,
+                VoiceSession.conversation_id.is_(None),
+                VoiceSession.created_at > since,
+            )
+        )
+    ).scalar_one()
+    return float(reserved)
+
+
 async def _open_session(db: AsyncSession, user_id: uuid.UUID) -> VoiceSession | None:
     return (
         await db.execute(
@@ -137,7 +157,7 @@ async def start_session(ctx: OrgContext = Depends(get_org_context), db: AsyncSes
     allowed, total, used = await voice_allowance(db, ctx.user)
     if not allowed:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "La conversación por voz es parte del plan Individual + voz.")
-    left = None if total is None else max(0.0, total - used)
+    left = None if total is None else max(0.0, total - used - await _reserved_seconds(db, ctx.user.id))
     bucket = voice_agent.bucket_for(left)
     if bucket is None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Ya usaste los minutos de voz de este mes. Se renuevan el 1°.")
@@ -294,7 +314,12 @@ async def _session_for(db: AsyncSession, details: dict, agent_id: str) -> tuple[
     started = voice_agent.conversation_start(details)
     query = select(VoiceSession).where(VoiceSession.agent_id == agent_id, VoiceSession.conversation_id.is_(None))
     if started is not None:
-        query = query.where(VoiceSession.created_at <= datetime.fromtimestamp(started + 60, UTC))
+        # Solo las que pudieron abrir esta conversación: entregadas antes de que
+        # empezara y con el link todavía vivo.
+        query = query.where(
+            VoiceSession.created_at <= datetime.fromtimestamp(started + 60, UTC),
+            VoiceSession.created_at >= datetime.fromtimestamp(started - SIGNED_URL_SECONDS, UTC),
+        )
     return (await db.execute(query.order_by(VoiceSession.created_at.desc()).limit(1))).scalars().first(), False
 
 

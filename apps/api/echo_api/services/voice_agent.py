@@ -102,6 +102,10 @@ def agent_config(voice_id: str | None = None, llm: str = AGENT_LLM, max_seconds:
             "tts": {"model_id": TTS_MODEL, "voice_id": voice_id or current_voice_id()},
             "conversation": {"max_duration_seconds": max_seconds},
         },
+        # Solo con un link firmado que entrega el servidor de Echo: sin esto el
+        # agente es público y cualquiera con su id hablaría a cuenta de Becode,
+        # sin pasar por el límite de minutos.
+        "platform_settings": {"auth": {"enable_auth": True}},
     }
 
 

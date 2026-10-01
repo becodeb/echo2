@@ -323,3 +323,23 @@ def test_voice_comes_only_with_the_paid_voice_plan(client, monkeypatch):
     status = client.get("/api/voice/status", headers=user.headers).json()
     assert status["allowed"] is True and status["seconds_left"] == status["seconds_total"] == 30 * 60
     assert client.get("/api/billing/me", headers=user.headers).json()["features"]["voice"] is True
+
+
+def test_the_agents_only_take_signed_links(client, monkeypatch):
+    # Sin autenticación, cualquiera con el id del agente hablaría a cuenta de Becode.
+    for seconds in voice_agent.BUCKETS:
+        assert voice_agent.agent_config(max_seconds=seconds)["platform_settings"]["auth"]["enable_auth"] is True
+
+
+def test_cutting_before_connecting_does_not_free_the_minutes(client, monkeypatch):
+    _setup(monkeypatch)
+    # Le quedan 11 minutos.
+    user = _voice_user(client, used_seconds=30 * 60 - 11 * 60)
+    first = client.post("/api/voice/sessions", headers=user.headers).json()
+    assert first["max_seconds"] == 600
+    client.post("/api/voice/sessions/end", json={"session_id": first["session_id"]}, headers=user.headers)
+    # El link de la primera sigue vivo: sus 10 minutos quedan apartados.
+    second = client.post("/api/voice/sessions", headers=user.headers).json()
+    assert second["max_seconds"] == 60
+    client.post("/api/voice/sessions/end", json={"session_id": second["session_id"]}, headers=user.headers)
+    assert client.post("/api/voice/sessions", headers=user.headers).status_code == 409
