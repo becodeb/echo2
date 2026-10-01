@@ -115,8 +115,17 @@ def _context_block(chunks: list[dict], include_meeting: bool) -> str:
     return "\n".join(lines)
 
 
+def _without_minors(column):
+    """Condición para dejar afuera lo que cuelga de reuniones donde hablan menores."""
+    return column.not_in(select(Meeting.id).where(Meeting.meta["minors"].astext == "true"))
+
+
 async def _structured_block(
-    db: AsyncSession, org_id: uuid.UUID, meeting_id: uuid.UUID | None, scope: Scope
+    db: AsyncSession,
+    org_id: uuid.UUID,
+    meeting_id: uuid.UUID | None,
+    scope: Scope,
+    exclude_minors: bool = False,
 ) -> str:
     """Decisiones, tareas y reuniones como contexto estructurado.
 
@@ -125,11 +134,15 @@ async def _structured_block(
     `action_items` y `meetings`, no con los segmentos hablados.
 
     Todo filtrado por lo que quien pregunta puede ver: lo que entra acá le
-    llega al modelo y el modelo lo puede repetir en la respuesta.
+    llega al modelo y el modelo lo puede repetir en la respuesta. Con
+    `exclude_minors` (la voz) tampoco entra nada de reuniones con menores: lo
+    que el agente lee termina en ElevenLabs.
     """
     meetings_q = select(Meeting).where(
         Meeting.organization_id == org_id, Meeting.deleted_at.is_(None), meeting_filter(scope)
     )
+    if exclude_minors:
+        meetings_q = meetings_q.where(_without_minors(Meeting.id))
     if meeting_id:
         meetings_q = meetings_q.where(Meeting.id == meeting_id)
     meetings = (await db.execute(meetings_q.order_by(Meeting.started_at.asc()))).scalars().all()
@@ -163,6 +176,12 @@ async def _structured_block(
         questions_q = questions_q.where(Question.meeting_id == meeting_id)
         risks_q = risks_q.where(Risk.meeting_id == meeting_id)
         summaries_q = summaries_q.where(MeetingSummary.meeting_id == meeting_id)
+    if exclude_minors:
+        decisions_q = decisions_q.where(_without_minors(Decision.meeting_id))
+        tasks_q = tasks_q.where(or_(ActionItem.meeting_id.is_(None), _without_minors(ActionItem.meeting_id)))
+        questions_q = questions_q.where(_without_minors(Question.meeting_id))
+        risks_q = risks_q.where(_without_minors(Risk.meeting_id))
+        summaries_q = summaries_q.where(_without_minors(MeetingSummary.meeting_id))
     decisions = (await db.execute(decisions_q.limit(50))).scalars().all()
     tasks = (await db.execute(tasks_q.limit(50))).scalars().all()
     questions = (await db.execute(questions_q.limit(30))).scalars().all()
@@ -298,7 +317,7 @@ async def _ask(
                 entities, ensure_ascii=False, indent=1
             )
 
-    structured_block = await _structured_block(db, ctx.org_id, meeting_id, scope)
+    structured_block = await _structured_block(db, ctx.org_id, meeting_id, scope, exclude_minors=exclude_minors)
 
     if not chunks and not memory_block and not structured_block:
         # Sin contexto no se llama al modelo: dejarlo responder de memoria es

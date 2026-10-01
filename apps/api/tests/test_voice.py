@@ -182,3 +182,51 @@ def test_the_voice_agent_never_reads_meetings_with_minors(client, monkeypatch):
     voice_ids = {str(mid) for mid in seen[0]}
     assert with_minors not in voice_ids and adults in voice_ids
     assert with_minors in {str(mid) for mid in seen[1]}
+
+
+def test_the_voice_prompt_has_nothing_from_meetings_with_minors(client, monkeypatch):
+    """Ni el título ni las decisiones, tareas, preguntas, riesgos o resúmenes de
+    una reunión con menores llegan al LLM cuando pregunta la voz."""
+    import echo_api.routers.chat as chat_module
+
+    prompts: list[str] = []
+
+    async def no_chunks(*args, **kwargs):
+        return []
+
+    async def some_llm(db, org_id):
+        from echo_api.services.ai_settings import LLMConfig
+
+        return LLMConfig("openai", "gpt-4o-mini", "sk-test")
+
+    class _SpyProvider:
+        async def chat(self, system, messages, temperature=None):
+            prompts.append(messages[-1]["content"])
+            return "ok"
+
+    async def no_protect(db, org_id, provider, meeting_id, user_id):
+        return _SpyProvider()
+
+    monkeypatch.setattr(chat_module, "retrieve_context", no_chunks)
+    monkeypatch.setattr(chat_module, "resolve_llm", some_llm)
+    monkeypatch.setattr(chat_module, "protect", no_protect)
+    user = EchoTestUser(client, org_name=f"Colegio {uuid.uuid4().hex[:4]}")
+    with_minors = client.post("/api/meetings", json={"title": "Entrevista Tobías", "level": "primaria", "minors": True},
+                              headers=user.headers).json()["id"]
+    adults = client.post("/api/meetings", json={"title": "Equipo directivo", "level": "primaria"},
+                         headers=user.headers).json()["id"]
+    for meeting, label in ((with_minors, "MENOR"), (adults, "ADULTOS")):
+        args = {"m": meeting, "o": user.org_id}
+        _sql("INSERT INTO decisions (id, meeting_id, organization_id, text, status, source, created_at, updated_at) "
+             f"VALUES (gen_random_uuid(), :m, :o, 'decision {label}', 'active', 'ai', now(), now())", **args)
+        _sql("INSERT INTO action_items (id, meeting_id, organization_id, text, status, source, created_at, updated_at) "
+             f"VALUES (gen_random_uuid(), :m, :o, 'tarea {label}', 'pending', 'ai', now(), now())", **args)
+
+    client.post("/api/ask", json={"question": "¿Qué decidimos?", "voice": True}, headers=user.headers)
+    client.post("/api/ask", json={"question": "¿Qué decidimos?"}, headers=user.headers)
+    voice_prompt, text_prompt = prompts
+    assert "Equipo directivo" in voice_prompt and "decision ADULTOS" in voice_prompt and "tarea ADULTOS" in voice_prompt
+    for leaked in ("Entrevista Tobías", "decision MENOR", "tarea MENOR"):
+        assert leaked not in voice_prompt
+    # Por escrito, quien puede ver la reunión la sigue consultando.
+    assert "Entrevista Tobías" in text_prompt and "decision MENOR" in text_prompt
