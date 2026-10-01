@@ -119,7 +119,7 @@ export function Layout({ children }: { children: ReactNode }) {
       className={({ isActive }) => {
         const active =
           item.to === "/internal" ? isActive || inInternal : item.to === "/meetings" ? isActive && !inInternal : isActive;
-        return `flex items-center gap-2.5 rounded-xl px-2.5 py-[7px] text-[14px] font-medium transition-colors duration-150 ${
+        return `flex items-center gap-2.5 rounded-xl px-2.5 py-[10px] text-[15px] font-medium transition-colors duration-150 md:py-[7px] md:text-[14px] ${
           collapsed ? "md:justify-center md:px-0" : ""
         } ${active ? "bg-ink-100 text-ink-900" : "text-ink-600 hover:bg-ink-50 hover:text-ink-900"}`;
       }}
@@ -137,9 +137,11 @@ export function Layout({ children }: { children: ReactNode }) {
     >
       {/* Barra lateral */}
       <aside
-        className={`${mobileNav ? "flex" : "hidden"} absolute inset-y-0 left-0 z-40 w-60 flex-col border-r border-ink-100 bg-white transition-[width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] md:static md:flex ${
-          collapsed ? "md:w-16 md:border-r-0 md:bg-transparent" : ""
-        }`}
+        // En el celular es un cajón que entra deslizándose desde la izquierda
+        // (antes aparecía de golpe); en la compu, la barra de siempre.
+        className={`fixed inset-y-0 left-0 z-40 flex w-[min(18rem,85vw)] flex-col border-r border-ink-100 bg-white pt-[env(safe-area-inset-top)] transition-[width,translate,visibility] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] md:static md:visible md:translate-x-0 md:pt-0 ${
+          mobileNav ? "visible translate-x-0 shadow-[0_24px_64px_-12px_rgba(20,24,36,0.35)] md:shadow-none" : "invisible -translate-x-full"
+        } ${collapsed ? "md:w-16 md:border-r-0 md:bg-transparent" : "md:w-60"}`}
       >
         <div className={`flex items-center gap-2.5 px-5 pb-3 pt-5 ${collapsed ? "md:justify-center md:px-0" : ""}`}>
           <span className="text-ink-900">
@@ -163,7 +165,13 @@ export function Layout({ children }: { children: ReactNode }) {
       </aside>
 
       {/* click-out del nav móvil */}
-      {mobileNav && <div className="fixed inset-0 z-30 bg-ink-950/30 md:hidden" onClick={() => setMobileNav(false)} />}
+      <div
+        className={`fixed inset-0 z-30 bg-ink-950/30 transition-opacity duration-300 md:hidden ${
+          mobileNav ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+        onClick={() => setMobileNav(false)}
+        aria-hidden
+      />
 
       {/* Contenido: con el panel de preguntas abierto se vuelve una tarjeta, como en ElevenLabs. */}
       <div

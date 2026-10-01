@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { EchoFace } from "./EchoFace";
 
 /**
  * La mascota de Echo en la conversación por voz: el orbe de vidrio líquido
@@ -15,6 +16,12 @@ import { useEffect, useRef } from "react";
  * reproduce el alfa de WebM): cada mp4 trae la imagen a la izquierda y su
  * transparencia a la derecha ("_alpha.mp4", hechos desde los ProRes con alfa),
  * y acá se arman en un canvas cuadro por cuadro.
+ *
+ * iPhone: Safari solo deja reproducir un video sin un toque si tiene el
+ * atributo `muted` en el HTML (React pone la propiedad, no el atributo), no
+ * los carga por adelantado (para mostrar el primer cuadro hay que darle play y
+ * pausarlo) y no reproduce los que no se ven. Si igual no se dibuja nada, quedan
+ * los ojos de Echo de siempre: nunca un hueco.
  */
 export type OrbState = "idle" | "activation" | "listening" | "thinking" | "speaking";
 
@@ -39,11 +46,11 @@ function scratchContext(): CanvasRenderingContext2D | null {
 }
 
 /** Un cuadro: la mitad izquierda es el color (premultiplicado) y la derecha la transparencia. */
-function drawFrame(video: HTMLVideoElement, canvas: HTMLCanvasElement) {
-  if (video.readyState < 2) return;
+function drawFrame(video: HTMLVideoElement, canvas: HTMLCanvasElement): boolean {
+  if (video.readyState < 2 || !video.videoWidth) return false;
   const source = scratchContext();
   const target = canvas.getContext("2d");
-  if (!source || !target) return;
+  if (!source || !target) return false;
   source.drawImage(video, 0, 0, SIDE * 2, SIDE);
   const both = source.getImageData(0, 0, SIDE * 2, SIDE).data;
   const out = target.createImageData(SIDE, SIDE);
@@ -63,6 +70,16 @@ function drawFrame(video: HTMLVideoElement, canvas: HTMLCanvasElement) {
     }
   }
   target.putImageData(out, 0, 0);
+  return true;
+}
+
+/** Lo que iOS necesita para reproducir sin un toque y dentro de la página. */
+function prepareVideo(video: HTMLVideoElement) {
+  video.muted = true;
+  video.defaultMuted = true;
+  video.setAttribute("muted", "");
+  video.setAttribute("playsinline", "");
+  video.setAttribute("webkit-playsinline", "");
 }
 
 export function EchoOrb({
@@ -80,12 +97,24 @@ export function EchoOrb({
   const clip: Clip = state === "idle" ? "activation" : state;
   const clipRef = useRef(clip);
   clipRef.current = clip;
+  // Si en un rato no se pudo dibujar ningún cuadro, se muestran los ojos de siempre.
+  const [painted, setPainted] = useState(false);
+  const [fallback, setFallback] = useState(false);
+  const paintedRef = useRef(false);
 
   const draw = (name: Clip) => {
     const video = videos.current[name];
     const canvas = canvases.current[name];
-    if (video && canvas) drawFrame(video, canvas);
+    if (video && canvas && drawFrame(video, canvas) && !paintedRef.current) {
+      paintedRef.current = true;
+      setPainted(true);
+    }
   };
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setFallback(!paintedRef.current), 2500);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   // Mientras un clip se reproduce (o se está desvaneciendo), se dibuja cada cuadro.
   useEffect(() => {
@@ -110,12 +139,25 @@ export function EchoOrb({
         // Cada clip arranca en el orbe quieto: desde el principio empalma.
         video.currentTime = 0;
         if (state === "idle" || reduce) {
-          video.pause();
-          // El primer cuadro (los ojos) igual se dibuja.
+          // El primer cuadro (los ojos) igual se dibuja. iOS no carga el video
+          // hasta que se reproduce: play y pausa en el primer cuadro.
           const show = () => draw(name);
           video.addEventListener("seeked", show, { once: true });
-          if (video.readyState >= 2) window.setTimeout(show, 30);
-          else video.addEventListener("loadeddata", show, { once: true });
+          video.addEventListener("loadeddata", show, { once: true });
+          if (video.readyState >= 2) {
+            video.pause();
+            window.setTimeout(show, 30);
+          } else {
+            void video
+              .play()
+              .then(() => {
+                if (clipRef.current !== name || state !== "idle") return;
+                video.pause();
+                video.currentTime = 0;
+                show();
+              })
+              .catch(() => {});
+          }
         } else {
           void video.play().catch(() => {});
         }
@@ -130,10 +172,16 @@ export function EchoOrb({
 
   return (
     <div className="relative" style={{ width: size, height: size }} aria-hidden>
+      {fallback && !painted && (
+        <span className="absolute inset-0 flex items-center justify-center text-ink-900">
+          <EchoFace mood={state === "thinking" ? "thinking" : state === "listening" ? "listening" : "idle"} size={size / 3} />
+        </span>
+      )}
       {ORDER.map((name) => (
         <div key={name}>
           <video
             ref={(element) => {
+              if (element) prepareVideo(element);
               videos.current[name] = element;
             }}
             src={CLIPS[name]}
@@ -142,8 +190,10 @@ export function EchoOrb({
             preload="auto"
             loop={name !== "activation"}
             onEnded={name === "activation" ? onActivated : undefined}
-            // Fuera de la vista pero "visible", para que el navegador decodifique los cuadros.
-            className="pointer-events-none absolute left-0 top-0 h-px w-px opacity-0"
+            // Casi transparente y en el centro, tapado por el orbe: iOS no
+            // reproduce los videos que considera invisibles (opacidad 0). Lo
+            // que se ve es el canvas.
+            className="pointer-events-none absolute left-1/2 top-1/2 h-[2px] w-[2px] opacity-[0.01]"
           />
           <canvas
             ref={(element) => {
