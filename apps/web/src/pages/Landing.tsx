@@ -1,4 +1,3 @@
-import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
 import "../landing/landing.css";
 import { Hero } from "../landing/Hero";

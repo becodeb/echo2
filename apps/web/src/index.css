@@ -1,7 +1,8 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter Var", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Nunito (redonda), servida desde Echo: @fontsource-variable/nunito en main.tsx. */
+  --font-sans: "Nunito Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --color-ink-50: #f6f7f9;
   --color-ink-100: #eceef2;
   --color-ink-200: #d9dde5;
@@ -39,7 +40,6 @@ html {
 
 body {
   @apply bg-[#fafbfc] text-ink-900 antialiased;
-  font-feature-settings: "cv02", "cv03", "cv11";
   /* Si algo se pasa de ancho, que no arrastre la página entera de costado. */
   overflow-x: clip;
 }

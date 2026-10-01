@@ -1,10 +1,9 @@
-/* Landing pública de Echo. Tipografía propia (Geist), botones en píldora como
+/* Landing pública de Echo. La misma tipografía que la app (Nunito), botones en píldora como
  * los ojos, mosaicos a 16px. Todo lo que se mueve es transform u opacity. */
 
 .landing {
-  font-family: "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: "Nunito Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-feature-settings: "cv11", "ss01";
 }
 
 /* Botones: siempre píldora. */
