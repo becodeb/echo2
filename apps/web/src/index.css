@@ -172,3 +172,16 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .ask-shimmer { animation: none; color: #9aa1ae; }
 }
+
+/* Ventanas (Modal en components/ui.tsx): entran y salen, sin saltos. */
+@keyframes modal-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modal-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes modal-panel-in { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes modal-panel-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(8px) scale(0.98); } }
+.modal-backdrop { animation: modal-in 0.18s ease-out; }
+.modal-panel { animation: modal-panel-in 0.24s cubic-bezier(0.16, 1, 0.3, 1); }
+.modal-leaving { animation: modal-out 0.16s ease-in forwards; }
+.modal-leaving .modal-panel { animation: modal-panel-out 0.16s ease-in forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .modal-backdrop, .modal-panel, .modal-leaving, .modal-leaving .modal-panel { animation: none; }
+}

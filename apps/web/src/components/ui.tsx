@@ -1,4 +1,5 @@
-import { type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, useEffect, useState } from "react";
+import { type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { EchoFace, type EchoMood } from "./EchoFace";
 
 export function Button({
@@ -92,6 +93,14 @@ export function EmptyState({
   );
 }
 
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Ventana sobre la página (§4.5): entra y sale con una animación corta, el
+ * foco queda adentro mientras está abierta (Tab da la vuelta) y al cerrarla
+ * vuelve a lo que la abrió. Escape o tocar afuera la cierran.
+ */
 export function Modal({
   open,
   onClose,
@@ -105,42 +114,98 @@ export function Modal({
   children: ReactNode;
   wide?: boolean;
 }) {
+  // Sigue montada un momento después de cerrar, para la animación de salida.
+  const [mounted, setMounted] = useState(open);
+  const [leaving, setLeaving] = useState(false);
+  const panel = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      setLeaving(false);
+      return;
+    }
+    if (!mounted) return;
+    setLeaving(true);
+    const timer = window.setTimeout(() => {
+      setMounted(false);
+      setLeaving(false);
+    }, 160);
+    return () => window.clearTimeout(timer);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!open) return;
+    const opener = document.activeElement as HTMLElement | null;
+    // El primer campo (o el panel) recibe el foco, salvo que adentro ya haya uno con autoFocus.
+    const frame = requestAnimationFrame(() => {
+      const box = panel.current;
+      if (!box || box.contains(document.activeElement)) return;
+      const field = box.querySelector<HTMLElement>("input, textarea, select");
+      (field ?? box).focus();
+    });
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") {
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab" || !panel.current) return;
+      const items = Array.from(panel.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+        (item) => item.offsetParent !== null,
+      );
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener("keydown", onKey);
     // La página de atrás no se mueve mientras la ventana está abierta.
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
+      cancelAnimationFrame(frame);
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = previous;
+      // Al cerrar, el foco vuelve a lo que abrió la ventana.
+      if (opener && document.contains(opener)) opener.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
-  if (!open) return null;
-  return (
+  if (!mounted) return null;
+  // En body: dentro de la página (que tiene su animación de entrada) quedaba
+  // debajo de lo que flota, como el globito de la voz.
+  return createPortal(
     <div
       // El fondo scrollea: si la ventana es más alta que la pantalla (celular,
       // teclado abierto), el botón de abajo tiene que poder alcanzarse.
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain bg-ink-950/40 p-3 pt-4 backdrop-blur-[2px] sm:p-4 sm:pt-[8vh]"
+      className={`modal-backdrop fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain bg-ink-950/40 p-3 pt-4 backdrop-blur-[2px] sm:p-4 sm:pt-[8vh] ${
+        leaving ? "modal-leaving" : ""
+      }`}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
     >
       <div
-        className={`animate-fade-up mb-4 w-full ${wide ? "max-w-3xl" : "max-w-lg"} rounded-3xl border border-ink-100 bg-white p-5 shadow-xl sm:p-7`}
+        ref={panel}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        tabIndex={-1}
+        className={`modal-panel mb-4 w-full ${wide ? "max-w-3xl" : "max-w-lg"} rounded-3xl border border-ink-100 bg-white p-5 shadow-xl outline-none sm:p-7`}
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-ink-900">{title}</h2>
           <button
             onClick={onClose}
-            className="rounded-full p-2 text-ink-400 hover:bg-ink-100 hover:text-ink-700"
+            className="-mr-1 flex h-11 w-11 items-center justify-center rounded-full text-ink-400 hover:bg-ink-100 hover:text-ink-700"
             aria-label="Cerrar"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -150,7 +215,8 @@ export function Modal({
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

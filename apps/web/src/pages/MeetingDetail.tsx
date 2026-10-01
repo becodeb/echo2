@@ -4,6 +4,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { AdminOrgOut, ChatOut, InsightsOut, MeetingOut, MinutesOut, SegmentOut } from "../api/types";
+import { Tabs } from "../components/Tabs";
 import { useAuth } from "../state/auth";
 import { Badge, Button, Card, EmptyState, Input, Modal, Spinner, formatDate, formatDuration, formatMs } from "../components/ui";
 import { EchoFace } from "../components/EchoFace";
@@ -126,28 +127,21 @@ export default function MeetingDetail() {
         )}
       </header>
 
-      <nav className="-mx-6 mb-6 flex gap-1 overflow-x-auto border-b border-ink-100 px-6 sm:mx-0 sm:px-0" role="tablist">
-        {tabs.map((item) => (
-          <button
-            key={item.id}
-            role="tab"
-            aria-selected={activeTab === item.id}
-            onClick={() => {
-              setTab(item.id);
-              params.set("tab", item.id);
-              setParams(params, { replace: true });
-            }}
-            className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors sm:px-4 ${
-              activeTab === item.id
-                ? "border-ink-900 text-ink-900"
-                : "border-transparent text-ink-400 hover:text-ink-700"
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </nav>
+      <div className="mb-6">
+        <Tabs
+          items={tabs}
+          value={activeTab}
+          onChange={(id) => {
+            setTab(id);
+            params.set("tab", id);
+            setParams(params, { replace: true });
+          }}
+          label="Secciones de la reunión"
+          idPrefix="reunion"
+        />
+      </div>
 
+      <div role="tabpanel" id={`reunion-panel-${activeTab}`} aria-labelledby={`reunion-tab-${activeTab}`}>
       {activeTab === "summary" && (
         <div className="space-y-4">
           <RecordingCard meeting={meeting} />
@@ -159,6 +153,7 @@ export default function MeetingDetail() {
       {activeTab === "minutes" && <MinutesTab meetingId={meeting.id} minutesTitle={meeting.title} />}
       {activeTab === "tasks" && <TasksTab meetingId={meeting.id} />}
       {activeTab === "chat" && <ChatTab meetingId={meeting.id} onJump={(ms) => { params.set("t", String(ms)); setParams(params); setTab("transcript"); }} />}
+      </div>
     </div>
   );
 }
