@@ -37,6 +37,7 @@ import asyncio
 import logging
 import re
 import uuid
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -287,24 +288,58 @@ async def diarize_meeting(meeting_id: uuid.UUID) -> bool:
         if (meeting.meta or {}).get("audio_limit"):
             # Se pasó de las horas de audio del mes: queda lo transcripto en vivo.
             return False
-        # Decidir y reservar los créditos van juntos y de a una reunión por
-        # persona: si le queda 1 crédito y terminan dos reuniones a la vez,
-        # solo una lo gasta (la otra sale sin personas).
+        # Decidir y reservar van juntos y de a una reunión por persona: si le
+        # queda 1 crédito (o media hora del plan Individual) y terminan dos
+        # reuniones a la vez, solo una lo gasta (la otra sale sin personas).
         if created_by is not None:  # las de un Echo Device no tienen persona
             await db.execute(sql_text("SELECT pg_advisory_xact_lock(:key)"), {"key": _lock_key(created_by)})
         decision = await plans.final_pass_for(db, meeting, total_ms / 1000)
         hold_id = None
-        if decision.provider == "elevenlabs" and decision.credits:
+        individual = decision.covered_by == "individual"
+        if decision.provider == "elevenlabs" and (decision.credits or individual):
             hold = await plans.record_usage(
                 db, kind="stt_final", provider="elevenlabs", model=SCRIBE_MODEL, unit="audio_seconds",
-                quantity=0, cost_usd=0, organization_id=organization_id, user_id=created_by,
+                # Las horas del plan Individual se reservan enteras (cuentan
+                # en el mes desde ya); los créditos, por cantidad.
+                quantity=total_ms / 1000 if individual else 0, cost_usd=0,
+                organization_id=organization_id, user_id=created_by,
                 meeting_id=meeting_id, credits=decision.credits,
                 meta={"covered_by": decision.covered_by, "hold": True},
             )
             await db.flush()
             hold_id = hold.id
         await db.commit()
-        config = await resolve_stt(db, meeting.organization_id)
+    try:
+        return await _run_final_pass(meeting_id, path, total_ms, decision, hold_id, organization_id, created_by)
+    except Exception:
+        # Lo que falle después de reservar no se lleva los créditos ni las horas.
+        await _release_unless_pending(meeting_id, hold_id)
+        raise
+
+
+async def _release_unless_pending(meeting_id: uuid.UUID, hold_id: uuid.UUID | None) -> None:
+    """Devuelve la reserva salvo que la pasada haya quedado pendiente de reintento."""
+    if not hold_id:
+        return
+    async with SessionLocal() as db:
+        meeting = await db.get(Meeting, meeting_id)
+        if meeting is not None and (meeting.meta or {}).get("people_status") == "pending":
+            return
+    await _release_hold(hold_id)
+
+
+async def _run_final_pass(
+    meeting_id: uuid.UUID,
+    path: Path,
+    total_ms: int,
+    decision: "plans.FinalPass",
+    hold_id: uuid.UUID | None,
+    organization_id: uuid.UUID,
+    created_by: uuid.UUID | None,
+) -> bool:
+    async with SessionLocal() as db:
+        meeting = await db.get(Meeting, meeting_id)
+        config = await resolve_stt(db, organization_id)
         vocabulary = await _vocabulary(db, meeting)
         language = meeting.language if meeting.language and meeting.language != "auto" else "es"
 
@@ -703,6 +738,48 @@ async def _after_retry(meeting_id: uuid.UUID, organization_id: uuid.UUID, create
             log.warning("índice tras el reintento falló en %s: %s", meeting_id, exc)
 
 
+# Una reserva que sigue así después de esto quedó colgada (se reinició el
+# servidor a mitad de una pasada, o la reunión terminó en "failed").
+STALE_HOLD_HOURS = 6
+
+
+async def release_stale_holds(now: datetime | None = None) -> int:
+    """Devuelve las reservas de créditos u horas que nadie cerró. Las de
+    reuniones que esperan el reintento de ElevenLabs se respetan hasta que el
+    reintento se rinda (o venza la copia del audio)."""
+    limit = (now or datetime.now(UTC)) - timedelta(hours=STALE_HOLD_HOURS)
+    released = 0
+    async with SessionLocal() as db:
+        holds = (
+            await db.execute(
+                select(UsageEvent).where(
+                    UsageEvent.kind == "stt_final",
+                    UsageEvent.meta["hold"].astext == "true",
+                    UsageEvent.created_at < limit,
+                )
+            )
+        ).scalars().all()
+        for hold in holds:
+            meeting = await db.get(Meeting, hold.meeting_id) if hold.meeting_id else None
+            waiting = (
+                meeting is not None
+                and meeting.status == "completed"
+                and (meeting.meta or {}).get("people_status") == "pending"
+                and people_path(meeting.id).exists()
+            )
+            if waiting:
+                continue
+            await db.delete(hold)
+            if meeting is not None and (meeting.meta or {}).get("people_status") == "pending":
+                meta = {**meeting.meta, "people_status": "failed"}
+                meta.pop("people_retry", None)
+                meeting.meta = meta
+                people_path(meeting.id).unlink(missing_ok=True)
+            released += 1
+        await db.commit()
+    return released
+
+
 async def retry_loop(interval_seconds: int = RETRY_EVERY_SECONDS) -> None:
     while True:
         await asyncio.sleep(interval_seconds)
@@ -712,6 +789,12 @@ async def retry_loop(interval_seconds: int = RETRY_EVERY_SECONDS) -> None:
                 log.info("personas: %s reuniones separadas en un reintento", retried)
         except Exception:  # noqa: BLE001 - el reintento nunca tira abajo la API
             log.exception("personas: falló el reintento")
+        try:
+            released = await release_stale_holds()
+            if released:
+                log.info("créditos: %s reservas colgadas devueltas", released)
+        except Exception:  # noqa: BLE001
+            log.exception("créditos: falló la limpieza de reservas")
         try:
             retried = await retry_pending_text()
             if retried:

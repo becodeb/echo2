@@ -412,3 +412,64 @@ def test_a_device_in_a_classroom_never_goes_to_elevenlabs(client, monkeypatch):
     minors = dict(_sql_rows("SELECT id::text, meta->>'minors' FROM meetings WHERE id IN (:a, :b)", a=marked, b=plain))
     assert minors == {marked: "true", plain: "false"}
     monkeypatch.undo()
+
+
+def test_individual_hours_are_reserved_when_two_meetings_end_together(client, monkeypatch):
+    _setup(monkeypatch, "2026-09-27")
+    first_user, first = _meeting(client, 20.4, [(0, 20400, "hola", None)])
+    # Plan Individual con 18 s de quién habló: la primera reunión los reserva
+    # enteros y la segunda ya no entra por el plan (va por créditos).
+    _sql("UPDATE users SET plan = 'individual', limits = CAST('{\"people_hours_per_month\": 0.005}' AS jsonb)"
+         " WHERE id = :id", id=first_user.user_id)
+    second = uuid.UUID(client.post("/api/meetings", json={"title": "Otra", "level": "primaria"},
+                                   headers=first_user.headers).json()["id"])
+    _sql("UPDATE meetings SET meta = CAST('{\"people\": true}' AS jsonb) WHERE id = :id", id=str(second))
+    rec.pcm_path(second).write_bytes(_tone(20.4))
+
+    async def both():
+        return await asyncio.gather(diarization.diarize_meeting(first), diarization.diarize_meeting(second))
+
+    assert asyncio.run(both()) == [True, True]
+    monkeypatch.undo()
+    covered = sorted((u.meta or {}).get("covered_by") for m in (first, second) for u in _usage(m))
+    assert covered == ["credits", "individual"]
+    _cleanup(first)
+    _cleanup(second)
+
+
+def test_if_something_fails_after_reserving_the_credit_comes_back(client, monkeypatch):
+    _setup(monkeypatch, "2026-09-27")
+    user, meeting_id = _meeting(client, 20.4, [(0, 20400, "hola", None)], people=True)
+
+    async def broken(*args, **kwargs):
+        raise RuntimeError("se cortó la base")
+
+    monkeypatch.setattr(diarization, "_live_rows", broken)
+    try:
+        asyncio.run(diarization.diarize_meeting(meeting_id))
+    except RuntimeError:
+        pass
+    monkeypatch.undo()
+    assert _usage(meeting_id) == []
+    _cleanup(meeting_id)
+
+
+def test_holds_left_hanging_are_released(client, monkeypatch):
+    from datetime import UTC, datetime, timedelta
+
+    _setup(monkeypatch, "2026-09-27")
+    user, meeting_id = _meeting(client, 20.4, [(0, 20400, "hola", None)], people=True,
+                                people_status="pending", people_retry={"attempts": 1})
+    _sql("UPDATE meetings SET status = 'failed' WHERE id = :id", id=str(meeting_id))
+    _sql("INSERT INTO usage_events (id, kind, provider, unit, quantity, cost_usd, credits, user_id, organization_id,"
+         " meeting_id, meta, created_at) VALUES (gen_random_uuid(), 'stt_final', 'elevenlabs', 'audio_seconds', 0, 0,"
+         " 1, :u, :o, :m, CAST('{\"hold\": true, \"covered_by\": \"credits\"}' AS jsonb), now() - interval '7 hours')",
+         u=user.user_id, o=user.org_id, m=str(meeting_id))
+    assert asyncio.run(diarization.release_stale_holds()) == 1
+    monkeypatch.undo()
+    assert _usage(meeting_id) == []
+    _, meeting = _transcript(client, user, meeting_id)
+    assert meeting["meta"]["people_status"] == "failed"
+    # Una reserva reciente no se toca.
+    assert asyncio.run(diarization.release_stale_holds(datetime.now(UTC) - timedelta(hours=1))) == 0
+    _cleanup(meeting_id)
