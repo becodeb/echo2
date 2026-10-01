@@ -434,3 +434,44 @@ quedaron nombradas por su voz.
   igual con "Pasate al plan con voz" (a Planes) o no aparece.
 - Mascota liviana (ver §4.12: hoy calienta el iPhone y se ve borrosa).
 - Probarlo en escritorio y en iPhone (375×812) y mandarle capturas a Bauti.
+
+---
+
+## 8. Estado al terminar (1/10, sesión de implementación)
+
+Todo el plan quedó implementado, con tests (244 del API, 18 web). Decisiones de
+Bauti durante la sesión:
+
+| Tema | Decisión |
+|---|---|
+| §1.5 voz y nombres | Nombres reales en la voz, declarado en Privacidad. |
+| Motor de transcripción | Los colegios ya no eligen motor ni cargan keys: Groq con la key de Becode. Ajustes → IA quedó en "Idioma del acta". |
+| Baja de cuenta | Botón que pide la baja; Becode la procesa en 5 días hábiles. |
+| Responsable | Becode, con formulario de contacto (/contacto), sin mostrar el mail. |
+| Cancelación | El plan sigue hasta fin de mes; después pasa a Gratis. |
+| §7.4 aprender | Viene prendido al grabar Mi voz; se puede apagar (y se olvida lo aprendido). |
+| §7.6 globito | Lo ve todo el mundo; sin voz en el plan, "Pasate al plan con voz". |
+| Voz por plan | Solo el plan Individual + voz (y superadmins). Ni Cortesía ni Instituciones: se contrata aparte. bautistagoni@northfield.edu.ar pasó a Individual + voz. |
+| §2.9 minutos | 30 min por mes en el plan de US$10 (migración 0021). |
+| §3.4 planes pagos | Solo pagos: reuniones de más de 1 h, preguntar sobre todas, Word / Google Docs / Drive, importar grabaciones; soporte prioritario. Aplicado en la app (plans.is_paid). |
+| §3.6 demo | Renderizada desde apps/video (EchoDemo) y puesta en la landing. |
+| §4.2 fuente | Nunito, servida desde Echo, en la app y la landing. Las actas eligen Arial, Calibri o Times New Roman. |
+
+Lo que no se pudo hacer como decía el plan, y cómo quedó:
+
+- §2.1 "límite de duración del lado de ElevenLabs por override": ElevenLabs no
+  deja cambiar `max_duration_seconds` por conversación. Hay un agente por
+  duración (1, 3 y 10 min) y cada charla usa el que entra en lo que queda.
+- §4.12 mascota 2x: la composición en WebGL y la pausa al no verse están; para
+  que se vea nítida en retina hay que volver a exportar los cuatro videos a
+  960 px (están en otra PC, "videos/codigo").
+- §7.2 calibración: con el banco (3 reuniones) el umbral quedó en 0,75 con
+  0,10 de margen. Falta confirmarlo con voces reales: después del deploy,
+  `python -m echo_api.voiceprints --comparar` en el contenedor api.
+
+Pendiente de Bauti:
+
+- Configurar el mail (Resend: `RESEND_API_KEY` y `MAIL_FROM`). Mientras
+  tanto, "Olvidé mi contraseña" y el contacto llegan a la campanita de Becode.
+- Que un abogado revise /legal/privacidad y /legal/terminos.
+- Grabar una reunión de prueba con "Hola, soy…" y Mi voz para ver los nombres.
