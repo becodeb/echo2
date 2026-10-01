@@ -11,8 +11,8 @@ import {
   Shimmer,
   useBilling,
   type BillingInfo,
-  type PublicPlan,
 } from "../components/billing";
+import { CompareTable, PlanCard, planSpecs, type PlanSpec } from "../components/PlanCatalog";
 import { Spinner } from "../components/ui";
 
 /**
@@ -46,7 +46,11 @@ export default function Plans() {
           ))}
         </div>
       ) : (
-        <PlanGrid billing={billing} />
+        <>
+          <PlanGrid billing={billing} />
+          <h2 className="mb-4 mt-12 text-xl font-semibold tracking-tight text-ink-900">Comparar planes</h2>
+          <CompareTable plans={billing.plans} />
+        </>
       )}
 
       <p className="mt-8 text-center text-xs leading-relaxed text-ink-400">
@@ -116,219 +120,131 @@ function CurrentPlan({ billing }: { billing: BillingInfo }) {
   );
 }
 
-interface CardSpec {
-  plan: PublicPlan;
-  tagline: string;
-  bullets: string[];
-  cta: string;
-  requestable: boolean;
-}
-
-function specs(billing: BillingInfo): CardSpec[] {
-  const byCode = Object.fromEntries(billing.plans.map((plan) => [plan.code, plan]));
-  const out: CardSpec[] = [];
-  const base = byCode.base;
-  if (base) {
-    const credits = base.limits.credits_per_month ?? 4;
-    out.push({
-      plan: base,
-      tagline: "Para empezar, sin pagar nada.",
-      bullets: [
-        "Reuniones sin límite, transcriptas en vivo",
-        `${credits} reuniones por mes con quién habló`,
-        "Acta, resumen y tareas con responsables",
-        "Chat con la IA sobre cada reunión",
-      ],
-      cta: "Plan actual",
-      requestable: false,
-    });
-  }
-  const individual = byCode.individual;
-  if (individual) {
-    const hours = individual.limits.people_hours_per_month ?? 5;
-    out.push({
-      plan: individual,
-      tagline: "Para quien graba sus propias reuniones.",
-      bullets: ["Todo lo de Gratis", `${hours} h por mes con quién habló en cada reunión`, "Sin créditos que contar"],
-      cta: "Suscribirme",
-      requestable: true,
-    });
-  }
-  const voice = byCode.individual_voz;
-  if (voice) {
-    const minutes = voice.limits.voice_minutes_per_month ?? 30;
-    out.push({
-      plan: voice,
-      tagline: "Para hablarle a Echo como a una persona.",
-      bullets: [
-        "Todo lo de Individual",
-        `${minutes} min por mes de conversación por voz con Echo`,
-        "Preguntale por tus reuniones sin escribir",
-      ],
-      cta: "Suscribirme",
-      requestable: true,
-    });
-  }
-  const school = byCode.institucion;
-  if (school) {
-    out.push({
-      plan: school,
-      tagline: "Para todo el colegio, con sus sedes y niveles.",
-      bullets: [
-        "Quién habló en todas las reuniones",
-        "Toda la institución: sedes, niveles, familias y equipos",
-        "Te acompañamos a empezar",
-      ],
-      cta: "Contact sales",
-      requestable: true,
-    });
-  }
-  return out;
-}
+const REQUESTABLE = new Set(["individual", "individual_voz", "institucion"]);
 
 function PlanGrid({ billing }: { billing: BillingInfo }) {
   const current = currentPlans(billing);
-  const cards = specs(billing);
+  const specs = planSpecs(billing.plans);
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      {cards.map((card, index) => (
-        <PlanCard
-          key={card.plan.code}
-          card={card}
-          current={current.has(card.plan.code)}
-          // Individual + voz ya trae todo lo de Individual.
-          included={card.plan.code === "individual" && current.has("individual_voz")}
-          featured={card.plan.code === "individual_voz"}
-          // Solo un pedido abierto deja el botón en "te vamos a contactar":
-          // uno ya resuelto (o cancelado) permite pedir de nuevo.
-          pending={billing.requests.find(
-            (request) => request.plan === card.plan.code && (request.status === "new" || request.status === "contacted"),
-          )}
-          delay={index * 60}
-        />
-      ))}
+      {specs.map((spec, index) => {
+        const isCurrent = current.has(spec.plan.code);
+        // Individual + voz ya trae todo lo de Individual.
+        const included = spec.plan.code === "individual" && current.has("individual_voz");
+        // Solo un pedido abierto deja el botón en "te vamos a contactar": uno
+        // ya resuelto (o cancelado) permite pedir de nuevo.
+        const pending = billing.requests.find(
+          (request) => request.plan === spec.plan.code && (request.status === "new" || request.status === "contacted"),
+        );
+        return (
+          <PlanCard
+            key={spec.plan.code}
+            spec={spec}
+            featured={spec.plan.code === "individual_voz"}
+            badge={isCurrent ? "Tu plan" : undefined}
+            delay={index * 60}
+          >
+            <PlanAction
+              spec={spec}
+              featured={spec.plan.code === "individual_voz"}
+              state={
+                isCurrent
+                  ? "Plan actual"
+                  : included
+                    ? "Incluido en tu plan"
+                    : !REQUESTABLE.has(spec.plan.code)
+                      ? "Incluido para todos"
+                      : null
+              }
+              pending={pending}
+            />
+          </PlanCard>
+        );
+      })}
     </div>
   );
 }
 
-function PlanCard({
-  card,
-  current,
-  included,
+/**
+ * Suscribirme / Contact sales, con un paso de confirmación (§4.7): todavía no
+ * hay cobro, así que lo que hace es avisarle a Becode, y eso se dice antes.
+ */
+function PlanAction({
+  spec,
   featured,
+  state,
   pending,
-  delay,
 }: {
-  card: CardSpec;
-  current: boolean;
-  included: boolean;
+  spec: PlanSpec;
   featured: boolean;
+  state: string | null;
   pending?: { status: string };
-  delay: number;
 }) {
   const queryClient = useQueryClient();
+  const [confirming, setConfirming] = useState(false);
   const [sent, setSent] = useState(false);
   const request = useMutation({
-    mutationFn: () => api("/api/billing/requests", { method: "POST", body: JSON.stringify({ plan: card.plan.code }) }),
+    mutationFn: () => api("/api/billing/requests", { method: "POST", body: JSON.stringify({ plan: spec.plan.code }) }),
     onSuccess: () => {
       setSent(true);
+      setConfirming(false);
       queryClient.invalidateQueries({ queryKey: ["billing"] });
     },
   });
-  const asked = sent || !!pending;
-  const price = card.plan.price_usd;
+  const sales = spec.plan.code === "institucion";
+  const solid = featured ? "bg-white text-ink-900 hover:bg-ink-100" : "bg-ink-900 text-white hover:bg-ink-700";
+  const muted = featured ? "bg-white/10 text-ink-300" : "bg-ink-50 text-ink-400";
 
-  return (
-    <article
-      className={`animate-fade-up relative flex flex-col rounded-3xl border p-6 transition-shadow duration-300 hover:shadow-[0_12px_32px_-12px_rgba(20,24,36,0.18)] ${
-        featured ? "border-ink-900 bg-ink-950 text-white" : "border-ink-100 bg-white"
-      }`}
-      style={{ animationDelay: `${delay}ms`, animationFillMode: "backwards" }}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <h2 className={`text-lg font-semibold ${featured ? "text-white" : "text-ink-900"}`}>{card.plan.name}</h2>
-        {current && (
-          <span
-            className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-              featured ? "bg-white text-ink-900" : "bg-ink-100 text-ink-700"
-            }`}
-          >
-            Tu plan
-          </span>
-        )}
+  if (state) {
+    return <div className={`rounded-full py-2.5 text-center text-sm font-medium ${muted}`}>{state}</div>;
+  }
+  if (sent || pending) {
+    return (
+      <div
+        className={`animate-fade-up flex items-center justify-center gap-2 rounded-full py-2.5 text-sm font-medium ${
+          featured ? "bg-white/10 text-white" : "bg-emerald-50 text-emerald-700"
+        }`}
+        role="status"
+      >
+        <svg width="14" height="14" viewBox="0 0 12 12" fill="none" aria-hidden>
+          <path d="M2.5 6.2 5 8.5l4.5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        {pending?.status === "contacted" ? "Ya te contactamos" : "Listo, te vamos a contactar"}
       </div>
-      <p className={`mt-1 text-sm ${featured ? "text-ink-300" : "text-ink-500"}`}>{card.tagline}</p>
-
-      <div className="mt-6 flex items-baseline gap-1.5">
-        {price == null ? (
-          <span className={`text-[28px] font-semibold tracking-tight ${featured ? "text-white" : "text-ink-900"}`}>
-            A medida
-          </span>
-        ) : (
-          <>
-            <span className={`text-[40px] font-semibold leading-none tracking-tight ${featured ? "text-white" : "text-ink-900"}`}>
-              {price === 0 ? "US$ 0" : `US$ ${price.toLocaleString("es-AR")}`}
-            </span>
-            <span className={`text-sm ${featured ? "text-ink-400" : "text-ink-400"}`}>/ mes</span>
-          </>
-        )}
-      </div>
-
-      <ul className="mt-6 flex-1 space-y-3">
-        {card.bullets.map((bullet) => (
-          <li key={bullet} className="flex items-start gap-2.5 text-sm">
-            <span
-              aria-hidden
-              className={`mt-[3px] flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${
-                featured ? "bg-white text-ink-900" : "bg-ink-900 text-white"
-              }`}
-            >
-              <svg width="9" height="9" viewBox="0 0 12 12" fill="none">
-                <path d="M2.5 6.2 5 8.5l4.5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </span>
-            <span className={featured ? "text-ink-200" : "text-ink-600"}>{bullet}</span>
-          </li>
-        ))}
-      </ul>
-
-      <div className="mt-8">
-        {current || included || !card.requestable ? (
-          <div
-            className={`rounded-full py-2.5 text-center text-sm font-medium ${
-              featured ? "bg-white/10 text-ink-300" : "bg-ink-50 text-ink-400"
-            }`}
-          >
-            {current ? "Plan actual" : included ? "Incluido en tu plan" : "Incluido para todos"}
-          </div>
-        ) : asked ? (
-          <div
-            className={`animate-fade-up flex items-center justify-center gap-2 rounded-full py-2.5 text-sm font-medium ${
-              featured ? "bg-white/10 text-white" : "bg-emerald-50 text-emerald-700"
-            }`}
-            role="status"
-          >
-            <svg width="14" height="14" viewBox="0 0 12 12" fill="none" aria-hidden>
-              <path d="M2.5 6.2 5 8.5l4.5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            {pending?.status === "contacted" ? "Ya te contactamos" : "Listo, te vamos a contactar"}
-          </div>
-        ) : (
+    );
+  }
+  if (confirming) {
+    return (
+      <div className={`animate-fade-up rounded-2xl p-3 text-sm ${featured ? "bg-white/10 text-ink-200" : "bg-ink-50 text-ink-600"}`}>
+        <p>
+          {sales
+            ? "Le avisamos a Becode y te escribimos para armar el plan de tu institución."
+            : `Le avisamos a Becode que querés el plan ${spec.plan.name}. Te escribimos por mail para darlo de alta; todavía no se cobra desde Echo.`}
+        </p>
+        <div className="mt-3 flex gap-2">
           <button
             type="button"
             onClick={() => request.mutate()}
             disabled={request.isPending}
-            className={`flex w-full items-center justify-center gap-2 rounded-full py-2.5 text-sm font-semibold transition-all duration-200 active:scale-[0.98] disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 ${
-              featured ? "bg-white text-ink-900 hover:bg-ink-100" : "bg-ink-900 text-white hover:bg-ink-700"
-            }`}
+            className={`flex min-h-10 flex-1 items-center justify-center rounded-full px-3 font-semibold disabled:opacity-60 ${solid}`}
           >
-            {request.isPending ? <Spinner /> : card.cta}
+            {request.isPending ? <Spinner /> : "Sí, avisar"}
           </button>
-        )}
-        {request.isError && (
-          <p className="mt-2 text-center text-xs text-red-500">No se pudo enviar el pedido. Probá de nuevo.</p>
-        )}
+          <button type="button" onClick={() => setConfirming(false)} className="min-h-10 rounded-full px-3 font-medium">
+            Cancelar
+          </button>
+        </div>
+        {request.isError && <p className="mt-2 text-xs text-red-500">No se pudo enviar el pedido. Probá de nuevo.</p>}
       </div>
-    </article>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => setConfirming(true)}
+      className={`flex w-full items-center justify-center gap-2 rounded-full py-2.5 text-sm font-semibold transition-all duration-200 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 ${solid}`}
+    >
+      {sales ? "Contact sales" : "Suscribirme"}
+    </button>
   );
 }

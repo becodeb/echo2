@@ -274,3 +274,12 @@ def test_usage_month_is_validated_and_the_org_panel_shows_only_members(client):
     panel = client.get("/api/billing/usage?scope=org", headers=admin.headers).json()
     assert [p["user_id"] for p in panel["people"]] == [admin.user_id]
     assert panel["total_cost_usd"] == 0.5
+
+
+def test_the_landing_sees_the_plans_without_a_session(client):
+    plans = client.get("/api/billing/plans").json()
+    codes = [plan["code"] for plan in plans]
+    assert codes[:3] == ["base", "individual", "individual_voz"] and "institucion" in codes and "cortesia" not in codes
+    by_code = {plan["code"]: plan for plan in plans}
+    assert by_code["institucion"]["price_usd"] is None
+    assert by_code["individual_voz"]["limits"]["voice_minutes_per_month"] == 30

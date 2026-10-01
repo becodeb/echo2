@@ -94,6 +94,31 @@ def _next_month(start: datetime) -> datetime:
     return local.replace(year=year, month=month).astimezone(UTC)
 
 
+def _public(plan: BillingPlan) -> PublicPlanOut:
+    return PublicPlanOut(
+        code=plan.code,
+        name=plan.name,
+        scope=plan.scope,
+        # Instituciones: sin precio en la web, solo "Contact sales".
+        price_usd=None if plan.code == PLAN_INSTITUTION or plan.price_usd is None else float(plan.price_usd),
+        features=plan.features or {},
+        limits=plan.limits or {},
+    )
+
+
+async def _public_plans(db: AsyncSession) -> list[PublicPlanOut]:
+    rows = (
+        await db.execute(select(BillingPlan).where(BillingPlan.code != PLAN_COURTESY).order_by(BillingPlan.sort))
+    ).scalars().all()
+    return [_public(plan) for plan in rows]
+
+
+@router.get("/plans", response_model=list[PublicPlanOut])
+async def public_plans(db: AsyncSession = Depends(get_db)):
+    """Los planes con sus precios y topes, sin sesión: la landing los muestra."""
+    return await _public_plans(db)
+
+
 @router.get("/me", response_model=BillingOut)
 async def my_billing(ctx: OrgContext = Depends(get_org_context), db: AsyncSession = Depends(get_db)):
     access = await plans.people_access(db, ctx.org, ctx.user)
@@ -138,18 +163,7 @@ async def my_billing(ctx: OrgContext = Depends(get_org_context), db: AsyncSessio
             voice=(await plans.voice_allowance(db, ctx.user))[0],
             paid=plans.is_paid(ctx.org, ctx.user),
         ),
-        plans=[
-            PublicPlanOut(
-                code=plan.code,
-                name=plan.name,
-                scope=plan.scope,
-                # Instituciones: sin precio en la web, solo "Contact sales".
-                price_usd=None if plan.code == PLAN_INSTITUTION or plan.price_usd is None else float(plan.price_usd),
-                features=plan.features or {},
-                limits=plan.limits or {},
-            )
-            for plan in public
-        ],
+        plans=[_public(plan) for plan in public],
         requests=[RequestOut(id=r.id, plan=r.plan, status=r.status, created_at=r.created_at) for r in requests],
         month_start=start,
         renews_at=_next_month(start),
