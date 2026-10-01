@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { rememberNext, takeNext } from "./lib/next";
 import { useAuth } from "./state/auth";
 import { useMyAccess } from "./state/access";
 import { Layout } from "./components/Layout";
@@ -53,6 +54,8 @@ const loadUsage = () => import("./pages/Usage");
 const Usage = lazy(loadUsage);
 const loadLegal = () => import("./pages/Legal");
 const Legal = lazy(loadLegal);
+const loadForgot = () => import("./pages/ForgotPassword");
+const ForgotPassword = lazy(loadForgot);
 const loadContact = () => import("./pages/Contact");
 const Contact = lazy(loadContact);
 
@@ -60,6 +63,14 @@ const Contact = lazy(loadContact);
 // la pantalla quedaba vacía: al cambiar de sección "se teletransportaba". Con
 // la sesión abierta se bajan todas en segundo plano, así cambiar es inmediato.
 const PAGE_LOADERS = [loadMeetingLive, loadMeetingDetail, loadMeetings, loadInternalMeetings, loadProjects, loadProjectDetail, loadPeople, loadPersonDetail, loadTasks, loadAskEcho, loadSearchPage, loadSettings, loadAdmin, loadFamilies, loadReports, loadChooseLevel, loadPlans, loadUsage, loadLegal];
+
+/** Sin sesión: a Ingresar, recordando el link que se quería abrir. */
+function ToLogin() {
+  const location = useLocation();
+  const next = location.pathname + location.search + location.hash;
+  rememberNext(next);
+  return <Navigate to={`/login?next=${encodeURIComponent(next)}`} replace />;
+}
 
 function FullLoader() {
   return (
@@ -72,7 +83,16 @@ function FullLoader() {
 export default function App() {
   const { loading, user, organizations } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const myAccess = useMyAccess();
+
+  // Después de entrar con Google (que sale de la página), volver al link que
+  // se quería abrir.
+  useEffect(() => {
+    if (!user) return;
+    const next = takeNext();
+    if (next && next !== location.pathname + location.search) navigate(next, { replace: true });
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!user) return;
@@ -95,12 +115,19 @@ export default function App() {
   }
 
   // Privacidad, términos y contacto: públicos, con o sin sesión.
-  if (location.pathname.startsWith("/legal") || location.pathname === "/contacto") {
+  if (
+    location.pathname.startsWith("/legal") ||
+    location.pathname === "/contacto" ||
+    location.pathname === "/olvide" ||
+    location.pathname === "/restablecer"
+  ) {
     return (
       <Suspense fallback={<div className="min-h-dvh bg-[#fafbfc]" />}>
         <Routes>
           <Route path="/legal/:doc" element={<Legal />} />
           <Route path="/contacto" element={<Contact />} />
+          <Route path="/olvide" element={<ForgotPassword />} />
+          <Route path="/restablecer" element={<ForgotPassword />} />
           <Route path="*" element={<Navigate to="/legal/privacidad" replace />} />
         </Routes>
       </Suspense>
@@ -131,7 +158,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<ToLogin />} />
       </Routes>
     );
   }

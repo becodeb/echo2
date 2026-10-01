@@ -110,6 +110,10 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_from: str = ""
+    # Resend (resend.com): si está, los mails salen por su API en vez de SMTP.
+    resend_api_key: str = ""
+    # Remitente de los mails ("Echo <no-responder@becode.com.ar>"); si no, smtp_from.
+    mail_from: str = ""
     # Adónde llegan los pedidos de plan. Nunca se muestra en la web.
     sales_email: str = "becodestudio@gmail.com"
 

@@ -24,6 +24,7 @@ from .core import (
     Organization,
     OrganizationInvite,
     OrganizationMember,
+    PasswordReset,
     RefreshToken,
     User,
 )
@@ -70,7 +71,7 @@ __all__ = [
     "MeetingAttachment", "OrgGoogleDrive", "ServerAISettings", "UserGoogleDrive",
     "InternalGroup", "InternalGroupMember", "DEFAULT_GROUPS", "MEETING_KINDS", "UserVoiceSample", "VoiceSession",
     "RELATIONSHIPS", "SEVERITIES", "AUDIENCES",
-    "RefreshToken", "ROLES", "ROLE_OWNER", "ROLE_ADMIN", "ROLE_MEMBER", "ROLE_VIEWER",
+    "PasswordReset", "RefreshToken", "ROLES", "ROLE_OWNER", "ROLE_ADMIN", "ROLE_MEMBER", "ROLE_VIEWER",
     "EMBEDDING_DIM", "Meeting", "MeetingParticipant", "Speaker", "SpeakerProfile",
     "TranscriptSegment", "SegmentRevision", "Bookmark", "MeetingLink",
     "MeetingTopic", "Decision", "ActionItem", "Question", "Risk", "MeetingSummary",

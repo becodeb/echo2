@@ -4,6 +4,7 @@ import { useAuth } from "../state/auth";
 import { Button, Input, Spinner } from "../components/ui";
 import { EchoFace } from "../components/EchoFace";
 import { GoogleButton } from "../components/GoogleButton";
+import { safeNext, takeNext } from "../lib/next";
 import { useTitle } from "../lib/useTitle";
 
 /** Motivos que puede devolver el callback de Google, en castellano y sin
@@ -34,7 +35,7 @@ export default function Login() {
     setError(null);
     try {
       await login(email, password);
-      navigate("/");
+      navigate(safeNext(params.get("next")) ?? takeNext() ?? "/", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al iniciar sesión");
     } finally {
@@ -75,6 +76,11 @@ export default function Login() {
             <Button type="submit" disabled={busy} className="w-full">
               {busy ? <Spinner /> : "Iniciar sesión"}
             </Button>
+            <p className="text-center text-sm">
+              <Link to="/olvide" className="font-medium text-ink-500 hover:text-ink-900">
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </p>
           </form>
           <GoogleButton label="Continuar con Google" />
         </div>
