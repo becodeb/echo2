@@ -236,17 +236,6 @@ export function NewMeetingModal({
               options={creatable.map((value) => ({ value, label: LEVEL_LABEL[value] }))}
             />
           )}
-          <Select
-            label="Idioma"
-            value={language}
-            onChange={setLanguage}
-            options={[
-              { value: "es", label: "Español" },
-              { value: "en", label: "English" },
-              { value: "pt", label: "Português" },
-              { value: "auto", label: "Detectar automáticamente" },
-            ]}
-          />
         </div>
         <Input
           label="Participantes (separados por coma)"
@@ -254,20 +243,41 @@ export function NewMeetingModal({
           value={participants}
           onChange={(event) => setParticipants(event.target.value)}
         />
-        {kind === "familia" && (
-          <label className="flex items-center gap-2 text-sm text-ink-600">
-            <input
-              type="checkbox"
-              checked={visibility === "private"}
-              onChange={(event) => setVisibility(event.target.checked ? "private" : "org")}
-              className="rounded border-ink-300"
+        <details className="group rounded-2xl border border-ink-100 px-4 py-1">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-sm font-medium text-ink-700">
+            Opciones avanzadas
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="transition-transform group-open:rotate-180" aria-hidden>
+              <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </summary>
+          <div className="space-y-4 pb-4 pt-2">
+            <Select
+              label="Idioma"
+              value={language}
+              onChange={setLanguage}
+              options={[
+                { value: "es", label: "Español" },
+                { value: "en", label: "English" },
+                { value: "pt", label: "Português" },
+                { value: "auto", label: "Detectar automáticamente" },
+              ]}
             />
-            Reunión privada (solo vos y con quien la compartas)
-          </label>
-        )}
-        <SettingsGroup>
-          <RecordToggle checked={recordAudio} onChange={setRecordAudio} />
-        </SettingsGroup>
+        {kind === "familia" && (
+              <label className="flex items-center gap-2 text-sm text-ink-600">
+                <input
+                  type="checkbox"
+                  checked={visibility === "private"}
+                  onChange={(event) => setVisibility(event.target.checked ? "private" : "org")}
+                  className="rounded border-ink-300"
+                />
+                Reunión privada (solo vos y con quien la compartas)
+              </label>
+            )}
+            <SettingsGroup>
+              <RecordToggle checked={recordAudio} onChange={setRecordAudio} />
+            </SettingsGroup>
+          </div>
+        </details>
         <MeetingAiPlan
           people={people}
           onPeople={setPeople}
@@ -315,7 +325,15 @@ export function NewMeetingModal({
             onChange={(event) => setUpload(event.target.files?.[0] ?? null)}
           />
         </div>
-        <div className="flex justify-end gap-2 pt-2">
+        <p className="flex items-start gap-2 text-xs leading-relaxed text-ink-500">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="mt-0.5 shrink-0" aria-hidden>
+            <rect x="5" y="11" width="14" height="10" rx="3" stroke="currentColor" strokeWidth="2" />
+            <path d="M8 11V8a4 4 0 0 1 8 0v3" stroke="currentColor" strokeWidth="2" />
+          </svg>
+          Los nombres se reemplazan antes de que la IA lea la reunión, y el audio se borra al terminar.
+        </p>
+        {/* En el celular el botón queda fijo abajo: el formulario es largo. */}
+        <div className="sticky bottom-0 -mx-5 flex justify-end gap-2 border-t border-ink-100 bg-white px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:static sm:mx-0 sm:border-0 sm:p-0 sm:pt-2">
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancelar
           </Button>

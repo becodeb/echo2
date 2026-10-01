@@ -102,15 +102,7 @@ export function MeetingAiPlan({
           <Row
             on
             label="Conversación por voz"
-            hint={
-              <>
-                Después, preguntale por la reunión hablando, desde{" "}
-                <Link to="/ask" className="font-medium text-ink-700 underline-offset-2 hover:underline">
-                  Preguntale a Echo
-                </Link>
-                .
-              </>
-            }
+            hint="Después, preguntale por la reunión hablando, con Hablar con Echo."
           />
         )}
       </ul>
@@ -208,7 +200,7 @@ function PeopleRow({
           label="Quién habló"
           hint={
             people
-              ? `Al terminar, Echo separa a cada persona. Gasta 1 crédito por cada hora de reunión.`
+              ? `Al terminar, Echo separa a cada persona. Gasta 1 crédito (2 si la reunión dura más de una hora).`
               : `Te quedan ${left} de ${total} créditos este mes. Activalo solo si lo necesitás.`
           }
           extra={
