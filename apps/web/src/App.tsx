@@ -53,6 +53,8 @@ const loadUsage = () => import("./pages/Usage");
 const Usage = lazy(loadUsage);
 const loadLegal = () => import("./pages/Legal");
 const Legal = lazy(loadLegal);
+const loadContact = () => import("./pages/Contact");
+const Contact = lazy(loadContact);
 
 // Las páginas se bajan de a una la primera vez que se abren, y mientras tanto
 // la pantalla quedaba vacía: al cambiar de sección "se teletransportaba". Con
@@ -92,12 +94,13 @@ export default function App() {
     );
   }
 
-  // Privacidad y términos: públicos, con o sin sesión.
-  if (location.pathname.startsWith("/legal")) {
+  // Privacidad, términos y contacto: públicos, con o sin sesión.
+  if (location.pathname.startsWith("/legal") || location.pathname === "/contacto") {
     return (
       <Suspense fallback={<div className="min-h-dvh bg-[#fafbfc]" />}>
         <Routes>
           <Route path="/legal/:doc" element={<Legal />} />
+          <Route path="/contacto" element={<Contact />} />
           <Route path="*" element={<Navigate to="/legal/privacidad" replace />} />
         </Routes>
       </Suspense>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { NavLink, Navigate, Route, Routes, useSearchParams } from "react-router-dom";
+import { Link, NavLink, Navigate, Route, Routes, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { DriveStatusOut, MyDriveOut, ReasonOut } from "../api/types";
@@ -568,42 +568,103 @@ function NotificationsSection() {
 // ── Privacidad ───────────────────────────────────────────────────
 
 function PrivacySection() {
+  const queryClient = useQueryClient();
+  const [confirming, setConfirming] = useState(false);
+  const { data: deletion } = useQuery({
+    queryKey: ["deletion-request"],
+    queryFn: () => api<{ requested_at: string | null }>("/api/me/deletion-request", { skipOrg: true }),
+  });
+  const ask = useMutation({
+    mutationFn: () => api("/api/me/deletion-request", { method: "POST", skipOrg: true }),
+    onSuccess: () => {
+      setConfirming(false);
+      return queryClient.invalidateQueries({ queryKey: ["deletion-request"] });
+    },
+  });
+
   return (
-    <Card>
-      <h2 className="mb-3 font-semibold text-ink-900">Privacidad</h2>
-      <div className="space-y-3 text-sm leading-relaxed text-ink-600">
-        <p>
-          <strong className="text-ink-800">El audio no queda guardado en Echo.</strong> Mientras dura la
-          reunión y hasta que termina de procesarse, Echo usa una copia de trabajo del audio para
-          transcribir y saber quién habló, y la borra al terminar. Lo que queda es el transcript, los
-          hablantes, las decisiones, tareas, resúmenes y el acta. Solo si elegís grabar una reunión se
-          guarda el audio, y va a tu Google Drive.
+    <div className="space-y-5">
+      <Card>
+        <h2 className="mb-3 font-semibold text-ink-900">Cómo cuida Echo tus datos</h2>
+        <ul className="space-y-2.5 text-sm leading-relaxed text-ink-600">
+          <li>
+            <strong className="text-ink-800">El audio no queda guardado.</strong> Echo usa una copia de trabajo para
+            transcribir y la borra al terminar (si algo falla, como mucho 48 horas). Solo si elegís grabar una reunión,
+            el audio va a tu Google Drive.
+          </li>
+          <li>
+            <strong className="text-ink-800">Los nombres no le llegan a la IA:</strong> se reemplazan por marcadores
+            antes de redactar el acta o responder, y vuelven al terminar.
+          </li>
+          <li>
+            <strong className="text-ink-800">Reuniones con menores:</strong> no se separa quién habló y la voz de Echo
+            no las usa.
+          </li>
+          <li>
+            <strong className="text-ink-800">Siempre se ve cuándo se graba:</strong> la app y el Echo Device muestran
+            «● Grabando». Avisá a quienes participan que la reunión se transcribe.
+          </li>
+        </ul>
+        <p className="mt-4 text-sm">
+          <Link to="/legal/privacidad" className="font-medium text-ink-900 underline underline-offset-2">
+            Leer la política de privacidad completa
+          </Link>
         </p>
-        <p>
-          <strong className="text-ink-800">Modo local (Echo Bridge):</strong> con el bridge instalado, el
-          audio nunca sale de la computadora — solo el texto llega al servidor.
+      </Card>
+
+      <Card>
+        <h2 className="mb-1 font-semibold text-ink-900">Tus datos</h2>
+        <p className="mb-4 text-sm text-ink-500">
+          Podés pedir una copia de tus datos, corregirlos o borrarlos (Ley 25.326).
         </p>
-        <p>
-          <strong className="text-ink-800">Modo cloud:</strong> el audio viaja cifrado al proveedor de
-          transcripción configurado, que lo procesa; Echo borra su copia al terminar la reunión. Siempre se indica en la
-          pantalla de la reunión qué modo está activo.
-        </p>
-        <p>
-          <strong className="text-ink-800">Indicador de grabación:</strong> cuando hay captura activa, la UI
-          (y el dispositivo ESP32) muestran «● Grabando». Nunca hay grabación oculta. Asegurate de que los
-          participantes sepan que la reunión está siendo transcripta.
-        </p>
-        <p>
-          <strong className="text-ink-800">Identificación por voz:</strong> Echo <strong>no</strong> analiza
-          ni almacena características biométricas de la voz. Los hablantes se separan por los turnos que
-          informa el motor de transcripción y se identifican renombrándolos a mano.
-        </p>
-        <p>
-          <strong className="text-ink-800">API keys:</strong> se guardan cifradas (Fernet/AES) y nunca se
-          devuelven completas al navegador ni se registran en logs.
-        </p>
-      </div>
-    </Card>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            to="/contacto?tema=privacidad"
+            className="inline-flex min-h-11 items-center rounded-full bg-ink-100 px-4 text-sm font-medium text-ink-800 hover:bg-ink-200"
+          >
+            Pedir mis datos o corregirlos
+          </Link>
+          {!deletion?.requested_at && !confirming && (
+            <button
+              onClick={() => setConfirming(true)}
+              className="min-h-11 rounded-full px-4 text-sm font-medium text-red-600 hover:bg-red-50"
+            >
+              Pedir la baja de mi cuenta
+            </button>
+          )}
+        </div>
+        {confirming && (
+          <div className="mt-4 rounded-2xl bg-red-50 p-4 text-sm text-red-900">
+            <p className="font-medium">¿Pedir la baja de tu cuenta?</p>
+            <p className="mt-1 text-red-800">
+              Becode borra tu cuenta y tus datos personales dentro de los 5 días hábiles. Las reuniones que hiciste para
+              una institución quedan en la institución. No se puede deshacer.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                onClick={() => ask.mutate()}
+                disabled={ask.isPending}
+                className="min-h-11 rounded-full bg-red-600 px-4 font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {ask.isPending ? <Spinner /> : "Sí, pedir la baja"}
+              </button>
+              <button onClick={() => setConfirming(false)} className="min-h-11 rounded-full px-4 font-medium text-red-800">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+        {deletion?.requested_at && (
+          <p className="mt-4 rounded-2xl bg-ink-50 px-4 py-3 text-sm text-ink-600">
+            Pediste la baja el {new Date(deletion.requested_at).toLocaleDateString("es-AR")}. Becode la procesa dentro de
+            los 5 días hábiles y te avisa por mail.
+          </p>
+        )}
+        {ask.isError && (
+          <p className="mt-3 text-sm text-red-600">{ask.error instanceof Error ? ask.error.message : "No se pudo pedir"}</p>
+        )}
+      </Card>
+    </div>
   );
 }
 
