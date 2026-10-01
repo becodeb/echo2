@@ -224,7 +224,7 @@ export function Hero() {
           scrolled ? "border-b border-ink-200/60 bg-[#fafbfc]/80 backdrop-blur-md" : "border-b border-transparent"
         }`}
       >
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-6 md:px-12">
+        <div className="relative flex h-16 items-center justify-between gap-4 px-6 md:px-12">
           <Link
             to="/"
             className={`text-lg font-semibold tracking-tight text-ink-950 transition-opacity duration-700 ${lit ? "opacity-100" : "pointer-events-none opacity-0"}`}
@@ -232,7 +232,7 @@ export function Hero() {
             Echo
           </Link>
           <nav
-            className={`hidden items-center gap-6 text-sm font-medium text-ink-600 transition-opacity duration-700 md:flex [&>a:hover]:text-ink-950 ${
+            className={`absolute left-1/2 hidden -translate-x-1/2 items-center gap-6 text-sm font-medium text-ink-600 transition-opacity duration-700 lg:flex [&>a:hover]:text-ink-950 ${
               lit ? "opacity-100" : "pointer-events-none opacity-0"
             }`}
             aria-label="Secciones"
