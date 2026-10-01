@@ -28,8 +28,16 @@ Reglas de reconocimiento, pensadas para transcripts:
   reconocibles al resto de esa familia por nombre de pila: "Melina" pasa a
   ser "[MADRE_1]" y no un genérico.
 
-Lo que NO cubre: un nombre que no está en ninguna lista y se dice solo por
-el nombre de pila. Por eso importa cargar la nómina.
+- Un nombre que no está en ninguna lista también se tapa si parece nombre
+  propio: palabra con mayúscula a mitad de oración que en el mismo texto no
+  aparece en minúscula ("¿Qué hacés, Bauti?"). Es local, sin mandar nada a
+  nadie, y cubre la pasada con Groq (Gratis, reuniones con menores), donde no
+  hay detección de entidades de Scribe. Va como "[NOMBRE_n]".
+- Lo que Scribe detectó como dato personal o de salud (teléfono, dirección,
+  diagnóstico, medicación) va como "[DATO_n]".
+
+Lo que NO cubre: un nombre fuera de las listas dicho al principio de una
+oración ("Bauti dijo que..."). Por eso importa cargar la nómina.
 """
 from __future__ import annotations
 
@@ -58,7 +66,7 @@ LABELS = {
     "persona": "PERSONA",
     "otro": "PERSONA",
 }
-ALL_LABELS = sorted(set(LABELS.values()) | {"NOMBRE", "NUMERO", "EMAIL"})
+ALL_LABELS = sorted(set(LABELS.values()) | {"NOMBRE", "NUMERO", "EMAIL", "DATO"})
 
 # Palabras sueltas que no se toman como nombre aunque vengan con mayúscula:
 # conectores de apellidos compuestos y palabras que abren oraciones.
@@ -74,6 +82,28 @@ STOPWORDS = {
     "viernes", "sabado", "domingo",
 }
 MIN_SINGLE_WORD = 3
+
+# Palabras que van con mayúscula a mitad de oración y no son nombres de
+# persona. No hace falta que esté todo: tapar de más se restaura igual; esto
+# es para que la IA no pierda contexto obvio de un colegio.
+COMMON_CAPITALIZED = {
+    "echo", "google", "drive", "meet", "zoom", "whatsapp", "gmail", "excel", "word", "classroom",
+    "teams", "instagram", "facebook", "youtube", "internet", "covid", "dios", "virgen", "navidad",
+    "pascua", "ministerio", "educacion", "argentina", "buenos", "aires", "provincia", "ciudad",
+    "inicial", "primaria", "secundaria", "jardin", "nivel", "colegio", "escuela", "instituto",
+    "universidad", "direccion", "secretaria", "consejo", "gabinete", "equipo", "orientacion",
+    "psicopedagogia", "lengua", "matematica", "ingles", "historia", "geografia", "biologia",
+    "fisica", "quimica", "musica", "plastica", "tecnologia", "ciencias", "naturales", "sociales",
+    "semana", "dia", "acto", "face", "persona", "hablante", "participante", "reunion", "acta", "anexo",
+}
+# "Colegio Northfield", "Escuela San Martín": lo que sigue es el nombre de una
+# institución, no de una persona.
+INSTITUTION_WORDS = {
+    "colegio", "escuela", "instituto", "jardin", "universidad", "club", "sede", "liceo", "fundacion",
+    "hospital", "clinica", "parroquia", "empresa", "barrio", "calle", "avenida", "plaza", "parque",
+}
+# Lo que antecede a un comienzo de oración (ahí la mayúscula no dice nada).
+_SENTENCE_START = set('.!?¿¡:;\n"«“(-•*>[]#|')
 
 PRIVACY_NOTE = (
     "\n\nPrivacidad: los nombres propios y datos personales del texto fueron reemplazados por "
@@ -160,8 +190,17 @@ class Pseudonymizer:
     """
 
     def __init__(self, people: list[Person], priority_groups: set[str] | None = None,
-                 priority_people: list[Person] | None = None):
+                 priority_people: list[Person] | None = None, data: list[str] | None = None,
+                 keep: set[str] | None = None):
         self.people = list(people) + list(priority_people or [])
+        # Palabras que no se adivinan como nombre (las del nombre de la sede).
+        self.keep = {fold(word) for word in keep or set()}
+        # Datos que detectó Scribe (dirección, teléfono, diagnóstico...), tal cual se dijeron.
+        literals = sorted({" ".join(d.split()) for d in data or [] if len(d.strip()) >= 3}, key=len, reverse=True)
+        self._data = (
+            re.compile(r"(?<!\w)(" + "|".join(re.escape(d) for d in literals) + r")(?!\w)", re.IGNORECASE)
+            if literals else None
+        )
         self.priority: set[int] = {len(people) + i for i in range(len(priority_people or []))}
         self.priority_groups = set(priority_groups or set())
         self._index: dict[tuple[str, ...], set[int]] = {}
@@ -203,18 +242,25 @@ class Pseudonymizer:
         return None
 
     # ── reemplazo ───────────────────────────────────────────────
-    def apply(self, text: str) -> str:
+    def apply(self, text: str, guess: bool = True) -> str:
+        """`guess`: tapar también lo que parece nombre aunque no esté en ninguna
+        lista. Con instrucciones propias (el prompt del sistema) va en False."""
         if not text:
             return text
         text = _EMAIL.sub(lambda m: self._scrub_literal("EMAIL", m.group(0)), text)
         text = _NUMBER.sub(self._scrub_number, text)
+        if self._data is not None:
+            text = self._data.sub(lambda m: self._scrub_literal("DATO", m.group(0), fold_key=True), text)
         words = list(_WORD.finditer(text))
         self._promote(text, words)
+        lowercase = {fold(w.group(0)) for w in words if w.group(0).islower()} if guess else set()
         out: list[str] = []
         cursor = 0
         i = 0
         while i < len(words):
             match = self._match_at(text, words, i)
+            if match is None and guess:
+                match = self._guess_at(text, words, i, lowercase)
             if match is None:
                 i += 1
                 continue
@@ -226,11 +272,47 @@ class Pseudonymizer:
         out.append(text[cursor:])
         return "".join(out)
 
-    def _scrub_literal(self, label: str, value: str) -> str:
+    def _scrub_literal(self, label: str, value: str, fold_key: bool = False) -> str:
+        same = (lambda a, b: fold(a) == fold(b)) if fold_key else (lambda a, b: a == b)
         for token, original in self.restore_map.items():
-            if original == value and token.startswith(f"[{label}_"):
+            if same(original, value) and token.startswith(f"[{label}_"):
                 return token
         return self._new_token(label, value)
+
+    def _looks_like_name(self, word: str, lowercase: set[str]) -> bool:
+        key = fold(word)
+        return (
+            len(key) >= MIN_SINGLE_WORD
+            and key not in self.keep
+            and word[:1].isupper()
+            and not word.isupper()  # siglas y títulos en mayúsculas
+            and key not in STOPWORDS
+            and key not in COMMON_CAPITALIZED
+            and key not in lowercase
+        )
+
+    def _guess_at(self, text: str, words: list[re.Match], i: int, lowercase: set[str]) -> tuple[int, str] | None:
+        """Nombre propio fuera de las listas: mayúscula a mitad de oración."""
+        if not self._looks_like_name(words[i].group(0), lowercase):
+            return None
+        before = text[:words[i].start()].rstrip(" \t")
+        if not before or before[-1] in _SENTENCE_START or before[-1] == "\n":
+            return None
+        j = i - 1
+        while j >= 0 and text[words[j].end():words[j + 1].start()] == " " and words[j].group(0)[:1].isupper():
+            if fold(words[j].group(0)) in INSTITUTION_WORDS:
+                return None
+            j -= 1
+        n = 1
+        while (
+            i + n < len(words)
+            and text[words[i + n - 1].end():words[i + n].start()] == " "
+            and self._looks_like_name(words[i + n].group(0), lowercase)
+            and self._match_at(text, words, i + n) is None
+        ):
+            n += 1
+        surface = text[words[i].start():words[i + n - 1].end()]
+        return n, self._token_for_generic(surface)
 
     def _scrub_number(self, match: re.Match) -> str:
         value = match.group(0)
@@ -320,7 +402,7 @@ class PrivateLLMProvider(LLMProvider):
     async def chat(self, system, messages, temperature=0.2, max_tokens=4096) -> str:
         p = self.pseudonymizer
         safe_messages = [{**m, "content": p.apply(m.get("content") or "")} for m in messages]
-        safe_system = p.apply(system)
+        safe_system = p.apply(system, guess=False)
         if p.used:
             safe_system += PRIVACY_NOTE
         with collect_usage() as used:
@@ -412,6 +494,25 @@ def forget_org_cache(org_id: uuid.UUID) -> None:
 _NAME_ENTITY = re.compile(r"^(person|name)", re.IGNORECASE)
 
 
+# Entidades de Scribe que NO son datos personales: números dichos ("uno, dos,
+# tres"), "profe", fechas de un compromiso. Todo lo demás de pii/phi
+# (dirección, teléfono, documento, diagnóstico, medicación) se tapa.
+_HARMLESS_ENTITY = re.compile(
+    r"^(cardinal|ordinal|occupation|language|date|time|duration|quantity|percent|money)$", re.IGNORECASE
+)
+
+
+def detected_data(meta: dict | None) -> list[str]:
+    """Datos personales o de salud que Scribe detectó (meta.detected_entities)."""
+    out: list[str] = []
+    for entity in (meta or {}).get("detected_entities") or []:
+        text = " ".join(str(entity.get("text") or "").split())
+        kind = str(entity.get("type") or "")
+        if text and kind and not _NAME_ENTITY.match(kind) and not _HARMLESS_ENTITY.match(kind) and text not in out:
+            out.append(text)
+    return out
+
+
 def detected_names(meta: dict | None) -> list[str]:
     """Nombres que Scribe detectó en el audio (meta.detected_entities).
 
@@ -436,13 +537,19 @@ async def build_pseudonymizer(
 ) -> Pseudonymizer:
     from ..models import Meeting, MeetingParticipant, Speaker
 
+    from ..models import Organization
+
     people = await _org_people(db, org_id)
+    organization = await db.get(Organization, org_id)
+    keep = set(_WORD.findall(organization.name)) if organization is not None and organization.name else set()
     priority_people: list[Person] = []
     priority_groups: set[str] = set()
+    data: list[str] = []
     if meeting_id:
         meeting = await db.get(Meeting, meeting_id)
         if meeting is not None and meeting.family_id:
             priority_groups.add(f"family:{meeting.family_id}")
+        data = detected_data(meeting.meta if meeting is not None else None)
         # Lo que se dijo en voz alta aunque no esté en ninguna nómina: los
         # nombres que detectó la pasada final (services/diarization.py).
         for name in detected_names(meeting.meta if meeting is not None else None):
@@ -462,7 +569,7 @@ async def build_pseudonymizer(
                 person = Person.parse(name, "persona")
                 if person:
                     priority_people.append(person)
-    return Pseudonymizer(people, priority_groups, priority_people)
+    return Pseudonymizer(people, priority_groups, priority_people, data, keep)
 
 
 async def protect(

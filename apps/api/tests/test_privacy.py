@@ -174,3 +174,56 @@ def test_a_name_in_no_roster_does_not_reach_the_ai(client):
     answer = asyncio.run(run())
     assert sent and "Vanina" not in sent[0] and "Toranzo" not in sent[0] and "Ezequiel" not in sent[0]
     assert answer == "Hablaron Vanina y Ezequiel Toranzo."
+
+
+def test_a_name_outside_every_list_is_covered_without_scribe():
+    """Pasada con Groq (Gratis, menores): sin entidades de Scribe. Lo que tiene
+    pinta de nombre propio a mitad de oración tampoco sale (reunión del 1/10)."""
+    text = (
+        "[00:01] Persona 1: ¿Qué hacés, Bauti?\n"
+        "[00:03] Persona 2: ¿Todo bien, Lau? Tenemos que probar la app de Andy en el colegio.\n"
+        "[00:45] Persona 1: Yo hablo con Carla Curto y con Cristian. Bueno, dale.\n"
+        "[00:50] Persona 2: El Colegio y la colegio... Martina viene el lunes."
+    )
+    pseudo = Pseudonymizer(roster())
+    safe = pseudo.apply(text)
+    for name in ("Bauti", "Lau", "Andy", "Carla", "Curto", "Cristian"):
+        assert name not in safe, name
+    # Lo que también aparece en minúscula, o abre la oración, no se toca.
+    assert "El Colegio" in safe and "Bueno, dale" in safe and "Persona 1:" in safe
+    assert "[NOMBRE_" in safe and pseudo.restore(safe) == text
+
+
+def test_instructions_are_not_guessed_but_the_transcript_is():
+    seen = {}
+
+    class Spy(LLMProvider):
+        name = "spy"
+
+        async def chat(self, system, messages, temperature=0.2, max_tokens=4096):
+            seen["system"], seen["user"] = system, messages[-1]["content"]
+            return "Hablaste con [NOMBRE_1]."
+
+    wrapped = PrivateLLMProvider(Spy(), Pseudonymizer([]))
+    answer = asyncio.run(wrapped.chat("Sos Echo, el asistente de la Dirección.",
+                                      [{"role": "user", "content": "Lo dijo hoy Ludmila en la reunión."}]))
+    assert "Ludmila" not in seen["user"] and "Echo" in seen["system"] and "Dirección" in seen["system"]
+    assert answer == "Hablaste con Ludmila."
+
+
+def test_personal_and_health_data_that_scribe_heard_is_covered():
+    from echo_api.services.privacy import detected_data
+
+    meta = {"detected_entities": [
+        {"text": "Bautista Goñi", "type": "name"}, {"text": "uno", "type": "cardinal"},
+        {"text": "profe", "type": "occupation"}, {"text": "Avenida Libertador 1450", "type": "location_address"},
+        {"text": "TDAH", "type": "medical_condition"}, {"text": "metilfenidato", "type": "medication"},
+    ]}
+    data = detected_data(meta)
+    assert data == ["Avenida Libertador 1450", "TDAH", "metilfenidato"]
+    pseudo = Pseudonymizer([], data=data)
+    text = "Uno, dos. La profe dijo que vive en avenida libertador 1450, tiene TDAH y toma Metilfenidato."
+    safe = pseudo.apply(text)
+    assert "libertador" not in safe.lower() and "TDAH" not in safe and "etilfenidato" not in safe
+    assert safe.startswith("Uno, dos. La profe") and "[DATO_" in safe
+    assert pseudo.restore(safe) == text
