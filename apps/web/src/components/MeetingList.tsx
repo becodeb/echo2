@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import type { MeetingListItem } from "../api/types";
 import { LEVEL_LABEL } from "../state/access";
+import { DeleteDraft } from "./DeleteDraft";
 import { MeetingStatus } from "./MeetingStatus";
 import { Card, formatDate, formatDuration } from "./ui";
 
@@ -17,7 +18,7 @@ export function MeetingList({ meetings }: { meetings: MeetingListItem[] }) {
           <Link
             key={meeting.id}
             to={target}
-            className="flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-ink-50"
+            className="group flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-ink-50"
           >
             <div className="min-w-0">
               <p className="truncate font-medium text-ink-900">{meeting.title}</p>
@@ -31,7 +32,10 @@ export function MeetingList({ meetings }: { meetings: MeetingListItem[] }) {
                 {meeting.recorded && " · con grabación"}
               </p>
             </div>
-            <MeetingStatus status={meeting.status} />
+            <span className="flex shrink-0 items-center gap-2">
+              {meeting.status === "draft" && <DeleteDraft meetingId={meeting.id} title={meeting.title} />}
+              <MeetingStatus status={meeting.status} />
+            </span>
           </Link>
         );
       })}

@@ -68,10 +68,11 @@ export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
         </Svg>
       );
     case "internal":
+      // Dos globos de charla: la reunión entre el equipo (Reuniones es uno solo).
       return (
         <Svg size={size}>
-          <path d="M12 3.5 5.5 6v5.2c0 4 2.7 7.4 6.5 8.8 3.8-1.4 6.5-4.8 6.5-8.8V6L12 3.5z" />
-          <path d="m9.3 11.8 1.9 1.9 3.6-3.7" />
+          <path d="M14.5 6.2A6 6 0 0 0 3.5 9.5a5.9 5.9 0 0 0 .8 3L3.5 15l2.6-.8" />
+          <path d="M20.5 14a5.5 5.5 0 0 1-.7 2.7l.7 2.8-2.8-.8A5.5 5.5 0 1 1 20.5 14z" />
         </Svg>
       );
     case "tasks":

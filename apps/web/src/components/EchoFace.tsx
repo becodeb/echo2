@@ -3,7 +3,7 @@
  * el favicon y el dispositivo ESP32.
  *
  * Estados: idle (espera), listening (escucha, reacciona al volumen),
- * thinking (procesa), sleeping (pausa), done (sonríe), error.
+ * thinking (procesa), sleeping (pausa), done (ojos contentos), error.
  */
 
 export type EchoMood = "idle" | "listening" | "thinking" | "sleeping" | "done" | "error";
@@ -36,10 +36,10 @@ export function EchoFace({
     >
       <g className="echo-pupils">
         {mood === "done" ? (
+          // Contento: los mismos ojos, achinados hacia arriba (sin boca: Echo es solo ojos).
           <>
-            <path d="M10 18 q3.5 -5 7 0" fill="none" stroke={stroke} strokeWidth={3} strokeLinecap="round" />
-            <path d="M23 18 q3.5 -5 7 0" fill="none" stroke={stroke} strokeWidth={3} strokeLinecap="round" />
-            <path d="M13 27 q7 6 14 0" fill="none" stroke={stroke} strokeWidth={2.5} strokeLinecap="round" />
+            <path d="M9 22.5c0-3.4 1.8-5.5 4-5.5s4 2.1 4 5.5c-1.2-1.3-2.5-1.9-4-1.9s-2.8.6-4 1.9z" fill={stroke} />
+            <path d="M23 22.5c0-3.4 1.8-5.5 4-5.5s4 2.1 4 5.5c-1.2-1.3-2.5-1.9-4-1.9s-2.8.6-4 1.9z" fill={stroke} />
           </>
         ) : mood === "error" ? (
           <>

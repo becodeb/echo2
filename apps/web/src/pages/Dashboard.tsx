@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
+import { DeleteDraft } from "../components/DeleteDraft";
 import { MeetingStatus } from "../components/MeetingStatus";
 import { Card, EmptyState, formatDate, formatDuration } from "../components/ui";
 import { useAuth } from "../state/auth";
@@ -78,7 +79,7 @@ export default function Dashboard() {
                       ? `/meetings/${meeting.id}/live`
                       : `/meetings/${meeting.id}`
                   }
-                  className="flex items-center justify-between gap-4 px-5 py-3.5 transition-colors hover:bg-ink-50"
+                  className="group flex items-center justify-between gap-4 px-5 py-3.5 transition-colors hover:bg-ink-50"
                 >
                   <div className="min-w-0">
                     <p className="truncate font-medium text-ink-900">{meeting.title}</p>
@@ -87,7 +88,10 @@ export default function Dashboard() {
                       {meeting.duration_seconds > 0 && ` · ${formatDuration(meeting.duration_seconds)}`}
                     </p>
                   </div>
-                  <MeetingStatus status={meeting.status} />
+                  <span className="flex shrink-0 items-center gap-2">
+                    {meeting.status === "draft" && <DeleteDraft meetingId={meeting.id} title={meeting.title} />}
+                    <MeetingStatus status={meeting.status} />
+                  </span>
                 </Link>
               );
             })}
