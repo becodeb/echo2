@@ -148,6 +148,16 @@ def test_superadmin_sets_plans_and_limits(client):
     assert client.put(f"/api/admin/organizations/{teacher.org_id}/plan", json={"limits": {"credits_per_month": 10}},
                       headers=admin.headers).status_code == 200
     assert _run(_access(teacher)).credits_left == 10
+    # Vaciar el campo vuelve al valor del plan; nunca deja la organización sin tope.
+    cleared = client.put(f"/api/admin/organizations/{teacher.org_id}/plan",
+                         json={"limits": {"credits_per_month": None}}, headers=admin.headers)
+    assert cleared.json()["limits"] == {}
+    assert _run(_access(teacher)).credits_left == 4
+    _sql("UPDATE organizations SET limits = CAST('{\"credits_per_month\": null}' AS jsonb) WHERE id = :id",
+         id=teacher.org_id)
+    assert _run(_access(teacher)).credits_left == 4
+    client.put(f"/api/admin/organizations/{teacher.org_id}/plan", json={"limits": {"credits_per_month": 10}},
+               headers=admin.headers)
     assert client.put(f"/api/admin/organizations/{teacher.org_id}/plan", json={"limits": {"inventado": 1}},
                       headers=admin.headers).status_code == 422
     assert client.put(f"/api/admin/users/{teacher.user_id}/plan", json={"limits": {"credits_per_month": -1}},

@@ -210,3 +210,28 @@ def test_superadmin_sees_plan_requests_from_any_campus(client, monkeypatch):
     # En su propia organización, no en la de quien pidió.
     notes = client.get("/api/notifications", headers=admin.headers).json()["notifications"]
     assert any(note["kind"] == "plan_request" and "Pide Plan" in note["title"] for note in notes)
+
+
+def test_a_double_click_on_subscribe_does_not_break_the_request(client):
+    session = _register(client)
+    headers = _headers(session)
+    # Dos pedidos que quedaron iguales (como pasaba con un doble clic): el siguiente igual responde.
+    for _ in range(2):
+        _sql(
+            "INSERT INTO plan_requests (id, user_id, plan, status, created_at, updated_at)"
+            " VALUES (:id, :u, 'individual', 'new', now(), now())",
+            id=str(uuid.uuid4()), u=session["user"]["id"],
+        )
+    again = client.post("/api/billing/requests", json={"plan": "individual"}, headers=headers)
+    assert again.status_code == 201, again.text
+    count = asyncio.run(_count_requests(session["user"]["id"]))
+    assert count == 2
+
+
+async def _count_requests(user_id: str) -> int:
+    from sqlalchemy import func, select
+
+    from echo_api.models import PlanRequest
+
+    async with SessionLocal() as db:
+        return (await db.execute(select(func.count()).where(PlanRequest.user_id == uuid.UUID(user_id)))).scalar_one()

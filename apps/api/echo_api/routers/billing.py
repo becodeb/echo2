@@ -16,6 +16,7 @@ from datetime import UTC, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
+from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
@@ -163,16 +164,20 @@ async def request_plan(
 ):
     if data.plan not in REQUESTABLE:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Ese plan no se puede pedir desde acá")
+    # De a un pedido por persona: un doble clic no crea dos.
+    await db.execute(sql_text("SELECT pg_advisory_xact_lock(:key)"), {"key": ctx.user.id.int % (2**63 - 1)})
     recent = (
         await db.execute(
-            select(PlanRequest).where(
+            select(PlanRequest)
+            .where(
                 PlanRequest.user_id == ctx.user.id,
                 PlanRequest.plan == data.plan,
                 PlanRequest.status == "new",
                 PlanRequest.created_at > datetime.now(UTC) - REQUEST_COOLDOWN,
             )
+            .order_by(PlanRequest.created_at.desc())
         )
-    ).scalar_one_or_none()
+    ).scalars().first()
     if recent is not None:
         return RequestOut(id=recent.id, plan=recent.plan, status=recent.status, created_at=recent.created_at)
 

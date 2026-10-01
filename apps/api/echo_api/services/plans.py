@@ -90,12 +90,17 @@ async def plans_by_code(db: AsyncSession) -> dict[str, BillingPlan]:
 
 
 def _limits(*layers: dict | None) -> dict:
-    """Topes de varias capas: cada una pisa a la anterior; None borra el tope."""
+    """Topes de varias capas: cada una pisa a la anterior.
+
+    Un valor vacío (None) en una capa no pisa nada: una organización o persona
+    sin un tope propio usa el del plan, nunca queda "sin tope" por accidente.
+    """
     out: dict = {}
     for layer in layers:
         for key, value in (layer or {}).items():
-            out[key] = value
-    return {key: value for key, value in out.items() if value is not None}
+            if value is not None:
+                out[key] = value
+    return out
 
 
 @dataclass

@@ -40,6 +40,12 @@ def _check_limits(limits: dict | None) -> dict | None:
     return out
 
 
+def _own_limits(limits: dict) -> dict | None:
+    """Topes propios de una organización o persona: lo vacío vuelve al del plan."""
+    own = {key: value for key, value in (_check_limits(limits) or {}).items() if value is not None}
+    return own or None
+
+
 class PlanOut(BaseModel):
     code: str
     name: str
@@ -130,7 +136,7 @@ async def set_organization_plan(
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Plan de organización desconocido")
         org.plan = data.plan
     if data.limits is not None:
-        org.limits = _check_limits(data.limits) or None
+        org.limits = _own_limits(data.limits)
     await audit(
         db, org_id, admin.id, "admin.org_plan", "organization", str(org_id),
         detail={"by": admin.email, "plan": org.plan, "limits": org.limits},
@@ -177,7 +183,7 @@ async def set_user_plan(
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Plan individual desconocido")
         user.plan = data.plan
     if data.limits is not None:
-        user.limits = _check_limits(data.limits) or None
+        user.limits = _own_limits(data.limits)
     await audit(
         db, None, admin.id, "admin.user_plan", "user", str(user_id),
         detail={"by": admin.email, "plan": user.plan, "limits": user.limits},
