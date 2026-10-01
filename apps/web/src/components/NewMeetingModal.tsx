@@ -7,6 +7,7 @@ import { AUDIENCES } from "./ClassificationPanel";
 import { FamilySelect } from "./FamilySelect";
 import { MeetingAiPlan } from "./MeetingAiPlan";
 import { RecordToggle } from "./RecordToggle";
+import { SettingsGroup } from "./SettingRows";
 import { Select } from "./Select";
 import { SegmentedToggle, Switch } from "./Toggles";
 import { Button, Input, Modal, Spinner } from "./ui";
@@ -251,7 +252,9 @@ export function NewMeetingModal({
             Reunión privada (solo vos y con quien la compartas)
           </label>
         )}
-        <RecordToggle checked={recordAudio} onChange={setRecordAudio} />
+        <SettingsGroup>
+          <RecordToggle checked={recordAudio} onChange={setRecordAudio} />
+        </SettingsGroup>
         <MeetingAiPlan
           people={people}
           onPeople={setPeople}

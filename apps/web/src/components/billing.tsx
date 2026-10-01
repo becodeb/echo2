@@ -51,6 +51,7 @@ export const PLAN_NAME: Record<string, string> = {
   individual_voz: "Individual + voz",
   institucion: "Instituciones",
   cortesia: "Cortesía",
+  becode: "Cuenta Becode",
 };
 
 /** El plan que manda para esta persona en esta organización. */

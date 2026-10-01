@@ -26,6 +26,31 @@ const NAV = [
   { to: "/ask", label: "Preguntale a Echo", icon: "M12 3a9 9 0 1 0 4.5 16.8L21 21l-1.2-4.5A9 9 0 0 0 12 3z" },
 ];
 
+/** Título de la barra de arriba según la ruta (como el de cada página de ElevenLabs). */
+function pageTitle(pathname: string): string {
+  const exact: Record<string, string> = {
+    "/": "Inicio",
+    "/meetings": "Reuniones",
+    "/internal": "Reuniones internas",
+    "/tasks": "Mi trabajo",
+    "/projects": "Proyectos",
+    "/people": "Personas",
+    "/families": "Familias",
+    "/reports": "Reportes",
+    "/ask": "Preguntale a Echo",
+    "/search": "Buscar",
+    "/plans": "Planes",
+    "/usage": "Consumo",
+    "/admin": "Panel de Becode",
+  };
+  if (exact[pathname]) return exact[pathname];
+  if (pathname.startsWith("/settings")) return "Ajustes";
+  if (pathname.startsWith("/meetings/")) return "Reunión";
+  if (pathname.startsWith("/projects/")) return "Proyecto";
+  if (pathname.startsWith("/people/")) return "Persona";
+  return "Echo";
+}
+
 function NavIcon({ d }: { d: string }) {
   return (
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -88,17 +113,7 @@ export function Layout({ children }: { children: ReactNode }) {
           <span className="text-[17px] font-semibold tracking-tight text-ink-900">Echo</span>
         </div>
 
-        <div className="px-3 pb-1 pt-3">
-          <button
-            onClick={() => setPaletteOpen(true)}
-            className="flex w-full items-center justify-between rounded-lg border border-ink-150 border-ink-200 bg-ink-50 px-3 py-1.5 text-sm text-ink-400 hover:border-ink-300"
-          >
-            <span>Buscar…</span>
-            <kbd className="rounded border border-ink-200 bg-white px-1.5 text-[10px] text-ink-400">Ctrl K</kbd>
-          </button>
-        </div>
-
-        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-3">
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2" aria-label="Secciones">
           {nav.map((item) => (
             <NavLink
               key={item.to}
@@ -108,8 +123,8 @@ export function Layout({ children }: { children: ReactNode }) {
               className={({ isActive }) => {
                 const active =
                   item.to === "/internal" ? isActive || inInternal : item.to === "/meetings" ? isActive && !inInternal : isActive;
-                return `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                  active ? "bg-ink-100 text-ink-900" : "text-ink-500 hover:bg-ink-50 hover:text-ink-800"
+                return `flex items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-[14px] font-medium transition-colors duration-150 ${
+                  active ? "bg-ink-100 text-ink-900" : "text-ink-600 hover:bg-ink-50 hover:text-ink-900"
                 }`;
               }}
             >
@@ -216,8 +231,22 @@ export function Layout({ children }: { children: ReactNode }) {
             </svg>
           </button>
           <span className="text-ink-900"><EchoFace mood="idle" size={22} /></span>
-          <span className="font-semibold text-ink-900">Echo</span>
+          <span className="min-w-0 flex-1 truncate font-semibold text-ink-900">{pageTitle(location.pathname)}</span>
+          <button
+            onClick={() => setPaletteOpen(true)}
+            className="rounded-full p-2 text-ink-500 hover:bg-ink-100 hover:text-ink-900"
+            aria-label="Buscar"
+          >
+            <NavIcon d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5" />
+          </button>
         </header>
+        {!/^\/meetings\/[^/]+\/live/.test(location.pathname) && (
+          <TopBar
+            title={pageTitle(location.pathname)}
+            onSearch={() => setPaletteOpen(true)}
+            unread={notifData?.unread_count ?? 0}
+          />
+        )}
         {myAccess?.superadmin_visit && (
           <div className="border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-center text-xs font-medium text-amber-800">
             Estás viendo {activeOrg?.name} como superadmin. Queda registrado en su historial.
@@ -239,9 +268,11 @@ export function Layout({ children }: { children: ReactNode }) {
  */
 function PlanCard({ onNavigate }: { onNavigate: () => void }) {
   const { data: billing } = useBilling();
+  const { user } = useAuth();
   const navigate = useNavigate();
   if (!billing) return <div className="mb-2 h-[62px] animate-pulse rounded-2xl bg-ink-50" />;
-  const plan = effectivePlan(billing);
+  // Las cuentas de Becode tienen todo habilitado: no es "Gratis" ni hay que mejorar nada.
+  const plan = user?.is_superadmin ? "becode" : effectivePlan(billing);
   const people = billing.people;
   const credits = people.mode !== "always" && people.credits_per_month != null;
   return (
@@ -254,16 +285,16 @@ function PlanCard({ onNavigate }: { onNavigate: () => void }) {
         }}
         className="flex w-full items-center justify-between gap-2 text-left"
       >
-        <span className="text-xs font-semibold text-ink-800">{PLAN_NAME[plan] ?? plan}</span>
+        <span className="truncate text-xs font-semibold text-ink-800">{PLAN_NAME[plan] ?? plan}</span>
         {credits ? (
           <CreditDots total={people.credits_per_month ?? 0} left={people.credits_left ?? 0} size="sm" />
         ) : (
-          <span className="text-[11px] font-medium text-ink-400">Quién habló incluido</span>
+          <span className="whitespace-nowrap text-[11px] font-medium text-ink-400">Todo incluido</span>
         )}
       </button>
       <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-ink-400">
         <span className="truncate">
-          {credits ? `${people.credits_left} de ${people.credits_per_month} este mes` : "Todas las reuniones"}
+          {credits ? `${people.credits_left} de ${people.credits_per_month} este mes` : "Quién habló en todas las reuniones"}
         </span>
         {plan === "base" && (
           <NavLink to="/plans" onClick={onNavigate} className="shrink-0 font-semibold text-ink-700 hover:text-ink-900">
@@ -271,6 +302,41 @@ function PlanCard({ onNavigate }: { onNavigate: () => void }) {
           </NavLink>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Barra de arriba en la computadora: el título de la página a la izquierda, y
+ * a la derecha la búsqueda y los accesos en píldoras (como en ElevenLabs).
+ */
+function TopBar({ title, onSearch, unread }: { title: string; onSearch: () => void; unread: number }) {
+  const pill =
+    "inline-flex items-center gap-1.5 rounded-full border border-ink-200 bg-white px-3 py-1.5 text-[13px] font-medium text-ink-700 transition-colors hover:border-ink-300 hover:bg-ink-50";
+  return (
+    <div className="hidden h-14 shrink-0 items-center gap-3 border-b border-ink-100 bg-white px-6 md:flex">
+      <h1 className="min-w-0 flex-1 truncate text-[15px] font-semibold text-ink-900">{title}</h1>
+      <button
+        type="button"
+        onClick={onSearch}
+        className="flex w-64 items-center gap-2 rounded-full border border-ink-200 bg-white px-3 py-1.5 text-[13px] text-ink-400 transition-colors hover:border-ink-300"
+      >
+        <NavIcon d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5" />
+        <span className="flex-1 text-left">Buscar…</span>
+        <kbd className="rounded-md border border-ink-200 px-1.5 text-[10px] text-ink-400">Ctrl K</kbd>
+      </button>
+      <NavLink to="/ask" className={pill}>
+        <NavIcon d="M12 3a9 9 0 1 0 4.5 16.8L21 21l-1.2-4.5A9 9 0 0 0 12 3z" />
+        Preguntar
+      </NavLink>
+      <NavLink to="/settings/notifications" className={`${pill} relative !px-2`} aria-label="Notificaciones">
+        <NavIcon d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10 21h4" />
+        {unread > 0 && (
+          <span className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-accent-500 px-1 text-center text-[10px] font-semibold leading-[18px] text-white">
+            {unread}
+          </span>
+        )}
+      </NavLink>
     </div>
   );
 }

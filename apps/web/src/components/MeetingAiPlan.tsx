@@ -7,6 +7,7 @@ import {
   useBilling,
   type BillingInfo,
 } from "./billing";
+import { PillSwitch } from "./SettingRows";
 
 /**
  * "Lo que va a hacer Echo" en una reunión nueva, según el plan y los créditos
@@ -97,9 +98,17 @@ export function MeetingAiPlan({
         />
         {features.voice && (
           <Row
-            on={false}
+            on
             label="Conversación por voz"
-            hint="Muy pronto en tu plan."
+            hint={
+              <>
+                Después, preguntale por la reunión hablando, desde{" "}
+                <Link to="/ask" className="font-medium text-ink-700 underline-offset-2 hover:underline">
+                  Preguntale a Echo
+                </Link>
+                .
+              </>
+            }
           />
         )}
       </ul>
@@ -192,7 +201,7 @@ function PeopleRow({
           label="Quién habló"
           hint={
             people
-              ? `Al terminar, Echo separa a cada persona. Gasta 1 crédito (2 si dura más de una hora).`
+              ? `Al terminar, Echo separa a cada persona. Gasta 1 crédito por cada hora de reunión.`
               : `Te quedan ${left} de ${total} créditos este mes. Activalo solo si lo necesitás.`
           }
           extra={
@@ -306,22 +315,7 @@ function Toggle({
           </p>
         )}
       </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        aria-label={label}
-        onClick={() => onChange(!checked)}
-        className={`relative mt-0.5 h-[26px] w-[44px] shrink-0 rounded-full transition-colors duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 ${
-          checked ? "bg-ink-900" : "bg-ink-200"
-        }`}
-      >
-        <span
-          aria-hidden
-          className="absolute left-[3px] top-[3px] h-5 w-5 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.25)] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
-          style={{ transform: checked ? "translateX(18px)" : "translateX(0)" }}
-        />
-      </button>
+      <PillSwitch checked={checked} onChange={onChange} label={label} />
     </div>
   );
 }

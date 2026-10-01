@@ -6,6 +6,7 @@ import type { LiveEvent, MeetingOut, RecordingState } from "../api/types";
 import { MicrophoneSource, SystemAudioSource, canCaptureSystemAudio, listMicrophones, type AudioSource } from "../lib/audio";
 import { BridgeSttSession, checkBridge, type BridgeHealth } from "../lib/bridge";
 import { RecordToggle } from "../components/RecordToggle";
+import { ChoiceCards, PillSwitch, SettingRow, SettingsGroup } from "../components/SettingRows";
 import { Select } from "../components/Select";
 import { Button, Modal, Spinner, formatMs } from "../components/ui";
 import { EchoFace, type EchoMood } from "../components/EchoFace";
@@ -838,17 +839,6 @@ export default function MeetingLive() {
         </p>
       )}
 
-      {/* Avisar ANTES y no después: si el motor no separa hablantes, todo lo
-          dicho en la sala queda atribuido a una sola persona y eso no se puede
-          arreglar sobre la grabación una vez terminada. */}
-      {recording && !captureSystem && (
-        <p className="border-b border-amber-100 bg-amber-50 px-6 py-2.5 text-sm text-amber-800">
-          Con un solo micrófono, separar quién habla depende del modelo de transcripción. Si el
-          acta te junta a dos personas en un mismo hablante, cambiá el modelo de voz a uno que
-          separe hablantes en Ajustes → IA y transcripción.
-        </p>
-      )}
-
       <div className="flex min-h-0 flex-1">
         {/* Transcript */}
         <div
@@ -860,83 +850,83 @@ export default function MeetingLive() {
           className="min-w-0 flex-1 overflow-y-auto px-6 py-6"
         >
           {!recording && lines.length === 0 && (
-            <div className="mx-auto flex max-w-md flex-col items-center gap-6 pt-[8vh] text-center">
-              <span className="text-ink-300"><EchoFace mood="idle" size={64} /></span>
+            <div className="mx-auto flex max-w-lg flex-col items-center gap-6 pt-[4vh] text-center sm:pt-[7vh]">
+              <span className="flex h-20 w-20 items-center justify-center rounded-full bg-white text-ink-800 shadow-[0_1px_2px_rgba(16,24,40,0.06),0_8px_24px_-12px_rgba(16,24,40,0.18)]">
+                <EchoFace mood="idle" size={44} />
+              </span>
               <div>
-                <h2 className="text-lg font-semibold text-ink-900">Todo listo para empezar</h2>
-                <p className="mt-1 text-sm text-ink-500">
-                  Asegurate de que los participantes sepan que la reunión está siendo transcripta.
+                <h2 className="text-2xl font-semibold tracking-tight text-ink-900">Todo listo para empezar</h2>
+                <p className="mt-1.5 text-sm text-ink-500">
+                  Avisales a los participantes que la reunión se transcribe.
                 </p>
               </div>
 
-              <div className="w-full space-y-3 rounded-2xl border border-ink-100 bg-white p-5 text-left shadow-sm">
-                <Select
-                  label="Micrófono"
-                  value={deviceId}
-                  onChange={setDeviceId}
-                  options={[
-                    { value: "", label: "Micrófono predeterminado" },
-                    ...micDevices.map((device) => ({
-                      value: device.deviceId,
-                      label: device.label || `Micrófono ${device.deviceId.slice(0, 6)}`,
-                    })),
-                  ]}
-                />
-
-                <RecordToggle checked={recordingOn} onChange={setRecordAudio} disabled={recordingBusy} />
-
-                {canCaptureSystemAudio() ? (
-                  <label className="flex items-center gap-2 text-sm text-ink-600">
-                    <input
-                      type="checkbox"
-                      checked={captureSystem}
-                      onChange={(event) => setCaptureSystem(event.target.checked)}
-                      className="rounded border-ink-300"
+              <div className="w-full space-y-3 text-left">
+                <SettingsGroup>
+                  <div className="px-4 py-3.5">
+                    <Select
+                      label="Micrófono"
+                      value={deviceId}
+                      onChange={setDeviceId}
+                      options={[
+                        { value: "", label: "Micrófono predeterminado" },
+                        ...micDevices.map((device) => ({
+                          value: device.deviceId,
+                          label: device.label || `Micrófono ${device.deviceId.slice(0, 6)}`,
+                        })),
+                      ]}
                     />
-                    <span>
-                      Incluir audio del sistema (Meet, Zoom, Teams, Discord)
-                      <span className="block text-xs text-ink-400">
-                        Separa tu voz de la de los remotos: quedan como Speaker 1 y Speaker 2
-                      </span>
-                    </span>
-                  </label>
-                ) : (
-                  <p className="rounded-lg bg-ink-50 px-3 py-2 text-xs text-ink-500">
-                    <span className="font-medium text-ink-700">¿Reunión virtual (Meet, Zoom, Teams)?</span> Este
-                    dispositivo no puede capturar el audio de la llamada. Ponela en altavoz cerca del micrófono
-                    o grabá desde una computadora, donde sí se escucha a todos por separado.
-                  </p>
-                )}
-
-                <div className="border-t border-ink-100 pt-3">
-                  <span className="mb-1.5 block text-sm font-medium text-ink-700">Motor de transcripción</span>
-                  <div className="space-y-1.5">
-                    <label className="flex items-center gap-2 text-sm text-ink-600">
-                      <input
-                        type="radio"
-                        name="engine"
-                        checked={engine === "bridge"}
-                        disabled={!(bridge !== "checking" && bridge?.engine.available)}
-                        onChange={() => setEngine("bridge")}
-                      />
-                      <span className={`h-2 w-2 rounded-full ${bridgeState.dot}`} />
-                      {bridgeState.label}
-                      <span className="text-xs text-ink-400">(el audio nunca sale de tu máquina)</span>
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-ink-600">
-                      <input
-                        type="radio"
-                        name="engine"
-                        checked={engine === "cloud"}
-                        onChange={() => setEngine("cloud")}
-                      />
-                      Motor cloud
-                      <span className="text-xs text-ink-400">
-                        (envía temporalmente el audio al proveedor configurado)
-                      </span>
-                    </label>
                   </div>
+                  <RecordToggle checked={recordingOn} onChange={setRecordAudio} disabled={recordingBusy} />
+                  {canCaptureSystemAudio() ? (
+                    <SettingRow
+                      label="Incluir el audio de la llamada"
+                      hint="Meet, Zoom, Teams o Discord: tu voz y la de los demás quedan separadas."
+                      control={
+                        <PillSwitch
+                          checked={captureSystem}
+                          onChange={setCaptureSystem}
+                          label="Incluir el audio de la llamada"
+                        />
+                      }
+                    />
+                  ) : (
+                    <SettingRow
+                      label="¿Reunión por Meet, Zoom o Teams?"
+                      hint="Este dispositivo no puede tomar el audio de la llamada. Ponela en altavoz cerca del micrófono, o grabá desde una computadora."
+                    />
+                  )}
+                </SettingsGroup>
+
+                {/* Solo si hay Echo Bridge en esta computadora: si no, la única
+                    opción es la nube y la pregunta sobra (en el celular, siempre). */}
+                {bridge !== "checking" && bridge?.engine.available && (
+                <div className="pt-1">
+                  <p className="mb-2 px-1 text-xs font-medium text-ink-500">Dónde se transcribe</p>
+                  <ChoiceCards
+                    ariaLabel="Dónde se transcribe"
+                    value={engine}
+                    onChange={setEngine}
+                    options={[
+                      {
+                        value: "cloud",
+                        title: "En la nube",
+                        hint: "El audio viaja cifrado al servicio que transcribe y Echo no se lo queda.",
+                      },
+                      {
+                        value: "bridge",
+                        title: (
+                          <span className="flex items-center gap-1.5">
+                            <span className={`h-2 w-2 rounded-full ${bridgeState.dot}`} />
+                            Echo Bridge
+                          </span>
+                        ),
+                        hint: "En tu computadora, con tu motor de voz: el audio no sale de ahí.",
+                      },
+                    ]}
+                  />
                 </div>
+                )}
               </div>
 
               {homeScreenApp && (
@@ -956,10 +946,23 @@ export default function MeetingLive() {
                 </div>
               )}
 
-              {error && <p className="text-sm text-red-600">{error}</p>}
-              <Button onClick={start} disabled={starting} className="w-full max-w-xs !py-3 text-base">
-                {starting ? "Iniciando…" : "Iniciar reunión"}
-              </Button>
+              {/* Abajo y fijo en el celular, como la barra de acción de ElevenLabs. */}
+              <div className="sticky bottom-0 -mx-6 w-[calc(100%+3rem)] bg-gradient-to-t from-[#fafbfc] via-[#fafbfc] to-transparent px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 sm:static sm:mx-0 sm:w-full sm:bg-none sm:p-0">
+                {error && (
+                  <p role="alert" className="animate-fade-up mb-3 rounded-xl bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
+                    {error}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={start}
+                  disabled={starting}
+                  className="flex w-full items-center justify-center gap-2 rounded-full bg-ink-900 py-3.5 text-[15px] font-semibold text-white transition-all duration-200 hover:bg-ink-700 active:scale-[0.99] disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 sm:mx-auto sm:max-w-xs"
+                >
+                  {starting ? <Spinner /> : <span className="h-2 w-2 rounded-full bg-red-500" aria-hidden />}
+                  {starting ? "Iniciando…" : "Iniciar reunión"}
+                </button>
+              </div>
             </div>
           )}
 

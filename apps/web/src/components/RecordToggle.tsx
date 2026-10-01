@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import type { MyDriveOut } from "../api/types";
+import { PillSwitch, SettingRow } from "./SettingRows";
 
 /** Estado del Drive personal (adonde van las grabaciones de cada uno). */
 export function useMyDrive(enabled = true) {
@@ -28,24 +29,19 @@ export function RecordToggle({
 }) {
   const { data: drive } = useMyDrive();
   return (
-    <label className={`flex items-start gap-2 text-sm text-ink-600 ${disabled ? "opacity-60" : ""}`}>
-      <input
-        type="checkbox"
-        checked={checked}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.checked)}
-        className="mt-0.5 rounded border-ink-300"
-      />
-      <span>
-        Grabar el audio completo
-        <span className="block text-xs text-ink-400">
+    <SettingRow
+      disabled={disabled}
+      label="Grabar el audio completo"
+      control={<PillSwitch checked={checked} onChange={onChange} label="Grabar el audio completo" disabled={disabled} />}
+      hint={
+        <>
           {drive?.connected ? (
             <>Al terminar se guarda en tu Google Drive ({drive.connected_email}) y se borra de Echo.</>
           ) : (
             <>
               Al terminar lo podés descargar durante 48 horas; después se borra.{" "}
               {drive?.enabled && (
-                <Link to="/settings/my-drive" className="font-medium text-accent-600 hover:underline">
+                <Link to="/settings/my-drive" className="font-medium text-ink-700 underline-offset-2 hover:underline">
                   Conectá tu Drive
                 </Link>
               )}
@@ -53,8 +49,8 @@ export function RecordToggle({
             </>
           )}
           {checked && " Avisale a los participantes que se graba."}
-        </span>
-      </span>
-    </label>
+        </>
+      }
+    />
   );
 }
