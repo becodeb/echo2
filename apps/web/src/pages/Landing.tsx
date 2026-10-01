@@ -3,6 +3,7 @@ import "../landing/landing.css";
 import { useTitle } from "../lib/useTitle";
 import { Hero } from "../landing/Hero";
 import { Steps } from "../landing/Steps";
+import { Demo } from "../landing/Demo";
 import { Specimens } from "../landing/Specimens";
 import { Acta } from "../landing/Acta";
 import { Privacy } from "../landing/Privacy";
@@ -21,6 +22,7 @@ export default function Landing() {
     <main className="landing bg-[#fafbfc] text-ink-950 antialiased">
       <Hero />
       <Steps />
+      <Demo />
       <Specimens />
       <Acta />
       <Privacy />
