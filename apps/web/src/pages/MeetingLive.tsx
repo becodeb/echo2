@@ -742,7 +742,7 @@ export default function MeetingLive() {
       queued: "Preparando la reunión…",
       speakers: "Identificando quién habló…",
       insights: "Extrayendo decisiones y tareas…",
-      embeddings: "Indexando el transcript…",
+      embeddings: "Preparando la búsqueda…",
       summary: "Escribiendo el resumen…",
       minutes: "Generando el acta…",
       memory: "Actualizando la memoria…",

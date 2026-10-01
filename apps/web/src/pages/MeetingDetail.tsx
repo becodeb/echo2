@@ -25,15 +25,15 @@ const TASK_STATUS_OPTIONS = [
 ];
 
 const SHARE_ROLE_OPTIONS = [
-  { value: "viewer", label: "Viewer" },
-  { value: "commenter", label: "Commenter" },
-  { value: "editor", label: "Editor" },
-  { value: "admin", label: "Admin" },
+  { value: "viewer", label: "Puede ver" },
+  { value: "commenter", label: "Puede comentar" },
+  { value: "editor", label: "Puede editar" },
+  { value: "admin", label: "Administra" },
 ];
 
 const TABS = [
   { id: "summary", label: "Resumen" },
-  { id: "transcript", label: "Transcript" },
+  { id: "transcript", label: "Transcripción" },
   { id: "minutes", label: "Acta" },
   { id: "tasks", label: "Tareas" },
   { id: "chat", label: "Chat" },
@@ -498,7 +498,7 @@ function TranscriptTab({
         <input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Buscar en el transcript…"
+          placeholder="Buscar en la transcripción…"
           className="w-64 rounded-xl border border-ink-200 px-3 py-1.5 text-sm focus:border-accent-500 focus:outline-none"
         />
         {lowConfidence > 0 && (
@@ -547,7 +547,7 @@ function TranscriptTab({
           );
         })}
         {pages.length === 0 && (
-          <EmptyState title={search ? "Sin coincidencias" : "Sin transcript"} mood="idle" />
+          <EmptyState title={search ? "Sin coincidencias" : "Sin transcripción"} mood="idle" />
         )}
         {nextAfter != null && pages.length > 0 && (
           <div className="flex justify-center py-2">
@@ -750,7 +750,7 @@ function MinutesTab({ meetingId, minutesTitle }: { meetingId: string; minutesTit
       return (
         <Card>
           <EmptyState title="Echo está redactando el acta…" mood="thinking">
-            <p>Lee el transcript y arma el acta con el modelo de tu organización. Suele estar en menos de un minuto.</p>
+            <p>Lee la transcripción y arma el acta con el formato de tu organización. Suele estar en menos de un minuto.</p>
             {retryStuck}
           </EmptyState>
         </Card>

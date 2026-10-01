@@ -232,7 +232,7 @@ function Privacy() {
 
       <Section title="Qué guarda Echo y por cuánto tiempo">
         <ul>
-          <li><strong>El texto de las reuniones</strong> (transcript, acta, tareas): hasta que la institución o quien la creó lo borre.</li>
+          <li><strong>El texto de las reuniones</strong> (transcripción, acta, tareas): hasta que la institución o quien la creó lo borre.</li>
           <li><strong>El audio de trabajo</strong> se borra cuando termina de procesarse la reunión. Si la transcripción completa o la separación de quién habló falló, se guarda una copia comprimida hasta 48 horas para reintentarlo, y después se borra.</li>
           <li><strong>La grabación completa</strong>, solo si se eligió grabar la reunión: va al Google Drive de quien grabó; si no tiene Drive conectado, queda para descargar 48 horas y se borra.</li>
           <li><strong>La muestra de voz y su huella</strong>, hasta que las borres.</li>

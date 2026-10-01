@@ -376,7 +376,7 @@ function TopBar({
         }`}
       >
         <Icon name="ask" size={16} />
-        Preguntar
+        Preguntale a Echo
       </button>
       <RoundButton label="Notificaciones" onClick={onNotifications} badge={unread} toggle="notifications" active={notificationsOpen}>
         <Icon name="bell" />

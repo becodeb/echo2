@@ -66,7 +66,7 @@ export default function SharedView() {
             [
               ["summary", "Resumen"],
               ["minutes", "Acta"],
-              ["transcript", "Transcript"],
+              ["transcript", "Transcripción"],
             ] as const
           ).map(([value, label]) => (
             <button

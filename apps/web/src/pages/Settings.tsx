@@ -169,9 +169,9 @@ function OrgSection() {
             value={inviteRole}
             onChange={setInviteRole}
             options={[
-              { value: "member", label: "Member" },
-              { value: "admin", label: "Admin" },
-              { value: "viewer", label: "Viewer" },
+              { value: "member", label: "Miembro" },
+              { value: "admin", label: "Administra" },
+              { value: "viewer", label: "Solo lectura" },
             ]}
             className="w-32 shrink-0"
           />
