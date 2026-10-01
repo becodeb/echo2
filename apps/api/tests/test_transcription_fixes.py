@@ -306,3 +306,27 @@ def test_an_echo_device_records_like_the_web(client, monkeypatch):
     asyncio.run(usage())
     assert [u.kind for u in rows] == ["stt_live"]
     rec.pcm_path(meeting_id).unlink(missing_ok=True)
+
+
+def test_a_device_with_minors_marks_the_meeting_it_joins(client, monkeypatch):
+    import echo_api.routers.device_stream as device_module
+    from echo_api.security import hash_refresh_token
+    from echo_api.services.ai_settings import SttConfig
+
+    async def fake_resolve_stt(db, org_id):
+        return SttConfig(provider="fake", model=None, api_key="x")
+
+    monkeypatch.setattr(device_module, "resolve_stt", fake_resolve_stt)
+    owner = EchoTestUser(client, org_name=f"Colegio {uuid.uuid4().hex[:4]}")
+    plain, classroom = uuid.uuid4().hex, uuid.uuid4().hex
+    for token, minors in ((plain, False), (classroom, True)):
+        _sql("INSERT INTO devices (id, organization_id, name, kind, token_hash, minors, created_at, updated_at)"
+             " VALUES (:id, :o, 'Sala', 'esp32', :h, :m, now(), now())",
+             id=str(uuid.uuid4()), o=owner.org_id, h=hash_refresh_token(token), m=minors)
+    # La reunión la empezó un dispositivo sin menores...
+    meeting = client.post("/api/devices/meetings", json={}, headers={"Authorization": f"Bearer {plain}"}).json()
+    assert client.get(f"/api/meetings/{meeting['id']}", headers=owner.headers).json()["meta"].get("minors") is False
+    # ...y al sumarse el del aula con menores queda marcada.
+    with client.websocket_connect(f"/api/devices/stream?token={classroom}&meeting_id={meeting['id']}"):
+        pass
+    assert client.get(f"/api/meetings/{meeting['id']}", headers=owner.headers).json()["meta"]["minors"] is True

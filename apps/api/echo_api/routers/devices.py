@@ -11,7 +11,7 @@ import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,8 +36,9 @@ class PairInitIn(BaseModel):
 
 
 @router.post("/pair/init")
-async def pair_init(data: PairInitIn, db: AsyncSession = Depends(get_db)):
-    rate_limit("device_pair_init", 20, 60)
+async def pair_init(data: PairInitIn, request: Request, db: AsyncSession = Depends(get_db)):
+    # Por IP: un balde global lo agotaba cualquiera y nadie más podía vincular.
+    rate_limit(f"device_pair_init:{request.client.host if request.client else 'x'}", 20, 60)
     code = "".join(secrets.choice("0123456789") for _ in range(6))
     pair = DevicePairCode(
         code=code,
@@ -149,6 +150,9 @@ async def claim_device(
     db: AsyncSession = Depends(get_db),
 ):
     ctx.require_role("member")
+    # El código es de 6 cifras y vale 10 minutos: sin límite, alguien de otra
+    # sede podría probarlos todos y quedarse con el audio de un aula.
+    rate_limit(f"device_claim:{ctx.user.id}", 10, 600)
     pair = (
         await db.execute(select(DevicePairCode).where(DevicePairCode.code == data.code.strip()))
     ).scalar_one_or_none()

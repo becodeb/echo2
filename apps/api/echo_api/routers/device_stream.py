@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from ..db import SessionLocal, get_db
-from ..models import Device, Meeting, OrganizationMember
+from ..models import Device, Meeting, Organization, OrganizationMember, User
 from ..routers.live import _record_live_usage, _store_segment
 from ..security import hash_refresh_token
 from ..services import plans
@@ -29,7 +29,7 @@ from ..services.ai_settings import get_vocabulary, resolve_stt
 from ..services.background import spawn
 from ..services.insights_live import maybe_extract_live_insights
 from ..services.live_bus import live_bus
-from ..services.recording import PcmWriter
+from ..services.recording import PcmWriter, pcm_path
 from ..services.stt import get_stt_provider
 from ..services.stt.channels import (
     is_noise_transcript,
@@ -163,8 +163,20 @@ async def device_stream(websocket: WebSocket):
         if not meeting or meeting.status not in ("live", "paused"):
             await websocket.close(code=4404, reason="Reunión no activa")
             return
+        # Un dispositivo de un aula con menores marca la reunión a la que se
+        # suma (y no se desmarca): si no, la pasada final mandaría el audio de
+        # los chicos a separar voces y a comparar con huellas de voz.
+        if device.minors and not plans.minors_present(meeting):
+            meeting.meta = {**(meeting.meta or {}), "minors": True}
+            await db.commit()
         stt_config = await resolve_stt(db, device.organization_id)
         vocabulary = await get_vocabulary(db, device.organization_id)
+        org = await db.get(Organization, meeting.organization_id)
+        creator = await db.get(User, meeting.created_by) if meeting.created_by else None
+        # El plan Gratis corta a la hora, como el vivo de la web.
+        free_limit = not (
+            plans.is_paid(org, creator) if creator else org is not None and org.plan in plans.PAID_ORG_PLANS
+        )
 
     await websocket.accept()
     if stt_config is None:
@@ -189,6 +201,8 @@ async def device_stream(websocket: WebSocket):
     segments_since_insights = 0
     # Horas de audio del mes de quien administra la sede (§2.2).
     audio_guard = plans.AudioGuard(meeting.id, meeting.organization_id, meeting.created_by)
+    existing = pcm_path(meeting.id)
+    audio_ms = existing.stat().st_size // 32 if existing.exists() else 0
 
     async def flush(upto: int | None = None):
         nonlocal audio_buffer, stream_offset_ms, segments_since_insights, previous_text
@@ -236,6 +250,13 @@ async def device_stream(websocket: WebSocket):
             if message.get("type") == "websocket.disconnect":
                 break
             if message.get("bytes") is not None:
+                audio_ms += int(len(message["bytes"]) / 2 / sample_rate * 1000)
+                if free_limit and audio_ms >= plans.FREE_MEETING_SECONDS * 1000:
+                    await websocket.send_text(json.dumps({
+                        "type": "limit", "code": "meeting_length",
+                        "message": "En el plan Gratis las reuniones duran hasta una hora.",
+                    }))
+                    break
                 audio_buffer.extend(message["bytes"])
                 writer.write(message["bytes"], 1)
                 # Cortes en las pausas, como el WebSocket de la web: el corte
