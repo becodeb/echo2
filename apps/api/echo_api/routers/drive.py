@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
 from ..db import get_db
-from ..deps import OrgContext, get_org_context
+from ..deps import get_org_context, OrgContext, require_paid
 from ..models import OrganizationMember
 from ..security import create_access_token, decode_token, encrypt_secret
 from ..services.audit import audit
@@ -81,6 +81,7 @@ async def connect_url(
     if not settings.google_enabled:
         raise HTTPException(status.HTTP_409_CONFLICT, "Google no está configurado en el servidor")
     ctx.require_role("admin")
+    require_paid(ctx, "Guardar en Google Drive")
 
     # El estado es un JWT corto: identifica usuario y organización en el
     # callback, donde no hay sesión de la que colgarse.

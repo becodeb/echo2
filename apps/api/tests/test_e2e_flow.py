@@ -215,6 +215,7 @@ def test_cloud_audio_mode_stores_nothing_without_stt(client, monkeypatch):
 
 def test_export_minutes_formats(client, fake_ai):
     user = EchoTestUser(client, name="Exporta", org_name="Org Export")
+    user.make_paid()
     created = client.post("/api/meetings", json={"title": "Para exportar"}, headers=user.headers)
     meeting_id = created.json()["id"]
     client.post(f"/api/meetings/{meeting_id}/start", headers=user.headers)
@@ -246,6 +247,7 @@ def test_exports_need_auth_headers(client):
     """La web baja los exports con fetch + headers (apiDownload): un link
     directo no lleva token ni organización y el API lo rechaza."""
     user = EchoTestUser(client, name="Exporta Web", org_name="Org Export Web")
+    user.make_paid()
     created = client.post("/api/meetings", json={"title": "Acta a mano"}, headers=user.headers)
     meeting_id = created.json()["id"]
     saved = client.post(
@@ -280,6 +282,7 @@ def test_exports_with_non_latin1_title(client):
     from urllib.parse import unquote
 
     user = EchoTestUser(client, name="Exporta Unicode", org_name="Org Export Unicode")
+    user.make_paid()
     title = "Reunión — equipo “A”"
     created = client.post("/api/meetings", json={"title": title}, headers=user.headers)
     meeting_id = created.json()["id"]
@@ -313,6 +316,7 @@ def test_exports_with_non_latin1_title(client):
 def test_google_doc_export_needs_connected_drive(client):
     """Sin Drive conectado el Documento de Google no se puede crear: 409 con el motivo."""
     user = EchoTestUser(client, name="Sin Drive", org_name="Org Sin Drive")
+    user.make_paid()
     created = client.post("/api/meetings", json={"title": "Sin drive"}, headers=user.headers)
     meeting_id = created.json()["id"]
     client.post(
@@ -335,6 +339,7 @@ def test_the_acta_uses_the_font_the_school_chose(client):
     from docx import Document
 
     user = EchoTestUser(client, name="Fuente", org_name=f"Org Fuente {uuid.uuid4().hex[:4]}")
+    user.make_paid()
     meeting_id = client.post("/api/meetings", json={"title": "Acta"}, headers=user.headers).json()["id"]
     client.post(f"/api/meetings/{meeting_id}/minutes/versions", json={"body_markdown": "# Acta\n\nTexto."},
                 headers=user.headers)

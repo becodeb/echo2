@@ -329,6 +329,7 @@ def test_imports_count_and_respect_the_audio_hours(client):
     # Lo importado cuenta por su pasada final; lo del vivo, una sola vez.
     assert _run(usage()).audio_seconds == 1200 + 600
     _over_the_hour(user)
+    user.make_paid()
     sent = client.post(f"/api/meetings/{imported}/import", files={"file": ("a.mp3", b"ID3", "audio/mpeg")},
                        headers=user.headers)
     assert sent.status_code == 429 and "audio" in sent.json()["detail"]
@@ -348,3 +349,60 @@ def test_every_model_echo_uses_has_a_price():
     assert plans.stt_cost("elevenlabs", SCRIBE_MODEL, 3600) == 0.22
     assert plans.stt_cost("elevenlabs", SCRIBE_MODEL, 3600, keyterms=True, entities=True) == 0.34
     assert voice_agent.voice_cost(60) == 0.08
+
+
+def test_free_accounts_get_the_free_plan_and_paid_ones_the_rest(client, monkeypatch):
+    """Solo de los planes pagos (Bauti, 1/10): Word, Documento de Google,
+    Drive, importar, preguntar sobre todas las reuniones y reuniones de más
+    de una hora. PDF y el chat de cada reunión, para todos."""
+    import echo_api.routers.live as live_module
+    from echo_api.services.ai_settings import SttConfig
+    from echo_api.services.stt.base import SttResult
+
+    user = EchoTestUser(client, org_name=f"Colegio {uuid.uuid4().hex[:4]}")
+    meeting_id = client.post("/api/meetings", json={"title": "x", "level": "primaria"}, headers=user.headers).json()["id"]
+    client.post(f"/api/meetings/{meeting_id}/minutes/versions", json={"body_markdown": "# Acta"}, headers=user.headers)
+    export = f"/api/meetings/{meeting_id}/export"
+    assert client.get(f"{export}/minutes.pdf", headers=user.headers).status_code == 200
+    for response in (
+        client.get(f"{export}/minutes.docx", headers=user.headers),
+        client.get(f"{export}/transcript.docx", headers=user.headers),
+        client.post(f"{export}/minutes/google-doc", headers=user.headers),
+        client.post("/api/ask", json={"question": "¿Qué pasó?"}, headers=user.headers),
+        client.post(f"/api/meetings/{meeting_id}/import", files={"file": ("a.mp3", b"ID3", "audio/mpeg")},
+                    headers=user.headers),
+    ):
+        assert response.status_code == 403 and "planes pagos" in response.json()["detail"]
+    assert client.get("/api/billing/me", headers=user.headers).json()["features"]["paid"] is False
+
+    # Una reunión del plan Gratis se corta a la hora (acá, a los 2 s).
+    class Quiet:
+        name, model = "groq", "whisper-large-v3-turbo"
+
+        async def transcribe_chunk(self, *args, **kwargs):
+            return SttResult(segments=[])
+
+    async def fake_resolve_stt(db, org_id):
+        return SttConfig(provider="groq", model=None, api_key="x")
+
+    monkeypatch.setattr(live_module, "resolve_stt", fake_resolve_stt)
+    monkeypatch.setattr(live_module, "get_stt_provider", lambda *args, **kwargs: Quiet())
+    monkeypatch.setattr(plans, "FREE_MEETING_SECONDS", 2)
+    monkeypatch.setattr(plans, "FREE_MEETING_WARN_SECONDS", 1)
+    audio = _tone(4.0)
+    seen = []
+    with client.websocket_connect(f"/api/meetings/{meeting_id}/ws?token={user.token}") as websocket:
+        websocket.send_text(json.dumps({"type": "hello", "role": "recorder", "sample_rate": 16000}))
+        assert json.loads(websocket.receive_text())["type"] == "hello_ack"
+        for start in range(0, len(audio), 3200):
+            websocket.send_bytes(audio[start:start + 3200])
+        while "limit" not in seen:
+            seen.append(json.loads(websocket.receive_text())["type"])
+    assert "warning" in seen
+    # Lo que llegó después de la hora no se guardó.
+    assert rec.pcm_path(uuid.UUID(meeting_id)).stat().st_size <= 2 * 32000 + 3200
+    rec.pcm_path(uuid.UUID(meeting_id)).unlink(missing_ok=True)
+
+    user.make_paid()
+    assert client.get(f"{export}/minutes.docx", headers=user.headers).status_code == 200
+    assert client.get("/api/billing/me", headers=user.headers).json()["features"]["paid"] is True

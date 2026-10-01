@@ -9,7 +9,7 @@ import json
 import uuid
 
 from conftest import EchoTestUser
-from test_levels import Member
+from test_levels import Member, _sql
 
 from echo_api.services import recording as rec
 
@@ -114,6 +114,8 @@ def test_member_without_direction_cannot_manage_groups(client):
 
 def test_recording_is_written_while_live_and_left_for_download(client):
     owner, director, _, meeting = _school_with_internal_meeting(client)
+    # Mandar la grabación a Drive es de los planes pagos.
+    _sql("UPDATE users SET plan = 'individual' WHERE id = :id", id=director.user_id)
     meeting_id = meeting["id"]
     enabled = client.put(f"/api/meetings/{meeting_id}/recording", json={"enabled": True}, headers=director.headers)
     assert enabled.status_code == 200, enabled.text

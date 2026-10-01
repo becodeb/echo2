@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..deps import OrgContext, get_meeting_or_404, get_org_context
+from ..deps import get_meeting_or_404, get_org_context, OrgContext, require_paid
 from ..models import Minutes, MinutesVersion, Organization
 from ..services.drive import DriveError, get_user_connection, upload_google_doc
 from ..services.transcript_util import format_ms, load_transcript_lines
@@ -192,6 +192,8 @@ async def export_minutes(
     ctx: OrgContext = Depends(get_org_context),
     db: AsyncSession = Depends(get_db),
 ):
+    if fmt == "docx":
+        require_paid(ctx, "Exportar a Word")
     meeting = await get_meeting_or_404(meeting_id, ctx, db)
     markdown = await _get_minutes_markdown(db, meeting.id)
     filename = f"acta-{meeting.title[:40].replace(' ', '-')}"
@@ -237,6 +239,8 @@ async def export_transcript(
     ctx: OrgContext = Depends(get_org_context),
     db: AsyncSession = Depends(get_db),
 ):
+    if fmt == "docx":
+        require_paid(ctx, "Exportar a Word")
     meeting = await get_meeting_or_404(meeting_id, ctx, db)
     filename = f"transcript-{meeting.title[:40].replace(' ', '-')}"
 
@@ -283,6 +287,7 @@ async def export_google_doc(
     """Crea el acta o el transcript como Documento de Google en el Drive de quien lo pide."""
     if kind not in ("minutes", "transcript"):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Se puede exportar minutes o transcript")
+    require_paid(ctx, "Crear un Documento de Google")
     meeting = await get_meeting_or_404(meeting_id, ctx, db)
     connection = await get_user_connection(db, ctx.user.id)
     if connection is None:

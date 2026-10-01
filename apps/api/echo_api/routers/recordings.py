@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..deps import OrgContext, can_edit_meeting, get_meeting_or_404, get_org_context
+from ..deps import can_edit_meeting, get_meeting_or_404, get_org_context, OrgContext, require_paid
 from ..services import recording as rec
 from ..services.audit import audit
 from ..services.drive import get_user_connection
@@ -80,6 +80,7 @@ async def send_recording_to_drive(
     db: AsyncSession = Depends(get_db),
 ):
     """Manda el audio que quedó para descargar al Drive de quien lo pide."""
+    require_paid(ctx, "Guardar en Google Drive")
     meeting = await get_meeting_or_404(meeting_id, ctx, db)
     if not rec.mp3_path(meeting.id).exists():
         raise HTTPException(status.HTTP_404_NOT_FOUND, "El audio ya no está en el servidor")

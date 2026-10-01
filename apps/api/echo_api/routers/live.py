@@ -39,7 +39,7 @@ from sqlalchemy import func, select
 
 from ..db import SessionLocal
 from ..deps import user_can_access_meeting
-from ..models import Meeting, OrganizationMember, TranscriptSegment, User
+from ..models import Meeting, Organization, OrganizationMember, TranscriptSegment, User
 from ..security import decode_token
 from ..services.ai_settings import get_vocabulary, resolve_stt
 from ..services.background import spawn
@@ -235,6 +235,11 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
     transcribe = True
     # Horas de audio del mes (§2.2): pasado el tope, se graba sin transcribir.
     audio_guard = plans.AudioGuard(meeting.id, meeting.organization_id, user.id)
+    # Plan Gratis: reuniones de hasta una hora (aviso a los 55 minutos).
+    free_limit = False
+    base_audio_ms = 0
+    hour_warned = False
+    hour_reached = False
 
     async def forward_bus():
         try:
@@ -383,6 +388,23 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
                 if audio_started_at is None:
                     audio_started_at = now
                 audio_received_ms += int(len(message["bytes"]) / 2 / channels / sample_rate * 1000)
+                if free_limit:
+                    total_ms = base_audio_ms + audio_received_ms
+                    if total_ms >= plans.FREE_MEETING_SECONDS * 1000:
+                        if not hour_reached:
+                            hour_reached = True
+                            await websocket.send_text(json.dumps({
+                                "type": "limit", "code": "meeting_length",
+                                "message": "En el plan Gratis las reuniones duran hasta una hora: la grabación se "
+                                "terminó y Echo ya está armando el acta.",
+                            }))
+                        continue
+                    if not hour_warned and total_ms >= plans.FREE_MEETING_WARN_SECONDS * 1000:
+                        hour_warned = True
+                        await live_bus.publish(channel, {
+                            "type": "warning", "code": "meeting_length",
+                            "message": "Quedan 5 minutos: en el plan Gratis las reuniones duran hasta una hora.",
+                        })
                 elapsed_ms = (now - audio_started_at) * 1000
                 if not rate_warned and elapsed_ms > 5000 and audio_received_ms > elapsed_ms * MAX_REALTIME_RATIO:
                     rate_warned = True
@@ -445,6 +467,11 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
                     with contextlib.suppress(ValueError, TypeError):
                         sample_rate = max(8000, min(48000, int(data["sample_rate"])))
                 if role == "recorder":
+                    async with SessionLocal() as db:
+                        org = await db.get(Organization, meeting.organization_id)
+                        free_limit = not plans.is_paid(org, user)
+                    existing = pcm_path(meeting.id)
+                    base_audio_ms = existing.stat().st_size // 32 if existing.exists() else 0
                     previous = _recorders.get(channel)
                     if previous is not None and previous is not websocket:
                         with contextlib.suppress(Exception):

@@ -1,10 +1,11 @@
-import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useRef, useState, type FormEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { Audience, FamilyOut, MeetingOut } from "../api/types";
 import { AUDIENCES } from "./ClassificationPanel";
 import { FamilySelect } from "./FamilySelect";
+import { usePaid } from "./billing";
 import { MeetingAiPlan } from "./MeetingAiPlan";
 import { RecordToggle } from "./RecordToggle";
 import { SettingsGroup } from "./SettingRows";
@@ -98,8 +99,14 @@ export function NewMeetingModal({
     .filter(Boolean)
     .map((name) => ({ name }));
 
+  // Importar la grabación de una reunión que ya pasó (Zoom, Meet, el celular):
+  // es de los planes pagos.
+  const paid = usePaid();
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [upload, setUpload] = useState<File | null>(null);
+
   const create = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (file?: File) => {
       const common = {
         title: title.trim() || defaultTitle,
         language,
@@ -125,9 +132,14 @@ export function NewMeetingModal({
           body: JSON.stringify({ family_id: familyId || null, audience: audience || null }),
         }).catch(() => undefined);
       }
-      return meeting;
+      if (file) {
+        const form = new FormData();
+        form.append("file", file, file.name);
+        await api(`/api/meetings/${meeting.id}/import`, { method: "POST", body: form });
+      }
+      return { meeting, imported: !!file };
     },
-    onSuccess: (meeting) => {
+    onSuccess: ({ meeting, imported }) => {
       localStorage.setItem("echo_pref_lang", language);
       queryClient.invalidateQueries({ queryKey: ["billing"] });
       queryClient.invalidateQueries({ queryKey: ["meetings"] });
@@ -142,15 +154,16 @@ export function NewMeetingModal({
       setMinors(false);
       setWantsMinutes(false);
       setProjectId("");
+      setUpload(null);
       onClose();
-      navigate(`/meetings/${meeting.id}/live`);
+      navigate(imported ? `/meetings/${meeting.id}` : `/meetings/${meeting.id}/live`);
     },
   });
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (kind === "equipo" && !groupId) return;
-    create.mutate();
+    create.mutate(upload ?? undefined);
   };
 
   return (
@@ -268,12 +281,50 @@ export function NewMeetingModal({
             {create.error instanceof Error ? create.error.message : "Error al crear"}
           </p>
         )}
+        <div className="rounded-2xl border border-dashed border-ink-200 px-4 py-3">
+          {paid === false ? (
+            <p className="text-sm text-ink-500">
+              ¿Ya tenés la grabación (Zoom, Meet, el celular)? Subirla es parte de los planes pagos.{" "}
+              <Link to="/plans" onClick={onClose} className="font-medium text-ink-800 underline-offset-2 hover:underline">
+                Ver planes
+              </Link>
+            </p>
+          ) : upload ? (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="min-w-0 flex-1 truncate text-ink-700">
+                Grabación: <strong className="font-medium text-ink-900">{upload.name}</strong>
+              </span>
+              <button type="button" onClick={() => setUpload(null)} className="min-h-9 px-2 text-ink-500 hover:text-ink-900">
+                Quitar
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => fileInput.current?.click()}
+              className="min-h-9 text-left text-sm text-ink-600 hover:text-ink-900"
+            >
+              ¿Ya tenés la grabación (Zoom, Meet, el celular)? <span className="font-medium text-ink-900 underline underline-offset-2">Subila</span>
+            </button>
+          )}
+          <input
+            ref={fileInput}
+            type="file"
+            accept=".mp3,.wav,.m4a,.webm,.mp4,.ogg,.flac,audio/*,video/mp4"
+            className="hidden"
+            onChange={(event) => setUpload(event.target.files?.[0] ?? null)}
+          />
+        </div>
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="submit" disabled={create.isPending || (kind === "equipo" && !groupId)}>
-            {create.isPending ? <Spinner /> : "Comenzar reunión"}
+          <Button
+            type="button"
+            onClick={() => create.mutate(upload ?? undefined)}
+            disabled={create.isPending || (kind === "equipo" && !groupId)}
+          >
+            {create.isPending ? <Spinner /> : upload ? "Subir y procesar" : "Comenzar reunión"}
           </Button>
         </div>
       </form>

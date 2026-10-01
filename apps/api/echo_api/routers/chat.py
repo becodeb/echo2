@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
 from ..db import get_db
-from ..deps import OrgContext, get_meeting_or_404, get_org_context, rate_limit
+from ..deps import OrgContext, get_meeting_or_404, get_org_context, rate_limit, require_paid
 from ..models import ActionItem, Decision, Meeting, MeetingSummary, Question, Risk
 from ..services.access import Scope, meeting_filter, meeting_id_filter, visible_meeting_id_list
 from ..services.ai_settings import resolve_embeddings, resolve_llm
@@ -396,5 +396,8 @@ async def global_chat(
     db: AsyncSession = Depends(get_db),
 ):
     settings = get_settings()
+    # Preguntar sobre todas las reuniones es de los planes pagos (sobre una
+    # reunión, en su pestaña de chat, puede cualquiera).
+    require_paid(ctx, "Preguntar sobre todas tus reuniones")
     rate_limit(f"chat:{ctx.user.id}", settings.rate_limit_chat_per_minute)
     return await _ask(db, ctx, data.question, data.history, None, exclude_minors=data.voice)

@@ -103,6 +103,31 @@ export function EchoChat({
   const column = wide ? "mx-auto w-full max-w-3xl" : "w-full";
   const canTalk = !!billing?.features.voice;
 
+  if (billing && !billing.features.paid) {
+    // Plan Gratis: se pregunta sobre cada reunión, desde su pestaña Chat.
+    return (
+      <div className="flex h-full min-h-0 w-full flex-col">
+        {header}
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
+          <EchoAvatar />
+          <div className="max-w-sm">
+            <p className="text-lg font-semibold tracking-tight text-ink-900">Preguntale a Echo por todas tus reuniones</p>
+            <p className="mt-2 text-sm leading-relaxed text-ink-500">
+              «¿Qué quedamos con la familia de Pedro?», «¿qué tareas tengo esta semana?». En el plan Gratis podés
+              preguntar sobre cada reunión desde su pestaña Chat.
+            </p>
+          </div>
+          <Link
+            to="/plans"
+            className="inline-flex min-h-11 items-center rounded-full bg-ink-900 px-5 text-sm font-semibold text-white hover:bg-ink-700"
+          >
+            Ver planes
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
       {header}

@@ -184,7 +184,10 @@ def test_member_without_direction_cannot_see_the_access_panel(client):
     assert client.get("/api/org/access", headers=teacher.headers).status_code == 403
 
 
-def test_global_chat_only_sends_visible_meetings_to_the_model(client, fake_ai):
+def test_global_chat_only_sends_visible_meetings_to_the_model(client, fake_ai, monkeypatch):
+    from echo_api.services import plans
+
+    monkeypatch.setattr(plans, "is_paid", lambda org, user: True)
     owner, _ = _school(client)
     teacher = Member(client, owner, "Pregunta")
     _grant(client, owner, teacher, "primaria", "total")

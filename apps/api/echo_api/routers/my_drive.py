@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
 from ..db import get_db
+from ..services import plans
 from ..deps import get_current_user
 from ..models import User
 from ..security import create_access_token
@@ -43,10 +44,12 @@ async def my_drive(user: User = Depends(get_current_user), db: AsyncSession = De
 
 
 @router.post("/connect-url")
-async def my_drive_connect_url(user: User = Depends(get_current_user)):
+async def my_drive_connect_url(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     settings = get_settings()
     if not settings.google_enabled:
         raise HTTPException(status.HTTP_409_CONFLICT, "Google no está configurado en el servidor")
+    if not await plans.is_paid_anywhere(db, user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, plans.paid_only("Guardar en Google Drive"))
     state = create_access_token(str(user.id), extra={"purpose": "drive_user"})
     params = {
         "client_id": settings.google_client_id,

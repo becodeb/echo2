@@ -248,6 +248,42 @@ class LimitReached(Exception):
     """Se llegó a un tope del plan; el mensaje es para la persona."""
 
 
+# Lo que es solo de los planes pagos (Bauti, 1/10): reuniones de más de una
+# hora, preguntar sobre todas las reuniones, Word / Documento de Google /
+# Drive e importar grabaciones. Paga quien tiene un plan individual o está en
+# una sede con plan (Instituciones o Cortesía).
+PAID_USER_PLANS = ("individual", "individual_voz")
+PAID_ORG_PLANS = ("institucion", "cortesia")
+FREE_MEETING_SECONDS = 60 * 60
+FREE_MEETING_WARN_SECONDS = 55 * 60
+
+
+def is_paid(org: Organization | None, user: User) -> bool:
+    return bool(
+        user.is_superadmin or user.plan in PAID_USER_PLANS or (org is not None and org.plan in PAID_ORG_PLANS)
+    )
+
+
+async def is_paid_anywhere(db: AsyncSession, user: User) -> bool:
+    """Para lo que no depende de una sede (Mi Google Drive)."""
+    if is_paid(None, user):
+        return True
+    from ..models import OrganizationMember
+
+    return (
+        await db.execute(
+            select(Organization.id)
+            .join(OrganizationMember, OrganizationMember.organization_id == Organization.id)
+            .where(OrganizationMember.user_id == user.id, Organization.plan.in_(PAID_ORG_PLANS))
+            .limit(1)
+        )
+    ).first() is not None
+
+
+def paid_only(what: str) -> str:
+    return f"{what} es parte de los planes pagos. Mirá los planes en Echo."
+
+
 AUDIO_CHECK_EVERY_MS = 5 * 60 * 1000
 AUDIO_LIMIT_MESSAGE = (
     "Llegaste a las horas de audio de este mes: la grabación sigue, pero ya no se transcribe. "

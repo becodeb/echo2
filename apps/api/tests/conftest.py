@@ -123,6 +123,12 @@ class EchoTestUser:
         assert org_response.status_code == 201, org_response.text
         self.org_id = org_response.json()["id"]
 
+    def make_paid(self) -> None:
+        """Plan Individual: lo que es de los planes pagos (Word, Drive, importar, preguntar sobre todas)."""
+        from test_levels import _sql
+
+        _sql("UPDATE users SET plan = 'individual' WHERE id = :id", id=self.user_id)
+
     @property
     def headers(self) -> dict:
         return {

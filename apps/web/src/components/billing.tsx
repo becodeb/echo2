@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
@@ -19,7 +20,7 @@ export interface BillingInfo {
     people_hours_left: number | null;
     available: boolean;
   };
-  features: { transcription: boolean; minutes: boolean; tasks: boolean; chat: boolean; voice: boolean };
+  features: { transcription: boolean; minutes: boolean; tasks: boolean; chat: boolean; voice: boolean; paid: boolean };
   plans: PublicPlan[];
   requests: { id: string; plan: string; status: string; created_at: string }[];
   month_start: string;
@@ -167,4 +168,22 @@ export function renewsLabel(iso: string): string {
 /** Skeleton redondeado para mientras carga. */
 export function Shimmer({ className = "" }: { className?: string }) {
   return <span className={`block animate-pulse rounded-2xl bg-ink-100 ${className}`} />;
+}
+
+/** ¿La cuenta tiene un plan pago? undefined mientras carga (no se muestra el aviso). */
+export function usePaid(): boolean | undefined {
+  const { data } = useBilling();
+  return data ? data.features.paid : undefined;
+}
+
+/** Lo que es de los planes pagos (Bauti, 1/10), con el camino a Planes. */
+export function PaidOnly({ what, className = "" }: { what: string; className?: string }) {
+  return (
+    <div className={`flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-accent-50 px-4 py-3 text-sm text-accent-700 ${className}`}>
+      <span className="min-w-0 flex-1">{what} es parte de los planes pagos.</span>
+      <Link to="/plans" className="inline-flex min-h-9 items-center rounded-full bg-ink-900 px-4 font-semibold text-white hover:bg-ink-700">
+        Ver planes
+      </Link>
+    </div>
+  );
 }

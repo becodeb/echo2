@@ -75,6 +75,8 @@ export default function MeetingLive() {
   const [level, setLevel] = useState(0);
   const [micDevices, setMicDevices] = useState<MediaDeviceInfo[]>([]);
   const [deviceId, setDeviceId] = useState<string>(() => localStorage.getItem("echo_pref_mic") ?? "");
+  // Para terminar la reunión desde un aviso del servidor (tope del plan Gratis).
+  const finishRef = useRef<(() => Promise<void>) | null>(null);
   // Consejo "Hola, soy…" (§7.3): se ve al empezar hasta que se cierra.
   const [helloTipHidden, setHelloTipHidden] = useState(() => {
     try {
@@ -257,6 +259,11 @@ export default function MeetingLive() {
           break;
         case "warning":
           setWarning(event.message);
+          break;
+        case "limit":
+          // Plan Gratis: la reunión llegó a la hora. Se termina sola.
+          setWarning(event.message);
+          void finishRef.current?.();
           break;
         case "flushed":
           flushWaiter.current?.();
@@ -636,6 +643,9 @@ export default function MeetingLive() {
       setError(err instanceof Error ? err.message : "No se pudo finalizar");
     }
   }, [id, flushAndWait]);
+  useEffect(() => {
+    finishRef.current = finish;
+  }, [finish]);
 
   // Mientras procesa, además del aviso en vivo se pregunta al servidor: si la
   // conexión se cortó justo, la pantalla se quedaba esperando para siempre.

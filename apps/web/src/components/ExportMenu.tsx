@@ -4,13 +4,14 @@ import { useMutation } from "@tanstack/react-query";
 import { api, apiDownload } from "../api/client";
 import { Button, Spinner } from "./ui";
 import { useMyDrive } from "./RecordToggle";
+import { usePaid } from "./billing";
 
 type Kind = "minutes" | "transcript";
 
 const FORMATS: { fmt: string; label: string; hint: string }[] = [
   { fmt: "pdf", label: "PDF", hint: "Para imprimir o mandar" },
   { fmt: "docx", label: "Word (.docx)", hint: "Para seguir editando" },
-  { fmt: "md", label: "Markdown (.md)", hint: "Texto con formato" },
+  { fmt: "md", label: "Texto con formato (.md)", hint: "Para pegar en otro lado" },
   { fmt: "txt", label: "Texto plano (.txt)", hint: "Sin formato" },
 ];
 
@@ -33,6 +34,8 @@ export function ExportMenu({
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
   const { data: drive } = useMyDrive(open);
+  // Word y Documento de Google son de los planes pagos; PDF y texto, de todos.
+  const paid = usePaid() !== false;
   const [docUrl, setDocUrl] = useState<string | null>(null);
   const prefix = kind === "minutes" ? "acta" : "transcript";
 
@@ -88,7 +91,21 @@ export function ExportMenu({
           role="menu"
           className="absolute right-0 z-30 mt-1 w-64 rounded-2xl border border-ink-100 bg-white p-1.5 shadow-lg"
         >
-          {FORMATS.map((item) => (
+          {FORMATS.map((item) =>
+            item.fmt === "docx" && !paid ? (
+              <Link
+                key={item.fmt}
+                to="/plans"
+                role="menuitem"
+                className="flex w-full flex-col rounded-xl px-3 py-2 text-left hover:bg-ink-50"
+              >
+                <span className="flex items-center gap-2 text-sm font-medium text-ink-800">
+                  {item.label}
+                  <span className="rounded-full bg-accent-50 px-2 py-0.5 text-[11px] font-semibold text-accent-700">Plan pago</span>
+                </span>
+                <span className="text-xs text-ink-400">{item.hint}</span>
+              </Link>
+            ) : (
             <button
               key={item.fmt}
               role="menuitem"
@@ -100,8 +117,17 @@ export function ExportMenu({
               <span className="text-sm font-medium text-ink-800">{item.label}</span>
               <span className="text-xs text-ink-400">{item.hint}</span>
             </button>
-          ))}
-          {drive?.enabled && (
+            ),
+          )}
+          {drive?.enabled && !paid && (
+            <div className="mt-1 border-t border-ink-100 pt-1">
+              <Link to="/plans" className="block rounded-xl px-3 py-2 text-sm text-ink-500 hover:bg-ink-50">
+                <span className="font-medium text-ink-800">Documento de Google</span>{" "}
+                <span className="rounded-full bg-accent-50 px-2 py-0.5 text-[11px] font-semibold text-accent-700">Plan pago</span>
+              </Link>
+            </div>
+          )}
+          {drive?.enabled && paid && (
             <div className="mt-1 border-t border-ink-100 pt-1">
               {drive.connected ? (
                 docUrl ? (

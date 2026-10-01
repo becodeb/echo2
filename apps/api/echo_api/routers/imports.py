@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 
 from ..config import get_settings
 from ..db import SessionLocal, get_db
-from ..deps import OrgContext, get_meeting_or_404, get_org_context
+from ..deps import get_meeting_or_404, get_org_context, OrgContext, require_paid
 from ..models import Meeting
 from ..services import plans
 from ..services.ai_settings import resolve_stt
@@ -98,6 +98,7 @@ async def import_recording(
     if extension not in ALLOWED_EXTENSIONS:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Formato no soportado: {extension}")
 
+    require_paid(ctx, "Importar grabaciones")
     try:
         await plans.check_audio_month(db, ctx.org, ctx.user)
     except plans.LimitReached as exc:

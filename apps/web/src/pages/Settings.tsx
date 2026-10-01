@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import type { DriveStatusOut, MyDriveOut, ReasonOut } from "../api/types";
 import { Select } from "../components/Select";
 import { Switch } from "../components/Toggles";
+import { PaidOnly, usePaid } from "../components/billing";
 import { VoiceRecorder, type MyVoice } from "../components/VoiceRecorder";
 import { Badge, Button, Card, Input, Modal, Spinner } from "../components/ui";
 import { useAuth } from "../state/auth";
@@ -1039,6 +1040,7 @@ const DRIVE_ERRORS: Record<string, string> = {
 };
 
 function DriveSection() {
+  const paid = usePaid();
   const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
 
@@ -1133,9 +1135,13 @@ function DriveSection() {
         </div>
       ) : (
         <div className="space-y-3">
-          <Button onClick={() => connect.mutate()} disabled={connect.isPending}>
-            {connect.isPending ? <Spinner /> : "Conectar Google Drive"}
-          </Button>
+          {paid === false ? (
+            <PaidOnly what="Guardar en el Drive de la sede" />
+          ) : (
+            <Button onClick={() => connect.mutate()} disabled={connect.isPending}>
+              {connect.isPending ? <Spinner /> : "Conectar Google Drive"}
+            </Button>
+          )}
           {connect.isError && (
             <p className="text-sm text-red-600">
               {connect.error instanceof Error ? connect.error.message : "No se pudo iniciar"}
@@ -1156,6 +1162,7 @@ function DriveSection() {
  * del de la sede (donde van las actas): la grabación es de quien grabó.
  */
 function MyDriveSection() {
+  const paid = usePaid();
   const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
 
@@ -1241,9 +1248,13 @@ function MyDriveSection() {
         </div>
       ) : (
         <div className="space-y-3">
-          <Button onClick={() => connect.mutate()} disabled={connect.isPending}>
-            {connect.isPending ? <Spinner /> : "Conectar mi Google Drive"}
-          </Button>
+          {paid === false ? (
+            <PaidOnly what="Guardar en Google Drive" />
+          ) : (
+            <Button onClick={() => connect.mutate()} disabled={connect.isPending}>
+              {connect.isPending ? <Spinner /> : "Conectar mi Google Drive"}
+            </Button>
+          )}
           {connect.isError && (
             <p className="text-sm text-red-600">
               {connect.error instanceof Error ? connect.error.message : "No se pudo iniciar"}

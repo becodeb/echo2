@@ -54,6 +54,9 @@ class FeaturesOut(BaseModel):
     tasks: bool
     chat: bool
     voice: bool
+    # Plan pago (individual o de la sede): reuniones de más de una hora,
+    # preguntar sobre todas, Word / Google Docs / Drive, importar grabaciones.
+    paid: bool = False
 
 
 class PublicPlanOut(BaseModel):
@@ -133,6 +136,7 @@ async def my_billing(ctx: OrgContext = Depends(get_org_context), db: AsyncSessio
             tasks=llm is not None,
             chat=llm is not None and embeddings is not None,
             voice=(await plans.voice_allowance(db, ctx.user))[0],
+            paid=plans.is_paid(ctx.org, ctx.user),
         ),
         plans=[
             PublicPlanOut(

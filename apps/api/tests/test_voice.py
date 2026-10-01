@@ -248,6 +248,7 @@ def test_the_voice_agent_never_reads_meetings_with_minors(client, monkeypatch):
     monkeypatch.setattr(chat_module, "retrieve_context", spy_retrieve)
     monkeypatch.setattr(chat_module, "resolve_llm", some_llm)
     user = EchoTestUser(client, org_name=f"Colegio {uuid.uuid4().hex[:4]}")
+    user.make_paid()
     with_minors = client.post("/api/meetings", json={"title": "Con alumnos", "level": "primaria", "minors": True},
                               headers=user.headers).json()["id"]
     adults = client.post("/api/meetings", json={"title": "Equipo", "level": "primaria"}, headers=user.headers).json()["id"]
@@ -286,6 +287,7 @@ def test_the_voice_prompt_has_nothing_from_meetings_with_minors(client, monkeypa
     monkeypatch.setattr(chat_module, "resolve_llm", some_llm)
     monkeypatch.setattr(chat_module, "protect", no_protect)
     user = EchoTestUser(client, org_name=f"Colegio {uuid.uuid4().hex[:4]}")
+    user.make_paid()
     with_minors = client.post("/api/meetings", json={"title": "Entrevista Tobías", "level": "primaria", "minors": True},
                               headers=user.headers).json()["id"]
     adults = client.post("/api/meetings", json={"title": "Equipo directivo", "level": "primaria"},

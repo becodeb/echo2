@@ -459,5 +459,6 @@ export type LiveEvent =
   | { type: "processing"; stage: string; progress: number }
   | { type: "insights"; totals: { decisions: number; tasks: number; questions: number }; new: Record<string, number> }
   | { type: "warning"; code: string; message: string }
+  | { type: "limit"; code: string; message: string }
   | { type: "error"; code: string; message: string }
   | { type: "pong" };

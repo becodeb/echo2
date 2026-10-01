@@ -107,6 +107,7 @@ def test_import_corta_por_content_length_antes_de_leer(client, monkeypatch):
     monkeypatch.setattr(imports_module, "resolve_stt", fake_resolve_stt)
 
     user = EchoTestUser(client, name="Importa", org_name="Org Import")
+    user.make_paid()
     meeting_id = client.post(
         "/api/meetings", json={"title": "Audio grande"}, headers=user.headers
     ).json()["id"]

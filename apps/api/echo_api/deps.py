@@ -240,6 +240,14 @@ def can_edit_meeting(ctx: OrgContext, meeting: Meeting) -> bool:
 _buckets: dict[str, deque] = defaultdict(deque)
 
 
+def require_paid(ctx: "OrgContext", what: str) -> None:
+    """Corta con 403 si la sede y la persona están en el plan Gratis."""
+    from .services.plans import is_paid, paid_only
+
+    if not is_paid(ctx.org, ctx.user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, paid_only(what))
+
+
 def rate_limit(key: str, limit: int, window_seconds: int = 60) -> None:
     from .config import get_settings
 
