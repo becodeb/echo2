@@ -7,6 +7,7 @@ import { EchoOrb, type OrbState } from "./EchoOrb";
 import { micErrorMessage } from "../lib/micError";
 
 interface SessionOut {
+  session_id: string;
   signed_url: string;
   max_seconds: number;
   seconds_left: number | null;
@@ -89,6 +90,8 @@ export function VoiceChat({ onClose }: { onClose: () => void }) {
   const [summary, setSummary] = useState<{ seconds: number; left: number | null } | null>(null);
   const conversation = useRef<VoiceConversation | null>(null);
   const conversationId = useRef<string | null>(null);
+  // La sesión que entregó el servidor: al cortar se anota contra ella.
+  const sessionId = useRef<string | null>(null);
   // Cuándo empezó y cuánto puede durar: el reloj se calcula de acá, no restando de a uno.
   const startedAt = useRef(0);
   const maxSeconds = useRef(0);
@@ -110,13 +113,22 @@ export function VoiceChat({ onClose }: { onClose: () => void }) {
 
   const report = useCallback(async () => {
     const id = conversationId.current;
+    const session = sessionId.current;
     conversationId.current = null;
-    if (!id) return;
+    sessionId.current = null;
+    if (!session) return;
+    if (!id) {
+      // Se cerró antes de conectar: se libera la sesión para poder abrir otra.
+      await api("/api/voice/sessions/end", { method: "POST", body: JSON.stringify({ session_id: session }) }).catch(
+        () => undefined,
+      );
+      return;
+    }
     const elapsed = (Date.now() - startedAt.current) / 1000;
     // Aunque esto no llegue (pestaña cerrada), el servidor lo anota igual.
     const ended = await api<EndOut>("/api/voice/sessions/end", {
       method: "POST",
-      body: JSON.stringify({ conversation_id: id, seconds: elapsed }),
+      body: JSON.stringify({ session_id: session, conversation_id: id, seconds: elapsed }),
     }).catch(() => null);
     const seconds = ended && !ended.pending ? ended.seconds : elapsed;
     const left = ended && !ended.pending ? ended.seconds_left : null;
@@ -143,7 +155,11 @@ export function VoiceChat({ onClose }: { onClose: () => void }) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach((track) => track.stop());
       const session = await api<SessionOut>("/api/voice/sessions", { method: "POST" });
-      if (closed.current) return;
+      sessionId.current = session.session_id;
+      if (closed.current) {
+        void report();
+        return;
+      }
       const { Conversation } = await import("@elevenlabs/client");
       const voice = (await Conversation.startSession({
         signedUrl: session.signed_url,
@@ -193,10 +209,12 @@ export function VoiceChat({ onClose }: { onClose: () => void }) {
       if (closed.current) {
         // Se cerró la ventana mientras conectaba: no dejar la charla abierta sin pantalla.
         await voice.endSession().catch(() => undefined);
+        void report();
         return;
       }
       conversation.current = voice;
     } catch (caught) {
+      void report();
       if (closed.current) return;
       setPhase("error");
       setError(micError(caught));

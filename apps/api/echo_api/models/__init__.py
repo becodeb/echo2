@@ -29,7 +29,7 @@ from .core import (
 )
 from .groups import DEFAULT_GROUPS, InternalGroup, InternalGroupMember
 from .integrations import OrgGoogleDrive, ServerAISettings, UserGoogleDrive
-from .voice import UserVoiceSample
+from .voice import UserVoiceSample, VoiceSession
 from .insights import ActionItem, Decision, MeetingSummary, MeetingTopic, Question, Risk
 from .meetings import (
     EMBEDDING_DIM,
@@ -68,7 +68,7 @@ __all__ = [
     "Family", "FamilyMember", "MeetingReason", "MeetingAttendance",
     "Professional", "FamilyProfessional", "MeetingProfessionalAttendance",
     "MeetingAttachment", "OrgGoogleDrive", "ServerAISettings", "UserGoogleDrive",
-    "InternalGroup", "InternalGroupMember", "DEFAULT_GROUPS", "MEETING_KINDS", "UserVoiceSample",
+    "InternalGroup", "InternalGroupMember", "DEFAULT_GROUPS", "MEETING_KINDS", "UserVoiceSample", "VoiceSession",
     "RELATIONSHIPS", "SEVERITIES", "AUDIENCES",
     "RefreshToken", "ROLES", "ROLE_OWNER", "ROLE_ADMIN", "ROLE_MEMBER", "ROLE_VIEWER",
     "EMBEDDING_DIM", "Meeting", "MeetingParticipant", "Speaker", "SpeakerProfile",

@@ -15,7 +15,7 @@ import uuid
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, LargeBinary, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -37,3 +37,29 @@ class UserVoiceSample(PKMixin, TimestampMixin, Base):
     embedding_model: Mapped[str | None] = mapped_column(String(60))
     learned_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     learn_from_meetings: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+
+
+class VoiceSession(PKMixin, TimestampMixin, Base):
+    """Una charla de Hablar con Echo que entregó el servidor (routers/voice.py).
+
+    El tope de minutos lo aplica el servidor: decide cuánto puede durar
+    (eligiendo el agente con esa duración máxima), deja una sola abierta por
+    persona y concilia el consumo por este id, no por lo que diga el navegador.
+    """
+
+    __tablename__ = "voice_sessions"
+    __table_args__ = (Index("ix_voice_sessions_user_created", "user_id", "created_at"),)
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="SET NULL")
+    )
+    allowed_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
+    agent_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    # Si nadie la cierra (pestaña cerrada), deja de contar como abierta acá.
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    conversation_id: Mapped[str | None] = mapped_column(String(120), unique=True)
+    seconds: Mapped[float | None] = mapped_column(Float)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

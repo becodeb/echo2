@@ -10,11 +10,16 @@ Un solo agente de ElevenLabs Agents para toda la instalación
 - Lo que sabe de las reuniones lo pide con la herramienta de cliente
   `consultar_reuniones`: la ejecuta el navegador contra el chat de Echo, que
   ya seudonimiza lo que le manda a la IA. El agente no ve la base.
-- 30 minutos por mes (tope del plan, ajustable por un superadmin).
+- 30 minutos por mes (tope del plan, ajustable por un superadmin). El tope lo
+  aplica el servidor (routers/voice.py): ElevenLabs no deja cambiar la
+  duración máxima por conversación, así que hay un agente igual por cada
+  duración (BUCKETS) y cada charla usa el que entra en lo que queda del mes.
 
 Solo cuentas de personas mayores de 18 (términos) y solo planes con
 `features.voice`; nunca una organización.
 """
+import hashlib
+import json
 import logging
 
 import httpx
@@ -31,6 +36,9 @@ DEFAULT_VOICE_ID = "p7AwDmKvTdoHTBuueGvP"
 AGENT_LLM = "gemini-3.5-flash-lite"
 # Una conversación no pasa de esto aunque queden minutos del mes.
 MAX_CONVERSATION_SECONDS = 600
+# Duraciones máximas con su propio agente: la charla usa la mayor que entra
+# en lo que le queda a la persona (con 2:30 libres, una de 3 minutos no).
+BUCKETS = (60, 180, MAX_CONVERSATION_SECONDS)
 # ElevenLabs Agents: US$ 0,08 por minuto (sin el LLM, que se cobra aparte).
 PRICE_PER_MINUTE = 0.08
 
@@ -71,17 +79,17 @@ CLIENT_TOOL = {
 }
 
 
-def agent_config(voice_id: str | None = None, llm: str = AGENT_LLM) -> dict:
+def agent_config(voice_id: str | None = None, llm: str = AGENT_LLM, max_seconds: int = MAX_CONVERSATION_SECONDS) -> dict:
     return {
-        "name": "Echo",
+        "name": "Echo" if max_seconds == MAX_CONVERSATION_SECONDS else f"Echo ({max_seconds // 60} min)",
         "conversation_config": {
             "agent": {
                 "language": "es",
                 "first_message": FIRST_MESSAGE,
-                # echo_user y echo_org: para anotar el consumo desde el servidor
-                # aunque el navegador no avise al cortar (reconcile_usage).
+                # echo_session: la sesión que entregó el servidor, para anotar el
+                # consumo aunque el navegador no avise al cortar.
                 "dynamic_variables": {
-                    "dynamic_variable_placeholders": {"user_name": "", "echo_user": "", "echo_org": ""}
+                    "dynamic_variable_placeholders": {"user_name": "", "echo_session": ""}
                 },
                 "prompt": {
                     "prompt": PROMPT,
@@ -92,9 +100,23 @@ def agent_config(voice_id: str | None = None, llm: str = AGENT_LLM) -> dict:
                 },
             },
             "tts": {"model_id": TTS_MODEL, "voice_id": voice_id or current_voice_id()},
-            "conversation": {"max_duration_seconds": MAX_CONVERSATION_SECONDS},
+            "conversation": {"max_duration_seconds": max_seconds},
         },
     }
+
+
+def config_hash(voice_id: str | None = None, llm: str = AGENT_LLM) -> str:
+    """Huella de la configuración de los agentes: si no cambió, no se actualizan."""
+    configs = [agent_config(voice_id, llm, seconds) for seconds in BUCKETS]
+    return hashlib.sha256(json.dumps(configs, sort_keys=True).encode()).hexdigest()
+
+
+def bucket_for(seconds_left: float | None) -> int | None:
+    """La duración máxima de la próxima charla (None = no alcanza para ninguna)."""
+    if seconds_left is None:
+        return MAX_CONVERSATION_SECONDS
+    fitting = [seconds for seconds in BUCKETS if seconds <= seconds_left]
+    return max(fitting) if fitting else None
 
 
 def current_voice_id() -> str:
@@ -130,7 +152,12 @@ async def ensure_voice(voice_id: str) -> None:
             raise RuntimeError(f"No se pudo agregar la voz a la cuenta: {added.text[:200]}")
 
 
-async def create_or_update_agent(agent_id: str | None = None, voice_id: str | None = None, llm: str = AGENT_LLM) -> str:
+async def create_or_update_agent(
+    agent_id: str | None = None,
+    voice_id: str | None = None,
+    llm: str = AGENT_LLM,
+    max_seconds: int = MAX_CONVERSATION_SECONDS,
+) -> str:
     """Crea el agente de Echo (o lo actualiza si ya existe). Devuelve su id."""
     try:
         await ensure_voice(voice_id or current_voice_id())
@@ -138,10 +165,12 @@ async def create_or_update_agent(agent_id: str | None = None, voice_id: str | No
         log.warning("voz: no se pudo preparar la voz del agente: %s", exc)
     async with httpx.AsyncClient(timeout=60) as client:
         if agent_id:
-            response = await client.patch(f"{API}/agents/{agent_id}", headers=_headers(), json=agent_config(voice_id, llm))
+            response = await client.patch(
+                f"{API}/agents/{agent_id}", headers=_headers(), json=agent_config(voice_id, llm, max_seconds)
+            )
             response.raise_for_status()
             return agent_id
-        response = await client.post(f"{API}/agents/create", headers=_headers(), json=agent_config(voice_id, llm))
+        response = await client.post(f"{API}/agents/create", headers=_headers(), json=agent_config(voice_id, llm, max_seconds))
         response.raise_for_status()
         return response.json()["agent_id"]
 
@@ -196,10 +225,16 @@ async def recent_conversations(agent_id: str, pages: int = 3) -> list[dict]:
     return out
 
 
-def conversation_owner(details: dict) -> tuple[str | None, str | None]:
-    """(user_id, org_id) que el navegador mandó al abrir la conversación."""
+def conversation_session(details: dict) -> str | None:
+    """La sesión que el navegador dice que es (se verifica contra la base)."""
     variables = ((details.get("conversation_initiation_client_data") or {}).get("dynamic_variables")) or {}
-    return variables.get("echo_user") or None, variables.get("echo_org") or None
+    return variables.get("echo_session") or None
+
+
+def conversation_start(details: dict) -> float | None:
+    """Cuándo empezó la conversación (unix), si ElevenLabs lo informa."""
+    start = (details.get("metadata") or {}).get("start_time_unix_secs")
+    return float(start) if isinstance(start, int | float) else None
 
 
 def voice_cost(seconds: float) -> float:

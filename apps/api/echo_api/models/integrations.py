@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base, PKMixin, TimestampMixin
@@ -88,6 +88,10 @@ class ServerAISettings(PKMixin, TimestampMixin, Base):
     # Agente de ElevenLabs para la conversación por voz (services/voice_agent.py):
     # lo crea un superadmin desde el panel, con la key de la instalación.
     voice_agent_id: Mapped[str | None] = mapped_column(String(80))
+    # Un agente por duración máxima de la charla: {"60": id, "180": id, "600": id}.
+    voice_agents: Mapped[dict | None] = mapped_column(JSONB)
+    # Con qué configuración se crearon (para no actualizarlos en cada arranque).
+    voice_agent_hash: Mapped[str | None] = mapped_column(String(64))
     updated_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id")
     )

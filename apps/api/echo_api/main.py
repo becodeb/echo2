@@ -122,15 +122,12 @@ async def _start_recordings_cleanup() -> None:
 
 @app.on_event("startup")
 async def _ensure_voice_agent() -> None:
-    """Crea el agente de voz si hay key de ElevenLabs y no existe, o lo pone al
-    día (prompt, voz, variables) si ya existe; y arranca la conciliación del
-    consumo de voz (routers/voice.py). Si falla, se ve en el panel de Becode."""
-    from sqlalchemy import select
-
+    """Crea los agentes de voz si hay key de ElevenLabs y faltan, y los pone al
+    día solo si cambió su configuración (prompt, voz, LLM); y arranca la
+    conciliación del consumo de voz (routers/voice.py). Si falla, se ve en el
+    panel de Becode."""
     from .db import SessionLocal
-    from .models import ServerAISettings
-    from .routers.voice import reconcile_loop
-    from .services import voice_agent
+    from .routers.voice import ensure_agents, reconcile_loop
     from .services.background import spawn
 
     if settings.echo_env == "test" or not settings.elevenlabs_api_key:
@@ -138,14 +135,8 @@ async def _ensure_voice_agent() -> None:
     spawn(reconcile_loop(), name="voice-reconcile")
     try:
         async with SessionLocal() as db:
-            row = (await db.execute(select(ServerAISettings).limit(1))).scalar_one_or_none()
-            agent_id = await voice_agent.create_or_update_agent(row.voice_agent_id if row else None)
-            if row is None:
-                row = ServerAISettings()
-                db.add(row)
-            row.voice_agent_id = agent_id
-            await db.commit()
-            logging.getLogger("echo").info("agente de voz listo: %s", agent_id)
+            agents = await ensure_agents(db)
+            logging.getLogger("echo").info("agentes de voz listos: %s", agents)
     except Exception:  # noqa: BLE001 - nunca impide que la API levante
         logging.getLogger("echo").exception("no se pudo crear el agente de voz")
 
