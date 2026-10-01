@@ -14,6 +14,7 @@ import {
 } from "../components/billing";
 import { CompareTable, PlanCard, planSpecs, type PlanSpec } from "../components/PlanCatalog";
 import { Spinner } from "../components/ui";
+import { useAuth } from "../state/auth";
 
 /**
  * Planes: Gratis, Individual, Individual + voz e Instituciones.
@@ -74,8 +75,14 @@ function currentPlans(billing: BillingInfo): Set<string> {
 }
 
 function CurrentPlan({ billing }: { billing: BillingInfo }) {
-  // El plan que pagó la persona va primero: es el que ella eligió.
-  const plan = billing.user_plan !== "base" ? billing.user_plan : effectivePlan(billing);
+  const { user } = useAuth();
+  // El plan que pagó la persona va primero: es el que ella eligió. La gente de
+  // Becode tiene todo incluido, como dice Inicio.
+  const plan = user?.is_superadmin
+    ? "becode"
+    : billing.user_plan !== "base"
+      ? billing.user_plan
+      : effectivePlan(billing);
   const people = billing.people;
   return (
     <div className="animate-fade-up rounded-3xl border border-ink-100 bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] sm:w-80">
@@ -123,7 +130,9 @@ function CurrentPlan({ billing }: { billing: BillingInfo }) {
 const REQUESTABLE = new Set(["individual", "individual_voz", "institucion"]);
 
 function PlanGrid({ billing }: { billing: BillingInfo }) {
-  const current = currentPlans(billing);
+  const { user } = useAuth();
+  const becode = !!user?.is_superadmin;
+  const current = becode ? new Set<string>() : currentPlans(billing);
   const specs = planSpecs(billing.plans);
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -148,13 +157,15 @@ function PlanGrid({ billing }: { billing: BillingInfo }) {
               spec={spec}
               featured={spec.plan.code === "individual_voz"}
               state={
-                isCurrent
-                  ? "Plan actual"
-                  : included
-                    ? "Incluido en tu plan"
-                    : !REQUESTABLE.has(spec.plan.code)
-                      ? "Incluido para todos"
-                      : null
+                becode
+                  ? "Incluido en tu cuenta"
+                  : isCurrent
+                    ? "Plan actual"
+                    : included
+                      ? "Incluido en tu plan"
+                      : !REQUESTABLE.has(spec.plan.code)
+                        ? "Incluido para todos"
+                        : null
               }
               pending={pending}
             />
