@@ -126,6 +126,9 @@ class Device(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
     available_version: Mapped[str | None] = mapped_column(String(40))  # para OTA futuro
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_state: Mapped[dict | None] = mapped_column(JSONB)  # {wifi_rssi, status, ...}
+    # Puede estar en un aula: por defecto sus reuniones van como "hablan
+    # menores" (sin ElevenLabs ni voz). Solo un admin lo apaga.
+    minors: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
 
 
 class DevicePairCode(PKMixin, TimestampMixin, Base):

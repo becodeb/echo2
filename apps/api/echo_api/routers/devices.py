@@ -195,19 +195,22 @@ async def list_devices(ctx: OrgContext = Depends(get_org_context), db: AsyncSess
             "last_seen_at": d.last_seen_at.isoformat() if d.last_seen_at else None,
             "online": bool(d.last_seen_at and (now - d.last_seen_at).total_seconds() < 60),
             "state": d.last_state,
+            "minors": d.minors,
         }
         for d in rows
     ]
 
 
-class DeviceRenameIn(BaseModel):
-    name: str = Field(min_length=1, max_length=200)
+class DeviceUpdateIn(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    # "Pueden hablar menores": por defecto sí (puede estar en un aula).
+    minors: bool | None = None
 
 
 @router.patch("/{device_id}")
-async def rename_device(
+async def update_device(
     device_id: uuid.UUID,
-    data: DeviceRenameIn,
+    data: DeviceUpdateIn,
     ctx: OrgContext = Depends(get_org_context),
     db: AsyncSession = Depends(get_db),
 ):
@@ -219,9 +222,18 @@ async def rename_device(
     ).scalar_one_or_none()
     if not device:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Dispositivo no encontrado")
-    device.name = data.name.strip()
+    if data.name is not None:
+        device.name = data.name.strip()
+    if data.minors is not None and data.minors != device.minors:
+        # Apagarlo manda las reuniones del dispositivo a separar quién habló
+        # (ElevenLabs): lo decide un admin y queda registrado.
+        if not data.minors:
+            ctx.require_role("admin")
+        device.minors = data.minors
+        await audit(db, ctx.org_id, ctx.user.id, "device.minors", "device", str(device.id),
+                    detail={"minors": data.minors})
     await db.commit()
-    return {"id": str(device.id), "name": device.name}
+    return {"id": str(device.id), "name": device.name, "minors": device.minors}
 
 
 @router.delete("/{device_id}", status_code=204)

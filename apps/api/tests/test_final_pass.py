@@ -441,3 +441,37 @@ def test_an_imported_audio_goes_through_the_final_pass(client, monkeypatch, tmp_
     assert [(u.provider, u.credits) for u in _usage(meeting_id)] == [("elevenlabs", 1)]
     # Ni el archivo subido ni el audio de trabajo quedan en el disco.
     assert not source.exists() and not rec.pcm_path(meeting_id).exists()
+
+
+def test_a_device_in_a_classroom_never_goes_to_elevenlabs(client, monkeypatch):
+    from echo_api.security import hash_refresh_token
+
+    _setup(monkeypatch, "2026-09-27")
+    owner = EchoTestUser(client, org_name=f"Colegio {uuid.uuid4().hex[:4]}")
+    _sql("UPDATE organizations SET plan = 'institucion' WHERE id = :id", id=owner.org_id)
+    token, device_id = uuid.uuid4().hex, str(uuid.uuid4())
+    _sql("INSERT INTO devices (id, organization_id, name, kind, token_hash, created_at, updated_at)"
+         " VALUES (:id, :o, 'Aula 3', 'esp32', :h, now(), now())", id=device_id, o=owner.org_id,
+         h=hash_refresh_token(token))
+    device = client.get("/api/devices", headers=owner.headers).json()[0]
+    assert device["minors"] is True  # por defecto: puede estar en un aula
+    bearer = {"Authorization": f"Bearer {token}"}
+    meeting_id = uuid.UUID(client.post("/api/devices/meetings", json={}, headers=bearer).json()["id"])
+    rec.pcm_path(meeting_id).write_bytes(_tone(20.4))
+    assert asyncio.run(diarization.diarize_meeting(meeting_id)) is False
+    assert all("elevenlabs" not in url for url, _ in _FakeApis.requests)
+    _cleanup(meeting_id)
+
+    # Un miembro no lo puede apagar; un admin sí, y queda en la auditoría.
+    member = EchoTestUser(client, org_name="x")
+    _sql("INSERT INTO organization_members (id, organization_id, user_id, role, created_at, updated_at)"
+         " VALUES (gen_random_uuid(), :o, :u, 'member', now(), now())", o=owner.org_id, u=member.user_id)
+    as_member = {**member.headers, "X-Organization-Id": owner.org_id}
+    assert client.patch(f"/api/devices/{device_id}", json={"minors": False}, headers=as_member).status_code == 403
+    assert client.patch(f"/api/devices/{device_id}", json={"minors": False}, headers=owner.headers).json()["minors"] is False
+    # Con el ajuste apagado, el dispositivo igual puede marcar una reunión con menores.
+    marked = client.post("/api/devices/meetings", json={"minors": True}, headers=bearer).json()["id"]
+    plain = client.post("/api/devices/meetings", json={}, headers=bearer).json()["id"]
+    minors = dict(_sql_rows("SELECT id::text, meta->>'minors' FROM meetings WHERE id IN (:a, :b)", a=marked, b=plain))
+    assert minors == {marked: "true", plain: "false"}
+    monkeypatch.undo()

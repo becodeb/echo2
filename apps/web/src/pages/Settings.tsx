@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { DriveStatusOut, MyDriveOut, ReasonOut } from "../api/types";
 import { Select } from "../components/Select";
+import { Switch } from "../components/Toggles";
 import { Badge, Button, Card, Input, Modal, Spinner } from "../components/ui";
 import { useAuth } from "../state/auth";
 import { LEVEL_LABEL, useMyAccess, type Level, type LevelAccess } from "../state/access";
@@ -411,6 +412,7 @@ function DevicesSection() {
         last_seen_at: string | null;
         online: boolean;
         state: { wifi_rssi?: number } | null;
+        minors: boolean;
       }[]>("/api/devices"),
     refetchInterval: 15_000,
   });
@@ -430,6 +432,12 @@ function DevicesSection() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["devices"] }),
   });
 
+  const setMinors = useMutation({
+    mutationFn: ({ deviceId, minors }: { deviceId: string; minors: boolean }) =>
+      api(`/api/devices/${deviceId}`, { method: "PATCH", body: JSON.stringify({ minors }) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["devices"] }),
+  });
+
   return (
     <div className="space-y-5">
       <Card>
@@ -445,7 +453,8 @@ function DevicesSection() {
         )}
         <ul className="divide-y divide-ink-100">
           {devices?.map((device) => (
-            <li key={device.id} className="flex items-center justify-between py-3">
+            <li key={device.id} className="space-y-3 py-3">
+              <div className="flex items-center justify-between">
               <div>
                 <p className="flex items-center gap-2 text-sm font-medium text-ink-800">
                   <span className={`h-2 w-2 rounded-full ${device.online ? "bg-emerald-500" : "bg-ink-300"}`} />
@@ -460,9 +469,25 @@ function DevicesSection() {
                 </p>
               </div>
               <Button variant="ghost" onClick={() => unlink.mutate(device.id)}>Desvincular</Button>
+              </div>
+              <Switch
+                checked={device.minors}
+                onChange={(minors) => setMinors.mutate({ deviceId: device.id, minors })}
+                label="Pueden hablar menores de 18"
+                hint={
+                  device.minors
+                    ? "Sus reuniones se transcriben sin separar quién habló y no las usa la voz de Echo."
+                    : "Solo si nunca graba en un aula. Apagarlo lo puede hacer un admin."
+                }
+              />
             </li>
           ))}
         </ul>
+        {setMinors.isError && (
+          <p className="mt-2 text-sm text-red-600">
+            {setMinors.error instanceof Error ? setMinors.error.message : "No se pudo cambiar"}
+          </p>
+        )}
       </Card>
 
       <Modal open={showClaim} onClose={() => setShowClaim(false)} title="Vincular dispositivo">

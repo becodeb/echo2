@@ -57,6 +57,9 @@ async def _device_by_token(db, token: str) -> Device | None:
 
 class DeviceMeetingIn(BaseModel):
     title: str | None = Field(default=None, max_length=300)
+    # El dispositivo puede marcar una reunión con menores, nunca desmarcarla:
+    # eso es del ajuste del dispositivo (Ajustes → Dispositivos).
+    minors: bool = False
 
 
 @router.post("/api/devices/meetings", status_code=201)
@@ -92,7 +95,7 @@ async def device_create_meeting(
         status="live",
         audio_source="device",
         started_at=datetime.now(UTC),
-        meta={"visibility": "org", "device_id": str(device.id)},
+        meta={"visibility": "org", "device_id": str(device.id), "minors": bool(device.minors or data.minors)},
     )
     db.add(meeting)
     await db.commit()
