@@ -43,3 +43,18 @@ def test_an_old_link_does_not_work(client):
     token = _link_for(admin.user_id)
     _sql("UPDATE password_resets SET expires_at = :t", t=datetime.now(UTC) - timedelta(minutes=1))
     assert client.post("/api/auth/password/reset", json={"token": token, "password": "nueva-12345"}).status_code == 400
+
+
+def test_using_a_link_voids_the_ones_asked_before(client):
+    admin = EchoTestUser(client, org_name="Becode")
+    _sql("UPDATE users SET is_superadmin = true WHERE id = :id", id=admin.user_id)
+    user = EchoTestUser(client, org_name=f"Colegio {uuid.uuid4().hex[:4]}")
+    email = _sql_rows("SELECT email FROM users WHERE id = :id", id=user.user_id)[0][0]
+    client.post("/api/auth/password/forgot", json={"email": email})
+    first = _link_for(admin.user_id)
+    client.post("/api/auth/password/forgot", json={"email": email})
+    second = _link_for(admin.user_id)
+    assert first != second
+    assert client.post("/api/auth/password/reset", json={"token": second, "password": "nueva-12345"}).status_code == 200
+    # El primero (que pudo quedar en otro mail) ya no sirve.
+    assert client.post("/api/auth/password/reset", json={"token": first, "password": "otra-12345"}).status_code == 400

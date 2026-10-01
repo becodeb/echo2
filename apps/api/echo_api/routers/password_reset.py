@@ -87,10 +87,15 @@ async def reset_password(data: ResetIn, db: AsyncSession = Depends(get_db)):
     if reset is None or reset.used_at is not None or reset.expires_at < now:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "El link venció o ya se usó. Pedí uno nuevo.")
     user = await db.get(User, reset.user_id)
-    if user is None or not user.is_active:
+    if user is None or not user.is_active or user.deleted_at is not None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "El link venció o ya se usó. Pedí uno nuevo.")
     user.password_hash = hash_password(data.password)
-    reset.used_at = now
+    # Este link y los otros que se hayan pedido antes dejan de servir.
+    await db.execute(
+        update(PasswordReset)
+        .where(PasswordReset.user_id == user.id, PasswordReset.used_at.is_(None))
+        .values(used_at=now)
+    )
     # Las sesiones abiertas (por ejemplo, de quien adivinó la contraseña vieja) se cierran.
     await db.execute(
         update(RefreshToken)

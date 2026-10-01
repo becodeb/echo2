@@ -76,7 +76,7 @@ def _quality(pcm: bytes) -> str | None:
 async def _to_pcm16(data: bytes) -> bytes:
     """Cualquier audio del navegador (webm, mp4/aac, wav) → PCM16 mono 16 kHz."""
     process = await asyncio.create_subprocess_exec(
-        "ffmpeg", "-loglevel", "error", "-i", "pipe:0", "-t", "30",
+        "ffmpeg", "-loglevel", "error", "-protocol_whitelist", "pipe", "-i", "pipe:0", "-t", "30",
         "-ac", "1", "-ar", "16000", "-f", "s16le", "pipe:1",
         stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
     )

@@ -128,10 +128,17 @@ def test_usage_per_person_and_per_school(client):
          id=str(uuid.uuid4()), org=owner.org_id, user=teacher_session["user"]["id"])
     teacher_headers = _headers(teacher_session, owner.org_id)
     assert client.get("/api/billing/usage?scope=org", headers=teacher_headers).status_code == 403
+    # Lo suyo lo ve, pero sin la plata (solo la ven quienes administran).
+    _sql("INSERT INTO usage_events (id, kind, provider, unit, quantity, cost_usd, credits, user_id, organization_id,"
+         " created_at, updated_at) VALUES (gen_random_uuid(), 'stt_live', 'groq', 'audio_seconds', 600, 0.05, 0, :u, :o,"
+         " now(), now())", u=teacher_session["user"]["id"], o=owner.org_id)
+    [teacher] = client.get("/api/billing/usage", headers=teacher_headers).json()["people"]
+    assert teacher["audio_seconds"] == 600
+    assert teacher["cost_usd"] == 0 and all(line["cost_usd"] == 0 for line in teacher["lines"])
 
     school = client.get("/api/billing/usage?scope=org", headers=owner.headers).json()
     names = {person["name"]: person for person in school["people"]}
-    assert names["Directora"]["credits"] == 1 and names["Maestra"]["cost_usd"] == 0
+    assert names["Directora"]["credits"] == 1 and names["Maestra"]["cost_usd"] == 0.05
     # Otro mes: vacío.
     assert client.get("/api/billing/usage?month=2020-01", headers=owner.headers).json()["total_cost_usd"] == 0
     assert client.get("/api/billing/usage?month=enero", headers=owner.headers).status_code == 422

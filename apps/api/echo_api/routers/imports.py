@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 
 from ..config import get_settings
 from ..db import SessionLocal, get_db
-from ..deps import get_meeting_or_404, get_org_context, OrgContext, require_paid
+from ..deps import can_edit_meeting, get_meeting_or_404, get_org_context, OrgContext, require_paid
 from ..models import Meeting
 from ..services import plans
 from ..services.ai_settings import resolve_stt
@@ -90,7 +90,9 @@ async def import_recording(
     db=Depends(get_db),
 ):
     settings = get_settings()
-    meeting = await get_meeting_or_404(meeting_id, ctx, db)
+    meeting = await get_meeting_or_404(meeting_id, ctx, db, minimum_role="editor")
+    if not can_edit_meeting(ctx, meeting):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Sin permiso de edición")
     if meeting.status not in ("draft",):
         raise HTTPException(status.HTTP_409_CONFLICT, "Solo se puede importar a una reunión nueva")
 
@@ -156,7 +158,7 @@ async def _process_import(meeting_id: str, source_path: str) -> None:
         # PCM16 mono 16 kHz, lo que lee la pasada final. ffmpeg lee del disco:
         # nunca hace falta tener el archivo crudo en RAM.
         process = await asyncio.create_subprocess_exec(
-            "ffmpeg", "-y", "-i", source_path, "-ac", "1", "-ar", "16000", "-f", "s16le", str(target),
+            "ffmpeg", "-y", "-protocol_whitelist", "file", "-i", source_path, "-ac", "1", "-ar", "16000", "-f", "s16le", str(target),
             stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
         )
         await process.wait()

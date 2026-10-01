@@ -390,6 +390,13 @@ async def usage(
         if not people:
             people = [PersonUsage(user_id=ctx.user.id, name=ctx.user.name, email=ctx.user.email, plan=ctx.user.plan,
                                   cost_usd=0, credits=0, audio_seconds=0, tokens=0, lines=[])]
+        # La plata solo la ven quienes administran una institución (y Becode),
+        # igual que en la pantalla: al resto se le muestra lo que le queda.
+        if not (ctx.user.is_superadmin or (ctx.role in ("owner", "admin") and not ctx.org.is_personal)):
+            for person in people:
+                person.cost_usd = 0
+                for line in person.lines:
+                    line.cost_usd = 0
     local = start.astimezone(plans.ARGENTINA)
     return UsageOut(
         month=f"{local.year:04d}-{local.month:02d}",
