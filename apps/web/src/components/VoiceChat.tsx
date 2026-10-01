@@ -63,7 +63,7 @@ export function VoiceChatButton() {
   );
 }
 
-function VoiceChat({ onClose }: { onClose: () => void }) {
+export function VoiceChat({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);

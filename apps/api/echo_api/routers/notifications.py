@@ -3,7 +3,7 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
@@ -23,12 +23,14 @@ async def list_notifications(
     db: AsyncSession = Depends(get_db),
     unread_only: bool = False,
 ):
+    # Los pedidos de plan le llegan al superadmin desde la organización de
+    # quien pide: los ve en cualquier sede en la que esté.
+    scope = Notification.organization_id == ctx.org_id
+    if ctx.user.is_superadmin:
+        scope = or_(scope, Notification.kind == "plan_request")
     query = (
         select(Notification)
-        .where(
-            Notification.user_id == ctx.user.id,
-            Notification.organization_id == ctx.org_id,
-        )
+        .where(Notification.user_id == ctx.user.id, scope)
         .order_by(Notification.created_at.desc())
         .limit(50)
     )
@@ -61,7 +63,9 @@ async def mark_all_read(
         update(Notification)
         .where(
             Notification.user_id == ctx.user.id,
-            Notification.organization_id == ctx.org_id,
+            or_(Notification.organization_id == ctx.org_id, Notification.kind == "plan_request")
+            if ctx.user.is_superadmin
+            else Notification.organization_id == ctx.org_id,
             Notification.read_at.is_(None),
         )
         .values(read_at=datetime.now(UTC))

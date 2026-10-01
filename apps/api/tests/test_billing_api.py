@@ -194,3 +194,19 @@ def test_billing_says_if_people_can_be_separated(client, monkeypatch):
     monkeypatch.setattr(get_settings(), "elevenlabs_api_key", "")
     user = EchoTestUser(client, org_name=f"Colegio {uuid.uuid4().hex[:4]}")
     assert client.get("/api/billing/me", headers=user.headers).json()["people"]["available"] is False
+
+
+def test_superadmin_sees_plan_requests_from_any_campus(client, monkeypatch):
+    import echo_api.routers.billing as billing_module
+
+    async def no_mail(*args):
+        return True
+
+    monkeypatch.setattr(billing_module, "send_mail", no_mail)
+    admin = EchoTestUser(client, org_name="Becode")
+    _sql("UPDATE users SET is_superadmin = true WHERE id = :id", id=admin.user_id)
+    session = _register(client, name="Pide Plan")
+    assert client.post("/api/billing/requests", json={"plan": "individual"}, headers=_headers(session)).status_code == 201
+    # En su propia organización, no en la de quien pidió.
+    notes = client.get("/api/notifications", headers=admin.headers).json()["notifications"]
+    assert any(note["kind"] == "plan_request" and "Pide Plan" in note["title"] for note in notes)
