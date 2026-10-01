@@ -12,7 +12,7 @@ import { AnnouncementPopup } from "./AnnouncementPopup";
 import { AskPanel } from "./AskPanel";
 import { CommandPalette } from "./CommandPalette";
 import { Icon, type IconName } from "./icons";
-import { NotificationsModal } from "./NotificationsModal";
+import { NotificationsPanel } from "./NotificationsPanel";
 import { VoicePrompt } from "./VoicePrompt";
 import { CreditDots, effectivePlan, PLAN_NAME, useBilling } from "./billing";
 
@@ -159,7 +159,6 @@ export function Layout({ children }: { children: ReactNode }) {
           {!collapsed && <PlanCard onNavigate={() => setMobileNav(false)} />}
           {user?.is_superadmin &&
             navLink({ to: "/admin", label: "Panel de Becode", icon: "admin" })}
-          {navLink({ to: "/settings", label: "Ajustes", icon: "settings" })}
         </div>
       </aside>
 
@@ -178,14 +177,17 @@ export function Layout({ children }: { children: ReactNode }) {
               <path d="M4 7h16M4 12h16M4 17h16" />
             </svg>
           </button>
-          <span className="min-w-0 flex-1 truncate px-1 font-semibold text-ink-900">{pageTitle(location.pathname)}</span>
+          <span className="flex min-w-0 flex-1 items-center gap-2 px-1">
+            <span className="truncate font-semibold text-ink-900">{pageTitle(location.pathname)}</span>
+            {myAccess?.superadmin_visit && <SuperadminTag org={activeOrg?.name ?? "esta sede"} compact />}
+          </span>
           <RoundButton label="Buscar" onClick={() => setPaletteOpen(true)}>
             <Icon name="search" />
           </RoundButton>
           <RoundButton label="Preguntale a Echo" onClick={() => setAskOpen(true)}>
             <Icon name="ask" />
           </RoundButton>
-          <RoundButton label="Notificaciones" onClick={() => setNotificationsOpen(true)} badge={unread}>
+          <RoundButton label="Notificaciones" onClick={() => setNotificationsOpen((open) => !open)} badge={unread} toggle="notifications" active={notificationsOpen}>
             <Icon name="bell" />
           </RoundButton>
           <ProfileMenu />
@@ -193,18 +195,16 @@ export function Layout({ children }: { children: ReactNode }) {
         {!live && (
           <TopBar
             title={pageTitle(location.pathname)}
+            superadminVisit={myAccess?.superadmin_visit ? activeOrg?.name ?? "esta sede" : null}
             onSearch={() => setPaletteOpen(true)}
             askOpen={askOpen}
             onAsk={() => setAskOpen((open) => !open)}
-            onNotifications={() => setNotificationsOpen(true)}
+            onNotifications={() => setNotificationsOpen((open) => !open)}
+            notificationsOpen={notificationsOpen}
             unread={unread}
           />
         )}
-        {myAccess?.superadmin_visit && (
-          <div className="border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-center text-xs font-medium text-amber-800">
-            Estás viendo {activeOrg?.name} como superadmin. Queda registrado en su historial.
-          </div>
-        )}
+
         <main className="min-h-0 flex-1 overflow-y-auto">
           {/* Cada sección entra con un fundido corto en vez de aparecer de golpe. */}
           <div key={location.pathname} className="page-in h-full">
@@ -226,7 +226,13 @@ export function Layout({ children }: { children: ReactNode }) {
       )}
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
-      {notificationsOpen && <NotificationsModal onClose={() => setNotificationsOpen(false)} />}
+      {notificationsOpen && (
+        <NotificationsPanel
+          onClose={() => setNotificationsOpen(false)}
+          // Colgando de la campanita: corre a la izquierda si el panel de preguntas está abierto.
+          className={askOpen ? "md:right-[396px]" : "md:right-4"}
+        />
+      )}
       <AnnouncementPopup />
       <VoicePrompt />
     </div>
@@ -238,22 +244,27 @@ function RoundButton({
   onClick,
   badge = 0,
   active = false,
+  toggle,
   children,
 }: {
   label: string;
   onClick: () => void;
   badge?: number;
   active?: boolean;
+  // Para que el panel que abre no se cierre al tocar el mismo botón.
+  toggle?: string;
   children: ReactNode;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      data-notifications-toggle={toggle === "notifications" ? "" : undefined}
+      aria-expanded={toggle ? active : undefined}
       aria-label={label}
       title={label}
       className={`relative flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
-        active ? "bg-ink-900 text-white" : "text-ink-600 hover:bg-ink-100 hover:text-ink-900"
+        active ? "bg-ink-100 text-ink-900" : "text-ink-600 hover:bg-ink-100 hover:text-ink-900"
       }`}
     >
       {children}
@@ -273,22 +284,30 @@ function RoundButton({
  */
 function TopBar({
   title,
+  superadminVisit,
   onSearch,
   askOpen,
   onAsk,
   onNotifications,
+  notificationsOpen,
   unread,
 }: {
   title: string;
+  // Nombre de la sede que un superadmin está viendo sin ser miembro.
+  superadminVisit: string | null;
   onSearch: () => void;
   askOpen: boolean;
   onAsk: () => void;
   onNotifications: () => void;
+  notificationsOpen: boolean;
   unread: number;
 }) {
   return (
     <div className="hidden h-14 shrink-0 items-center gap-3 border-b border-ink-100 bg-white px-5 md:flex">
-      <h1 className="min-w-0 flex-1 truncate text-[15px] font-semibold text-ink-900">{title}</h1>
+      <div className="flex min-w-0 flex-1 items-center gap-2.5">
+        <h1 className="truncate text-[15px] font-semibold text-ink-900">{title}</h1>
+        {superadminVisit && <SuperadminTag org={superadminVisit} />}
+      </div>
       {askOpen ? (
         // Con el panel de preguntas abierto no hay lugar: la búsqueda queda en un ícono.
         <RoundButton label="Buscar" onClick={onSearch}>
@@ -318,7 +337,7 @@ function TopBar({
         <Icon name="ask" size={16} />
         Preguntar
       </button>
-      <RoundButton label="Notificaciones" onClick={onNotifications} badge={unread}>
+      <RoundButton label="Notificaciones" onClick={onNotifications} badge={unread} toggle="notifications" active={notificationsOpen}>
         <Icon name="bell" />
       </RoundButton>
       <ProfileMenu />
@@ -473,5 +492,17 @@ function PlanCard({ onNavigate }: { onNavigate: () => void }) {
         {plan === "base" && <span className="shrink-0 font-semibold text-ink-700">Mejorar</span>}
       </span>
     </button>
+  );
+}
+
+/** Una etiqueta chica en vez de la franja: estás en una sede ajena como superadmin. */
+function SuperadminTag({ org, compact = false }: { org: string; compact?: boolean }) {
+  return (
+    <span
+      title={`Estás viendo ${org} como superadmin. Queda registrado en su historial.`}
+      className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800"
+    >
+      {compact ? "Superadmin" : `Superadmin · ${org}`}
+    </span>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
@@ -48,11 +48,12 @@ function art(kind: string) {
 }
 
 /**
- * Notificaciones en una ventana, con las tarjetas de las novedades de
- * ElevenLabs: título, texto, cuándo fue y un dibujo redondo a la derecha.
+ * Notificaciones en un panel que se despliega desde la campanita, con las
+ * tarjetas de las novedades de ElevenLabs: título, texto, cuándo fue y un
+ * dibujo redondo a la derecha.
  * Tocar una lleva adonde corresponde y la marca leída.
  */
-export function NotificationsModal({ onClose }: { onClose: () => void }) {
+export function NotificationsPanel({ onClose, className = "" }: { onClose: () => void; className?: string }) {
   const { activeOrg } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -70,14 +71,22 @@ export function NotificationsModal({ onClose }: { onClose: () => void }) {
     onSuccess: refresh,
   });
 
+  // Se cierra al tocar afuera o con Escape, como el panel de novedades de ElevenLabs.
+  const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => event.key === "Escape" && onClose();
+    const onDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (panel.current?.contains(target)) return;
+      // El botón de la campanita abre y cierra él mismo.
+      if ((target as HTMLElement).closest?.("[data-notifications-toggle]")) return;
+      onClose();
+    };
     window.addEventListener("keydown", onKey);
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    window.addEventListener("mousedown", onDown);
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = previous;
+      window.removeEventListener("mousedown", onDown);
     };
   }, [onClose]);
 
@@ -90,13 +99,13 @@ export function NotificationsModal({ onClose }: { onClose: () => void }) {
   const items = data?.notifications ?? [];
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-ink-950/30 backdrop-blur-[2px] sm:items-start sm:pt-[9vh]"
+      ref={panel}
       role="dialog"
-      aria-modal="true"
       aria-label="Notificaciones"
-      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+      // Se abre ahí mismo, colgando de la campanita (en el celular, de lado a lado).
+      className={`notif-pop fixed inset-x-2 top-14 z-50 flex max-h-[80dvh] flex-col overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-[0_20px_56px_-16px_rgba(20,24,36,0.32)] md:inset-x-auto md:top-[52px] md:max-h-[72vh] md:w-[420px] ${className}`}
     >
-      <div className="animate-fade-up flex max-h-[85dvh] w-full flex-col overflow-hidden rounded-t-3xl border border-ink-100 bg-white shadow-[0_24px_64px_-16px_rgba(20,24,36,0.35)] sm:max-h-[75vh] sm:max-w-md sm:rounded-3xl">
+      <div className="flex min-h-0 flex-1 flex-col">
         <header className="flex items-center gap-3 border-b border-ink-100 px-5 py-4">
           <h2 className="flex-1 text-[15px] font-semibold text-ink-900">Notificaciones</h2>
           {(data?.unread_count ?? 0) > 0 && (

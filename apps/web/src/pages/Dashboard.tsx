@@ -1,7 +1,8 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
-import { Badge, Card, EmptyState, formatDate, formatDuration } from "../components/ui";
+import { MeetingStatus } from "../components/MeetingStatus";
+import { Card, EmptyState, formatDate, formatDuration } from "../components/ui";
 import { useAuth } from "../state/auth";
 
 interface DashboardData {
@@ -19,15 +20,6 @@ interface DashboardData {
   active_projects: { id: string; name: string; color: string }[];
   my_tasks: { id: string; text: string; due_date: string | null; overdue: boolean }[];
 }
-
-const STATUS_LABEL: Record<string, { label: string; tone: "gray" | "red" | "amber" | "green" | "sky" }> = {
-  draft: { label: "Borrador", tone: "gray" },
-  live: { label: "En vivo", tone: "red" },
-  paused: { label: "Pausada", tone: "amber" },
-  processing: { label: "Procesando", tone: "sky" },
-  completed: { label: "Completada", tone: "green" },
-  failed: { label: "Falló", tone: "red" },
-};
 
 export default function Dashboard() {
   const { activeOrg } = useAuth();
@@ -78,7 +70,6 @@ export default function Dashboard() {
               </EmptyState>
             )}
             {data?.recent_meetings.map((meeting) => {
-              const status = STATUS_LABEL[meeting.status] ?? STATUS_LABEL.draft;
               return (
                 <Link
                   key={meeting.id}
@@ -96,10 +87,7 @@ export default function Dashboard() {
                       {meeting.duration_seconds > 0 && ` · ${formatDuration(meeting.duration_seconds)}`}
                     </p>
                   </div>
-                  <Badge tone={status.tone}>
-                    {meeting.status === "live" && <span className="recording-dot h-1.5 w-1.5 rounded-full bg-red-500" />}
-                    {status.label}
-                  </Badge>
+                  <MeetingStatus status={meeting.status} />
                 </Link>
               );
             })}

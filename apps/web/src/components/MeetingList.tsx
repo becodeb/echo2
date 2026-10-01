@@ -1,23 +1,14 @@
 import { Link } from "react-router-dom";
 import type { MeetingListItem } from "../api/types";
 import { LEVEL_LABEL } from "../state/access";
-import { Badge, Card, formatDate, formatDuration } from "./ui";
-
-export const MEETING_STATUS: Record<string, { label: string; tone: "gray" | "red" | "amber" | "green" | "sky" }> = {
-  draft: { label: "Borrador", tone: "gray" },
-  live: { label: "En vivo", tone: "red" },
-  paused: { label: "Pausada", tone: "amber" },
-  processing: { label: "Procesando", tone: "sky" },
-  completed: { label: "Completada", tone: "green" },
-  failed: { label: "Falló", tone: "red" },
-};
+import { MeetingStatus } from "./MeetingStatus";
+import { Card, formatDate, formatDuration } from "./ui";
 
 /** Lista de reuniones: las terminadas van al detalle, las otras a grabar. */
 export function MeetingList({ meetings }: { meetings: MeetingListItem[] }) {
   return (
     <Card className="divide-y divide-ink-100 p-0">
       {meetings.map((meeting) => {
-        const status = MEETING_STATUS[meeting.status] ?? MEETING_STATUS.draft;
         const target =
           meeting.status === "completed" || meeting.status === "processing" || meeting.status === "failed"
             ? `/meetings/${meeting.id}`
@@ -40,10 +31,7 @@ export function MeetingList({ meetings }: { meetings: MeetingListItem[] }) {
                 {meeting.recorded && " · con grabación"}
               </p>
             </div>
-            <Badge tone={status.tone}>
-              {meeting.status === "live" && <span className="recording-dot h-1.5 w-1.5 rounded-full bg-red-500" />}
-              {status.label}
-            </Badge>
+            <MeetingStatus status={meeting.status} />
           </Link>
         );
       })}

@@ -121,3 +121,27 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .page-in { animation: none; }
 }
+
+/* Estado "En vivo": tres barritas que suben y bajan, como un ecualizador. */
+@keyframes live-bar {
+  0%, 100% { height: 35%; }
+  50% { height: 100%; }
+}
+.live-bar { height: 35%; animation: live-bar 900ms ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .live-bar { animation: none; height: 70%; }
+}
+
+/* El panel de notificaciones se despliega desde la campanita. */
+@keyframes notif-pop {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.notif-pop { transform-origin: top right; animation: notif-pop 200ms cubic-bezier(0.22, 0.8, 0.24, 1) backwards; }
+@media (prefers-reduced-motion: reduce) {
+  .notif-pop { animation: none; }
+}
+
+/* Conversación por voz: el velo aparece rápido, sin oscurecer. */
+@keyframes voice-veil { from { opacity: 0; } to { opacity: 1; } }
+.voice-veil { animation: voice-veil 0.18s ease-out; }

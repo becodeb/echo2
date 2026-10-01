@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { MeetingStatus, StatusIcons, StatusPill } from "../components/MeetingStatus";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
@@ -81,12 +82,7 @@ export default function MeetingDetail() {
       <header className="mb-6">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="min-w-0 break-words text-2xl font-semibold tracking-tight text-ink-900">{meeting.title}</h1>
-          {meeting.status === "processing" && (
-            <Badge tone="sky">
-              <Spinner className="h-3 w-3" /> Procesando
-            </Badge>
-          )}
-          {meeting.status === "failed" && <Badge tone="red">Falló</Badge>}
+          {(meeting.status === "processing" || meeting.status === "failed") && <MeetingStatus status={meeting.status} />}
           <div className="ml-auto flex gap-2">
             {user?.is_superadmin && <MoveMeetingButton meeting={meeting} />}
             <ShareButton meetingId={meeting.id} />
@@ -744,9 +740,9 @@ function MinutesTab({ meetingId, minutesTitle }: { meetingId: string; minutesTit
   }
 
   const statusBadge = {
-    draft: <Badge tone="gray">Borrador</Badge>,
-    in_review: <Badge tone="amber">En revisión</Badge>,
-    approved: <Badge tone="green">Aprobada</Badge>,
+    draft: <StatusPill tone="muted" icon={StatusIcons.pencil}>Borrador</StatusPill>,
+    in_review: <StatusPill tone="warn">En revisión</StatusPill>,
+    approved: <StatusPill tone="done" icon={StatusIcons.check}>Aprobada</StatusPill>,
   }[minutes.status];
 
   const verification = minutes.version.verification ?? [];
