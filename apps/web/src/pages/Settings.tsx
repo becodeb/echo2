@@ -10,6 +10,7 @@ import { LEVEL_LABEL, useMyAccess, type Level, type LevelAccess } from "../state
 import { ACTA_ENTREVISTA_COLEGIO } from "../lib/actaTemplates";
 import { LetterheadSection } from "./settings/LetterheadSection";
 import { CreateOrJoin } from "./OnboardingOrg";
+import { micErrorMessage } from "../lib/micError";
 
 const SECTIONS = [
   { path: "org", label: "Organización" },
@@ -1416,8 +1417,8 @@ function MyVoiceSection() {
           if (media.state === "recording") media.stop();
         }
       }, 250);
-    } catch {
-      setError("No se pudo usar el micrófono. Revisá el permiso del navegador.");
+    } catch (err) {
+      setError(micErrorMessage(err));
     }
   };
 

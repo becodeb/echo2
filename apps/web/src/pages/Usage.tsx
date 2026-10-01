@@ -3,6 +3,9 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { SegmentedToggle } from "../components/Toggles";
 import { AnimatedNumber, formatAudio, formatTokens, formatUSD, Shimmer } from "../components/billing";
+import { currentMonth } from "../lib/months";
+
+export { currentMonth };
 import { useAuth } from "../state/auth";
 
 export interface UsageLine {
@@ -77,11 +80,6 @@ export function shiftMonth(month: string, delta: number): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
-export function currentMonth(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-}
-
 export function MonthPicker({ month, onChange }: { month: string; onChange: (month: string) => void }) {
   const isCurrent = month >= currentMonth();
   const arrow = "rounded-full p-2 text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900 disabled:opacity-30 disabled:hover:bg-transparent";
@@ -100,9 +98,12 @@ export function MonthPicker({ month, onChange }: { month: string; onChange: (mon
 
 export function Stat({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-3xl border border-ink-100 bg-white p-4 sm:p-5">
+    <div className="min-w-0 rounded-3xl border border-ink-100 bg-white p-4 sm:p-5">
       <p className="text-xs font-medium text-ink-400">{label}</p>
-      <p className="mt-2 whitespace-nowrap text-[21px] font-semibold tracking-tight text-ink-900 sm:text-[26px]">{children}</p>
+      {/* En el celular la cifra puede partirse en dos renglones antes que salirse de la tarjeta. */}
+      <p className="mt-2 break-words text-[19px] font-semibold leading-tight tracking-tight text-ink-900 tabular-nums sm:whitespace-nowrap sm:text-[26px]">
+        {children}
+      </p>
     </div>
   );
 }

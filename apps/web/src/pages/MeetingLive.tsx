@@ -10,6 +10,7 @@ import { ChoiceCards, PillSwitch, SettingRow, SettingsGroup } from "../component
 import { Select } from "../components/Select";
 import { Button, Modal, Spinner, formatMs } from "../components/ui";
 import { EchoFace, type EchoMood } from "../components/EchoFace";
+import { micErrorMessage } from "../lib/micError";
 
 interface LiveLine {
   key: string;
@@ -481,7 +482,7 @@ export default function MeetingLive() {
       setRecording(true);
       setPaused(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo iniciar la captura");
+      setError(micErrorMessage(err, "No se pudo iniciar la captura"));
       await audioRef.current?.stop().catch(() => {});
       audioRef.current = null;
       bridgeRef.current?.close();
@@ -810,7 +811,7 @@ export default function MeetingLive() {
             onClick={() => {
               setBlackout(false);
               void restartAudio().catch((err) =>
-                setError(err instanceof Error ? err.message : "No se pudo retomar el micrófono"),
+                setError(micErrorMessage(err, "No se pudo retomar el micrófono")),
               );
             }}
           >

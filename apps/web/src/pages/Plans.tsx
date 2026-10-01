@@ -60,8 +60,18 @@ export default function Plans() {
   );
 }
 
+/** Los planes que la persona tiene hoy: el suyo (si pagó uno) y el de su institución. */
+function currentPlans(billing: BillingInfo): Set<string> {
+  const plans = new Set<string>();
+  if (billing.user_plan !== "base") plans.add(billing.user_plan);
+  if (billing.org_plan !== "base") plans.add(billing.org_plan === "cortesia" ? "institucion" : billing.org_plan);
+  if (plans.size === 0) plans.add("base");
+  return plans;
+}
+
 function CurrentPlan({ billing }: { billing: BillingInfo }) {
-  const plan = effectivePlan(billing);
+  // El plan que pagó la persona va primero: es el que ella eligió.
+  const plan = billing.user_plan !== "base" ? billing.user_plan : effectivePlan(billing);
   const people = billing.people;
   return (
     <div className="animate-fade-up rounded-3xl border border-ink-100 bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] sm:w-80">
@@ -177,7 +187,7 @@ function specs(billing: BillingInfo): CardSpec[] {
 }
 
 function PlanGrid({ billing }: { billing: BillingInfo }) {
-  const current = effectivePlan(billing);
+  const current = currentPlans(billing);
   const cards = specs(billing);
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -185,9 +195,15 @@ function PlanGrid({ billing }: { billing: BillingInfo }) {
         <PlanCard
           key={card.plan.code}
           card={card}
-          current={card.plan.code === current || (current === "cortesia" && card.plan.code === "institucion")}
+          current={current.has(card.plan.code)}
+          // Individual + voz ya trae todo lo de Individual.
+          included={card.plan.code === "individual" && current.has("individual_voz")}
           featured={card.plan.code === "individual_voz"}
-          pending={billing.requests.find((request) => request.plan === card.plan.code && request.status !== "cancelled")}
+          // Solo un pedido abierto deja el botón en "te vamos a contactar":
+          // uno ya resuelto (o cancelado) permite pedir de nuevo.
+          pending={billing.requests.find(
+            (request) => request.plan === card.plan.code && (request.status === "new" || request.status === "contacted"),
+          )}
           delay={index * 60}
         />
       ))}
@@ -198,12 +214,14 @@ function PlanGrid({ billing }: { billing: BillingInfo }) {
 function PlanCard({
   card,
   current,
+  included,
   featured,
   pending,
   delay,
 }: {
   card: CardSpec;
   current: boolean;
+  included: boolean;
   featured: boolean;
   pending?: { status: string };
   delay: number;
@@ -275,13 +293,13 @@ function PlanCard({
       </ul>
 
       <div className="mt-8">
-        {current || !card.requestable ? (
+        {current || included || !card.requestable ? (
           <div
             className={`rounded-full py-2.5 text-center text-sm font-medium ${
               featured ? "bg-white/10 text-ink-300" : "bg-ink-50 text-ink-400"
             }`}
           >
-            {current ? "Plan actual" : "Incluido para todos"}
+            {current ? "Plan actual" : included ? "Incluido en tu plan" : "Incluido para todos"}
           </div>
         ) : asked ? (
           <div

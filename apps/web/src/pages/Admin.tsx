@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { AdminOrgOut, ServerAIOut, ServerAITestOut } from "../api/types";
@@ -401,6 +402,13 @@ export default function Admin() {
     setTabState(next);
     window.history.replaceState(null, "", `#${next}`);
   };
+  // Un link a otra pestaña del panel (por ejemplo, una notificación de un
+  // pedido) con el panel ya abierto: solo cambia el #, la página no se monta de nuevo.
+  const { hash } = useLocation();
+  useEffect(() => {
+    const target = TABS.find((item) => item.id === hash.replace("#", ""));
+    if (target) setTabState(target.id as Tab);
+  }, [hash]);
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
