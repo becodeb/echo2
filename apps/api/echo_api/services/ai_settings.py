@@ -143,10 +143,14 @@ async def resolve_stt(db: AsyncSession, org_id: uuid.UUID) -> SttConfig | None:
     row = await get_org_ai_settings(db, org_id)
     if row and row.stt_provider and row.stt_provider != "bridge":
         key = decrypt_secret(row.stt_api_key_enc) if row.stt_api_key_enc else ""
-        if not key:
-            key = _env_key_for(row.stt_provider)
         if key:
+            # Con su propia key, la sede usa el motor que eligió (lo paga ella).
             return SttConfig(provider=row.stt_provider, model=row.stt_model, api_key=key)
+        if row.stt_provider == "groq" or not env.groq_api_key:
+            key = _env_key_for(row.stt_provider)
+            if key:
+                return SttConfig(provider=row.stt_provider, model=row.stt_model, api_key=key)
+        # Eligió otro motor pero con la key de Becode: va Groq, como todas.
     # Groq primero: whisper-large-v3-turbo sin pista fue lo más estable del
     # banco (sin bucles ni idiomas inventados) y cuesta US$ 0,04/h. OpenAI
     # queda solo si no hay otra key (docs/plan-transcripcion-y-planes.md).

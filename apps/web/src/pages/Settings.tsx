@@ -342,7 +342,7 @@ function AISection() {
           />
           <Input
             label="Modelo"
-            placeholder="gpt-4o-transcribe (default) · gpt-4o-transcribe-diarize (separa hablantes, sin diccionario)"
+            placeholder="El del proveedor (Groq: whisper-large-v3-turbo)"
             value={form.stt_model ?? ""}
             onChange={set("stt_model")}
           />

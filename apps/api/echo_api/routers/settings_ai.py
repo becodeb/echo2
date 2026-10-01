@@ -21,7 +21,7 @@ from ..services.audit import audit
 router = APIRouter(prefix="/api/org/ai-settings", tags=["settings"])
 
 LLM_PROVIDERS = ["openai", "anthropic", "gemini", "groq", "openrouter", "orcarouter", "gmi", "vercel", "deepseek", "ollama"]
-STT_PROVIDERS = ["bridge", "openai", "groq", "deepgram"]
+STT_PROVIDERS = ["bridge", "groq", "openai", "deepgram"]
 EMBEDDING_PROVIDERS = ["openai", "ollama", "none"]
 
 

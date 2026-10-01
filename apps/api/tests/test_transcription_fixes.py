@@ -211,6 +211,29 @@ def test_groq_transcribes_before_openai_when_both_keys_are_there(monkeypatch):
     assert (config.provider, config.api_key) == ("groq", "gsk-groq")
 
 
+def test_a_campus_that_picked_openai_without_its_own_key_uses_groq(monkeypatch):
+    from types import SimpleNamespace
+
+    from echo_api.config import get_settings
+    from echo_api.services import ai_settings
+
+    picked = SimpleNamespace(stt_provider="openai", stt_model=None, stt_api_key_enc=None)
+
+    async def org_settings(db, org_id):
+        return picked
+
+    monkeypatch.setattr(ai_settings, "get_org_ai_settings", org_settings)
+    monkeypatch.setattr(get_settings(), "openai_api_key", "sk-openai")
+    monkeypatch.setattr(get_settings(), "groq_api_key", "gsk-groq")
+    config = asyncio.run(ai_settings.resolve_stt(None, uuid.uuid4()))
+    assert (config.provider, config.api_key) == ("groq", "gsk-groq")
+    # Con su propia key, usa lo que eligió.
+    monkeypatch.setattr(ai_settings, "decrypt_secret", lambda value: "sk-propia")
+    picked.stt_api_key_enc = "cifrada"
+    config = asyncio.run(ai_settings.resolve_stt(None, uuid.uuid4()))
+    assert (config.provider, config.api_key) == ("openai", "sk-propia")
+
+
 def test_a_superadmin_visiting_a_campus_can_record(client):
     # Bauti entró a Northfield como superadmin (sin ser miembro): el REST lo
     # dejaba, el WebSocket lo rechazaba y la web decía "No se pudo conectar".
