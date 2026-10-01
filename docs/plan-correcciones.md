@@ -466,8 +466,13 @@ Lo que no se pudo hacer como decía el plan, y cómo quedó:
   que se vea nítida en retina hay que volver a exportar los cuatro videos a
   960 px (están en otra PC, "videos/codigo").
 - §7.2 calibración: con el banco (3 reuniones) el umbral quedó en 0,75 con
-  0,10 de margen. Falta confirmarlo con voces reales: después del deploy,
-  `python -m echo_api.voiceprints --comparar` en el contenedor api.
+  0,10 de margen. Con las muestras reales de producción (1/10, entre
+  muestras de Mi voz): la misma persona en dos cuentas y micrófonos da 0,75;
+  personas distintas, 0,64 y 0,73. El margen entre las dos personas evita
+  nombres equivocados, pero la franja es angosta: al principio va a haber
+  más "¿Es X?" que nombres automáticos, hasta que Echo aprenda de las
+  reuniones. Repetir `python -m echo_api.voiceprints --comparar` cuando
+  haya más muestras.
 
 Pendiente de Bauti:
 
