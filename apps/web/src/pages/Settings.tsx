@@ -1217,6 +1217,7 @@ function MyVoiceSection() {
   const [left, setLeft] = useState(VOICE_SECONDS);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const recorder = useRef<MediaRecorder | null>(null);
 
   const { data: voice, isLoading } = useQuery({
@@ -1225,7 +1226,10 @@ function MyVoiceSection() {
   });
   const remove = useMutation({
     mutationFn: () => api("/api/me/voice", { method: "DELETE", skipOrg: true }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["my-voice"] }),
+    onSuccess: () => {
+      setConfirmDelete(false);
+      return queryClient.invalidateQueries({ queryKey: ["my-voice"] });
+    },
   });
 
   useEffect(() => () => recorder.current?.stream.getTracks().forEach((track) => track.stop()), []);
@@ -1300,13 +1304,28 @@ function MyVoiceSection() {
             Tu voz está guardada
             {voice.recorded_at && ` desde el ${new Date(voice.recorded_at).toLocaleDateString("es")}`}.
           </span>
-          <button
-            onClick={() => remove.mutate()}
-            disabled={remove.isPending}
-            className="text-xs font-medium text-emerald-700 hover:text-red-600"
-          >
-            Borrar mi voz
-          </button>
+          {confirmDelete ? (
+            <span className="flex items-center gap-2 text-xs">
+              <span className="text-ink-600">¿Borrar tu voz? Echo deja de reconocerte.</span>
+              <button
+                onClick={() => remove.mutate()}
+                disabled={remove.isPending}
+                className="rounded-full bg-red-600 px-3 py-1.5 font-medium text-white hover:bg-red-700"
+              >
+                Sí, borrar
+              </button>
+              <button onClick={() => setConfirmDelete(false)} className="px-2 py-1.5 font-medium text-ink-500">
+                Cancelar
+              </button>
+            </span>
+          ) : (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="text-xs font-medium text-emerald-700 hover:text-red-600"
+            >
+              Borrar mi voz
+            </button>
+          )}
         </div>
       )}
 

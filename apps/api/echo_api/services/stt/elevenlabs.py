@@ -32,7 +32,6 @@ from .base import (
     SttSegment,
     SttWord,
     TranscriptionProvider,
-    pcm16_to_wav,
     post_with_rate_limit,
 )
 
@@ -235,9 +234,10 @@ class ElevenLabsProvider(TranscriptionProvider):
         offset_ms: int = 0,
         context: str | None = None,
     ) -> SttResult:
-        wav = pcm16_to_wav(pcm16, sample_rate)
-        payload = await self._request(wav, "chunk.wav", self.form(language, vocabulary))
-        return parse(payload, offset_ms)
+        """Cerrado a propósito: ElevenLabs solo recibe la reunión entera en la
+        pasada final, y nunca la de una reunión con menores. Un tramo en vivo no
+        sabe si hablan menores, así que no se manda (docs/plan-correcciones.md §1.8)."""
+        raise RuntimeError("ElevenLabs no transcribe en vivo: solo la pasada final")
 
 
 def _content_type(filename: str) -> str:

@@ -205,3 +205,12 @@ def test_a_rate_limit_waits_and_retries_instead_of_losing_the_window(monkeypatch
     assert [s.text for s in result.segments] == ["Hola."]
     assert waits == [7.0, 7.0] and len(_Capture.sent) == 3
     assert base.retry_after_seconds(httpx.Response(429, headers={"retry-after": "600"})) == base.RATE_LIMIT_MAX_WAIT
+
+
+def test_elevenlabs_never_gets_a_live_chunk():
+    # Un tramo en vivo no sabe si hablan menores: ElevenLabs solo ve la pasada final.
+    import pytest
+
+    provider = get_stt_provider("elevenlabs", "k")
+    with pytest.raises(RuntimeError):
+        asyncio.run(provider.transcribe_chunk(bytes(3200), 16000, "es"))
