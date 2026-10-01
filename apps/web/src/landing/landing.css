@@ -75,6 +75,12 @@
   background: #0c0e16;
 }
 
+/* Los ojos (video y ojos vivos) suben si el texto no entra debajo (4:3). */
+.landing .hero-sube {
+  transform: translateY(calc(-1 * var(--subida, 0px)));
+  transition: transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* Navbar del hero: entra cuando el video ya pestañeó, con una curva larga. */
 .landing .hero-fade {
   opacity: 0;

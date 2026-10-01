@@ -220,7 +220,9 @@ async def refresh_session(request: Request, response: Response, db: AsyncSession
 
     raw = request.cookies.get(REFRESH_COOKIE)
     if not raw:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sin sesión")
+        # Sin cookie no hay nada que renovar: es alguien que no entró (la
+        # landing pública). 204 y no 401, así no aparece como error.
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     stored = (
         await db.execute(select(RefreshToken).where(RefreshToken.token_hash == hash_refresh_token(raw)))

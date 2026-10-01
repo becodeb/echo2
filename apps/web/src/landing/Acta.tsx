@@ -14,7 +14,7 @@ export function Acta() {
           </h2>
           <p className="mt-6 leading-relaxed text-ink-600 md:text-lg">
             Cargás una vez el modelo de tu institución: logo, membrete y campos. Al finalizar cada
-            reunión, Echo lo completa con lo que se dijo y lo contrasta con el transcript.
+            reunión, Echo lo completa con lo que se dijo y lo contrasta con lo que se dijo.
           </p>
           <p className="mt-4 leading-relaxed text-ink-600 md:text-lg">
             Lo que no se dijo queda como «No especificado». Imprimís, firmás, y queda guardado en

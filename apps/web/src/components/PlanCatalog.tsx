@@ -169,7 +169,7 @@ export function PlanCard({
         >
           {price.amount}
         </span>
-        {price.per && <span className="text-sm text-ink-400">{price.per}</span>}
+        {price.per && <span className={`text-sm ${featured ? "text-ink-300" : "text-ink-400"}`}>{price.per}</span>}
       </div>
       <ul className="mt-6 flex-1 space-y-3">
         {spec.bullets.map((bullet) => (

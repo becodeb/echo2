@@ -3,9 +3,11 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../state/auth";
 import { Button, Input, Spinner } from "../components/ui";
 import { EchoFace } from "../components/EchoFace";
+import { useTitle } from "../lib/useTitle";
 import { GoogleButton } from "../components/GoogleButton";
 
 export default function Register() {
+  useTitle("Crear cuenta");
   const { register } = useAuth();
   const navigate = useNavigate();
   const [name, setName] = useState("");

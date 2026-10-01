@@ -7,7 +7,7 @@
   --color-ink-100: #eceef2;
   --color-ink-200: #d9dde5;
   --color-ink-300: #b7becc;
-  --color-ink-400: #8b94a7;
+  --color-ink-400: #6b7488; /* 4,7:1 sobre blanco (antes #8b94a7, 3:1) */
   --color-ink-500: #646e84;
   --color-ink-600: #4a5268;
   --color-ink-700: #363d4f;

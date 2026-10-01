@@ -6,10 +6,12 @@ import { createElement, useEffect, useRef, type ReactNode } from "react";
  */
 export function Reveal({
   as = "section",
+  id,
   className = "",
   children,
 }: {
   as?: "section" | "div" | "footer";
+  id?: string;
   className?: string;
   children: ReactNode;
 }) {
@@ -31,5 +33,5 @@ export function Reveal({
     return () => io.disconnect();
   }, []);
 
-  return createElement(as, { ref, className: "reveal " + className }, children);
+  return createElement(as, { ref, id, className: "reveal " + className }, children);
 }

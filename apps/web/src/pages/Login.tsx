@@ -4,6 +4,7 @@ import { useAuth } from "../state/auth";
 import { Button, Input, Spinner } from "../components/ui";
 import { EchoFace } from "../components/EchoFace";
 import { GoogleButton } from "../components/GoogleButton";
+import { useTitle } from "../lib/useTitle";
 
 /** Motivos que puede devolver el callback de Google, en castellano y sin
  *  detalle técnico: la persona solo necesita saber qué hacer ahora. */
@@ -16,6 +17,7 @@ const OAUTH_ERRORS: Record<string, string> = {
 };
 
 export default function Login() {
+  useTitle("Ingresar");
   const { login } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();

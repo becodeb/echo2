@@ -11,8 +11,8 @@ export function Closing() {
         <Link to="/register" className="btn btn-ink">
           Crear cuenta
         </Link>
-        <Link to="/login" className="btn btn-ghost">
-          Ingresar
+        <Link to="/contacto?tema=ventas" className="btn btn-ghost">
+          Para todo el colegio
         </Link>
       </div>
     </Reveal>
@@ -21,9 +21,11 @@ export function Closing() {
 
 export function Footer() {
   return (
-    <footer className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-10 text-sm text-ink-500 md:px-12">
+    <footer className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-10 text-sm text-ink-600 md:px-12">
       <span className="font-semibold tracking-tight text-ink-950">Echo</span>
-      <nav className="flex gap-5" aria-label="Legal">
+      <nav className="flex flex-wrap gap-x-5 gap-y-2" aria-label="Más">
+        <Link to="/contacto?tema=ventas" className="hover:text-ink-900">Contact sales</Link>
+        <Link to="/contacto" className="hover:text-ink-900">Contacto</Link>
         <Link to="/legal/privacidad" className="hover:text-ink-900">Privacidad</Link>
         <Link to="/legal/terminos" className="hover:text-ink-900">Términos</Link>
       </nav>

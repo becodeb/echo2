@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link, NavLink, useParams } from "react-router-dom";
 import { EchoFace } from "../components/EchoFace";
+import { useTitle } from "../lib/useTitle";
 
 /**
  * Privacidad y términos, públicos (con y sin sesión).
@@ -26,6 +27,7 @@ const UPDATED = "1 de octubre de 2026";
 export default function Legal() {
   const { doc } = useParams();
   const terms = doc === "terminos";
+  useTitle(terms ? "Términos" : "Privacidad");
   return (
     <LegalShell>
       <article key={doc} className="animate-fade-up">

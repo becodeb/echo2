@@ -43,7 +43,8 @@ async function tryRefresh(): Promise<boolean> {
           headers: { "x-echo-client": "web" },
           credentials: "include",
         });
-        if (!response.ok) return false;
+        // 204: no hay sesión (nadie entró en este navegador).
+        if (!response.ok || response.status === 204) return false;
         const data = await response.json();
         accessToken = data.access_token;
         window.dispatchEvent(new CustomEvent("echo:session", { detail: data }));

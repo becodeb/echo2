@@ -63,3 +63,10 @@ def test_me_requires_token(client):
     assert (
         client.get("/api/auth/me", headers={"Authorization": "Bearer invalido"}).status_code == 401
     )
+
+
+def test_refresh_without_a_session_is_not_an_error(client):
+    """La landing pública pregunta si hay sesión: sin cookie, 204 (sin error en la consola)."""
+    client.cookies.clear()
+    response = client.post("/api/auth/refresh", headers={"x-echo-client": "web"})
+    assert response.status_code == 204 and response.content == b""

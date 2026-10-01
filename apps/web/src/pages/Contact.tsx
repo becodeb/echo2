@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { Button, Input, Spinner } from "../components/ui";
+import { useTitle } from "../lib/useTitle";
 import { LegalShell } from "./Legal";
 
 /**
@@ -20,6 +21,7 @@ const TOPICS = [
 type Topic = (typeof TOPICS)[number]["value"];
 
 export default function Contact() {
+  useTitle("Contacto");
   const [params] = useSearchParams();
   const initial = TOPICS.find((topic) => topic.value === params.get("tema"))?.value ?? "ventas";
   const [topic, setTopic] = useState<Topic>(initial);

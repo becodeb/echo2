@@ -30,8 +30,8 @@ export function Ask() {
     <Reveal className="mx-auto max-w-3xl px-6 py-24 md:px-12 md:py-32">
       <h2 className="text-3xl font-semibold tracking-tighter text-ink-950 md:text-5xl">Preguntale a Echo</h2>
       <p className="mt-4 max-w-xl leading-relaxed text-ink-600 md:text-lg">
-        Sobre una entrevista o sobre todo el año. Cita título, fecha y minuto. Si no hay evidencia,
-        lo dice.
+        Sobre una entrevista o, en los planes pagos, sobre todo el año. Cita título, fecha y minuto. Si
+        no lo encuentra, lo dice.
       </p>
       <dl className="mt-12 space-y-8">
         {EXCHANGES.map((x) => (

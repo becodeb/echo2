@@ -16,6 +16,7 @@ import { NotificationsPanel } from "./NotificationsPanel";
 import { VoicePrompt } from "./VoicePrompt";
 import { VoiceBubble } from "./VoiceBubble";
 import { VoiceProvider, useVoice } from "../state/voice";
+import { useTitle } from "../lib/useTitle";
 import { CreditDots, effectivePlan, PLAN_NAME, useBilling } from "./billing";
 
 interface NavItem {
@@ -74,6 +75,8 @@ export function Layout({ children }: { children: ReactNode }) {
 
 function LayoutInner({ children }: { children: ReactNode }) {
   const voice = useVoice();
+  const routeTitle = pageTitle(useLocation().pathname);
+  useTitle(routeTitle);
   const { user, activeOrg } = useAuth();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);

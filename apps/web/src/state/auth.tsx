@@ -52,7 +52,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           headers: { "x-echo-client": "web" },
           credentials: "include",
         });
-        if (response.ok && !cancelled) {
+        // 204: no hay sesión (la landing pública); no es un error.
+        if (response.ok && response.status !== 204 && !cancelled) {
           applySession(await response.json());
         }
       } catch {

@@ -7,28 +7,28 @@ const STEPS: { mood: EchoMood; title: string; text: string }[] = [
   {
     mood: "listening",
     title: "Iniciá la reunión",
-    text: "Con una familia, el equipo docente o un cliente. Elegís micrófono y motor de voz; el indicador de grabación queda siempre a la vista.",
+    text: "Con una familia o con el equipo docente. Tocás Comenzar y Echo transcribe en vivo; el «Grabando» queda siempre a la vista.",
   },
   {
     mood: "thinking",
     title: "Finalizá",
-    text: "Echo separa hablantes, extrae acuerdos y tareas, resuelve fechas como «el viernes» y redacta el acta con el modelo de tu institución.",
+    text: "Echo separa quién habló (en el plan Gratis, 4 reuniones por mes), saca acuerdos y tareas, entiende fechas como «el viernes» y redacta el acta con el formato de tu colegio.",
   },
   {
     mood: "done",
     title: "Imprimí el acta",
-    text: "Apenas termina la reunión, el acta está lista con tu logo y tu membrete. Cada afirmación se contrasta con el transcript; lo que no se dijo queda como «No especificado». Firmás, imprimís, y queda en Drive.",
+    text: "Apenas termina la reunión, el acta está lista con tu logo y tu membrete. Cada afirmación se contrasta con lo que se dijo; lo que no se dijo queda como «No especificado». Firmás, imprimís y, si querés, queda en tu Google Drive.",
   },
   {
     mood: "idle",
     title: "Preguntá después",
-    text: "Sobre esa entrevista o sobre todo el año. Responde con fuentes y minutos; si no hay evidencia, lo dice.",
+    text: "Sobre esa entrevista o sobre todo el año. Responde con la reunión y el minuto; si no lo encuentra, lo dice.",
   },
 ];
 
 export function Steps() {
   return (
-    <Reveal className="mx-auto max-w-6xl px-6 py-24 md:px-12 md:py-32">
+    <Reveal id="como-funciona" className="mx-auto max-w-6xl scroll-mt-20 px-6 py-24 md:px-12 md:py-32">
       <h2 className="text-3xl font-semibold tracking-tighter text-ink-950 md:text-5xl">Así se usa</h2>
       <ol className="mt-10 md:mt-14">
         {STEPS.map((step) => (
