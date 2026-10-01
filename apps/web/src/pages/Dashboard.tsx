@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { effectivePlan, PLAN_NAME, useBilling } from "../components/billing";
 import { api } from "../api/client";
 import { DeleteDraft } from "../components/DeleteDraft";
 import { MeetingStatus } from "../components/MeetingStatus";
@@ -50,6 +52,7 @@ export default function Dashboard() {
               {data.pending_task_count === 1 ? "tarea necesita" : "tareas necesitan"} seguimiento
             </p>
           )}
+          <PlanLine />
         </div>
         <button
           onClick={() => navigate("/meetings?new=1")}
@@ -62,15 +65,34 @@ export default function Dashboard() {
         </button>
       </div>
 
+      {data && <FirstSteps hasMeetings={data.recent_meetings.length > 0} />}
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="min-w-0 lg:col-span-2">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-400">
             Reuniones recientes
           </h2>
-          <Card className="divide-y divide-ink-100 p-0">
+          <Card className="divide-y divide-ink-100 overflow-hidden p-0">
+            {!data && [0, 1, 2].map((index) => (
+              <div key={index} className="flex items-center justify-between gap-4 px-5 py-4" aria-hidden>
+                <div className="space-y-2">
+                  <div className="h-4 w-56 animate-pulse rounded-full bg-ink-100" />
+                  <div className="h-3 w-24 animate-pulse rounded-full bg-ink-100" />
+                </div>
+                <div className="h-6 w-16 animate-pulse rounded-full bg-ink-100" />
+              </div>
+            ))}
             {data?.recent_meetings.length === 0 && (
               <EmptyState title="Todavía no hay reuniones">
                 Creá tu primera reunión y Echo empezará a recordar por vos.
+                <div className="mt-4">
+                  <button
+                    onClick={() => navigate("/meetings?new=1")}
+                    className="inline-flex min-h-11 items-center rounded-full bg-ink-900 px-5 text-sm font-semibold text-white hover:bg-ink-700"
+                  >
+                    Crear la primera
+                  </button>
+                </div>
               </EmptyState>
             )}
             {data?.recent_meetings.map((meeting) => {
@@ -137,8 +159,14 @@ export default function Dashboard() {
             </span>
           </button>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-400">Mis tareas</h2>
-          <Card className="p-0">
-            {(!data || data.my_tasks.length === 0) && (
+          <Card className="overflow-hidden p-0">
+            {!data && (
+              <div className="space-y-3 px-5 py-5" aria-hidden>
+                <div className="h-4 w-full animate-pulse rounded-full bg-ink-100" />
+                <div className="h-4 w-2/3 animate-pulse rounded-full bg-ink-100" />
+              </div>
+            )}
+            {data && data.my_tasks.length === 0 && (
               <p className="px-5 py-6 text-center text-sm text-ink-400">Sin tareas pendientes</p>
             )}
             <ul className="divide-y divide-ink-100">
@@ -171,7 +199,7 @@ export default function Dashboard() {
                   <Link
                     key={project.id}
                     to={`/projects/${project.id}`}
-                    className="inline-flex items-center gap-2 rounded-xl border border-ink-150 border-ink-200 bg-white px-3 py-1.5 text-sm font-medium text-ink-700 hover:border-ink-300"
+                    className="inline-flex items-center gap-2 rounded-full border border-ink-200 bg-white px-3 py-1.5 text-sm font-medium text-ink-700 hover:border-ink-300"
                   >
                     <span className="h-2 w-2 rounded-full" style={{ backgroundColor: project.color }} />
                     {project.name}
@@ -183,5 +211,96 @@ export default function Dashboard() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** El plan y lo que queda del mes, en una línea (lleva a Planes). */
+function PlanLine() {
+  const { data: billing } = useBilling();
+  const { user } = useAuth();
+  if (!billing) return <div className="mt-2 h-4 w-60 animate-pulse rounded-full bg-ink-100" aria-hidden />;
+  const plan = user?.is_superadmin ? "becode" : effectivePlan(billing);
+  const people = billing.people;
+  const detail =
+    people.mode === "always"
+      ? people.people_hours_left != null
+        ? `te quedan ${people.people_hours_left.toLocaleString("es-AR", { maximumFractionDigits: 1 })} h con quién habló`
+        : "quién habló en todas las reuniones"
+      : `te quedan ${people.credits_left ?? 0} de ${people.credits_per_month ?? 0} reuniones con quién habló`;
+  return (
+    <Link to="/plans" className="mt-2 inline-flex flex-wrap items-center gap-x-2 text-sm text-ink-500 hover:text-ink-900">
+      <span className="rounded-full bg-ink-100 px-2.5 py-0.5 text-xs font-semibold text-ink-700">{PLAN_NAME[plan] ?? plan}</span>
+      <span>{detail}</span>
+    </Link>
+  );
+}
+
+const STEPS_KEY = "echo_primeros_pasos_ocultos";
+
+/** Primeros pasos para quien recién empieza; se van solos al completarlos (o al cerrarlos). */
+function FirstSteps({ hasMeetings }: { hasMeetings: boolean }) {
+  const voice = useVoice();
+  const [hidden, setHidden] = useState(() => {
+    try {
+      return localStorage.getItem(STEPS_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const { data: myVoice } = useQuery({
+    queryKey: ["my-voice"],
+    queryFn: () => api<{ has_sample: boolean }>("/api/me/voice", { skipOrg: true }),
+    enabled: !hidden,
+  });
+  if (hidden || !myVoice) return null;
+  const steps = [
+    { done: hasMeetings, label: "Grabá tu primera reunión", to: "/meetings?new=1" },
+    { done: myVoice.has_sample, label: "Grabá tu voz para aparecer con tu nombre", to: "/settings/my-voice" },
+    { done: false, label: "Preguntale a Echo por una reunión", action: voice.open, optional: true },
+  ];
+  if (steps.filter((step) => !step.optional).every((step) => step.done)) return null;
+  const close = () => {
+    setHidden(true);
+    try {
+      localStorage.setItem(STEPS_KEY, "1");
+    } catch {
+      // Sin almacenamiento: vuelve a aparecer al recargar.
+    }
+  };
+  return (
+    <section className="mb-8 rounded-3xl border border-ink-100 bg-white p-5" aria-label="Primeros pasos">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="text-[15px] font-semibold text-ink-900">Primeros pasos</h2>
+        <button onClick={close} className="min-h-9 rounded-full px-3 text-xs font-medium text-ink-500 hover:bg-ink-50">
+          Ocultar
+        </button>
+      </div>
+      <ol className="grid gap-2 sm:grid-cols-3">
+        {steps.map((step, index) => {
+          const inner = (
+            <>
+              <span
+                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                  step.done ? "bg-emerald-500 text-white" : "bg-ink-100 text-ink-600"
+                }`}
+              >
+                {step.done ? "✓" : index + 1}
+              </span>
+              <span className={step.done ? "text-ink-400 line-through" : "text-ink-800"}>{step.label}</span>
+            </>
+          );
+          const className = "flex min-h-12 w-full items-center gap-3 rounded-2xl bg-ink-50/70 px-3.5 py-2.5 text-left text-sm hover:bg-ink-100";
+          return (
+            <li key={step.label}>
+              {step.action ? (
+                <button type="button" onClick={step.action} className={className}>{inner}</button>
+              ) : (
+                <Link to={step.to!} className={className}>{inner}</Link>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }
