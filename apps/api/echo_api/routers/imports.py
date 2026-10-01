@@ -1,7 +1,8 @@
 """Importar una reunión ya grabada (MP3/WAV/M4A/WebM/MP4).
 
-Privacy-first: el archivo se procesa en un archivo temporal de vida mínima y
-se elimina inmediatamente después de transcribir. Nunca se archiva el audio.
+Privacy-first: el archivo subido se pasa a audio de trabajo y se borra en el
+momento; el audio de trabajo se borra al terminar la pasada final, igual que
+el de una reunión en vivo. Nunca se archiva el audio.
 """
 import asyncio
 import contextlib
@@ -11,18 +12,17 @@ import tempfile
 import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
-from sqlalchemy import select
 
 from ..config import get_settings
 from ..db import SessionLocal, get_db
 from ..deps import OrgContext, get_meeting_or_404, get_org_context
-from ..models import Meeting, TranscriptSegment
-from ..services.ai_settings import get_vocabulary, resolve_stt
+from ..models import Meeting
+from ..services.ai_settings import resolve_stt
 from ..services.audit import audit
 from ..services.background import spawn
 from ..services.live_bus import live_bus
 from ..services.pipeline import run_finalize_pipeline
-from ..services.stt import get_stt_provider
+from ..services.recording import pcm_path
 
 log = logging.getLogger("echo.imports")
 
@@ -124,8 +124,6 @@ async def import_recording(
         await audit(db, ctx.org_id, ctx.user.id, "meeting.import", "meeting", str(meeting.id),
                     detail={"filename": file.filename, "bytes": total_bytes})
         await db.commit()
-
-        vocabulary = await get_vocabulary(db, ctx.org_id)
     except BaseException:
         # Si la reunión no quedó marcada, nadie va a procesar ese temporal.
         _remove(source_path)
@@ -134,85 +132,42 @@ async def import_recording(
     # Se pasa la RUTA, no los bytes: mandar el buffer por valor a la tarea
     # duplicaba el pico de memoria justo cuando ya era el peor momento.
     spawn(
-        _process_import(
-            str(meeting.id), source_path, file.filename or f"audio{extension}", meeting.language,
-            stt_config.provider, stt_config.api_key, stt_config.model, vocabulary,
-        ),
+        _process_import(str(meeting.id), source_path),
         name=f"import:{meeting.id}",
     )
     return {"status": "processing"}
 
 
-async def _process_import(
-    meeting_id: str,
-    source_path: str,
-    filename: str,
-    language: str,
-    provider_name: str,
-    api_key: str,
-    model: str | None,
-    vocabulary: list[str],
-) -> None:
+async def _process_import(meeting_id: str, source_path: str) -> None:
+    """El audio importado pasa a ser el audio de trabajo de la reunión y la
+    pasada final lo transcribe como a cualquier otra: Groq, o ElevenLabs con
+    personas según el plan (con sus créditos y su consumo anotado). Después de
+    procesar se borra (services/recording.py), igual que el de una reunión en vivo.
+    """
     mid = uuid.UUID(meeting_id)
-    provider = get_stt_provider(provider_name, api_key, model)
-    wav_path = None
+    target = pcm_path(mid)
     try:
-        # transcodificar a WAV 16k mono con ffmpeg si no es wav. El original ya
-        # está en disco, así que ffmpeg lee de ahí: nunca hace falta tener el
-        # archivo crudo en RAM.
-        send_path = source_path
-        send_name = filename
-        if not filename.lower().endswith(".wav"):
-            wav_path = source_path + ".wav"
-            process = await asyncio.create_subprocess_exec(
-                "ffmpeg", "-y", "-i", source_path, "-ac", "1", "-ar", "16000", wav_path,
-                stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
-            )
-            await process.wait()
-            if process.returncode == 0 and os.path.exists(wav_path):
-                send_path = wav_path
-                send_name = "audio.wav"
-            # si ffmpeg falla se manda el original: los providers aceptan varios formatos
-
-        # El provider recibe bytes, así que acá sí hay una copia en RAM — pero
-        # una sola, del audio ya validado y (casi siempre) ya reducido a WAV
-        # 16k mono, no del cuerpo crudo del request.
-        with open(send_path, "rb") as audio:
-            payload = audio.read()
-        result = await provider.transcribe_file(payload, send_name, language, vocabulary)
-        del payload
+        # PCM16 mono 16 kHz, lo que lee la pasada final. ffmpeg lee del disco:
+        # nunca hace falta tener el archivo crudo en RAM.
+        process = await asyncio.create_subprocess_exec(
+            "ffmpeg", "-y", "-i", source_path, "-ac", "1", "-ar", "16000", "-f", "s16le", str(target),
+            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
+        )
+        await process.wait()
+        if process.returncode != 0 or not target.exists() or target.stat().st_size == 0:
+            target.unlink(missing_ok=True)
+            raise RuntimeError("No se pudo leer el audio. Probá con otro formato (mp3, m4a o wav).")
 
         async with SessionLocal() as db:
             meeting = await db.get(Meeting, mid)
             if not meeting:
+                target.unlink(missing_ok=True)
                 return
-            seq = 0
-            for segment in result.segments:
-                text = segment.text.strip()
-                if not text:
-                    continue
-                seq += 1
-                db.add(
-                    TranscriptSegment(
-                        meeting_id=mid,
-                        organization_id=meeting.organization_id,
-                        seq=seq,
-                        start_ms=segment.start_ms,
-                        end_ms=segment.end_ms,
-                        text=text,
-                        confidence=segment.confidence,
-                        speaker_hint=segment.speaker,
-                        is_final=True,
-                    )
-                )
-            if result.segments:
-                meeting.duration_seconds = max(
-                    meeting.duration_seconds, int(result.segments[-1].end_ms / 1000)
-                )
-            meeting.processing_state = {"stage": "queued", "progress": 20}
+            meeting.duration_seconds = max(meeting.duration_seconds or 0, target.stat().st_size // 32000)
+            meeting.processing_state = {"stage": "queued", "progress": 10}
             await db.commit()
 
-        await live_bus.publish(meeting_id, {"type": "processing", "stage": "transcribed", "progress": 20})
+        await live_bus.publish(meeting_id, {"type": "processing", "stage": "transcribing", "progress": 10})
         await run_finalize_pipeline(meeting_id)
     except Exception as exc:
         log.exception("import fallo meeting=%s", meeting_id)
@@ -224,7 +179,6 @@ async def _process_import(
                 await db.commit()
         await live_bus.publish(meeting_id, {"type": "status", "status": "failed"})
     finally:
-        # PRIVACY: eliminar cualquier archivo temporal pase lo que pase. El
-        # audio importado NUNCA se persiste, ni el original ni el transcodificado.
-        _remove(wav_path)
+        # PRIVACY: el original se borra pase lo que pase; el audio de trabajo
+        # lo cierra la pasada final (se borra, o va al Drive si se grababa).
         _remove(source_path)

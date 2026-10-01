@@ -32,7 +32,6 @@ target-version = "py312"
 # un cambio de código que este trabajo no toca.
 "echo_api/deps.py" = ["F401"]                    # ROLE_ADMIN/MEMBER/OWNER sin usar
 "echo_api/routers/device_stream.py" = ["F401"]   # asyncio sin usar
-"echo_api/routers/imports.py" = ["F401"]         # sqlalchemy.select sin usar
 "echo_api/routers/minutes.py" = ["F401"]         # MinutesTemplate sin usar
 "echo_api/services/insights_live.py" = ["F401"]  # TranscriptSegment sin usar
 "echo_api/services/memory_svc.py" = ["F401"]     # datetime.UTC y datetime sin usar

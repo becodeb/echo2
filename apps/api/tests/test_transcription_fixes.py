@@ -266,3 +266,45 @@ def test_if_the_engine_is_down_the_window_goes_to_the_next(monkeypatch):
     assert [s.text for s in result.segments] == ["Hola."]
     # El consumo se anota al que respondió.
     assert (chain.name, chain.model) == ("openai", "gpt-4o-transcribe")
+
+
+def test_an_echo_device_records_like_the_web(client, monkeypatch):
+    import time
+
+    import echo_api.routers.device_stream as device_module
+    from echo_api.security import hash_refresh_token
+    from echo_api.services import recording as rec
+    from echo_api.services.ai_settings import SttConfig
+    from test_speakers import _tone
+
+    async def fake_resolve_stt(db, org_id):
+        return SttConfig(provider="fake", model=None, api_key="x")
+
+    monkeypatch.setattr(device_module, "resolve_stt", fake_resolve_stt)
+    owner = EchoTestUser(client, org_name=f"Colegio {uuid.uuid4().hex[:4]}")
+    token = uuid.uuid4().hex
+    _sql("INSERT INTO devices (id, organization_id, name, kind, token_hash, created_at, updated_at)"
+         " VALUES (:id, :o, 'Sala 1', 'esp32', :h, now(), now())",
+         id=str(uuid.uuid4()), o=owner.org_id, h=hash_refresh_token(token))
+    meeting = client.post("/api/devices/meetings", json={}, headers={"Authorization": f"Bearer {token}"}).json()
+    with client.websocket_connect(f"/api/devices/stream?token={token}&meeting_id={meeting['id']}") as websocket:
+        websocket.send_bytes(_tone(3.0))
+        websocket.send_text(json.dumps({"type": "flush"}))
+        time.sleep(1)
+    meeting_id = uuid.UUID(meeting["id"])
+    # El audio quedó como audio de trabajo (para la pasada final) y el consumo anotado.
+    assert rec.pcm_path(meeting_id).stat().st_size == len(_tone(3.0))
+    rows = []
+
+    async def usage():
+        from sqlalchemy import select
+
+        from echo_api.db import SessionLocal
+        from echo_api.models import UsageEvent
+
+        async with SessionLocal() as db:
+            rows.extend((await db.execute(select(UsageEvent).where(UsageEvent.meeting_id == meeting_id))).scalars())
+
+    asyncio.run(usage())
+    assert [u.kind for u in rows] == ["stt_live"]
+    rec.pcm_path(meeting_id).unlink(missing_ok=True)

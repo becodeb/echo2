@@ -170,7 +170,7 @@ async def _store_segment(
         }
 
 
-async def _record_live_usage(meeting: Meeting, user_id: uuid.UUID, provider, seconds: float) -> None:
+async def _record_live_usage(meeting: Meeting, user_id: uuid.UUID | None, provider, seconds: float) -> None:
     """Segundos de audio que se mandaron a transcribir en vivo (panel de consumo)."""
     name = getattr(provider, "name", "desconocido")
     model = getattr(provider, "model", None)

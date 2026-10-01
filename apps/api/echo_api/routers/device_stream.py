@@ -2,8 +2,10 @@
 
 El dispositivo se autentica con su device token, puede crear/iniciar una
 reunión y transmite PCM16 16 kHz por WebSocket. El servidor transcribe con el
-provider cloud de la organización (mismas garantías del modo cloud: el audio
-vive en RAM y se descarta al transcribir). Si la organización usa Echo Bridge
+provider cloud de la organización, con los mismos filtros, respaldo e idioma
+fijo que el vivo de la web. El audio también va al audio de trabajo de la
+reunión, así al terminar tiene la misma pasada final (y se borra después,
+services/recording.py). Si la organización usa Echo Bridge
 en una PC de la sala, el dispositivo también puede apuntarse a ese bridge por
 LAN (config del firmware) y entonces el audio no sale de la red local.
 """
@@ -19,19 +21,22 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from ..db import SessionLocal, get_db
-from ..models import Device, Meeting
-from ..routers.live import _store_segment
+from ..models import Device, Meeting, OrganizationMember
+from ..routers.live import _record_live_usage, _store_segment
 from ..security import hash_refresh_token
-from ..services.ai_settings import get_vocabulary, resolve_stt
+from ..services.ai_settings import get_vocabulary, resolve_stt, stt_fallbacks
 from ..services.background import spawn
 from ..services.insights_live import maybe_extract_live_insights
 from ..services.live_bus import live_bus
+from ..services.recording import PcmWriter
 from ..services.stt import get_stt_provider
+from ..services.stt.base import FallbackSttProvider
 from ..services.stt.channels import (
     is_noise_transcript,
     is_prompt_echo,
     is_silent,
     is_unreliable,
+    repeats_previous,
     strip_hallucinations,
 )
 from ..services.stt.windowing import find_cut
@@ -68,9 +73,22 @@ async def device_create_meeting(
     if not device:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Dispositivo no vinculado")
 
+    # Toda reunión tiene quien la creó (y a quien se le anota el consumo): la
+    # de un dispositivo es de quien administra la sede. Antes iba vacío y la
+    # base lo rechazaba, así que el botón del dispositivo no creaba nada.
+    owner = (
+        await db.execute(
+            select(OrganizationMember.user_id)
+            .where(OrganizationMember.organization_id == device.organization_id)
+            .order_by((OrganizationMember.role == "owner").desc(), OrganizationMember.created_at)
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if owner is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "La sede no tiene miembros")
     meeting = Meeting(
         organization_id=device.organization_id,
-        created_by=None,
+        created_by=owner,
         title=data.title or f"Reunión — {device.name}",
         status="live",
         audio_source="device",
@@ -154,7 +172,12 @@ async def device_stream(websocket: WebSocket):
         await websocket.close()
         return
 
-    provider = get_stt_provider(stt_config.provider, stt_config.api_key, stt_config.model)
+    chain = [get_stt_provider(c.provider, c.api_key, c.model) for c in [stt_config, *stt_fallbacks(stt_config)]]
+    provider = chain[0] if len(chain) == 1 else FallbackSttProvider(chain)
+    # Idioma fijo, como en la web: con "auto" Whisper adivina por tramo.
+    language = meeting.language if meeting.language and meeting.language != "auto" else "es"
+    previous_text = ""
+    writer = PcmWriter(meeting.id)
     sample_rate = 16000
     audio_buffer = bytearray()
     stream_offset_ms = 0
@@ -162,7 +185,7 @@ async def device_stream(websocket: WebSocket):
     segments_since_insights = 0
 
     async def flush(upto: int | None = None):
-        nonlocal audio_buffer, stream_offset_ms, segments_since_insights
+        nonlocal audio_buffer, stream_offset_ms, segments_since_insights, previous_text
         if not audio_buffer:
             return
         cut = len(audio_buffer) if upto is None else upto
@@ -175,14 +198,13 @@ async def device_stream(websocket: WebSocket):
             del chunk
             return
         try:
-            result = await provider.transcribe_chunk(
-                chunk, sample_rate, meeting.language, vocabulary, offset_ms=offset
-            )
+            result = await provider.transcribe_chunk(chunk, sample_rate, language, vocabulary, offset_ms=offset)
         except Exception as exc:
             log.warning("device stt error: %s", exc)
             return
         finally:
             del chunk
+        await _record_live_usage(meeting, meeting.created_by, provider, duration_ms / 1000)
         for seg in result.segments:
             # Los mismos filtros que el vivo de la web.
             text = strip_hallucinations(seg.text)
@@ -190,9 +212,11 @@ async def device_stream(websocket: WebSocket):
                 not text
                 or is_unreliable(seg)
                 or is_prompt_echo(text, vocabulary)
-                or is_noise_transcript(text, meeting.language)
+                or is_noise_transcript(text, language)
+                or repeats_previous(text, previous_text)
             ):
                 continue
+            previous_text = text
             event = await _store_segment(meeting, text, seg.start_ms, seg.end_ms, seg.confidence, "device")
             await live_bus.publish(channel, event)
             segments_since_insights += 1
@@ -207,6 +231,7 @@ async def device_stream(websocket: WebSocket):
                 break
             if message.get("bytes") is not None:
                 audio_buffer.extend(message["bytes"])
+                writer.write(message["bytes"], 1)
                 # Cortes en las pausas, como el WebSocket de la web: el corte
                 # fijo cada 6 s partía palabras al medio y el modelo las perdía.
                 cut = find_cut(bytes(audio_buffer), sample_rate)
@@ -222,3 +247,4 @@ async def device_stream(websocket: WebSocket):
     finally:
         with contextlib.suppress(Exception):
             await flush()
+        writer.close()

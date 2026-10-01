@@ -60,7 +60,6 @@ from . import plans
 from .ai_settings import get_vocabulary, resolve_stt
 from .recording import pcm_path, recordings_dir
 from .stt.base import (
-    GROQ_MODEL,
     SCRIBE_MODEL,
     FallbackSttProvider,
     SttResult,
@@ -253,14 +252,26 @@ def _part_ranges(handle, size: int) -> list[tuple[int, int]]:
     return ranges
 
 
-async def _groq_rows(path: Path, api_key: str, language: str | None, vocabulary: list[str]) -> list[Row]:
-    """Texto sin personas de la reunión entera, parte por parte.
+def _text_engine(config):
+    """El motor de la pasada sin personas: Groq, y si se cae, OpenAI (si hay key).
 
-    Si Groq se cae, la parte va a OpenAI (si hay key) en vez de perderse.
-    """
-    provider = get_stt_provider("groq", api_key)
-    if get_settings().openai_api_key:
-        provider = FallbackSttProvider([provider, get_stt_provider("openai", get_settings().openai_api_key)])
+    Sin key de Groq en el servidor, el motor de la sede (así un audio
+    importado se transcribe igual)."""
+    groq = _groq_key(config)
+    openai = get_settings().openai_api_key
+    if groq:
+        chain = [get_stt_provider("groq", groq)] + ([get_stt_provider("openai", openai)] if openai else [])
+    elif config is not None:
+        chain = [get_stt_provider(config.provider, config.api_key, config.model)]
+        if openai and config.provider != "openai":
+            chain.append(get_stt_provider("openai", openai))
+    else:
+        return None
+    return chain[0] if len(chain) == 1 else FallbackSttProvider(chain)
+
+
+async def _text_rows(path: Path, provider, language: str | None, vocabulary: list[str]) -> list[Row]:
+    """Texto sin personas de la reunión entera, parte por parte."""
     rows: list[Row] = []
     with open(path, "rb") as handle:
         for start, end in _part_ranges(handle, path.stat().st_size):
@@ -392,7 +403,8 @@ async def diarize_meeting(meeting_id: uuid.UUID) -> bool:
         # Decidir y reservar los créditos van juntos y de a una reunión por
         # persona: si le queda 1 crédito y terminan dos reuniones a la vez,
         # solo una lo gasta (la otra sale sin personas).
-        await db.execute(sql_text("SELECT pg_advisory_xact_lock(:key)"), {"key": _lock_key(created_by)})
+        if created_by is not None:  # las de un Echo Device no tienen persona
+            await db.execute(sql_text("SELECT pg_advisory_xact_lock(:key)"), {"key": _lock_key(created_by)})
         decision = await plans.final_pass_for(db, meeting, total_ms / 1000)
         hold_id = None
         if decision.provider == "elevenlabs" and decision.credits:
@@ -434,18 +446,19 @@ async def diarize_meeting(meeting_id: uuid.UUID) -> bool:
         # Llamada de Meet/Zoom: el en vivo ya separó micrófono y sistema por
         # canal, y el audio de trabajo está mezclado. Se queda el en vivo.
         return False
-    key = _groq_key(config)
-    if not key:
+    engine = _text_engine(config)
+    if engine is None:
         return False
     try:
-        rows = await _groq_rows(path, key, language, vocabulary)
+        rows = await _text_rows(path, engine, language, vocabulary)
     except Exception as exc:  # noqa: BLE001 - queda el transcript en vivo
-        log.warning("pasada final con Groq falló en %s: %s", meeting_id, exc)
+        log.warning("pasada final sin personas falló en %s: %s", meeting_id, exc)
         return False
+    name, model = engine.name, getattr(engine, "model", None)
     async with SessionLocal() as db:
         await plans.record_usage(
-            db, kind="stt_final", provider="groq", model=GROQ_MODEL, unit="audio_seconds",
-            quantity=total_ms / 1000, cost_usd=plans.stt_cost("groq", GROQ_MODEL, total_ms / 1000),
+            db, kind="stt_final", provider=name, model=model, unit="audio_seconds",
+            quantity=total_ms / 1000, cost_usd=plans.stt_cost(name, model, total_ms / 1000),
             organization_id=organization_id, user_id=created_by, meeting_id=meeting_id,
             meta={"reason": decision.reason},
         )

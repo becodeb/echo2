@@ -366,3 +366,42 @@ def test_known_voice_goes_in_front_of_the_meeting_audio(client, monkeypatch):
     assert rows[0] == ("Bautista Goñi", "Hola, sí, ¿quién es? Yo soy-- hola, yo soy Bautista Goñi.")
     assert {name for name, _ in rows} == {"Bautista Goñi", "Persona 1", "Persona 2"}
     _cleanup(meeting_id)
+
+
+def test_an_imported_audio_goes_through_the_final_pass(client, monkeypatch, tmp_path):
+    import io
+    import wave
+
+    from echo_api.routers import imports
+    from echo_api.services import pipeline
+
+    async def nothing(db, org_id):
+        return None
+
+    _setup(monkeypatch, "2026-09-27")
+    # Sin IA: acá importa la transcripción, no el acta.
+    monkeypatch.setattr(pipeline, "resolve_llm", nothing)
+    monkeypatch.setattr(pipeline, "resolve_embeddings", nothing)
+    user = EchoTestUser(client, name="Bautista Goñi", org_name=f"Colegio {uuid.uuid4().hex[:4]}")
+    meeting_id = uuid.UUID(client.post("/api/meetings", json={"title": "Importada", "level": "primaria", "people": True},
+                                       headers=user.headers).json()["id"])
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as out:
+        out.setnchannels(1)
+        out.setsampwidth(2)
+        out.setframerate(16000)
+        out.writeframes(_tone(20.4))
+    source = tmp_path / "subido.wav"
+    source.write_bytes(buffer.getvalue())
+    _sql("UPDATE meetings SET status = 'processing', audio_source = 'import' WHERE id = :id", id=str(meeting_id))
+
+    asyncio.run(imports._process_import(str(meeting_id), str(source)))
+    monkeypatch.undo()
+
+    rows, meeting = _transcript(client, user, meeting_id)
+    # Como una reunión en vivo: ElevenLabs con sus tres personas y un crédito.
+    assert meeting["status"] == "completed"
+    assert len({name for name, _ in rows}) == 3 and all(name for name, _ in rows)
+    assert [(u.provider, u.credits) for u in _usage(meeting_id)] == [("elevenlabs", 1)]
+    # Ni el archivo subido ni el audio de trabajo quedan en el disco.
+    assert not source.exists() and not rec.pcm_path(meeting_id).exists()
