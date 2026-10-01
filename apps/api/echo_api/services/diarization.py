@@ -39,6 +39,7 @@ from pathlib import Path
 
 import numpy as np
 from sqlalchemy import delete, select
+from sqlalchemy import text as sql_text
 
 from ..config import get_settings
 from ..db import SessionLocal
@@ -51,6 +52,7 @@ from ..models import (
     OrganizationMember,
     Speaker,
     TranscriptSegment,
+    UsageEvent,
     User,
     UserVoiceSample,
 )
@@ -92,6 +94,10 @@ VOICE_MATCH_SHARE = 0.6
 # Reintentos de la separación cuando ElevenLabs falló.
 MAX_PEOPLE_ATTEMPTS = 6
 RETRY_EVERY_SECONDS = 15 * 60
+# Las muestras de "Mi voz" delante del audio: apagado. En la reunión del 27/9
+# partió a Bautista en dos personas y no nombró a nadie (sin la muestra salía
+# 3 de 3); en la del 30/9 ayudó. Hasta probarlo con más reuniones, no se usa.
+KNOWN_VOICES_IN_FINAL_PASS = False
 SPEAKER_COLORS = ["#6366f1", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6"]
 
 Row = tuple[str | None, str, int, int]  # (persona, texto, inicio, fin)
@@ -382,21 +388,41 @@ async def diarize_meeting(meeting_id: uuid.UUID) -> bool:
         meeting = await db.get(Meeting, meeting_id)
         if meeting is None:
             return False
+        organization_id, created_by = meeting.organization_id, meeting.created_by
+        # Decidir y reservar los créditos van juntos y de a una reunión por
+        # persona: si le queda 1 crédito y terminan dos reuniones a la vez,
+        # solo una lo gasta (la otra sale sin personas).
+        await db.execute(sql_text("SELECT pg_advisory_xact_lock(:key)"), {"key": _lock_key(created_by)})
         decision = await plans.final_pass_for(db, meeting, total_ms / 1000)
+        hold_id = None
+        if decision.provider == "elevenlabs" and decision.credits:
+            hold = await plans.record_usage(
+                db, kind="stt_final", provider="elevenlabs", model=SCRIBE_MODEL, unit="audio_seconds",
+                quantity=0, cost_usd=0, organization_id=organization_id, user_id=created_by,
+                meeting_id=meeting_id, credits=decision.credits,
+                meta={"covered_by": decision.covered_by, "hold": True},
+            )
+            await db.flush()
+            hold_id = hold.id
+        await db.commit()
         config = await resolve_stt(db, meeting.organization_id)
         vocabulary = await _vocabulary(db, meeting)
-        known = await _known_voices(db, meeting) if decision.provider == "elevenlabs" else []
+        known = (
+            await _known_voices(db, meeting)
+            if decision.provider == "elevenlabs" and KNOWN_VOICES_IN_FINAL_PASS
+            else []
+        )
         language = meeting.language if meeting.language and meeting.language != "auto" else "es"
-        organization_id, created_by = meeting.organization_id, meeting.created_by
 
     live = await _live_rows(meeting_id)
     # Lo dicho después del audio de trabajo (se grabó solo una parte con el
-    # bridge, o se retomó otro día) no está en el audio: se conserva.
-    after = [(hint, text, start, end) for start, end, text, hint in live if start >= total_ms]
+    # bridge, o se retomó otro día) no está en el audio: se conserva, sin
+    # persona (sus etiquetas del en vivo no son las de la pasada final).
+    after = _after_audio(live, total_ms)
 
     if decision.provider == "elevenlabs":
         people = await _people_pass(
-            meeting_id, path, language, vocabulary, known, decision, organization_id, created_by, total_ms
+            meeting_id, path, language, vocabulary, known, decision, organization_id, created_by, total_ms, hold_id
         )
         if people is not None:
             rows, voices = people
@@ -425,8 +451,26 @@ async def diarize_meeting(meeting_id: uuid.UUID) -> bool:
         )
         await db.commit()
     if rows:
-        await _replace_transcript(meeting_id, [(None, text, start, end) for _, text, start, end in rows] + after, {})
+        await _replace_transcript(meeting_id, [(None, line, start, end) for _, line, start, end in rows] + after, {})
     return False
+
+
+def _lock_key(user_id: uuid.UUID) -> int:
+    """Clave de pg_advisory_xact_lock (bigint) para los créditos de una persona."""
+    return user_id.int % (2**63 - 1)
+
+
+def _after_audio(live: list[tuple[int, int, str, str | None]], total_ms: int) -> list[Row]:
+    return [(None, line, start, end) for start, end, line, _ in live if start >= total_ms]
+
+
+async def _release_hold(hold_id: str | uuid.UUID | None) -> None:
+    """La separación no salió: los créditos reservados vuelven."""
+    if not hold_id:
+        return
+    async with SessionLocal() as db:
+        await db.execute(delete(UsageEvent).where(UsageEvent.id == uuid.UUID(str(hold_id))))
+        await db.commit()
 
 
 async def _people_pass(
@@ -439,8 +483,13 @@ async def _people_pass(
     organization_id: uuid.UUID,
     created_by: uuid.UUID,
     total_ms: int,
+    hold_id: uuid.UUID | None = None,
 ) -> tuple[list[Row], dict[str, KnownVoice]] | None:
-    """Scribe sobre la reunión entera. None = falló y quedó pendiente de reintento."""
+    """Scribe sobre la reunión entera.
+
+    None = no hay personas: falló y quedó pendiente de reintento (con los
+    créditos reservados), o no se pudo / no devolvió nada (créditos devueltos).
+    """
     prefix, windows = voice_prefix(known)
     offset_ms = len(prefix) // BYTES_PER_MS
     folder = recordings_dir()
@@ -455,6 +504,7 @@ async def _people_pass(
     except Exception as exc:  # noqa: BLE001 - sin mp3 no hay pasada con personas
         log.warning("no se pudo preparar el audio de %s para ElevenLabs: %s", meeting_id, exc)
         audio.unlink(missing_ok=True)
+        await _release_hold(hold_id)
         return None
     finally:
         prefix_file.unlink(missing_ok=True)
@@ -469,6 +519,7 @@ async def _people_pass(
         "covered_by": decision.covered_by,
         "total_ms": total_ms,
         "attempts": 1,
+        "hold_id": str(hold_id) if hold_id else None,
     }
     try:
         result = await _scribe(audio, language, vocabulary)
@@ -478,6 +529,12 @@ async def _people_pass(
         return None
     audio.unlink(missing_ok=True)
     rows, voices = rows_from_scribe(result, language, windows, offset_ms)
+    if not rows:
+        # Scribe no oyó nada: no se borra el texto en vivo ni se cobra.
+        log.warning("ElevenLabs devolvió una transcripción vacía en %s", meeting_id)
+        await _release_hold(hold_id)
+        await _update_meta(meeting_id, people_status="failed", people_retry=None)
+        return None
     await _charge(meeting_id, organization_id, created_by, retry, result)
     return rows, voices
 
@@ -485,15 +542,25 @@ async def _people_pass(
 async def _charge(
     meeting_id: uuid.UUID, organization_id: uuid.UUID, created_by: uuid.UUID, retry: dict, result: SttResult
 ) -> None:
-    """Anota el consumo y los créditos (solo cuando la separación salió bien)."""
+    """Anota el consumo y los créditos (solo cuando la separación salió bien).
+
+    Los créditos ya estaban reservados al decidir: la reserva pasa a ser el consumo.
+    """
     seconds = (retry["total_ms"] + retry["offset_ms"]) / 1000
+    cost = plans.stt_cost("elevenlabs", SCRIBE_MODEL, seconds, keyterms=True, entities=True)
     async with SessionLocal() as db:
-        await plans.record_usage(
-            db, kind="stt_final", provider="elevenlabs", model=SCRIBE_MODEL, unit="audio_seconds",
-            quantity=seconds, cost_usd=plans.stt_cost("elevenlabs", SCRIBE_MODEL, seconds, keyterms=True, entities=True),
-            organization_id=organization_id, user_id=created_by, meeting_id=meeting_id,
-            credits=retry.get("credits") or 0, meta={"covered_by": retry.get("covered_by")},
-        )
+        hold = await db.get(UsageEvent, uuid.UUID(retry["hold_id"])) if retry.get("hold_id") else None
+        if hold is not None:
+            hold.quantity = float(seconds)
+            hold.cost_usd = cost
+            hold.meta = {"covered_by": retry.get("covered_by")}
+        else:
+            await plans.record_usage(
+                db, kind="stt_final", provider="elevenlabs", model=SCRIBE_MODEL, unit="audio_seconds",
+                quantity=seconds, cost_usd=cost,
+                organization_id=organization_id, user_id=created_by, meeting_id=meeting_id,
+                credits=retry.get("credits") or 0, meta={"covered_by": retry.get("covered_by")},
+            )
         meeting = await db.get(Meeting, meeting_id)
         if meeting is not None:
             meta = {**(meeting.meta or {})}
@@ -511,8 +578,10 @@ async def _charge(
 async def retry_pending_people() -> int:
     """Vuelve a pedir la separación de las reuniones que quedaron pendientes.
 
-    Si alguien ya corrigió el transcript a mano, no se pisa: se da por
-    terminado sin personas.
+    Si alguien ya corrigió el transcript a mano (antes o mientras ElevenLabs
+    procesaba), no se pisa: se da por terminado sin personas y sin cobrar.
+    Si sale bien, la IA vuelve a deducir los nombres y la reunión se vuelve a
+    indexar para el chat.
     """
     done = 0
     async with SessionLocal() as db:
@@ -533,6 +602,7 @@ async def retry_pending_people() -> int:
     for meeting_id, organization_id, created_by, language, retry in jobs:
         audio = people_path(meeting_id)
         if not audio.exists() or not retry:
+            await _release_hold(retry.get("hold_id"))
             await _update_meta(meeting_id, people_status="failed", people_retry=None)
             continue
         async with SessionLocal() as db:
@@ -547,6 +617,7 @@ async def retry_pending_people() -> int:
             vocabulary = await _vocabulary(db, meeting) if meeting else []
         if edited:
             audio.unlink(missing_ok=True)
+            await _release_hold(retry.get("hold_id"))
             await _update_meta(meeting_id, people_status="skipped", people_retry=None)
             continue
         language = language if language and language != "auto" else "es"
@@ -557,6 +628,7 @@ async def retry_pending_people() -> int:
             log.warning("reintento de personas %s/%s falló en %s: %s", attempts, MAX_PEOPLE_ATTEMPTS, meeting_id, exc)
             if attempts >= MAX_PEOPLE_ATTEMPTS:
                 audio.unlink(missing_ok=True)
+                await _release_hold(retry.get("hold_id"))
                 await _update_meta(meeting_id, people_status="failed", people_retry=None)
             else:
                 await _update_meta(meeting_id, people_retry={**retry, "attempts": attempts})
@@ -567,12 +639,47 @@ async def retry_pending_people() -> int:
             for v in retry.get("voices") or []
         ]
         rows, voices = rows_from_scribe(result, language, windows, int(retry.get("offset_ms") or 0))
-        live = await _live_rows(meeting_id)
-        after = [(hint, text, start, end) for start, end, text, hint in live if start >= int(retry.get("total_ms") or 0)]
+        if not rows:
+            await _release_hold(retry.get("hold_id"))
+            await _update_meta(meeting_id, people_status="failed", people_retry=None)
+            continue
+        after = _after_audio(await _live_rows(meeting_id), int(retry.get("total_ms") or 0))
+        if not await _replace_transcript(meeting_id, rows + after, voices, only_if_unedited=True):
+            # Lo corrigieron a mano mientras ElevenLabs procesaba.
+            await _release_hold(retry.get("hold_id"))
+            await _update_meta(meeting_id, people_status="skipped", people_retry=None)
+            continue
         await _charge(meeting_id, organization_id, created_by, retry, result)
-        await _replace_transcript(meeting_id, rows + [row for row in after if row[0] is None], voices)
+        await _after_retry(meeting_id, organization_id, created_by)
         done += 1
     return done
+
+
+async def _after_retry(meeting_id: uuid.UUID, organization_id: uuid.UUID, created_by: uuid.UUID) -> None:
+    """Lo que la pasada de la reunión hizo sobre el transcript viejo, de nuevo
+    sobre el nuevo: nombres deducidos por la IA e índice del chat."""
+    from .ai_settings import resolve_embeddings, resolve_llm
+    from .llm import get_llm_provider
+    from .privacy import protect
+    from .rag import embed_meeting_segments
+
+    async with SessionLocal() as db:
+        llm_config = await resolve_llm(db, organization_id)
+        embeddings_config = await resolve_embeddings(db, organization_id)
+        provider = None
+        if llm_config:
+            provider = get_llm_provider(llm_config.provider, llm_config.api_key, llm_config.model, llm_config.base_url)
+            provider = await protect(db, organization_id, provider, meeting_id, created_by)
+    if provider is not None:
+        try:
+            await name_speakers(meeting_id, provider)
+        except Exception as exc:  # noqa: BLE001 - sin nombres queda "Persona 1"
+            log.warning("nombres tras el reintento fallaron en %s: %s", meeting_id, exc)
+    if embeddings_config:
+        try:
+            await embed_meeting_segments(meeting_id, embeddings_config)
+        except Exception as exc:  # noqa: BLE001 - el chat queda con el índice viejo
+            log.warning("índice tras el reintento falló en %s: %s", meeting_id, exc)
 
 
 async def retry_loop(interval_seconds: int = RETRY_EVERY_SECONDS) -> None:
@@ -586,12 +693,29 @@ async def retry_loop(interval_seconds: int = RETRY_EVERY_SECONDS) -> None:
             log.exception("personas: falló el reintento")
 
 
-async def _replace_transcript(meeting_id: uuid.UUID, final: list[Row], known: dict[str, KnownVoice]) -> None:
-    """Reemplaza el transcript en vivo por el final, con sus personas."""
+async def _replace_transcript(
+    meeting_id: uuid.UUID, final: list[Row], known: dict[str, KnownVoice], only_if_unedited: bool = False
+) -> bool:
+    """Reemplaza el transcript en vivo por el final, con sus personas.
+
+    only_if_unedited: no reemplaza (y devuelve False) si alguien corrigió algún
+    tramo. Los tramos quedan bloqueados mientras tanto, así una corrección que
+    llega justo ahora espera y no se pierde en silencio.
+    """
     async with SessionLocal() as db:
         meeting = await db.get(Meeting, meeting_id)
         if meeting is None:
-            return
+            return False
+        if only_if_unedited:
+            edited = (
+                await db.execute(
+                    select(TranscriptSegment.edited)
+                    .where(TranscriptSegment.meeting_id == meeting_id)
+                    .with_for_update()
+                )
+            ).scalars().all()
+            if any(edited):
+                return False
         await db.execute(delete(TranscriptSegment).where(TranscriptSegment.meeting_id == meeting_id))
         await db.execute(delete(Speaker).where(Speaker.meeting_id == meeting_id))
 
@@ -628,6 +752,7 @@ async def _replace_transcript(meeting_id: uuid.UUID, final: list[Row], known: di
             )
         await db.commit()
         log.info("transcripción final: %s → %s tramos, %s personas", meeting_id, len(final), len(speakers))
+    return True
 
 
 # ── Nombres con la IA ────────────────────────────────────────────

@@ -193,10 +193,12 @@ def test_if_elevenlabs_fails_people_stay_pending_and_are_retried(client, monkeyp
     user, meeting_id = _meeting(client, 20.4, [(0, 20400, "Hola, soy Vanina.", None)], people=True)
     assert asyncio.run(diarization.diarize_meeting(meeting_id)) is False
     rows, meeting = _transcript(client, user, meeting_id)
-    # Mientras tanto: el texto de Groq, sin etiquetar a nadie, y ningún crédito gastado.
+    # Mientras tanto: el texto de Groq, sin etiquetar a nadie, y el crédito
+    # reservado (así otra reunión no lo gasta mientras tanto).
     assert all(name is None for name, _ in rows) and len(rows) == 10
     assert meeting["meta"]["people_status"] == "pending"
-    assert [u.credits for u in _usage(meeting_id)] == [0]
+    held = [u for u in _usage(meeting_id) if u.provider == "elevenlabs"]
+    assert [(u.credits, u.quantity, (u.meta or {}).get("hold")) for u in held] == [(1, 0, True)]
     assert diarization.people_path(meeting_id).exists()
 
     _sql("UPDATE meetings SET status = 'completed' WHERE id = :id", id=str(meeting_id))
@@ -207,6 +209,8 @@ def test_if_elevenlabs_fails_people_stay_pending_and_are_retried(client, monkeyp
     assert len({name for name, _ in rows}) == 3 and all(rows[i][0] for i in range(len(rows)))
     assert meeting["meta"]["people_status"] == "done" and "people_retry" not in meeting["meta"]
     assert sorted(u.credits for u in _usage(meeting_id)) == [0, 1]
+    [charged] = [u for u in _usage(meeting_id) if u.provider == "elevenlabs"]
+    assert charged.quantity > 20 and charged.meta == {"covered_by": "credits"}
     assert not diarization.people_path(meeting_id).exists()
     _cleanup(meeting_id)
 
@@ -224,7 +228,79 @@ def test_a_transcript_corrected_by_hand_is_not_overwritten_by_the_retry(client, 
     rows, meeting = _transcript(client, user, meeting_id)
     assert rows[0][1] == "Hola, soy Vanina (corregido)."
     assert meeting["meta"]["people_status"] == "skipped"
+    # No se cobró: la reserva del crédito volvió.
+    assert [u.provider for u in _usage(meeting_id)] == ["groq"]
     _cleanup(meeting_id)
+
+
+def test_a_correction_made_while_scribe_works_is_not_lost(client, monkeypatch):
+    _setup(monkeypatch, "2026-09-27", scribe_status=500)
+    user, meeting_id = _meeting(client, 20.4, [(0, 20400, "Hola.", None)], people=True)
+    asyncio.run(diarization.diarize_meeting(meeting_id))
+    _sql("UPDATE meetings SET status = 'completed' WHERE id = :id", id=str(meeting_id))
+    _FakeApis.scribe_status = 200
+    real_scribe = diarization._scribe
+
+    async def slow_scribe(*args):
+        # Alguien corrige el texto mientras ElevenLabs procesa.
+        result = await real_scribe(*args)
+        await asyncio.to_thread(
+            _sql, "UPDATE transcript_segments SET edited = true, text = 'Corregido.' WHERE meeting_id = :id AND seq = 1",
+            id=str(meeting_id),
+        )
+        return result
+
+    monkeypatch.setattr(diarization, "_scribe", slow_scribe)
+    assert asyncio.run(diarization.retry_pending_people()) == 0
+    monkeypatch.undo()
+    rows, meeting = _transcript(client, user, meeting_id)
+    assert rows[0][1] == "Corregido."
+    assert meeting["meta"]["people_status"] == "skipped"
+    assert [u.provider for u in _usage(meeting_id)] == ["groq"]
+    _cleanup(meeting_id)
+
+
+def test_if_scribe_hears_nothing_the_live_text_stays_and_nothing_is_charged(client, monkeypatch):
+    _setup(monkeypatch, "2026-09-27")
+    _FakeApis.scribe = {**_FakeApis.scribe, "words": [], "text": ""}
+    _FakeApis.groq = {"text": "", "segments": []}
+    user, meeting_id = _meeting(client, 20.4, [(0, 20400, "Hola, soy Vanina.", None)], people=True)
+    assert asyncio.run(diarization.diarize_meeting(meeting_id)) is False
+    monkeypatch.undo()
+    rows, meeting = _transcript(client, user, meeting_id)
+    assert rows == [(None, "Hola, soy Vanina.")]
+    assert meeting["meta"]["people_status"] == "failed"
+    assert all(u.credits == 0 for u in _usage(meeting_id))
+    _cleanup(meeting_id)
+
+
+def test_the_last_credit_is_spent_once_when_two_meetings_end_together(client, monkeypatch):
+    _setup(monkeypatch, "2026-09-27")
+    user, first = _meeting(client, 20.4, [(0, 20400, "Hola.", None)], people=True)
+    second = uuid.UUID(client.post("/api/meetings", json={"title": "Otra", "level": "primaria"},
+                                   headers=user.headers).json()["id"])
+    _sql("UPDATE meetings SET meta = CAST('{\"people\": true}' AS jsonb) WHERE id = :id", id=str(second))
+    rec.pcm_path(second).write_bytes(_tone(20.4))
+    # Le queda un solo crédito de los 4.
+    _sql("INSERT INTO usage_events (id, kind, provider, unit, quantity, cost_usd, credits, user_id, organization_id,"
+         " created_at) VALUES (:id, 'stt_final', 'elevenlabs', 'audio_seconds', 0, 0, 3, :u, :o, now())",
+         id=str(uuid.uuid4()), u=user.user_id, o=user.org_id)
+
+    async def both():
+        return await asyncio.gather(diarization.diarize_meeting(first), diarization.diarize_meeting(second))
+
+    results = asyncio.run(both())
+    monkeypatch.undo()
+    assert sorted(results) == [False, True]
+    spent = [u.credits for m in (first, second) for u in _usage(m)]
+    assert sum(spent) == 1
+    _cleanup(first)
+    _cleanup(second)
+
+
+def test_lines_after_the_audio_keep_no_live_label():
+    live = [(0, 1000, "dentro", "speaker_1"), (30000, 31000, "después", "speaker_1")]
+    assert diarization._after_audio(live, 20000) == [(None, "después", 30000, 31000)]
 
 
 def test_the_voice_sample_in_front_names_that_person():
@@ -249,11 +325,17 @@ def test_the_voice_sample_in_front_names_that_person():
     assert {label: v.name for label, v in known.items()} == {"speaker_1": "Mariana Gibson", "speaker_3": "Laura Pérez"}
 
 
+def test_known_voices_are_off_in_the_final_pass():
+    # En la reunión del 27/9 empeoraba la separación: apagado hasta probarlo más.
+    assert diarization.KNOWN_VOICES_IN_FINAL_PASS is False
+
+
 def test_known_voice_goes_in_front_of_the_meeting_audio(client, monkeypatch):
     import io
     import wave
 
     _setup(monkeypatch, "2026-09-27")
+    monkeypatch.setattr(diarization, "KNOWN_VOICES_IN_FINAL_PASS", True)
     user, meeting_id = _meeting(client, 20.4, [(0, 20400, "hola", None)], people=True)
     buffer = io.BytesIO()
     with wave.open(buffer, "wb") as out:
