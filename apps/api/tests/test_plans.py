@@ -254,3 +254,81 @@ def test_abuse_limits_are_enforced(client):
     client.post(f"/api/meetings/{meeting_id}/pause", headers=user.headers)
     resumed = client.post(f"/api/meetings/{meeting_id}/start", headers=user.headers)
     assert resumed.status_code == 429 and "la hora de audio" in resumed.json()["detail"]
+
+
+def _over_the_hour(user) -> None:
+    _sql("UPDATE users SET limits = CAST('{\"audio_hours_per_month\": 1}' AS jsonb) WHERE id = :id", id=user.user_id)
+    _sql("INSERT INTO usage_events (id, kind, provider, unit, quantity, cost_usd, credits, user_id, organization_id,"
+         " created_at) VALUES (:id, 'stt_live', 'groq', 'audio_seconds', 3600, 0, 0, :u, :o, now())",
+         id=str(uuid.uuid4()), u=user.user_id, o=user.org_id)
+
+
+def test_over_the_audio_hours_it_records_but_no_longer_transcribes(client, monkeypatch):
+    import echo_api.routers.live as live_module
+    from echo_api.services import diarization
+    from echo_api.services.ai_settings import SttConfig
+
+    calls = []
+
+    class GroqLike:
+        name = "groq"
+        model = "whisper-large-v3-turbo"
+
+        async def transcribe_chunk(self, *args, **kwargs):
+            calls.append(1)
+            raise AssertionError("no debería transcribir")
+
+    async def fake_resolve_stt(db, org_id):
+        return SttConfig(provider="groq", model=None, api_key="x")
+
+    monkeypatch.setattr(live_module, "resolve_stt", fake_resolve_stt)
+    monkeypatch.setattr(live_module, "get_stt_provider", lambda *args, **kwargs: GroqLike())
+    user = EchoTestUser(client, org_name=f"Colegio {uuid.uuid4().hex[:4]}")
+    meeting_id = _meeting(client, user)
+    _over_the_hour(user)
+    audio = _tone(5.0) + _silence(1.0)
+    seen = []
+    with client.websocket_connect(f"/api/meetings/{meeting_id}/ws?token={user.token}") as websocket:
+        websocket.send_text(json.dumps({"type": "hello", "role": "recorder", "sample_rate": 16000}))
+        assert json.loads(websocket.receive_text())["type"] == "hello_ack"
+        for start in range(0, len(audio), 3200):
+            websocket.send_bytes(audio[start:start + 3200])
+        websocket.send_text(json.dumps({"type": "flush"}))
+        while "flushed" not in seen:
+            message = json.loads(websocket.receive_text())
+            seen.append(message.get("code") or message["type"])
+    assert "audio_limit" in seen and calls == []
+    # La grabación siguió: el audio de trabajo está entero.
+    assert rec.pcm_path(meeting_id).stat().st_size == len(audio)
+    # Y la pasada final tampoco la transcribe.
+    meta = _run(_meta(meeting_id))
+    assert meta["audio_limit"] is True
+    assert _run(diarization.diarize_meeting(meeting_id)) is False
+    rec.pcm_path(meeting_id).unlink(missing_ok=True)
+
+
+async def _meta(meeting_id):
+    async with SessionLocal() as db:
+        return (await db.get(Meeting, meeting_id)).meta
+
+
+def test_imports_count_and_respect_the_audio_hours(client):
+    user = EchoTestUser(client, org_name=f"Colegio {uuid.uuid4().hex[:4]}")
+    imported = client.post("/api/meetings", json={"title": "Zoom", "level": "primaria"}, headers=user.headers).json()["id"]
+    live = client.post("/api/meetings", json={"title": "Vivo", "level": "primaria"}, headers=user.headers).json()["id"]
+    _sql("UPDATE meetings SET audio_source = 'import' WHERE id = :id", id=imported)
+    for meeting, kind, seconds in ((imported, "stt_final", 1200), (live, "stt_live", 600), (live, "stt_final", 600)):
+        _sql("INSERT INTO usage_events (id, kind, provider, unit, quantity, cost_usd, credits, user_id, organization_id,"
+             " meeting_id, created_at) VALUES (:id, :k, 'groq', 'audio_seconds', :q, 0, 0, :u, :o, :m, now())",
+             id=str(uuid.uuid4()), k=kind, q=seconds, u=user.user_id, o=user.org_id, m=meeting)
+
+    async def usage():
+        async with SessionLocal() as db:
+            return await plans.month_usage(db, uuid.UUID(user.user_id))
+
+    # Lo importado cuenta por su pasada final; lo del vivo, una sola vez.
+    assert _run(usage()).audio_seconds == 1200 + 600
+    _over_the_hour(user)
+    sent = client.post(f"/api/meetings/{imported}/import", files={"file": ("a.mp3", b"ID3", "audio/mpeg")},
+                       headers=user.headers)
+    assert sent.status_code == 429 and "audio" in sent.json()["detail"]

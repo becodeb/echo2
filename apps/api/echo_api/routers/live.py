@@ -45,6 +45,7 @@ from ..services.ai_settings import get_vocabulary, resolve_stt
 from ..services.background import spawn
 from ..services.insights_live import maybe_extract_live_insights
 from ..services.live_bus import live_bus
+from ..services import plans
 from ..services.plans import record_usage, stt_cost
 from ..services.recording import PcmWriter, is_enabled, pcm_path, update_state
 from ..services.stt import get_stt_provider
@@ -232,6 +233,8 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
     # False = el recorder transcribe en su máquina (bridge) y manda audio solo
     # para grabar.
     transcribe = True
+    # Horas de audio del mes (§2.2): pasado el tope, se graba sin transcribir.
+    audio_guard = plans.AudioGuard(meeting.id, meeting.organization_id, user.id)
 
     async def forward_bus():
         try:
@@ -275,6 +278,13 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
             # solo queda a la mitad de volumen.
             tracks = [mic_track, system_track]
 
+        if not await audio_guard.allowed(offset):
+            if not audio_guard.warned:
+                audio_guard.warned = True
+                await live_bus.publish(
+                    channel, {"type": "warning", "code": "audio_limit", "message": plans.AUDIO_LIMIT_MESSAGE}
+                )
+            return
         # Whisper alucina créditos de subtitulado sobre silencio; además una
         # llamada por ventana muda es gasto puro.
         if all(is_silent(track, sample_rate) for track in tracks):

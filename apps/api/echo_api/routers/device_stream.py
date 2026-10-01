@@ -24,6 +24,7 @@ from ..db import SessionLocal, get_db
 from ..models import Device, Meeting, OrganizationMember
 from ..routers.live import _record_live_usage, _store_segment
 from ..security import hash_refresh_token
+from ..services import plans
 from ..services.ai_settings import get_vocabulary, resolve_stt
 from ..services.background import spawn
 from ..services.insights_live import maybe_extract_live_insights
@@ -186,6 +187,8 @@ async def device_stream(websocket: WebSocket):
     stream_offset_ms = 0
     channel = str(meeting.id)
     segments_since_insights = 0
+    # Horas de audio del mes de quien administra la sede (§2.2).
+    audio_guard = plans.AudioGuard(meeting.id, meeting.organization_id, meeting.created_by)
 
     async def flush(upto: int | None = None):
         nonlocal audio_buffer, stream_offset_ms, segments_since_insights, previous_text
@@ -197,7 +200,7 @@ async def device_stream(websocket: WebSocket):
         duration_ms = int(len(chunk) / 2 / sample_rate * 1000)
         offset = stream_offset_ms
         stream_offset_ms += duration_ms
-        if is_silent(chunk, sample_rate):
+        if is_silent(chunk, sample_rate) or not await audio_guard.allowed(offset):
             del chunk
             return
         try:

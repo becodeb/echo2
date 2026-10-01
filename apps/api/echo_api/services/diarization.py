@@ -284,6 +284,9 @@ async def diarize_meeting(meeting_id: uuid.UUID) -> bool:
         if meeting is None:
             return False
         organization_id, created_by = meeting.organization_id, meeting.created_by
+        if (meeting.meta or {}).get("audio_limit"):
+            # Se pasó de las horas de audio del mes: queda lo transcripto en vivo.
+            return False
         # Decidir y reservar los créditos van juntos y de a una reunión por
         # persona: si le queda 1 crédito y terminan dos reuniones a la vez,
         # solo una lo gasta (la otra sale sin personas).

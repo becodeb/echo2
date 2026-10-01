@@ -158,7 +158,21 @@ async def month_usage(db: AsyncSession, user_id: uuid.UUID, now: datetime | None
             .group_by(UsageEvent.kind)
         )
     ).all()
-    usage = MonthUsage()
+    # Lo importado no pasa por el en vivo: su audio es el de la pasada final.
+    # (Las de la web y los dispositivos ya suman por stt_live; no se cuentan dos veces.)
+    imported = (
+        await db.execute(
+            select(func.coalesce(func.sum(UsageEvent.quantity), 0.0))
+            .join(Meeting, Meeting.id == UsageEvent.meeting_id)
+            .where(
+                UsageEvent.user_id == user_id,
+                UsageEvent.created_at >= month_start(now),
+                UsageEvent.kind == "stt_final",
+                Meeting.audio_source == "import",
+            )
+        )
+    ).scalar_one()
+    usage = MonthUsage(audio_seconds=float(imported))
     for kind, credits, quantity, individual in rows:
         usage.credits += int(credits)
         if kind == "voice":
@@ -219,6 +233,51 @@ async def check_audio_month(db: AsyncSession, org: Organization, user: User) -> 
 
 class LimitReached(Exception):
     """Se llegó a un tope del plan; el mensaje es para la persona."""
+
+
+AUDIO_CHECK_EVERY_MS = 5 * 60 * 1000
+AUDIO_LIMIT_MESSAGE = (
+    "Llegaste a las horas de audio de este mes: la grabación sigue, pero ya no se transcribe. "
+    "Se renuevan el 1°."
+)
+
+
+class AudioGuard:
+    """Tope de horas de audio durante una grabación (en vivo o de un dispositivo).
+
+    Mira al empezar y cada 5 minutos de audio; si se pasó, deja de transcribir
+    (la grabación sigue) y marca la reunión para que la pasada final tampoco
+    la transcriba.
+    """
+
+    def __init__(self, meeting_id: uuid.UUID, organization_id: uuid.UUID, user_id: uuid.UUID | None):
+        self.meeting_id, self.organization_id, self.user_id = meeting_id, organization_id, user_id
+        self.next_check_ms = 0
+        self.over = False
+        self.warned = False
+
+    async def allowed(self, offset_ms: int) -> bool:
+        if self.over or self.user_id is None:
+            return not self.over
+        if offset_ms < self.next_check_ms:
+            return True
+        self.next_check_ms = offset_ms + AUDIO_CHECK_EVERY_MS
+        from ..db import SessionLocal
+
+        async with SessionLocal() as db:
+            org = await db.get(Organization, self.organization_id)
+            user = await db.get(User, self.user_id)
+            if org is None or user is None:
+                return True
+            try:
+                await check_audio_month(db, org, user)
+            except LimitReached:
+                self.over = True
+                meeting = await db.get(Meeting, self.meeting_id)
+                if meeting is not None:
+                    meeting.meta = {**(meeting.meta or {}), "audio_limit": True}
+                    await db.commit()
+        return not self.over
 
 
 @dataclass
