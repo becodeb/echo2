@@ -286,6 +286,8 @@ export interface LetterheadOut {
   signatures: string[];
   logo_data_url: string | null;
   interview_place: string;
+  /** Fuente del acta impresa, en Word y en PDF. */
+  font: "arial" | "calibri" | "times";
 }
 
 export interface FamilyMemberOut {

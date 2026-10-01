@@ -326,3 +326,24 @@ def test_google_doc_export_needs_connected_drive(client):
         assert "Drive" in response.json()["detail"]
     unknown = client.post(f"/api/meetings/{meeting_id}/export/otra/google-doc", headers=user.headers)
     assert unknown.status_code == 404
+
+
+def test_the_acta_uses_the_font_the_school_chose(client):
+    import io
+    import uuid
+
+    from docx import Document
+
+    user = EchoTestUser(client, name="Fuente", org_name=f"Org Fuente {uuid.uuid4().hex[:4]}")
+    meeting_id = client.post("/api/meetings", json={"title": "Acta"}, headers=user.headers).json()["id"]
+    client.post(f"/api/meetings/{meeting_id}/minutes/versions", json={"body_markdown": "# Acta\n\nTexto."},
+                headers=user.headers)
+    assert client.get("/api/org/letterhead", headers=user.headers).json()["font"] == "arial"
+    saved = client.put("/api/org/letterhead", json={"font": "times"}, headers=user.headers)
+    assert saved.status_code == 200 and saved.json()["font"] == "times"
+    assert client.put("/api/org/letterhead", json={"font": "comic"}, headers=user.headers).status_code == 422
+
+    docx = client.get(f"/api/meetings/{meeting_id}/export/minutes.docx", headers=user.headers).content
+    assert Document(io.BytesIO(docx)).styles["Normal"].font.name == "Times New Roman"
+    pdf = client.get(f"/api/meetings/{meeting_id}/export/minutes.pdf", headers=user.headers).content
+    assert b"Times-Roman" in pdf

@@ -1,6 +1,7 @@
 """Acta: lectura, edición (nueva versión), estados, plantillas y resúmenes."""
 import uuid
 from datetime import UTC, datetime
+from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
@@ -437,6 +438,14 @@ LOGO_PREFIXES = (
 LOGO_MAX_CHARS = 600_000  # unos 450 KB de imagen
 
 
+# Fuentes del acta: nombre para Word, y la de PDF que más se le parece.
+ACTA_FONTS = {
+    "arial": ("Arial", "Helvetica"),
+    "calibri": ("Calibri", "Helvetica"),
+    "times": ("Times New Roman", "Times-Roman"),
+}
+
+
 class LetterheadIn(BaseModel):
     institution: str = Field(default="", max_length=200)
     lines: list[str] = Field(default_factory=list, max_length=8)
@@ -449,6 +458,9 @@ class LetterheadIn(BaseModel):
     # Acta de entrevista: cómo se nombra el lugar en el párrafo fijo del
     # formulario ("A los … días … en las instalaciones de {esto}, se reúnen…").
     interview_place: str = Field(default="", max_length=400)
+    # La fuente del acta (impresa, Word y PDF): hay colegios que tienen que
+    # presentarlas en una en particular.
+    font: Literal["arial", "calibri", "times"] = "arial"
 
     @field_validator("lines", "signatures")
     @classmethod
@@ -477,6 +489,7 @@ def _letterhead_out(org: Organization) -> dict:
         "signatures": data.get("signatures") if data.get("signatures") is not None else ["Firma", "Firma"],
         "logo_data_url": data.get("logo_data_url") or None,
         "interview_place": data.get("interview_place") or "",
+        "font": data.get("font") if data.get("font") in ACTA_FONTS else "arial",
     }
 
 

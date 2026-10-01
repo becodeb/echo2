@@ -2,6 +2,7 @@ import { useEffect, useState, type ChangeEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api/client";
 import type { LetterheadOut } from "../../api/types";
+import { Select } from "../../components/Select";
 import { Button, Card, Input, Spinner } from "../../components/ui";
 
 const LOGO_MAX_BYTES = 400 * 1024;
@@ -117,6 +118,17 @@ export function LetterheadSection() {
           <Input label="Email" value={form.email} onChange={set("email")} />
         </div>
         <Input label="Título del acta" value={form.title} onChange={set("title")} placeholder="Acta de entrevista" />
+        <Select
+          label="Fuente del acta"
+          value={form.font ?? "arial"}
+          onChange={(font) => setForm({ ...form, font: font as LetterheadOut["font"] })}
+          options={[
+            { value: "arial", label: "Arial (sans serif)" },
+            { value: "calibri", label: "Calibri (sans serif)" },
+            { value: "times", label: "Times New Roman (con serif)" },
+          ]}
+        />
+        <p className="-mt-2 text-xs text-ink-400">Se usa en el acta impresa, en Word y en PDF.</p>
         <Input
           label="Lugar en el acta de entrevista"
           value={form.interview_place}

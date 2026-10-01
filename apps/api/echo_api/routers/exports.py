@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
 from ..deps import OrgContext, get_meeting_or_404, get_org_context
-from ..models import Minutes, MinutesVersion
+from ..models import Minutes, MinutesVersion, Organization
 from ..services.drive import DriveError, get_user_connection, upload_google_doc
 from ..services.transcript_util import format_ms, load_transcript_lines
 
@@ -55,11 +55,24 @@ async def _get_minutes_markdown(db: AsyncSession, meeting_id: uuid.UUID) -> str:
     return version.body_markdown
 
 
-def _markdown_to_docx(markdown: str, title: str) -> bytes:
+def _font_of(org: Organization | None) -> tuple[str, str]:
+    """(fuente de Word, fuente de PDF) del acta de esta organización."""
+    from .minutes import ACTA_FONTS
+
+    key = ((org.letterhead or {}) if org else {}).get("font") or "arial"
+    return ACTA_FONTS.get(key, ACTA_FONTS["arial"])
+
+
+def _markdown_to_docx(markdown: str, title: str, font: str = "Arial") -> bytes:
     from docx import Document
 
     document = Document()
     document.core_properties.title = title
+    for style in ("Normal", "Title", "Heading 1", "Heading 2", "Heading 3", "List Bullet", "Intense Quote"):
+        try:
+            document.styles[style].font.name = font
+        except KeyError:
+            pass
     table = None
     for raw_line in markdown.splitlines():
         line = raw_line.rstrip()
@@ -105,7 +118,7 @@ def _add_runs_with_bold(paragraph, text: str) -> None:
         run.bold = index % 2 == 1
 
 
-def _markdown_to_pdf(markdown: str, title: str) -> bytes:
+def _markdown_to_pdf(markdown: str, title: str, font: str = "Helvetica") -> bytes:
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import mm
@@ -119,7 +132,10 @@ def _markdown_to_pdf(markdown: str, title: str) -> bytes:
         leftMargin=22 * mm, rightMargin=22 * mm, topMargin=20 * mm, bottomMargin=20 * mm,
     )
     styles = getSampleStyleSheet()
-    body_style = ParagraphStyle("EchoBody", parent=styles["BodyText"], fontSize=10, leading=14)
+    bold = {"Helvetica": "Helvetica-Bold", "Times-Roman": "Times-Bold"}.get(font, font)
+    for name in ("Title", "Heading2", "Heading3"):
+        styles[name].fontName = bold
+    body_style = ParagraphStyle("EchoBody", parent=styles["BodyText"], fontName=font, fontSize=10, leading=14)
     elements = []
     table_rows: list[list[str]] = []
 
@@ -192,14 +208,14 @@ async def export_minutes(
             headers=_attachment(f"{filename}.txt"),
         )
     if fmt == "docx":
-        blob = _markdown_to_docx(markdown, meeting.title)
+        blob = _markdown_to_docx(markdown, meeting.title, _font_of(await db.get(Organization, meeting.organization_id))[0])
         return Response(
             blob,
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             headers=_attachment(f"{filename}.docx"),
         )
     if fmt == "pdf":
-        blob = _markdown_to_pdf(markdown, meeting.title)
+        blob = _markdown_to_pdf(markdown, meeting.title, _font_of(await db.get(Organization, meeting.organization_id))[1])
         return Response(
             blob, media_type="application/pdf",
             headers=_attachment(f"{filename}.pdf"),
