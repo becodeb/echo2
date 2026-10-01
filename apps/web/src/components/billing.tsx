@@ -113,8 +113,9 @@ export function AnimatedNumber({
   format?: (n: number) => string;
   duration?: number;
 }) {
-  const [shown, setShown] = useState(value);
-  const from = useRef(value);
+  // Arranca de cero y cuenta hasta el valor (antes aparecía ya en el final).
+  const [shown, setShown] = useState(0);
+  const from = useRef(0);
   useEffect(() => {
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     const start = from.current;

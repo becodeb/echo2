@@ -15,7 +15,7 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, null, select
 from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -225,6 +225,8 @@ def month_range(month: str | None) -> tuple[datetime, datetime]:
     if month:
         try:
             year, number = (int(part) for part in month.split("-", 1))
+            if not (2020 <= year <= 2100 and 1 <= number <= 12) or len(month) != 7:
+                raise ValueError(month)
             start = datetime(year, number, 1, tzinfo=plans.ARGENTINA).astimezone(UTC)
         except (ValueError, TypeError) as error:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Mes inválido (AAAA-MM)") from error
@@ -266,9 +268,18 @@ class UsageOut(BaseModel):
 
 
 async def usage_by_person(db: AsyncSession, start: datetime, end: datetime, *conditions) -> list[PersonUsage]:
+    return (await usage_by_org(db, start, end, *conditions, split=False)).get(None, [])
+
+
+async def usage_by_org(
+    db: AsyncSession, start: datetime, end: datetime, *conditions, split: bool = True
+) -> dict[uuid.UUID | None, list[PersonUsage]]:
+    """El consumo por persona, separado por organización (una sola consulta)."""
+    org_column = UsageEvent.organization_id if split else null()
     rows = (
         await db.execute(
             select(
+                org_column,
                 UsageEvent.user_id,
                 UsageEvent.kind,
                 UsageEvent.provider,
@@ -281,16 +292,20 @@ async def usage_by_person(db: AsyncSession, start: datetime, end: datetime, *con
                 func.bool_or(UsageEvent.meta["price_unknown"].astext == "true"),
             )
             .where(UsageEvent.created_at >= start, UsageEvent.created_at < end, *conditions)
-            .group_by(UsageEvent.user_id, UsageEvent.kind, UsageEvent.provider, UsageEvent.model, UsageEvent.unit)
+            .group_by(
+                *([UsageEvent.organization_id] if split else []),
+                UsageEvent.user_id, UsageEvent.kind, UsageEvent.provider, UsageEvent.model, UsageEvent.unit,
+            )
         )
     ).all()
-    user_ids = {row[0] for row in rows if row[0] is not None}
+    user_ids = {row[1] for row in rows if row[1] is not None}
     users = {
         user.id: user
         for user in (await db.execute(select(User).where(User.id.in_(user_ids or [uuid.uuid4()])))).scalars()
     }
-    people: dict[uuid.UUID | None, PersonUsage] = {}
-    for user_id, kind, provider, model, unit, quantity, cost, credits, events, unknown in rows:
+    by_org: dict[uuid.UUID | None, dict[uuid.UUID | None, PersonUsage]] = {}
+    for org_id, user_id, kind, provider, model, unit, quantity, cost, credits, events, unknown in rows:
+        people = by_org.setdefault(org_id, {})
         user = users.get(user_id)
         person = people.setdefault(
             user_id,
@@ -313,10 +328,13 @@ async def usage_by_person(db: AsyncSession, start: datetime, end: datetime, *con
             person.audio_seconds += line.quantity
         elif unit == "tokens":
             person.tokens += line.quantity
-    out = sorted(people.values(), key=lambda person: person.cost_usd, reverse=True)
-    for person in out:
-        person.cost_usd = round(person.cost_usd, 4)
-        person.lines.sort(key=lambda line: line.cost_usd, reverse=True)
+    out: dict[uuid.UUID | None, list[PersonUsage]] = {}
+    for org_id, people in by_org.items():
+        ordered = sorted(people.values(), key=lambda person: person.cost_usd, reverse=True)
+        for person in ordered:
+            person.cost_usd = round(person.cost_usd, 4)
+            person.lines.sort(key=lambda line: line.cost_usd, reverse=True)
+        out[org_id] = ordered
     return out
 
 
@@ -330,8 +348,6 @@ async def usage(
     start, end = month_range(month)
     if scope == "org":
         ctx.require_role("admin")
-        people = await usage_by_person(db, start, end, UsageEvent.organization_id == ctx.org_id)
-        # Los miembros que no gastaron nada también aparecen, en cero.
         members = (
             await db.execute(
                 select(User)
@@ -339,6 +355,12 @@ async def usage(
                 .where(OrganizationMember.organization_id == ctx.org_id, User.deleted_at.is_(None))
             )
         ).scalars().all()
+        # Solo los miembros: un superadmin que visitó la sede no figura en su consumo.
+        people = await usage_by_person(
+            db, start, end, UsageEvent.organization_id == ctx.org_id,
+            UsageEvent.user_id.in_([m.id for m in members] or [uuid.uuid4()]),
+        )
+        # Los miembros que no gastaron nada también aparecen, en cero.
         seen = {person.user_id for person in people}
         people += [
             PersonUsage(user_id=m.id, name=m.name, email=m.email, plan=m.plan, cost_usd=0, credits=0,

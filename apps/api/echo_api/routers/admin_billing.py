@@ -18,7 +18,7 @@ from ..models.billing import FEATURE_KEYS, LIMIT_KEYS
 from ..services.audit import audit
 from ..services.plans import ARGENTINA
 from .admin import get_superadmin
-from .billing import PersonUsage, month_range, usage_by_person
+from .billing import PersonUsage, month_range, usage_by_org, usage_by_person
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -234,8 +234,9 @@ async def usage_everywhere(
         for org in (await db.execute(select(Organization).where(Organization.id.in_([o for o in org_rows if o] or [uuid.uuid4()])))).scalars()
     }
     out: list[OrgUsageOut] = []
+    grouped = await usage_by_org(db, start, end)
     for org_id in org_rows:
-        people = await usage_by_person(db, start, end, UsageEvent.organization_id == org_id)
+        people = grouped.get(org_id, [])
         org = orgs.get(org_id)
         out.append(
             OrgUsageOut(

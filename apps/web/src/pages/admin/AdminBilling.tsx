@@ -5,7 +5,7 @@ import type { AdminOrgOut } from "../../api/types";
 import { Select } from "../../components/Select";
 import { AnimatedNumber, formatAudio, formatUSD, PLAN_NAME, Shimmer } from "../../components/billing";
 import { Button, Input, Spinner } from "../../components/ui";
-import { currentMonth, MonthPicker, PeopleTable, Stat, type PersonUsage } from "../Usage";
+import { currentMonth, MonthPicker, monthLabel, PeopleTable, shiftMonth, Stat, versus, type PersonUsage } from "../Usage";
 
 /**
  * Panel de superadmin: planes y topes (sin números fijos en el código: se
@@ -285,19 +285,34 @@ export function GlobalUsage() {
     queryFn: () => api<AdminUsage>(`/api/admin/usage?month=${month}`, { skipOrg: true }),
     placeholderData: keepPreviousData,
   });
-  const audio = (data?.organizations ?? []).reduce((total, org) => total + org.audio_seconds, 0);
+  const previousMonth = shiftMonth(month, -1);
+  const { data: before } = useQuery({
+    queryKey: ["admin-usage", previousMonth],
+    queryFn: () => api<AdminUsage>(`/api/admin/usage?month=${previousMonth}`, { skipOrg: true }),
+  });
+  const audioOf = (usage?: AdminUsage) => (usage?.organizations ?? []).reduce((total, org) => total + org.audio_seconds, 0);
+  const audio = audioOf(data);
   return (
     <div className="space-y-5">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold tracking-tight text-ink-900">
+          Consumo de {monthLabel(month).toLowerCase()}
+        </h2>
         <MonthPicker month={month} onChange={setMonth} />
       </div>
       {isLoading || !data ? (
         <Shimmer className="h-[104px]" />
       ) : (
         <div className="grid gap-3 sm:grid-cols-3">
-          <Stat label="Costo estimado total"><AnimatedNumber value={data.total_cost_usd} format={formatUSD} /></Stat>
-          <Stat label="Audio transcripto"><AnimatedNumber value={audio} format={formatAudio} /></Stat>
-          <Stat label="Créditos usados"><AnimatedNumber value={data.total_credits} /></Stat>
+          <Stat label="Costo estimado total" hint={versus(data.total_cost_usd, before?.total_cost_usd, previousMonth)}>
+            <AnimatedNumber value={data.total_cost_usd} format={formatUSD} />
+          </Stat>
+          <Stat label="Audio transcripto" hint={versus(audio, before ? audioOf(before) : undefined, previousMonth)}>
+            <AnimatedNumber value={audio} format={formatAudio} />
+          </Stat>
+          <Stat label="Créditos usados" hint={versus(data.total_credits, before?.total_credits, previousMonth)}>
+            <AnimatedNumber value={data.total_credits} />
+          </Stat>
         </div>
       )}
       <section className="rounded-3xl border border-ink-100 bg-white p-5">

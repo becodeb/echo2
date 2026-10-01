@@ -260,3 +260,17 @@ def test_the_chat_index_is_recorded_as_usage(client):
 
     [event] = asyncio.run(usage())
     assert (event.kind, event.unit, event.quantity, str(event.user_id)) == ("embeddings", "tokens", 100, user.user_id)
+
+
+def test_usage_month_is_validated_and_the_org_panel_shows_only_members(client):
+    admin = EchoTestUser(client, org_name=f"Colegio {uuid.uuid4().hex[:4]}")
+    for bad in ("9999-12", "2026-13", "2026-9", "abc"):
+        assert client.get(f"/api/billing/usage?month={bad}", headers=admin.headers).status_code == 422, bad
+    visitor = EchoTestUser(client, org_name="Becode")
+    for who, cost in ((admin.user_id, 0.5), (visitor.user_id, 9.0)):
+        _sql("INSERT INTO usage_events (id, kind, provider, unit, quantity, cost_usd, credits, user_id, organization_id,"
+             " created_at) VALUES (gen_random_uuid(), 'llm', 'openai', 'tokens', 100, :c, 0, :u, :o, now())",
+             c=cost, u=who, o=admin.org_id)
+    panel = client.get("/api/billing/usage?scope=org", headers=admin.headers).json()
+    assert [p["user_id"] for p in panel["people"]] == [admin.user_id]
+    assert panel["total_cost_usd"] == 0.5

@@ -80,15 +80,52 @@ export function shiftMonth(month: string, delta: number): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
+/** "septiembre" (sin el año), para títulos y comparaciones. */
+export function monthName(month: string): string {
+  const [year, number] = month.split("-").map(Number);
+  return new Date(year, number - 1, 1).toLocaleDateString("es-AR", { month: "long" });
+}
+
+/** "+12% que en agosto": la comparación con el mes anterior. */
+export function versus(value: number, previous: number | undefined, previousMonth: string): string | undefined {
+  if (previous === undefined) return undefined;
+  if (previous === 0) return value === 0 ? `Igual que en ${monthName(previousMonth)}` : `En ${monthName(previousMonth)}: nada`;
+  const change = Math.round(((value - previous) / previous) * 100);
+  if (change === 0) return `Igual que en ${monthName(previousMonth)}`;
+  return `${change > 0 ? "+" : ""}${change}% que en ${monthName(previousMonth)}`;
+}
+
+/**
+ * El mes que se mira: el anterior y el actual a la vista ("Septiembre ·
+ * Octubre", el cambio de mes es cuando el panel "da cero") y flechas para
+ * los más viejos.
+ */
 export function MonthPicker({ month, onChange }: { month: string; onChange: (month: string) => void }) {
-  const isCurrent = month >= currentMonth();
+  const current = currentMonth();
+  const previous = shiftMonth(current, -1);
+  const isCurrent = month >= current;
   const arrow = "rounded-full p-2 text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900 disabled:opacity-30 disabled:hover:bg-transparent";
+  const pill = (value: string, label: string) => (
+    <button
+      key={value}
+      type="button"
+      onClick={() => onChange(value)}
+      aria-pressed={month === value}
+      className={`min-h-9 rounded-full px-3.5 text-sm font-medium capitalize transition-colors ${
+        month === value ? "bg-ink-900 text-white" : "text-ink-600 hover:bg-ink-100"
+      }`}
+    >
+      {label}
+    </button>
+  );
   return (
-    <div className="inline-flex items-center gap-1 rounded-full border border-ink-100 bg-white p-1">
+    <div className="inline-flex items-center gap-1 rounded-full border border-ink-100 bg-white p-1" role="group" aria-label="Mes">
       <button type="button" className={arrow} onClick={() => onChange(shiftMonth(month, -1))} aria-label="Mes anterior">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M10 3 5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </button>
-      <span className="min-w-[130px] text-center text-sm font-medium text-ink-800" aria-live="polite">{monthLabel(month)}</span>
+      {month < previous && pill(month, monthLabel(month))}
+      {pill(previous, monthName(previous))}
+      {pill(current, monthName(current))}
       <button type="button" className={arrow} onClick={() => onChange(shiftMonth(month, 1))} disabled={isCurrent} aria-label="Mes siguiente">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="m6 3 5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </button>
@@ -96,7 +133,7 @@ export function MonthPicker({ month, onChange }: { month: string; onChange: (mon
   );
 }
 
-export function Stat({ label, children }: { label: string; children: React.ReactNode }) {
+export function Stat({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
   return (
     <div className="min-w-0 rounded-3xl border border-ink-100 bg-white p-4 sm:p-5">
       <p className="text-xs font-medium text-ink-400">{label}</p>
@@ -104,6 +141,7 @@ export function Stat({ label, children }: { label: string; children: React.React
       <p className="mt-2 break-words text-[19px] font-semibold leading-tight tracking-tight text-ink-900 tabular-nums sm:whitespace-nowrap sm:text-[26px]">
         {children}
       </p>
+      {hint && <p className="mt-1 text-xs text-ink-500">{hint}</p>}
     </div>
   );
 }
@@ -181,7 +219,7 @@ export default function Usage() {
         <div>
           <p className="text-sm font-medium text-ink-400">Consumo</p>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-900">
-            {effectiveScope === "org" ? `Lo que usó ${activeOrg?.name}` : "Lo que usaste"}
+            {effectiveScope === "org" ? `Lo que usó ${activeOrg?.name}` : "Lo que usaste"} en {monthName(month)}
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-3">
