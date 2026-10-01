@@ -25,6 +25,11 @@ reunión queda con "personas pendientes" y `retry_pending_people` vuelve a
 intentar más tarde con una copia comprimida del audio. No se etiqueta mal:
 mientras tanto, no hay personas.
 
+Si el que falla es Groq, no hay otro proveedor de respaldo (OpenAI no recibe
+audio): queda el texto en vivo, se guarda una copia comprimida del audio
+(como mucho 48 h) y `retry_pending_text` la vuelve a mandar a Groq más tarde.
+Quien grabó recibe un aviso.
+
 `name_speakers` le pide después a la IA que deduzca quién es cada persona sin
 nombre ("Mamá de Pedro"). Si no está segura, queda como sugerencia.
 """
@@ -49,6 +54,7 @@ from ..models import (
     InternalGroup,
     Meeting,
     MeetingParticipant,
+    Notification,
     OrganizationMember,
     Speaker,
     TranscriptSegment,
@@ -61,7 +67,6 @@ from .ai_settings import get_vocabulary, resolve_stt
 from .recording import pcm_path, recordings_dir
 from .stt.base import (
     SCRIBE_MODEL,
-    FallbackSttProvider,
     SttResult,
     SttSegment,
     SttWord,
@@ -112,6 +117,11 @@ class KnownVoice:
 
 def _normalize(text: str) -> str:
     return " ".join(re.sub(r"[^\wáéíóúüñ ]", " ", (text or "").lower()).split())
+
+
+def text_retry_path(meeting_id: uuid.UUID) -> Path:
+    """Copia del audio para reintentar el texto cuando Groq no respondió."""
+    return recordings_dir() / f"{meeting_id}.text.mp3"
 
 
 def people_path(meeting_id: uuid.UUID) -> Path:
@@ -253,21 +263,9 @@ def _part_ranges(handle, size: int) -> list[tuple[int, int]]:
 
 
 def _text_engine(config):
-    """El motor de la pasada sin personas: Groq, y si se cae, OpenAI (si hay key).
-
-    Sin key de Groq en el servidor, el motor de la sede (así un audio
-    importado se transcribe igual)."""
+    """El motor de la pasada sin personas: Groq, sin respaldo en otro proveedor."""
     groq = _groq_key(config)
-    openai = get_settings().openai_api_key
-    if groq:
-        chain = [get_stt_provider("groq", groq)] + ([get_stt_provider("openai", openai)] if openai else [])
-    elif config is not None:
-        chain = [get_stt_provider(config.provider, config.api_key, config.model)]
-        if openai and config.provider != "openai":
-            chain.append(get_stt_provider("openai", openai))
-    else:
-        return None
-    return chain[0] if len(chain) == 1 else FallbackSttProvider(chain)
+    return get_stt_provider("groq", groq) if groq else None
 
 
 async def _text_rows(path: Path, provider, language: str | None, vocabulary: list[str]) -> list[Row]:
@@ -453,19 +451,154 @@ async def diarize_meeting(meeting_id: uuid.UUID) -> bool:
         rows = await _text_rows(path, engine, language, vocabulary)
     except Exception as exc:  # noqa: BLE001 - queda el transcript en vivo
         log.warning("pasada final sin personas falló en %s: %s", meeting_id, exc)
+        await _keep_for_text_retry(meeting_id, path, total_ms, decision.reason)
         return False
+    await _record_text_usage(engine, total_ms, organization_id, created_by, meeting_id, decision.reason)
+    if rows:
+        await _replace_transcript(meeting_id, [(None, line, start, end) for _, line, start, end in rows] + after, {})
+    return False
+
+
+async def _record_text_usage(engine, total_ms: int, organization_id, created_by, meeting_id, reason) -> None:
     name, model = engine.name, getattr(engine, "model", None)
     async with SessionLocal() as db:
         await plans.record_usage(
             db, kind="stt_final", provider=name, model=model, unit="audio_seconds",
             quantity=total_ms / 1000, cost_usd=plans.stt_cost(name, model, total_ms / 1000),
             organization_id=organization_id, user_id=created_by, meeting_id=meeting_id,
-            meta={"reason": decision.reason},
+            meta={"reason": reason},
         )
         await db.commit()
-    if rows:
-        await _replace_transcript(meeting_id, [(None, line, start, end) for _, line, start, end in rows] + after, {})
-    return False
+
+
+async def _notify_creator(meeting_id: uuid.UUID, title: str, body: str) -> None:
+    """Aviso en la campanita de quien grabó (las de un Echo Device no tienen persona)."""
+    async with SessionLocal() as db:
+        meeting = await db.get(Meeting, meeting_id)
+        if meeting is None or meeting.created_by is None:
+            return
+        db.add(
+            Notification(
+                user_id=meeting.created_by, organization_id=meeting.organization_id, kind="transcript_status",
+                title=title[:300], body=body, link=f"/meetings/{meeting_id}",
+            )
+        )
+        await db.commit()
+
+
+async def _keep_for_text_retry(meeting_id: uuid.UUID, path: Path, total_ms: int, reason: str | None) -> None:
+    """Groq no respondió: se guarda el audio comprimido para reintentar.
+
+    Si ElevenLabs también quedó pendiente, su reintento ya trae el texto: no
+    hace falta otra copia.
+    """
+    async with SessionLocal() as db:
+        meeting = await db.get(Meeting, meeting_id)
+        if meeting is None or (meeting.meta or {}).get("people_status") == "pending":
+            return
+    target = text_retry_path(meeting_id)
+    try:
+        await _encode_mp3([path], target)
+    except Exception as exc:  # noqa: BLE001 - sin copia queda el texto en vivo
+        log.warning("no se pudo guardar el audio de %s para reintentar el texto: %s", meeting_id, exc)
+        target.unlink(missing_ok=True)
+        return
+    await _update_meta(
+        meeting_id, text_status="pending", text_retry={"total_ms": total_ms, "attempts": 1, "reason": reason}
+    )
+    await _notify_creator(
+        meeting_id,
+        "La transcripción completa se demora",
+        "El servicio de transcripción no respondió. Por ahora queda el texto en vivo; Echo lo vuelve a "
+        "intentar solo y te avisa. El audio se guarda como mucho 48 horas.",
+    )
+
+
+async def _decode_mp3(source: Path, target: Path) -> None:
+    """mp3 → PCM16 mono 16 kHz, lo que lee `_text_rows`."""
+    process = await asyncio.create_subprocess_exec(
+        "ffmpeg", "-y", "-loglevel", "error", "-i", str(source),
+        "-ac", "1", "-ar", str(SAMPLE_RATE), "-f", "s16le", str(target),
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    _, stderr = await process.communicate()
+    if process.returncode != 0:
+        raise RuntimeError((stderr or b"").decode(errors="ignore")[-300:] or "ffmpeg falló")
+
+
+async def retry_pending_text() -> int:
+    """Vuelve a mandar a Groq las reuniones cuyo texto quedó pendiente.
+
+    Como con las personas: si alguien corrigió el transcript a mano, no se pisa.
+    """
+    done = 0
+    async with SessionLocal() as db:
+        pending = (
+            (
+                await db.execute(
+                    select(Meeting).where(
+                        Meeting.deleted_at.is_(None),
+                        Meeting.status == "completed",
+                        Meeting.meta["text_status"].astext == "pending",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        jobs = [
+            (m.id, m.organization_id, m.created_by, m.language, dict((m.meta or {}).get("text_retry") or {}))
+            for m in pending
+        ]
+    for meeting_id, organization_id, created_by, language, retry in jobs:
+        audio = text_retry_path(meeting_id)
+        if not audio.exists() or not retry:
+            await _update_meta(meeting_id, text_status="failed", text_retry=None)
+            continue
+        async with SessionLocal() as db:
+            meeting = await db.get(Meeting, meeting_id)
+            vocabulary = await _vocabulary(db, meeting) if meeting else []
+            config = await resolve_stt(db, organization_id)
+        engine = _text_engine(config)
+        language = language if language and language != "auto" else "es"
+        pcm = audio.with_name(f"{meeting_id}.text.pcm")
+        try:
+            if engine is None:
+                raise RuntimeError("sin key de Groq")
+            await _decode_mp3(audio, pcm)
+            rows = await _text_rows(pcm, engine, language, vocabulary)
+        except Exception as exc:  # noqa: BLE001 - se vuelve a intentar en la próxima vuelta
+            attempts = int(retry.get("attempts") or 1) + 1
+            log.warning("reintento de texto %s/%s falló en %s: %s", attempts, MAX_PEOPLE_ATTEMPTS, meeting_id, exc)
+            if attempts >= MAX_PEOPLE_ATTEMPTS:
+                audio.unlink(missing_ok=True)
+                await _update_meta(meeting_id, text_status="failed", text_retry=None)
+                await _notify_creator(
+                    meeting_id,
+                    "No se pudo completar la transcripción",
+                    "Quedó el texto que se tomó en vivo. El audio guardado para reintentar ya se borró.",
+                )
+            else:
+                await _update_meta(meeting_id, text_retry={**retry, "attempts": attempts})
+            continue
+        finally:
+            pcm.unlink(missing_ok=True)
+        audio.unlink(missing_ok=True)
+        total_ms = int(retry.get("total_ms") or 0)
+        await _record_text_usage(engine, total_ms, organization_id, created_by, meeting_id, retry.get("reason"))
+        after = _after_audio(await _live_rows(meeting_id), total_ms)
+        final = [(None, line, start, end) for _, line, start, end in rows] + after
+        if not rows or not await _replace_transcript(meeting_id, final, {}, only_if_unedited=True):
+            await _update_meta(meeting_id, text_status="skipped", text_retry=None)
+            continue
+        await _update_meta(meeting_id, text_status="done", text_retry=None)
+        await _after_retry(meeting_id, organization_id, created_by)
+        await _notify_creator(
+            meeting_id, "La transcripción completa ya está", "Se reemplazó el texto en vivo por la versión completa."
+        )
+        done += 1
+    return done
 
 
 def _lock_key(user_id: uuid.UUID) -> int:
@@ -704,6 +837,12 @@ async def retry_loop(interval_seconds: int = RETRY_EVERY_SECONDS) -> None:
                 log.info("personas: %s reuniones separadas en un reintento", retried)
         except Exception:  # noqa: BLE001 - el reintento nunca tira abajo la API
             log.exception("personas: falló el reintento")
+        try:
+            retried = await retry_pending_text()
+            if retried:
+                log.info("texto: %s reuniones transcriptas en un reintento", retried)
+        except Exception:  # noqa: BLE001
+            log.exception("texto: falló el reintento")
 
 
 async def _replace_transcript(

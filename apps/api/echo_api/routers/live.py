@@ -41,14 +41,13 @@ from ..db import SessionLocal
 from ..deps import user_can_access_meeting
 from ..models import Meeting, OrganizationMember, TranscriptSegment, User
 from ..security import decode_token
-from ..services.ai_settings import get_vocabulary, resolve_stt, stt_fallbacks
+from ..services.ai_settings import get_vocabulary, resolve_stt
 from ..services.background import spawn
 from ..services.insights_live import maybe_extract_live_insights
 from ..services.live_bus import live_bus
 from ..services.plans import record_usage, stt_cost
 from ..services.recording import PcmWriter, is_enabled, pcm_path, update_state
 from ..services.stt import get_stt_provider
-from ..services.stt.base import FallbackSttProvider
 from ..services.stt.windowing import find_cut
 from ..services.stt.channels import (
     attribute_speaker,
@@ -73,6 +72,8 @@ MAX_REALTIME_RATIO = 1.5
 router = APIRouter(tags=["live"])
 
 MAX_SEGMENT_CHARS = 2000
+# Espera antes de cada reintento de un tramo que Groq no transcribió.
+LIVE_RETRY_WAITS = (1.0, 4.0)
 
 
 async def _authorize(websocket: WebSocket, meeting_id: uuid.UUID) -> tuple[Meeting, User] | None:
@@ -279,14 +280,16 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
         if all(is_silent(track, sample_rate) for track in tracks):
             del chunk
             return
-        # Un error suelto (timeout, 5xx, rate limit) se reintenta una vez: sin
-        # eso el tramo se perdía entero.
+        # Un error suelto (timeout, 5xx, rate limit) se reintenta con espera:
+        # sin eso el tramo se perdía entero. Si Groq sigue caído, el tramo no
+        # se pierde igual: está en el audio de trabajo y la pasada final lo
+        # transcribe (o lo guarda para reintentar, services/diarization.py).
         # Sin lo último dicho como pista, solo el diccionario: en un tramo casi
         # mudo el modelo devolvía la pista tal cual (el turno gigante de las
         # 02:10 de la reunión eb3ce903), y con pista "uno dos tres probando"
         # salía 12 veces en vez de 5 (bench/casos/2026-09-30).
         result = None
-        for attempt in range(2):
+        for attempt, wait in enumerate((*LIVE_RETRY_WAITS, None)):
             try:
                 result = await stt_provider.transcribe_chunk(
                     chunk, sample_rate, language, vocabulary, offset_ms=offset
@@ -294,15 +297,20 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
                 break
             except Exception as exc:  # provider caído: avisar sin matar la reunión
                 log.warning("stt cloud error (intento %d): %s", attempt + 1, exc)
-                if attempt == 0:
-                    await asyncio.sleep(1)
+                if wait is not None:
+                    await asyncio.sleep(wait)
         del chunk  # descartar el audio explícitamente
         if result is None:
             if not stt_error_sent:
                 stt_error_sent = True
                 await live_bus.publish(
                     channel,
-                    {"type": "warning", "code": "stt_error", "message": "El motor de transcripción falló; reintentando"},
+                    {
+                        "type": "warning",
+                        "code": "stt_error",
+                        "message": "La transcripción en vivo se demora. El audio se sigue guardando y "
+                        "se transcribe completo al finalizar.",
+                    },
                 )
             return
         stt_error_sent = False
@@ -397,11 +405,9 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
                             )
                         )
                         continue
-                    # Con respaldo: si Groq se cae, el tramo va a OpenAI.
-                    chain = [
-                        get_stt_provider(c.provider, c.api_key, c.model) for c in [config, *stt_fallbacks(config)]
-                    ]
-                    stt_provider = chain[0] if len(chain) == 1 else FallbackSttProvider(chain)
+                    # Sin respaldo en otro proveedor (OpenAI no recibe audio): si Groq
+                    # no responde, se reintenta y el tramo sale en la pasada final.
+                    stt_provider = get_stt_provider(config.provider, config.api_key, config.model)
                 audio_buffer.extend(message["bytes"])
                 cut = find_cut(bytes(audio_buffer), sample_rate, channels)
                 if cut:

@@ -197,41 +197,39 @@ def test_a_short_answer_said_twice_is_kept():
     assert repeats_previous("Uno dos tres probando.", "Uno dos tres.") is False
 
 
-def test_groq_transcribes_before_openai_when_both_keys_are_there(monkeypatch):
-    from echo_api.config import get_settings
-    from echo_api.services import ai_settings
-
-    async def no_org_settings(db, org_id):
-        return None
-
-    monkeypatch.setattr(ai_settings, "get_org_ai_settings", no_org_settings)
-    monkeypatch.setattr(get_settings(), "openai_api_key", "sk-openai")
-    monkeypatch.setattr(get_settings(), "groq_api_key", "gsk-groq")
-    config = asyncio.run(ai_settings.resolve_stt(None, uuid.uuid4()))
-    assert (config.provider, config.api_key) == ("groq", "gsk-groq")
-
-
-def test_a_campus_that_picked_openai_without_its_own_key_uses_groq(monkeypatch):
+def test_audio_only_goes_to_groq_whatever_the_campus_saved(monkeypatch):
+    """OpenAI no recibe audio: ni por defecto, ni como respaldo, ni porque una
+    sede lo haya elegido con su key (los colegios ya no eligen motor)."""
     from types import SimpleNamespace
 
     from echo_api.config import get_settings
-    from echo_api.services import ai_settings
+    from echo_api.services import ai_settings, diarization
 
-    picked = SimpleNamespace(stt_provider="openai", stt_model=None, stt_api_key_enc=None)
+    picked = SimpleNamespace(stt_provider="openai", stt_model=None, stt_api_key_enc="cifrada")
 
     async def org_settings(db, org_id):
         return picked
 
     monkeypatch.setattr(ai_settings, "get_org_ai_settings", org_settings)
+    monkeypatch.setattr(ai_settings, "decrypt_secret", lambda value: "sk-propia")
     monkeypatch.setattr(get_settings(), "openai_api_key", "sk-openai")
     monkeypatch.setattr(get_settings(), "groq_api_key", "gsk-groq")
     config = asyncio.run(ai_settings.resolve_stt(None, uuid.uuid4()))
     assert (config.provider, config.api_key) == ("groq", "gsk-groq")
-    # Con su propia key, usa lo que eligió.
-    monkeypatch.setattr(ai_settings, "decrypt_secret", lambda value: "sk-propia")
-    picked.stt_api_key_enc = "cifrada"
-    config = asyncio.run(ai_settings.resolve_stt(None, uuid.uuid4()))
-    assert (config.provider, config.api_key) == ("openai", "sk-propia")
+    assert diarization._text_engine(config).name == "groq"
+    # Sin Groq no hay transcripción en la nube, en vez de caer en OpenAI.
+    monkeypatch.setattr(get_settings(), "groq_api_key", "")
+    assert asyncio.run(ai_settings.resolve_stt(None, uuid.uuid4())) is None
+    assert diarization._text_engine(None) is None
+
+
+def test_a_campus_can_only_choose_the_language_of_the_minutes(client):
+    admin = EchoTestUser(client, org_name=f"Colegio {uuid.uuid4().hex[:4]}")
+    assert client.get("/api/org/ai-settings", headers=admin.headers).json() == {"minutes_language": "es"}
+    saved = client.put("/api/org/ai-settings", json={"minutes_language": "en", "stt_provider": "openai",
+                                                     "stt_api_key": "sk-x"}, headers=admin.headers)
+    assert saved.status_code == 200 and saved.json() == {"minutes_language": "en"}
+    assert client.put("/api/org/ai-settings", json={"minutes_language": "xx"}, headers=admin.headers).status_code == 422
 
 
 def test_a_superadmin_visiting_a_campus_can_record(client):

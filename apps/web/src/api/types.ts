@@ -78,6 +78,8 @@ export interface MeetingOut {
     minors?: boolean;
     /** pending: ElevenLabs falló y se reintenta solo (services/diarization.py). */
     people_status?: "pending" | "done" | "failed" | "skipped";
+    /** pending: Groq no respondió en la pasada final y se reintenta solo. */
+    text_status?: "pending" | "done" | "failed" | "skipped";
     timeline?: { at_ms: number; label: string }[];
     next_steps?: string[];
     mentions?: Record<string, unknown>;

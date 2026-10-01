@@ -24,13 +24,12 @@ from ..db import SessionLocal, get_db
 from ..models import Device, Meeting, OrganizationMember
 from ..routers.live import _record_live_usage, _store_segment
 from ..security import hash_refresh_token
-from ..services.ai_settings import get_vocabulary, resolve_stt, stt_fallbacks
+from ..services.ai_settings import get_vocabulary, resolve_stt
 from ..services.background import spawn
 from ..services.insights_live import maybe_extract_live_insights
 from ..services.live_bus import live_bus
 from ..services.recording import PcmWriter
 from ..services.stt import get_stt_provider
-from ..services.stt.base import FallbackSttProvider
 from ..services.stt.channels import (
     is_noise_transcript,
     is_prompt_echo,
@@ -172,8 +171,9 @@ async def device_stream(websocket: WebSocket):
         await websocket.close()
         return
 
-    chain = [get_stt_provider(c.provider, c.api_key, c.model) for c in [stt_config, *stt_fallbacks(stt_config)]]
-    provider = chain[0] if len(chain) == 1 else FallbackSttProvider(chain)
+    # Sin respaldo en otro proveedor: un tramo que Groq no transcribe queda en
+    # el audio de trabajo y sale en la pasada final.
+    provider = get_stt_provider(stt_config.provider, stt_config.api_key, stt_config.model)
     # Idioma fijo, como en la web: con "auto" Whisper adivina por tramo.
     language = meeting.language if meeting.language and meeting.language != "auto" else "es"
     previous_text = ""

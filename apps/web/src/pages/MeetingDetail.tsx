@@ -109,13 +109,19 @@ export default function MeetingDetail() {
             hasta entonces.
           </p>
         )}
+        {meeting.meta?.text_status === "pending" && (
+          <p className="animate-fade-up mt-3 flex items-center gap-2 rounded-2xl bg-ink-50 px-3.5 py-2.5 text-sm text-ink-600">
+            <Spinner className="h-3.5 w-3.5 shrink-0 text-ink-400" />
+            La transcripción completa se demora: por ahora ves el texto tomado en vivo. Echo lo reintenta solo y te
+            avisa cuando esté.
+          </p>
+        )}
         {meeting.meta?.minors && (
           <p className="mt-3 text-xs text-ink-400">Hablan menores de 18: esta reunión se transcribió sin separar quién habló.</p>
         )}
         {aiSkipped && (
           <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
-            El análisis con IA se salteó porque no hay un modelo configurado.{" "}
-            <Link to="/settings/ai" className="font-medium underline">Configurar IA</Link>
+            El análisis con IA se salteó porque el servicio de IA no estaba disponible en ese momento.
           </p>
         )}
       </header>

@@ -2,7 +2,9 @@
 
 `resolve_llm` baja por CUATRO niveles y devuelve el primero que resuelve:
 
-  1. **Organización** (`OrgAISettings`, key cifrada en DB) — Ajustes → IA.
+  1. **Organización** (`OrgAISettings`, key cifrada en DB) — solo la carga el
+     superadmin desde `/admin` (los colegios no eligen modelo ni ponen keys:
+     las pone Becode).
   2. **Servidor** (`ServerAISettings`, fila única en DB) — el default de la
      instalación que carga el superadmin en `/admin`. Va ANTES que el entorno
      a propósito: es lo que permite cambiar la key sin redeploy.
@@ -24,9 +26,10 @@ Dos matices que sorprenden:
   lo usa el panel de admin para probar la conexión sin tomar prestada la
   configuración de ninguna organización.
 
-Ojo: `resolve_stt` y `resolve_embeddings` NO miran `ServerAISettings`. Sólo
-tienen dos niveles (organización → entorno). El default del superadmin
-gobierna el LLM y nada más.
+`resolve_stt` y `resolve_embeddings` solo miran el entorno: la transcripción
+es siempre Groq con la key de Becode (OpenAI no recibe audio, ni como
+respaldo; docs/plan-correcciones.md §1.2) y los embeddings los pone el
+servidor. Lo que un colegio haya guardado antes en esas columnas no se usa.
 
 Nunca se expone la key completa al frontend.
 """
@@ -52,7 +55,7 @@ class LLMConfig:
 
 @dataclass
 class SttConfig:
-    provider: str  # bridge|openai|groq|deepgram|fake
+    provider: str  # groq (o fake en los tests)
     model: str | None
     api_key: str
 
@@ -139,58 +142,19 @@ async def resolve_llm(db: AsyncSession, org_id: uuid.UUID) -> LLMConfig | None:
 
 
 async def resolve_stt(db: AsyncSession, org_id: uuid.UUID) -> SttConfig | None:
+    """Groq whisper-large-v3-turbo con la key de Becode, para todas las sedes.
+
+    Sin respaldo en otro proveedor: si Groq se cae, se reintenta y el audio de
+    trabajo queda guardado para transcribirlo después (services/diarization.py).
+    """
     env = get_settings()
-    row = await get_org_ai_settings(db, org_id)
-    if row and row.stt_provider and row.stt_provider != "bridge":
-        key = decrypt_secret(row.stt_api_key_enc) if row.stt_api_key_enc else ""
-        if key:
-            # Con su propia key, la sede usa el motor que eligió (lo paga ella).
-            return SttConfig(provider=row.stt_provider, model=row.stt_model, api_key=key)
-        if row.stt_provider == "groq" or not env.groq_api_key:
-            key = _env_key_for(row.stt_provider)
-            if key:
-                return SttConfig(provider=row.stt_provider, model=row.stt_model, api_key=key)
-        # Eligió otro motor pero con la key de Becode: va Groq, como todas.
-    # Groq primero: whisper-large-v3-turbo sin pista fue lo más estable del
-    # banco (sin bucles ni idiomas inventados) y cuesta US$ 0,04/h. OpenAI
-    # queda solo si no hay otra key (docs/plan-transcripcion-y-planes.md).
     if env.groq_api_key:
         return SttConfig(provider="groq", model=None, api_key=env.groq_api_key)
-    if env.openai_api_key:
-        return SttConfig(provider="openai", model=None, api_key=env.openai_api_key)
-    if env.deepgram_api_key:
-        return SttConfig(provider="deepgram", model=None, api_key=env.deepgram_api_key)
     return None
-
-
-def stt_fallbacks(primary: SttConfig | None) -> list[SttConfig]:
-    """Motores de respaldo si el principal se cae, en orden: Groq y OpenAI
-    (sin repetir el principal). Solo los que tienen key en el entorno."""
-    env = get_settings()
-    out: list[SttConfig] = []
-    for provider, key in (("groq", env.groq_api_key), ("openai", env.openai_api_key)):
-        if key and (primary is None or primary.provider != provider):
-            out.append(SttConfig(provider=provider, model=None, api_key=key))
-    return out
 
 
 async def resolve_embeddings(db: AsyncSession, org_id: uuid.UUID) -> EmbeddingsConfig | None:
     env = get_settings()
-    row = await get_org_ai_settings(db, org_id)
-    if row and row.embeddings_provider:
-        if row.embeddings_provider == "none":
-            return None
-        key = decrypt_secret(row.embeddings_api_key_enc) if row.embeddings_api_key_enc else ""
-        if not key:
-            key = _env_key_for(row.embeddings_provider)
-        if key or row.embeddings_provider == "ollama":
-            return EmbeddingsConfig(
-                provider=row.embeddings_provider,
-                model=row.embeddings_model
-                or ("text-embedding-3-small" if row.embeddings_provider == "openai" else "nomic-embed-text"),
-                api_key=key,
-                base_url=env.ollama_base_url if row.embeddings_provider == "ollama" else None,
-            )
     if env.openai_api_key:
         return EmbeddingsConfig("openai", "text-embedding-3-small", env.openai_api_key)
     if env.ollama_base_url:

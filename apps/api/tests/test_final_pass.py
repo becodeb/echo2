@@ -14,6 +14,7 @@ from pathlib import Path
 import httpx
 from conftest import EchoTestUser
 from test_levels import _sql
+from test_voice import _sql_rows
 from test_speakers import _tone
 
 from echo_api.config import get_settings
@@ -35,6 +36,7 @@ class _FakeApis:
     scribe: dict | None = None
     groq: dict = {}
     scribe_status = 200
+    groq_status = 200
 
     def __init__(self, *args, **kwargs):
         pass
@@ -52,6 +54,8 @@ class _FakeApis:
             if _FakeApis.scribe_status >= 400:
                 return httpx.Response(_FakeApis.scribe_status, json={"detail": "quota_exceeded"}, request=request)
             return httpx.Response(200, json=_FakeApis.scribe, request=request)
+        if _FakeApis.groq_status >= 400:
+            return httpx.Response(_FakeApis.groq_status, json={"error": "down"}, request=request)
         return httpx.Response(200, json=_FakeApis.groq, request=request)
 
 
@@ -63,6 +67,7 @@ def _setup(monkeypatch, case: str, scribe_status: int = 200):
     _FakeApis.scribe = _fixture(f"scribe_{case}.json")
     _FakeApis.groq = _fixture(f"groq_{case}.json")
     _FakeApis.scribe_status = scribe_status
+    _FakeApis.groq_status = 200
     monkeypatch.setattr(httpx, "AsyncClient", _FakeApis)
 
 
@@ -109,6 +114,7 @@ def _usage(meeting_id):
 def _cleanup(meeting_id):
     rec.pcm_path(meeting_id).unlink(missing_ok=True)
     diarization.people_path(meeting_id).unlink(missing_ok=True)
+    diarization.text_retry_path(meeting_id).unlink(missing_ok=True)
 
 
 def test_meeting_of_the_27th_comes_out_with_its_three_people(client, monkeypatch):
@@ -173,6 +179,36 @@ def test_with_minors_it_never_goes_to_elevenlabs(client, monkeypatch):
     assert rows[0][1].startswith("Hola, sí")
     assert len(rows) == 10
     assert [(u.provider, u.credits) for u in _usage(meeting_id)] == [("groq", 0)]
+    _cleanup(meeting_id)
+
+
+def test_if_groq_fails_the_audio_never_goes_to_openai_and_is_retried(client, monkeypatch):
+    _setup(monkeypatch, "2026-09-27")
+    # Aunque haya key de OpenAI en el servidor: OpenAI no recibe audio.
+    monkeypatch.setattr(get_settings(), "openai_api_key", "sk-openai")
+    _FakeApis.groq_status = 503
+    user, meeting_id = _meeting(client, 20.4, [(0, 20400, "hola en vivo", None)], minors=True)
+    assert asyncio.run(diarization.diarize_meeting(meeting_id)) is False
+    assert all("openai.com" not in url for url, _ in _FakeApis.requests)
+    rows, meeting = _transcript(client, user, meeting_id)
+    # Queda el en vivo, la copia para reintentar y el aviso a quien grabó.
+    assert [text for _, text in rows] == ["hola en vivo"]
+    assert meeting["meta"]["text_status"] == "pending"
+    assert diarization.text_retry_path(meeting_id).exists()
+    [(title,)] = _sql_rows("SELECT title FROM notifications WHERE user_id = :u AND kind = 'transcript_status'",
+                           u=user.user_id)
+    assert "se demora" in title
+
+    _sql("UPDATE meetings SET status = 'completed' WHERE id = :id", id=str(meeting_id))
+    _FakeApis.groq_status = 200
+    assert asyncio.run(diarization.retry_pending_text()) == 1
+    monkeypatch.undo()
+    rows, meeting = _transcript(client, user, meeting_id)
+    assert rows[0][1].startswith("Hola, sí") and len(rows) == 10
+    assert meeting["meta"]["text_status"] == "done" and "text_retry" not in meeting["meta"]
+    assert not diarization.text_retry_path(meeting_id).exists()
+    assert [u.provider for u in _usage(meeting_id)] == ["groq"]
+    assert all("openai.com" not in url for url, _ in _FakeApis.requests)
     _cleanup(meeting_id)
 
 

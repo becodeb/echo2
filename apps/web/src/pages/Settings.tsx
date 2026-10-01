@@ -14,7 +14,7 @@ import { micErrorMessage } from "../lib/micError";
 
 const SECTIONS = [
   { path: "org", label: "Organización" },
-  { path: "ai", label: "IA y transcripción" },
+  { path: "ai", label: "Idioma del acta" },
   { path: "reasons", label: "Motivos de reunión" },
   { path: "dictionary", label: "Diccionario" },
   { path: "template", label: "Formato de acta" },
@@ -196,195 +196,32 @@ function OrgSection() {
   );
 }
 
-// ── IA / STT / Embeddings ────────────────────────────────────────
-
-interface AISettings {
-  llm_provider: string | null;
-  llm_model: string | null;
-  llm_api_key_masked: string | null;
-  llm_base_url: string | null;
-  llm_temperature: string | null;
-  stt_provider: string | null;
-  stt_model: string | null;
-  stt_api_key_masked: string | null;
-  embeddings_provider: string | null;
-  embeddings_model: string | null;
-  embeddings_api_key_masked: string | null;
-  minutes_language: string;
-  available: { llm_providers: string[]; stt_providers: string[]; embedding_providers: string[] };
-  effective: {
-    llm: { provider: string; model: string } | null;
-    stt: { provider: string; model: string } | null;
-    embeddings: { provider: string; model: string } | null;
-  };
-}
-
-/** Qué está usando el servidor ahora mismo. "Default del servidor" sin esto
- *  es una caja negra: no se ve si el chat quedó en GMI o si hay STT activo. */
-function ActiveBadge({ active }: { active: { provider: string; model: string } | null }) {
-  if (!active) {
-    return (
-      <p className="mb-3 inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
-        Sin configurar — esta función no va a andar
-      </p>
-    );
-  }
-  return (
-    <p className="mb-3 inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
-      Activo: {active.provider} · {active.model}
-    </p>
-  );
-}
+// ── Idioma del acta ──────────────────────────────────────────────
+// Los colegios no eligen modelo ni cargan keys: las pone Becode.
 
 function AISection() {
   const queryClient = useQueryClient();
   const { data: settings } = useQuery({
     queryKey: ["ai-settings"],
-    queryFn: () => api<AISettings>("/api/org/ai-settings"),
+    queryFn: () => api<{ minutes_language: string }>("/api/org/ai-settings"),
   });
-
-  const [form, setForm] = useState<Record<string, string>>({});
-  useEffect(() => {
-    if (settings) {
-      setForm({
-        llm_provider: settings.llm_provider ?? "",
-        llm_model: settings.llm_model ?? "",
-        llm_api_key: "",
-        llm_temperature: settings.llm_temperature ?? "0.2",
-        stt_provider: settings.stt_provider ?? "",
-        stt_model: settings.stt_model ?? "",
-        stt_api_key: "",
-        embeddings_provider: settings.embeddings_provider ?? "",
-        embeddings_api_key: "",
-        minutes_language: settings.minutes_language ?? "es",
-      });
-    }
-  }, [settings]);
-
   const save = useMutation({
-    mutationFn: () =>
-      api("/api/org/ai-settings", {
-        method: "PUT",
-        body: JSON.stringify({
-          llm_provider: form.llm_provider || null,
-          llm_model: form.llm_model || null,
-          llm_api_key: form.llm_api_key === "" ? null : form.llm_api_key,
-          llm_temperature: form.llm_temperature || null,
-          stt_provider: form.stt_provider || null,
-          stt_model: form.stt_model || null,
-          stt_api_key: form.stt_api_key === "" ? null : form.stt_api_key,
-          embeddings_provider: form.embeddings_provider || null,
-          embeddings_api_key: form.embeddings_api_key === "" ? null : form.embeddings_api_key,
-          minutes_language: form.minutes_language || null,
-        }),
-      }),
+    mutationFn: (minutes_language: string) =>
+      api("/api/org/ai-settings", { method: "PUT", body: JSON.stringify({ minutes_language }) }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["ai-settings"] }),
   });
-
-  const set = (key: string) => (event: { target: { value: string } }) =>
-    setForm((current) => ({ ...current, [key]: event.target.value }));
-  const pick = (key: string) => (value: string) => setForm((current) => ({ ...current, [key]: value }));
-  const providerOptions = (providers: string[], label = (provider: string) => provider) => [
-    { value: "", label: "Usar default del servidor" },
-    ...providers.map((provider) => ({ value: provider, label: label(provider) })),
-  ];
 
   if (!settings) return <div className="flex justify-center py-10 text-ink-300"><Spinner /></div>;
 
   return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault();
-        save.mutate();
-      }}
-      className="space-y-5"
-    >
-      <Card>
-        <h2 className="mb-1 font-semibold text-ink-900">Modelo de IA (resúmenes, actas, chat)</h2>
-        <ActiveBadge active={settings.effective.llm} />
-        <p className="mb-4 text-sm text-ink-400">
-          La API key se guarda cifrada y nunca vuelve completa al navegador.
-        </p>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Select
-            label="Proveedor"
-            value={form.llm_provider ?? ""}
-            onChange={pick("llm_provider")}
-            options={providerOptions(settings.available.llm_providers)}
-          />
-          <Input label="Modelo" placeholder="ej: claude-sonnet-5, gpt-4o-mini" value={form.llm_model ?? ""} onChange={set("llm_model")} />
-          <Input
-            label={`API key ${settings.llm_api_key_masked ? `(actual: ${settings.llm_api_key_masked})` : ""}`}
-            type="password"
-            placeholder="Dejar vacío para no cambiar"
-            value={form.llm_api_key ?? ""}
-            onChange={set("llm_api_key")}
-            autoComplete="off"
-          />
-          <Input label="Temperature" value={form.llm_temperature ?? ""} onChange={set("llm_temperature")} />
-        </div>
-      </Card>
-
-      <Card>
-        <h2 className="mb-1 font-semibold text-ink-900">Motor de transcripción (cloud fallback)</h2>
-        <ActiveBadge active={settings.effective.stt} />
-        <p className="mb-4 text-sm text-ink-400">
-          El modo preferido es Echo Bridge (local, el audio no sale de tu máquina). El modo cloud envía
-          temporalmente el audio al proveedor seleccionado y lo descarta al transcribir.
-        </p>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Select
-            label="Proveedor"
-            value={form.stt_provider ?? ""}
-            onChange={pick("stt_provider")}
-            options={providerOptions(settings.available.stt_providers, (provider) =>
-              provider === "bridge" ? "bridge (solo local)" : provider,
-            )}
-          />
-          <Input
-            label="Modelo"
-            placeholder="El del proveedor (Groq: whisper-large-v3-turbo)"
-            value={form.stt_model ?? ""}
-            onChange={set("stt_model")}
-          />
-          <Input
-            label={`API key ${settings.stt_api_key_masked ? `(actual: ${settings.stt_api_key_masked})` : ""}`}
-            type="password"
-            placeholder="Dejar vacío para no cambiar"
-            value={form.stt_api_key ?? ""}
-            onChange={set("stt_api_key")}
-            autoComplete="off"
-          />
-        </div>
-      </Card>
-
-      <Card>
-        <h2 className="mb-1 font-semibold text-ink-900">Embeddings (búsqueda semántica y RAG)</h2>
-        <ActiveBadge active={settings.effective.embeddings} />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Select
-            label="Proveedor"
-            value={form.embeddings_provider ?? ""}
-            onChange={pick("embeddings_provider")}
-            options={providerOptions(settings.available.embedding_providers)}
-          />
-          <Input
-            label={`API key ${settings.embeddings_api_key_masked ? `(actual: ${settings.embeddings_api_key_masked})` : ""}`}
-            type="password"
-            placeholder="Dejar vacío para no cambiar"
-            value={form.embeddings_api_key ?? ""}
-            onChange={set("embeddings_api_key")}
-            autoComplete="off"
-          />
-        </div>
-      </Card>
-
-      <Card>
-        <h2 className="mb-3 font-semibold text-ink-900">Idioma del acta</h2>
+    <Card>
+      <h2 className="mb-1 font-semibold text-ink-900">Idioma del acta</h2>
+      <p className="mb-4 text-sm text-ink-400">Puede ser distinto del idioma que se habló en la reunión.</p>
+      <div className="flex items-center gap-3">
         <Select
           ariaLabel="Idioma del acta"
-          value={form.minutes_language ?? "es"}
-          onChange={pick("minutes_language")}
+          value={settings.minutes_language}
+          onChange={(value) => save.mutate(value)}
           options={[
             { value: "es", label: "Español" },
             { value: "en", label: "English" },
@@ -392,21 +229,15 @@ function AISection() {
           ]}
           className="w-48"
         />
-        <p className="mt-2 text-xs text-ink-400">Puede diferir del idioma hablado en la reunión.</p>
-      </Card>
-
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={save.isPending}>
-          {save.isPending ? <Spinner /> : "Guardar"}
-        </Button>
+        {save.isPending && <Spinner />}
         {save.isSuccess && <span className="text-sm text-emerald-600">Guardado ✓</span>}
         {save.isError && (
           <span className="text-sm text-red-600">
-            {save.error instanceof Error ? save.error.message : "Error"}
+            {save.error instanceof Error ? save.error.message : "No se pudo guardar"}
           </span>
         )}
       </div>
-    </form>
+    </Card>
   );
 }
 
