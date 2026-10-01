@@ -57,7 +57,7 @@ Bauti pidió **no gastar más tokens de OpenAI en pruebas**: probar con Groq/Ele
 
 **Si trabajás en otra PC** (no en la que se armó el banco): `apps/api/bench/.env`,
 `apps/api/bench/.cache` y los audios de prueba no están en git (tienen keys y
-voces, una de una alumna). Pedile a Bauti que te copie `bench/.env` (o que te
+voces). Pedile a Bauti que te copie `bench/.env` (o que te
 pase las keys de prueba de Groq y ElevenLabs) y los dos mp3 de la sección 2. Sin
 `.cache`, el banco vuelve a pedir a las APIs: **no correr las variantes de
 OpenAI** (`--only` con las de Groq/ElevenLabs).
@@ -295,9 +295,9 @@ Bauti confirma antes del deploy.
 
 ## 7. Cosas que Bauti tiene que hacer en las cuentas (no las hace la IA)
 
-- ElevenLabs: uso para entrenamiento **ya desactivado** (30/9). Falta borrar del
-  historial de Speech to Text las pruebas con el audio del 30/9 (tenía la voz de
-  una alumna).
+- ElevenLabs: uso para entrenamiento **ya desactivado** (30/9). Bauti confirmó
+  que ninguno de los audios de prueba tiene voces de menores: no hay nada que
+  borrar por eso.
 - Groq: activar Zero Data Retention (console.groq.com → Settings → Data
   Controls; lo puede hacer un admin de la organización de Groq). Entrenamiento no
   hay que desactivarlo: por contrato no entrenan. Para cargar saldo, pasar al
@@ -358,7 +358,16 @@ sin turnos sin persona, 3 personas de 5 (C, D, E pegadas, como en el banco).
 Decisiones que tomó la implementación (confirmar con Bauti):
 - Créditos: uno por hora empezada (70 min = 2, 3 h = 3). Si queda 1 crédito
   y la reunión duró 2 h, gasta el que queda y separa igual.
-- Los créditos se cobran al terminar y solo si la separación salió bien.
+- Los créditos se reservan al decidir la pasada (de a una reunión por persona,
+  así el último crédito no se gasta dos veces) y vuelven si la separación no
+  sale (falla del todo, Scribe no devuelve nada o alguien corrigió el texto).
+- Las muestras de "Mi voz" delante del audio están **apagadas** en la pasada
+  final (`KNOWN_VOICES_IN_FINAL_PASS`): en la reunión del 27/9 partían a
+  Bautista en dos personas. Prenderlas solo después de probar con más reuniones.
+- Importar un audio y los Echo Devices pasan por la misma pasada final que el
+  vivo (créditos, personas y consumo incluidos).
+- Topes contra abuso (`meetings_per_day`, `audio_hours_per_month`): se
+  aplican si están cargados en el plan, la organización o la persona.
 - Cuenta individual: solo si el email no es de ningún colegio configurado y
   no tiene una invitación pendiente.
 - LLM del agente de voz: `gemini-3.5-flash-lite` (probados también
@@ -376,9 +385,6 @@ Lo que tiene que hacer Bauti antes o después del deploy:
   "Crear o actualizar el agente".
 - Coolify: `SMTP_HOST/PORT/USER/PASSWORD/FROM` para que los pedidos de plan
   lleguen por mail a becodestudio@gmail.com (sin eso quedan en el panel).
-- ElevenLabs: borrar del historial de Speech to Text **de la cuenta de
-  prueba** las corridas del 30/9 con el audio de la alumna (esta sesión lo
-  volvió a mandar para grabar los fixtures y el banco).
 - Groq: pasar al plan pago antes de que haya más de una reunión a la vez (el
   gratis deja 20 pedidos por minuto y una reunión en vivo ya lo roza; ahora
   se espera y reintenta, pero el texto en vivo se atrasa).
