@@ -140,6 +140,57 @@ async def month_usage(db: AsyncSession, user_id: uuid.UUID, now: datetime | None
     return usage
 
 
+def day_start(now: datetime | None = None) -> datetime:
+    """Primer instante del día en Argentina, en UTC."""
+    local = (now or datetime.now(UTC)).astimezone(ARGENTINA)
+    return local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(UTC)
+
+
+async def abuse_limit(db: AsyncSession, org: Organization, user: User, key: str) -> float | None:
+    """Un tope contra abuso (reuniones por día, horas de audio por mes). None = sin tope.
+
+    De los dos planes (el de la organización y el de la persona) vale el más
+    generoso; los topes propios de la organización y de la persona pisan eso.
+    """
+    if user.is_superadmin:
+        return None
+    by_code = await plans_by_code(db)
+    layers = [plan.limits or {} for plan in (by_code.get(org.plan), by_code.get(user.plan)) if plan is not None]
+    values = [layer.get(key) for layer in layers]
+    from_plans = None if not values or any(value is None for value in values) else max(values)
+    own = _limits(org.limits, user.limits)
+    value = own.get(key, from_plans)
+    return None if value is None else float(value)
+
+
+async def check_meetings_today(db: AsyncSession, org: Organization, user: User) -> None:
+    """Corta si la persona ya creó las reuniones que le permite el día."""
+    cap = await abuse_limit(db, org, user, "meetings_per_day")
+    if cap is None:
+        return
+    created = (
+        await db.execute(
+            select(func.count()).where(Meeting.created_by == user.id, Meeting.created_at >= day_start())
+        )
+    ).scalar_one()
+    if created >= cap:
+        raise LimitReached(f"Llegaste al tope de {int(cap)} reuniones por día. Mañana podés crear más.")
+
+
+async def check_audio_month(db: AsyncSession, org: Organization, user: User) -> None:
+    """Corta si la persona ya transcribió las horas de audio del mes."""
+    cap = await abuse_limit(db, org, user, "audio_hours_per_month")
+    if cap is None:
+        return
+    if (await month_usage(db, user.id)).audio_seconds >= cap * 3600:
+        hours = "la hora" if cap == 1 else f"las {cap:g} horas"
+        raise LimitReached(f"Ya usaste {hours} de audio de este mes. Se renuevan el 1°.")
+
+
+class LimitReached(Exception):
+    """Se llegó a un tope del plan; el mensaje es para la persona."""
+
+
 @dataclass
 class PeopleAccess:
     """Si las reuniones de esta persona en esta organización separan personas."""

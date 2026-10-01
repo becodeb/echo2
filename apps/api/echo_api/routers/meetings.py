@@ -24,6 +24,7 @@ from ..models import (
     Speaker,
     TranscriptSegment,
 )
+from ..services import plans
 from ..services.access import meeting_filter
 from ..services.audit import audit
 from ..services.pipeline import run_finalize_pipeline
@@ -161,6 +162,13 @@ def _meeting_out(m: Meeting, participants: list, speakers: list, group_name: str
     )
 
 
+async def _within_limits(check) -> None:
+    try:
+        await check
+    except plans.LimitReached as exc:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(exc)) from exc
+
+
 @router.post("", response_model=MeetingOut, status_code=201)
 async def create_meeting(
     data: MeetingCreateIn,
@@ -168,6 +176,7 @@ async def create_meeting(
     db: AsyncSession = Depends(get_db),
 ):
     ctx.require_role("member")
+    await _within_limits(plans.check_meetings_today(db, ctx.org, ctx.user))
     scope = await ctx.scope(db)
     if data.kind not in MEETING_KINDS:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Tipo de reunión desconocido")
@@ -428,6 +437,9 @@ async def start_meeting(
     # reunión sigue live en el servidor y reconectar no debe fallar.
     if meeting.status not in ("draft", "paused", "live"):
         raise HTTPException(status.HTTP_409_CONFLICT, f"No se puede iniciar desde estado {meeting.status}")
+    if meeting.status != "live":
+        # Reconectar una reunión que ya está en vivo nunca se corta a la mitad.
+        await _within_limits(plans.check_audio_month(db, ctx.org, ctx.user))
     if meeting.status == "draft":
         meeting.started_at = datetime.now(UTC)
     meeting.status = "live"

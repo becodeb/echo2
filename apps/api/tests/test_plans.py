@@ -232,3 +232,25 @@ def test_becode_accounts_have_everything_everywhere(client, monkeypatch):
     assert _run(_access(user)).mode == "always"
     billing = client.get("/api/billing/me", headers=user.headers).json()
     assert billing["features"]["voice"] is True
+
+
+def test_abuse_limits_are_enforced(client):
+    user = EchoTestUser(client, org_name=f"Colegio {uuid.uuid4().hex[:4]}")
+    _sql("UPDATE users SET limits = CAST('{\"meetings_per_day\": 2, \"audio_hours_per_month\": 1}' AS jsonb)"
+         " WHERE id = :id", id=user.user_id)
+    first = client.post("/api/meetings", json={"title": "Una", "level": "primaria"}, headers=user.headers)
+    assert first.status_code == 201
+    assert client.post("/api/meetings", json={"title": "Dos", "level": "primaria"}, headers=user.headers).status_code == 201
+    third = client.post("/api/meetings", json={"title": "Tres", "level": "primaria"}, headers=user.headers)
+    assert third.status_code == 429 and "2 reuniones por día" in third.json()["detail"]
+
+    meeting_id = first.json()["id"]
+    assert client.post(f"/api/meetings/{meeting_id}/start", headers=user.headers).status_code == 200
+    # Con la hora del mes gastada no arranca otra grabación, pero la que está en vivo reconecta.
+    _sql("INSERT INTO usage_events (id, kind, provider, unit, quantity, cost_usd, credits, user_id, organization_id,"
+         " created_at) VALUES (:id, 'stt_live', 'groq', 'audio_seconds', 3600, 0, 0, :u, :o, now())",
+         id=str(uuid.uuid4()), u=user.user_id, o=user.org_id)
+    assert client.post(f"/api/meetings/{meeting_id}/start", headers=user.headers).status_code == 200
+    client.post(f"/api/meetings/{meeting_id}/pause", headers=user.headers)
+    resumed = client.post(f"/api/meetings/{meeting_id}/start", headers=user.headers)
+    assert resumed.status_code == 429 and "la hora de audio" in resumed.json()["detail"]
