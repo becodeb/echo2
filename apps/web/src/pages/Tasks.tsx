@@ -54,12 +54,12 @@ export default function Tasks() {
     <div className="mx-auto max-w-4xl px-6 py-10">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight text-ink-900">Mi trabajo</h1>
-        <div className="flex rounded-xl bg-ink-100 p-1">
+        <div className="flex rounded-full bg-ink-100 p-1">
           {(["mine", "all"] as const).map((option) => (
             <button
               key={option}
               onClick={() => setScope(option)}
-              className={`rounded-md px-3 py-1 text-sm font-medium ${
+              className={`min-h-10 rounded-full px-4 py-1 text-sm font-medium md:min-h-0 ${
                 scope === option ? "bg-white text-ink-900 shadow-sm" : "text-ink-500"
               }`}
             >

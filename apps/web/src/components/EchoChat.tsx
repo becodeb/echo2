@@ -189,7 +189,7 @@ export function EchoChat({
             <button
               type="button"
               onClick={voice.open}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900 md:h-9 md:w-9"
               aria-label="Hablar con Echo"
               title="Hablar con Echo"
             >
@@ -202,7 +202,7 @@ export function EchoChat({
           <button
             type="submit"
             disabled={ask.isPending || !input.trim()}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink-900 text-white transition-all hover:bg-ink-700 active:scale-95 disabled:bg-ink-200"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ink-900 text-white transition-all hover:bg-ink-700 active:scale-95 disabled:bg-ink-200 md:h-9 md:w-9"
             aria-label="Enviar"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>

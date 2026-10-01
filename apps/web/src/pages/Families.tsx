@@ -1,4 +1,5 @@
 import { useCallback, useState, type FormEvent } from "react";
+import { Tabs } from "../components/Tabs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { FamilyMemberOut, FamilyOut, ProfessionalOut } from "../api/types";
@@ -417,22 +418,20 @@ export default function Families() {
         {tab === "familias" && <Button onClick={() => setCreating(true)}>Nueva familia</Button>}
       </div>
 
-      <div className="flex gap-1 border-b border-ink-100">
-        {(["familias", "profesionales"] as const).map((item) => (
-          <button
-            key={item}
-            onClick={() => setTab(item)}
-            className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium capitalize ${
-              tab === item
-                ? "border-ink-900 text-ink-900"
-                : "border-transparent text-ink-500 hover:text-ink-800"
-            }`}
-          >
-            {item}
-          </button>
-        ))}
+      <div className="inline-flex">
+        <Tabs
+          items={[
+            { id: "familias", label: "Familias" },
+            { id: "profesionales", label: "Profesionales" },
+          ]}
+          value={tab}
+          onChange={setTab}
+          label="Familias o profesionales"
+          idPrefix="familias"
+        />
       </div>
 
+      <div role="tabpanel" id={`familias-panel-${tab}`} aria-labelledby={`familias-tab-${tab}`}>
       {tab === "profesionales" ? (
         <ProfessionalsTab />
       ) : isLoading ? (
@@ -513,6 +512,7 @@ export default function Families() {
           </div>
         </>
       )}
+      </div>
 
       {panelFamily && <FamilyMeetingsPanel family={panelFamily} onClose={closePanel} />}
 

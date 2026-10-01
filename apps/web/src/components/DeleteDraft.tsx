@@ -38,14 +38,14 @@ export function DeleteDraft({ meetingId, title }: { meetingId: string; title: st
           type="button"
           onClick={() => remove.mutate()}
           disabled={remove.isPending}
-          className="inline-flex items-center gap-1.5 rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white md:min-h-0 transition-colors hover:bg-red-700 disabled:opacity-60"
         >
           {remove.isPending ? <Spinner /> : "Borrar"}
         </button>
         <button
           type="button"
           onClick={() => setAsking(false)}
-          className="rounded-full px-2.5 py-1 text-xs font-medium text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-800"
+          className="min-h-11 rounded-full px-2.5 py-1 text-xs font-medium text-ink-500 md:min-h-0 transition-colors hover:bg-ink-100 hover:text-ink-800"
         >
           Cancelar
         </button>
@@ -63,7 +63,7 @@ export function DeleteDraft({ meetingId, title }: { meetingId: string; title: st
       aria-label={`Borrar el borrador «${title}»`}
       title="Borrar borrador"
       // En la compu aparece al pasar por la fila; en el celular está siempre.
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink-400 transition-all hover:bg-red-50 hover:text-red-600 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-accent-500 md:opacity-0 md:group-hover:opacity-100"
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-400 md:h-7 md:w-7 transition-all hover:bg-red-50 hover:text-red-600 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-accent-500 md:opacity-0 md:group-hover:opacity-100"
     >
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <path d="M4.5 7h15M10 11v6M14 11v6M9 7l.6-2.1A1.3 1.3 0 0 1 10.9 4h2.2a1.3 1.3 0 0 1 1.3.9L15 7" />

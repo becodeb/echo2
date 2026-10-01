@@ -105,14 +105,14 @@ export function MonthPicker({ month, onChange }: { month: string; onChange: (mon
   const current = currentMonth();
   const previous = shiftMonth(current, -1);
   const isCurrent = month >= current;
-  const arrow = "rounded-full p-2 text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900 disabled:opacity-30 disabled:hover:bg-transparent";
+  const arrow = "flex h-10 w-10 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900 disabled:opacity-30 disabled:hover:bg-transparent";
   const pill = (value: string, label: string) => (
     <button
       key={value}
       type="button"
       onClick={() => onChange(value)}
       aria-pressed={month === value}
-      className={`min-h-9 rounded-full px-3.5 text-sm font-medium capitalize transition-colors ${
+      className={`min-h-10 rounded-full px-3.5 text-sm font-medium capitalize transition-colors ${
         month === value ? "bg-ink-900 text-white" : "text-ink-600 hover:bg-ink-100"
       }`}
     >

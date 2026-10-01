@@ -47,7 +47,7 @@ export default function Settings() {
               key={section.path}
               to={section.path}
               className={({ isActive }) =>
-                `whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium ${
+                `whitespace-nowrap rounded-xl px-3 py-3 text-sm font-medium md:py-2 ${
                   isActive ? "bg-ink-100 text-ink-900" : "text-ink-500 hover:bg-ink-50"
                 }`
               }

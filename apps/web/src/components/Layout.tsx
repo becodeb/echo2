@@ -221,7 +221,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
         }`}
       >
         <header className="flex items-center gap-1 border-b border-ink-100 bg-white px-3 py-2 md:hidden">
-          <button onClick={() => setMobileNav(true)} className="rounded-full p-2 text-ink-600 hover:bg-ink-100" aria-label="Menú">
+          <button onClick={() => setMobileNav(true)} className="flex h-11 w-11 items-center justify-center rounded-full text-ink-600 hover:bg-ink-100" aria-label="Menú">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
               <path d="M4 7h16M4 12h16M4 17h16" />
             </svg>
@@ -316,7 +316,7 @@ function RoundButton({
       aria-expanded={toggle ? active : undefined}
       aria-label={label}
       title={label}
-      className={`relative flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
+      className={`relative flex h-11 w-11 items-center justify-center rounded-full transition-colors md:h-9 md:w-9 ${
         active ? "bg-ink-100 text-ink-900" : "text-ink-600 hover:bg-ink-100 hover:text-ink-900"
       }`}
     >
@@ -435,7 +435,7 @@ function ProfileMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Tu cuenta"
-        className="flex h-9 w-9 items-center justify-center rounded-full ring-1 ring-ink-200 transition-shadow hover:ring-ink-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
+        className="flex h-11 w-11 items-center justify-center rounded-full ring-1 ring-ink-200 transition-shadow md:h-9 md:w-9 hover:ring-ink-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
       >
         <Avatar name={user.name} color={user.avatar_color} src={user.avatar_url} size={30} />
       </button>

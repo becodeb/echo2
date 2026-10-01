@@ -271,7 +271,7 @@ function FirstSteps({ hasMeetings }: { hasMeetings: boolean }) {
     <section className="mb-8 rounded-3xl border border-ink-100 bg-white p-5" aria-label="Primeros pasos">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-[15px] font-semibold text-ink-900">Primeros pasos</h2>
-        <button onClick={close} className="min-h-9 rounded-full px-3 text-xs font-medium text-ink-500 hover:bg-ink-50">
+        <button onClick={close} className="min-h-11 rounded-full px-3 text-xs font-medium text-ink-500 hover:bg-ink-50 md:min-h-9">
           Ocultar
         </button>
       </div>

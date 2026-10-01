@@ -33,7 +33,7 @@ export function SegmentedToggle<T extends string>({
           role="radio"
           aria-checked={value === option.value}
           onClick={() => onChange(option.value)}
-          className={`relative z-10 rounded-full px-4 py-2 text-sm font-semibold transition-colors duration-200 ${
+          className={`relative z-10 min-h-10 rounded-full px-4 py-2 text-sm font-semibold transition-colors duration-200 ${
             value === option.value ? "text-ink-900" : "text-ink-500 hover:text-ink-700"
           }`}
         >
