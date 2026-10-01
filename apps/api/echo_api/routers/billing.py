@@ -94,7 +94,6 @@ def _next_month(start: datetime) -> datetime:
 @router.get("/me", response_model=BillingOut)
 async def my_billing(ctx: OrgContext = Depends(get_org_context), db: AsyncSession = Depends(get_db)):
     access = await plans.people_access(db, ctx.org, ctx.user)
-    user_plan = (await db.execute(select(BillingPlan).where(BillingPlan.code == ctx.user.plan))).scalar_one_or_none()
     llm = await resolve_llm(db, ctx.org_id)
     embeddings = await resolve_embeddings(db, ctx.org_id)
     public = (
@@ -133,7 +132,7 @@ async def my_billing(ctx: OrgContext = Depends(get_org_context), db: AsyncSessio
             minutes=llm is not None,
             tasks=llm is not None,
             chat=llm is not None and embeddings is not None,
-            voice=ctx.user.is_superadmin or bool(user_plan and (user_plan.features or {}).get("voice")),
+            voice=(await plans.voice_allowance(db, ctx.user))[0],
         ),
         plans=[
             PublicPlanOut(

@@ -7,7 +7,7 @@ import { AnswerText } from "./AnswerText";
 import { useBilling } from "./billing";
 import { EchoFace } from "./EchoFace";
 import { formatMs } from "./ui";
-import { VoiceChat } from "./VoiceChat";
+import { useVoice } from "../state/voice";
 
 interface Message {
   role: "user" | "assistant";
@@ -49,7 +49,7 @@ export function EchoChat({
   const { data: billing } = useBilling();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [voiceOpen, setVoiceOpen] = useState(false);
+  const voice = useVoice();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -163,7 +163,7 @@ export function EchoChat({
           {canTalk && (
             <button
               type="button"
-              onClick={() => setVoiceOpen(true)}
+              onClick={voice.open}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900"
               aria-label="Hablar con Echo"
               title="Hablar con Echo"
@@ -194,7 +194,6 @@ export function EchoChat({
           </p>
         )}
       </div>
-      {voiceOpen && <VoiceChat onClose={() => setVoiceOpen(false)} />}
     </div>
   );
 }

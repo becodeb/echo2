@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import get_settings
 from ..db import SessionLocal, get_db
 from ..deps import OrgContext, get_org_context
-from ..models import BillingPlan, ServerAISettings, UsageEvent, User
+from ..models import ServerAISettings, UsageEvent, User
 from ..services import plans, voice_agent
 from ..services.audit import audit
 from .admin import get_superadmin
@@ -59,17 +59,29 @@ async def ensure_agent(db: AsyncSession) -> str:
 
 
 async def voice_allowance(db: AsyncSession, user: User) -> tuple[bool, float | None, float]:
-    """(tiene voz, segundos del mes (None = sin tope), segundos usados)."""
-    if user.is_superadmin:
-        # Las cuentas de Becode tienen todo habilitado, sin tope.
-        return True, None, (await plans.month_usage(db, user.id)).voice_seconds
-    plan = (await db.execute(select(BillingPlan).where(BillingPlan.code == user.plan))).scalar_one_or_none()
-    if plan is None or not (plan.features or {}).get("voice"):
-        return False, None, 0.0
-    limits = plans._limits(plan.limits, user.limits)
-    minutes = limits.get("voice_minutes_per_month")
-    used = (await plans.month_usage(db, user.id)).voice_seconds
-    return True, (float(minutes) * 60 if minutes is not None else None), used
+    return await plans.voice_allowance(db, user)
+
+
+class StatusOut(BaseModel):
+    allowed: bool
+    # None = sin tope (superadmins).
+    seconds_total: int | None
+    seconds_left: int | None
+    seconds_used: int
+    max_conversation_seconds: int
+
+
+@router.get("/api/voice/status", response_model=StatusOut)
+async def voice_status(ctx: OrgContext = Depends(get_org_context), db: AsyncSession = Depends(get_db)):
+    """Para la pantalla previa del globito: si tiene voz y cuánto le queda."""
+    allowed, total, used = await voice_allowance(db, ctx.user)
+    return StatusOut(
+        allowed=allowed,
+        seconds_total=None if total is None else int(total),
+        seconds_left=None if total is None else int(max(0.0, total - used)),
+        seconds_used=int(used),
+        max_conversation_seconds=voice_agent.MAX_CONVERSATION_SECONDS,
+    )
 
 
 class SessionOut(BaseModel):

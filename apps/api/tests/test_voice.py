@@ -230,3 +230,19 @@ def test_the_voice_prompt_has_nothing_from_meetings_with_minors(client, monkeypa
         assert leaked not in voice_prompt
     # Por escrito, quien puede ver la reunión la sigue consultando.
     assert "Entrevista Tobías" in text_prompt and "decision MENOR" in text_prompt
+
+
+def test_voice_comes_only_with_the_paid_voice_plan(client, monkeypatch):
+    """Ni Cortesía ni Instituciones dan voz (Bauti, 1/10): botón y sesión con la misma regla."""
+    _setup(monkeypatch)
+    user = EchoTestUser(client, org_name=f"Colegio {uuid.uuid4().hex[:4]}")
+    _sql("UPDATE organizations SET plan = 'cortesia' WHERE id = :id", id=user.org_id)
+    status = client.get("/api/voice/status", headers=user.headers).json()
+    assert status["allowed"] is False
+    assert client.get("/api/billing/me", headers=user.headers).json()["features"]["voice"] is False
+    assert client.post("/api/voice/sessions", headers=user.headers).status_code == 403
+
+    _sql("UPDATE users SET plan = 'individual_voz' WHERE id = :id", id=user.user_id)
+    status = client.get("/api/voice/status", headers=user.headers).json()
+    assert status["allowed"] is True and status["seconds_left"] == status["seconds_total"] == 30 * 60
+    assert client.get("/api/billing/me", headers=user.headers).json()["features"]["voice"] is True

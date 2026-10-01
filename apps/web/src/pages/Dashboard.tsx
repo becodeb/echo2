@@ -4,7 +4,9 @@ import { api } from "../api/client";
 import { DeleteDraft } from "../components/DeleteDraft";
 import { MeetingStatus } from "../components/MeetingStatus";
 import { Card, EmptyState, formatDate, formatDuration } from "../components/ui";
+import { EchoFace } from "../components/EchoFace";
 import { useAuth } from "../state/auth";
+import { useVoice } from "../state/voice";
 
 interface DashboardData {
   greeting_name: string;
@@ -25,6 +27,7 @@ interface DashboardData {
 export default function Dashboard() {
   const { activeOrg } = useAuth();
   const navigate = useNavigate();
+  const voice = useVoice();
   const { data } = useQuery({
     queryKey: ["dashboard", activeOrg?.id],
     queryFn: () => api<DashboardData>("/api/dashboard"),
@@ -119,6 +122,20 @@ export default function Dashboard() {
         </div>
 
         <div>
+          <button
+            type="button"
+            onClick={voice.open}
+            className="group mb-8 flex w-full items-center gap-4 rounded-3xl bg-ink-900 p-5 text-left text-white shadow-[0_12px_32px_-14px_rgba(20,24,36,0.6)] transition-transform duration-200 hover:-translate-y-0.5"
+          >
+            <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/10">
+              <span aria-hidden className="voice-bubble-wave absolute inset-0 rounded-full border-2 border-accent-400/50" />
+              <EchoFace mood="idle" size={26} />
+            </span>
+            <span className="min-w-0">
+              <span className="block font-semibold">Hablá con Echo</span>
+              <span className="mt-0.5 block text-sm text-white/70">Preguntale por tus reuniones, en voz alta.</span>
+            </span>
+          </button>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-400">Mis tareas</h2>
           <Card className="p-0">
             {(!data || data.my_tasks.length === 0) && (

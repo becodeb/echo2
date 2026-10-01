@@ -45,10 +45,18 @@ export type IconName =
   | "check"
   | "comment"
   | "sparkle"
-  | "megaphone";
+  | "megaphone"
+  | "voice";
 
 export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   switch (name) {
+    case "voice":
+      // Ondas de audio: Hablar con Echo.
+      return (
+        <Svg size={size}>
+          <path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4" />
+        </Svg>
+      );
     case "home":
       // Como el de ElevenLabs: una casita de esquinas muy redondeadas, techo
       // suave y la puerta como una línea abajo (cuadrícula de 18, trazo 1,5).

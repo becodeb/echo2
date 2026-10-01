@@ -123,6 +123,24 @@ class MonthUsage:
     audio_seconds: float = 0.0
 
 
+async def voice_allowance(db: AsyncSession, user: User) -> tuple[bool, float | None, float]:
+    """Hablar con Echo: (tiene voz, segundos del mes (None = sin tope), segundos usados).
+
+    La da solo el plan de la persona (Individual + voz) o ser superadmin. Ni
+    Cortesía ni Instituciones la incluyen: se contrata aparte (Bauti, 1/10).
+    La misma regla para mostrar el botón (routers/billing.py) y para abrir la
+    conversación (routers/voice.py).
+    """
+    used = (await month_usage(db, user.id)).voice_seconds
+    if user.is_superadmin:
+        return True, None, used
+    plan = (await db.execute(select(BillingPlan).where(BillingPlan.code == user.plan))).scalar_one_or_none()
+    if plan is None or not (plan.features or {}).get("voice"):
+        return False, None, used
+    minutes = _limits(plan.limits, user.limits).get("voice_minutes_per_month")
+    return True, (float(minutes) * 60 if minutes is not None else None), used
+
+
 async def month_usage(db: AsyncSession, user_id: uuid.UUID, now: datetime | None = None) -> MonthUsage:
     """Lo que esta persona gastó en el mes, en todas sus organizaciones."""
     rows = (

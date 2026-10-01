@@ -147,6 +147,16 @@ body {
 
 /* Conversación por voz: el velo aparece rápido, sin oscurecer. */
 @keyframes voice-veil { from { opacity: 0; } to { opacity: 1; } }
+/* El globito de Hablar con Echo: dos ondas que salen despacio. */
+@keyframes voice-bubble-wave {
+  from { transform: scale(1); opacity: 0.9; }
+  to { transform: scale(1.55); opacity: 0; }
+}
+.voice-bubble-wave { animation: voice-bubble-wave 2.6s ease-out infinite; }
+.voice-bubble-wave-late { animation-delay: 1.3s; }
+@media (prefers-reduced-motion: reduce) {
+  .voice-bubble-wave { animation: none; opacity: 0; }
+}
 .voice-veil { animation: voice-veil 0.18s ease-out; }
 
 /* "Buscando en tus reuniones…": un brillo que recorre el texto mientras Echo piensa. */
