@@ -33,6 +33,10 @@ const NAV_MAIN: NavItem[] = [
   { to: "/internal", label: "Reuniones internas", icon: "internal" },
   { to: "/tasks", label: "Mi trabajo", icon: "tasks" },
 ];
+const NAV_ACCOUNT: NavItem[] = [
+  { to: "/plans", label: "Planes", icon: "plans" },
+  { to: "/usage", label: "Consumo", icon: "usage" },
+];
 const NAV_SCHOOL: NavItem[] = [
   { to: "/people", label: "Personas", icon: "people" },
   { to: "/families", label: "Familias", icon: "families" },
@@ -181,9 +185,17 @@ function LayoutInner({ children }: { children: ReactNode }) {
             <Icon name="voice" />
             <span className={collapsed ? "md:hidden" : ""}>Hablar con Echo</span>
           </button>
-          <p className={`px-2.5 pb-1.5 pt-5 text-[12px] font-medium text-ink-400 ${collapsed ? "md:hidden" : ""}`}>Colegio</p>
+          {/* "Colegio" (personas, familias, proyectos, reportes) no va en una cuenta individual. */}
+          {!activeOrg?.is_personal && (
+            <>
+              <p className={`px-2.5 pb-1.5 pt-5 text-[12px] font-medium text-ink-400 ${collapsed ? "md:hidden" : ""}`}>Colegio</p>
+              {collapsed && <div className="hidden pt-4 md:block" />}
+              {NAV_SCHOOL.map(navLink)}
+            </>
+          )}
+          <p className={`px-2.5 pb-1.5 pt-5 text-[12px] font-medium text-ink-400 ${collapsed ? "md:hidden" : ""}`}>Cuenta</p>
           {collapsed && <div className="hidden pt-4 md:block" />}
-          {NAV_SCHOOL.map(navLink)}
+          {NAV_ACCOUNT.map(navLink)}
         </nav>
 
         <div className="space-y-1 p-3">
