@@ -110,10 +110,19 @@ def people_path(meeting_id: uuid.UUID) -> Path:
 # ── Turnos (puro, sin base ni red) ───────────────────────────────
 
 
-def _clean_rows(segments: list[SttSegment], language: str | None) -> list[Row]:
-    """Los mismos filtros que el en vivo, sobre cada turno."""
+def _clean_rows(segments: list[SttSegment], language: str | None, whisper: bool = True) -> list[Row]:
+    """Los mismos filtros que el en vivo, sobre cada turno.
+
+    `whisper=False` (Scribe): sin los filtros de alucinaciones de Whisper,
+    que con Scribe borraban turnos reales ("Amén.", "no, no, no").
+    """
     rows: list[Row] = []
     for seg in segments:
+        if not whisper:
+            text = " ".join((seg.text or "").split())
+            if text:
+                rows.append((seg.speaker, text, seg.start_ms, max(seg.end_ms, seg.start_ms + 1)))
+            continue
         text = strip_hallucinations(seg.text)
         if not text or is_unreliable(seg) or is_noise_transcript(text, language):
             continue
@@ -123,7 +132,7 @@ def _clean_rows(segments: list[SttSegment], language: str | None) -> list[Row]:
 
 def rows_from_scribe(result: SttResult, language: str | None) -> list[Row]:
     """Turnos con persona a partir de las palabras de Scribe."""
-    return _clean_rows(group_words(result.words), language)
+    return _clean_rows(group_words(result.words), language, whisper=False)
 
 
 def _pcm_array(path: Path) -> np.ndarray | None:

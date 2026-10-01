@@ -473,3 +473,18 @@ def test_holds_left_hanging_are_released(client, monkeypatch):
     # Una reserva reciente no se toca.
     assert asyncio.run(diarization.release_stale_holds(datetime.now(UTC) - timedelta(hours=1))) == 0
     _cleanup(meeting_id)
+
+
+def test_scribe_turns_are_not_cleaned_like_whisper():
+    from echo_api.services.stt.base import SttResult, SttSegment
+
+    result = SttResult(segments=[], words=[])
+    rows = diarization._clean_rows(
+        [SttSegment("Amén.", 0, 800, speaker="speaker_1"), SttSegment("No, no, no, no, no, no.", 900, 2000,
+                                                                       speaker="speaker_2")],
+        "es", whisper=False,
+    )
+    assert [text for _, text, _, _ in rows] == ["Amén.", "No, no, no, no, no, no."]
+    # Con Whisper (Groq) sí se filtran.
+    assert diarization._clean_rows([SttSegment("Amén.", 0, 800)], "es") == []
+    assert result.segments == []
