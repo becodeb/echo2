@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { TaskOut } from "../api/types";
 import { Select } from "../components/Select";
+import { TaskAssignee } from "../components/TaskAssignee";
 import { Badge, Card, EmptyState, Spinner, formatMs } from "../components/ui";
 import { useAuth } from "../state/auth";
 
@@ -49,6 +50,10 @@ export default function Tasks() {
   });
 
   const tasks = scope === "mine" ? myWork?.tasks ?? [] : allTasks ?? [];
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["my-work"] });
+    queryClient.invalidateQueries({ queryKey: ["tasks-all"] });
+  };
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-10">
@@ -114,8 +119,10 @@ export default function Tasks() {
                 <p className={`text-[15px] ${task.status === "done" ? "text-ink-400 line-through" : "text-ink-900"}`}>
                   {task.text}
                 </p>
+                <div className="mt-2">
+                  <TaskAssignee task={task} onAssigned={refresh} />
+                </div>
                 <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-400">
-                  {task.assignee_name && <span>{task.assignee_name}</span>}
                   {(task.due_date || task.due_text) && (
                     <span className={task.overdue ? "font-medium text-red-600" : ""}>
                       {task.due_date

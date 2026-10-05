@@ -195,6 +195,8 @@ export interface TaskOut {
   text: string;
   assignee_name: string | null;
   assignee_user_id: string | null;
+  /** Quién dijo en la reunión que se encargaba (las que detecta Echo). */
+  suggested_assignee?: string | null;
   due_text: string | null;
   due_date: string | null;
   status: "pending" | "in_progress" | "done" | "cancelled";

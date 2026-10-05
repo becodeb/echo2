@@ -60,10 +60,15 @@ class ActionItem(PKMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
     )
     text: Mapped[str] = mapped_column(Text, nullable=False)
+    # A quién le toca. Las que detecta la IA van a quien grabó la reunión, que
+    # las reparte entre las personas de la sede (routers/tasks.py).
     assignee_name: Mapped[str | None] = mapped_column(String(200))
     assignee_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id")
     )
+    # Quién dijo en la reunión que se encargaba ("la Directora"): ayuda a
+    # repartirla y es el responsable que figura en el acta.
+    suggested_assignee: Mapped[str | None] = mapped_column(String(200))
     due_text: Mapped[str | None] = mapped_column(String(120))  # "viernes"
     due_date: Mapped[date | None] = mapped_column(Date)  # 2026-08-28 (resuelta)
     status: Mapped[str] = mapped_column(String(20), default="pending")  # pending|in_progress|done|cancelled

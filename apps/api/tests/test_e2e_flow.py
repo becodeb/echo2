@@ -99,7 +99,10 @@ def test_full_meeting_lifecycle(client, fake_ai):
     # 6. insights persistidos
     insights = client.get(f"/api/meetings/{meeting_id}/insights", headers=user.headers).json()
     assert any("viernes" in decision["text"] for decision in insights["decisions"])
-    task = next(task for task in insights["action_items"] if task["assignee_name"] == "Marcos")
+    # Quien se nombró en la reunión queda como sugerencia; la tarea es de quien
+    # grabó, que la reparte.
+    task = next(task for task in insights["action_items"] if task["suggested_assignee"] == "Marcos")
+    assert task["assignee_user_id"] == user.user_id
     assert task["due_text"] == "viernes"
     assert task["due_date"] is not None  # fecha relativa resuelta
     assert task["evidence_start_ms"] is not None  # referencia al transcript

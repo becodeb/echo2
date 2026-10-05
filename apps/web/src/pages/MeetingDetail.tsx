@@ -16,6 +16,7 @@ import { AnswerText } from "../components/AnswerText";
 import { MarkdownView } from "../components/MarkdownView";
 import { InterviewReview } from "../components/InterviewReview";
 import { Select } from "../components/Select";
+import { TaskAssignee } from "../components/TaskAssignee";
 import { LEVELS, LEVEL_LABEL, useMyAccess, type Level } from "../state/access";
 
 const TASK_STATUS_OPTIONS = [
@@ -980,7 +981,13 @@ function TasksTab({ meetingId }: { meetingId: string }) {
           {tasks.map((task) => (
             <tr key={task.id}>
               <td className="px-5 py-3 text-ink-800">{task.text}</td>
-              <td className="px-3 py-3 text-ink-600">{task.assignee_name ?? "—"}</td>
+              <td className="px-3 py-3 text-ink-600">
+                <TaskAssignee
+                  task={task}
+                  onAssigned={() => queryClient.invalidateQueries({ queryKey: ["insights", meetingId] })}
+                  className="w-44"
+                />
+              </td>
               <td className="px-3 py-3 text-ink-600">
                 {task.due_date ?? task.due_text ?? "—"}
               </td>

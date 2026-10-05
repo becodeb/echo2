@@ -601,6 +601,8 @@ async def get_insights(
                 "id": str(a.id),
                 "text": a.text,
                 "assignee_name": a.assignee_name,
+                "assignee_user_id": str(a.assignee_user_id) if a.assignee_user_id else None,
+                "suggested_assignee": a.suggested_assignee,
                 "due_text": a.due_text,
                 "due_date": a.due_date.isoformat() if a.due_date else None,
                 "status": a.status,

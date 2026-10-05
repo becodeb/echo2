@@ -18,6 +18,7 @@ from .insights_prompts import LIVE_EXTRACT_SYSTEM, build_live_extract_prompt
 from .live_bus import live_bus
 from .llm import LLMError, get_llm_provider
 from .privacy import protect
+from .task_owner import task_owner
 from .transcript_util import load_transcript_lines, transcript_to_text
 
 log = logging.getLogger("echo.insights")
@@ -101,6 +102,7 @@ async def _extract(meeting_id: str) -> None:
         if not meeting:
             return
         reference_date = (meeting.started_at or meeting.created_at).date()
+        owner_id, owner_name = await task_owner(db, meeting)
 
         for item in result.get("decisions", []) or []:
             text = str(item.get("text", "")).strip()
@@ -123,12 +125,15 @@ async def _extract(meeting_id: str) -> None:
             if not text or _is_duplicate(text, existing_tasks):
                 continue
             due_text = item.get("due")
+            assignee = str(item.get("assignee") or "").strip() or None
             db.add(
                 ActionItem(
                     meeting_id=mid,
                     organization_id=meeting.organization_id,
                     text=text,
-                    assignee_name=item.get("assignee"),
+                    assignee_name=owner_name if owner_id else assignee,
+                    assignee_user_id=owner_id,
+                    suggested_assignee=assignee[:200] if assignee else None,
                     due_text=due_text,
                     due_date=resolve_relative_date(due_text, reference_date),
                     evidence_start_ms=_ms(item.get("evidence_start_ms")),

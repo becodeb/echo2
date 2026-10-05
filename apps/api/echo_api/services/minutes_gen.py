@@ -256,7 +256,8 @@ async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider) -> Non
         "tareas": [
             {
                 "texto": t.text,
-                "responsable": t.assignee_name,
+                # Quién se comprometió en la reunión, no a quién se le repartió.
+                "responsable": t.suggested_assignee or t.assignee_name,
                 "fecha": t.due_text,
                 "fecha_resuelta": t.due_date.isoformat() if t.due_date else None,
                 "evidencia_ms": t.evidence_start_ms,

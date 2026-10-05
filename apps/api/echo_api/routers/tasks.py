@@ -30,6 +30,8 @@ class TaskOut(BaseModel):
     text: str
     assignee_name: str | None
     assignee_user_id: uuid.UUID | None
+    # Quién dijo en la reunión que se encargaba: la pista para repartirla.
+    suggested_assignee: str | None = None
     due_text: str | None
     due_date: date | None
     status: str
@@ -73,6 +75,7 @@ def _task_out(task: ActionItem, meeting_title: str | None) -> TaskOut:
         text=task.text,
         assignee_name=task.assignee_name,
         assignee_user_id=task.assignee_user_id,
+        suggested_assignee=task.suggested_assignee,
         due_text=task.due_text,
         due_date=task.due_date,
         status=task.status,
@@ -140,7 +143,9 @@ async def update_task(
         task.due_date = data.due_date
     if data.assignee_name is not None:
         task.assignee_name = data.assignee_name or None
-    if data.assignee_user_id is not None:
+    if data.assignee_user_id is not None and data.assignee_user_id != task.assignee_user_id:
+        # Repartir: la tarea pasa a quien se elige, entre las personas de la
+        # sede. Ya no es "intacta": la pasada final no la vuelve a crear.
         member = (
             await db.execute(
                 select(OrganizationMember).where(
@@ -152,9 +157,10 @@ async def update_task(
         if not member:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "El usuario no pertenece a la organización")
         task.assignee_user_id = data.assignee_user_id
+        task.source = "manual" if task.source == "ai" else task.source
         assignee_user = await db.get(User, data.assignee_user_id)
         if assignee_user:
-            if not task.assignee_name:
+            if data.assignee_name is None:
                 task.assignee_name = assignee_user.name
             if assignee_user.id != ctx.user.id:
                 db.add(
@@ -195,11 +201,13 @@ async def create_task(
     if data.meeting_id:
         meeting = await get_meeting_or_404(data.meeting_id, ctx, db)
         meeting_title = meeting.title
+    # Sin responsable, es de quien la crea (y la puede repartir después).
     task = ActionItem(
         organization_id=ctx.org_id,
         meeting_id=data.meeting_id,
         text=data.text.strip(),
-        assignee_name=data.assignee_name,
+        assignee_name=data.assignee_name or ctx.user.name,
+        assignee_user_id=None if data.assignee_name else ctx.user.id,
         due_date=data.due_date,
         source="manual",
     )

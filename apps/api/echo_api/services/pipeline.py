@@ -69,6 +69,8 @@ from .memory_svc import update_memory_from_meeting
 from .recording import finalize_recording
 from .minutes_gen import generate_minutes
 from .rag import embed_meeting_segments
+from .task_owner import task_owner
+from .insights_live import _is_duplicate
 from .transcript_util import format_ms, load_transcript_lines, transcript_to_text
 
 log = logging.getLogger("echo.pipeline")
@@ -432,7 +434,8 @@ async def _persist_insights(meeting_id: uuid.UUID, insights: dict, reference_dat
         # La pasada final reemplaza lo extraído en vivo (consolidado > incremental)
         for model in (MeetingTopic, Decision, Question, Risk):
             await db.execute(delete(model).where(model.meeting_id == meeting_id))
-        # Las tareas en vivo pueden tener estado cambiado a mano: solo borrar las "ai" intactas
+        # Las tareas en vivo pueden tener estado cambiado (o estar repartidas)
+        # a mano: solo borrar las "ai" intactas. Repartir una la pasa a "manual".
         await db.execute(
             delete(ActionItem).where(
                 ActionItem.meeting_id == meeting_id,
@@ -474,17 +477,26 @@ async def _persist_insights(meeting_id: uuid.UUID, insights: dict, reference_dat
             .all()
         )
         participant_users = {p.name.lower(): p.user_id for p in participants if p.user_id}
+        owner_id, owner_name = await task_owner(db, meeting)
+        # Las que quedaron (tocadas a mano: estado, texto o a quién se le
+        # repartió) no se vuelven a crear.
+        kept = list(
+            (await db.execute(select(ActionItem.text).where(ActionItem.meeting_id == meeting_id))).scalars().all()
+        )
         for item in insights.get("tasks", []) or []:
             text = str(item.get("text", "")).strip()
-            if not text:
+            if not text or _is_duplicate(text, kept):
                 continue
-            assignee = item.get("assignee")
+            assignee = (str(item.get("assignee") or "").strip() or None)
             due_text = item.get("due")
             db.add(
                 ActionItem(
                     meeting_id=meeting_id, organization_id=org_id, text=text,
-                    assignee_name=assignee,
-                    assignee_user_id=participant_users.get((assignee or "").lower()),
+                    # A quien grabó, que la reparte; sin quien grabó (Echo
+                    # Device), a quien se nombró si es de la sede.
+                    assignee_name=owner_name if owner_id else assignee,
+                    assignee_user_id=owner_id or participant_users.get((assignee or "").lower()),
+                    suggested_assignee=assignee[:200] if assignee else None,
                     due_text=due_text,
                     due_date=resolve_relative_date(due_text, reference_date),
                     evidence_start_ms=_ms(item.get("evidence_start_ms")),
