@@ -2,8 +2,7 @@
 import uuid
 
 from conftest import EchoTestUser
-from test_levels import _sql
-from test_voice import _sql_rows
+from test_levels import _sql, _sql_rows
 
 
 def test_anyone_can_write_to_becode_without_seeing_an_email(client):

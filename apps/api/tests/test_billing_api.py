@@ -35,7 +35,9 @@ def test_someone_without_a_school_gets_an_individual_account_on_the_base_plan(cl
     codes = {plan["code"]: plan for plan in billing["plans"]}
     assert "cortesia" not in codes
     assert codes["institucion"]["price_usd"] is None
-    assert codes["individual"]["price_usd"] == 5 and codes["individual_voz"]["price_usd"] == 10
+    assert codes["individual"]["price_usd"] == 5
+    # Sin Hablar con Echo, "Individual + voz" ya no se ofrece.
+    assert "individual_voz" not in codes
 
 
 def test_someone_from_a_school_domain_does_not_get_a_personal_account(client):
@@ -286,7 +288,7 @@ def test_usage_month_is_validated_and_the_org_panel_shows_only_members(client):
 def test_the_landing_sees_the_plans_without_a_session(client):
     plans = client.get("/api/billing/plans").json()
     codes = [plan["code"] for plan in plans]
-    assert codes[:3] == ["base", "individual", "individual_voz"] and "institucion" in codes and "cortesia" not in codes
+    assert codes[:2] == ["base", "individual"] and "institucion" in codes
+    assert "cortesia" not in codes and "individual_voz" not in codes
     by_code = {plan["code"]: plan for plan in plans}
     assert by_code["institucion"]["price_usd"] is None
-    assert by_code["individual_voz"]["limits"]["voice_minutes_per_month"] == 30

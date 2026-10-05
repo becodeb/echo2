@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { SegmentedToggle } from "../components/Toggles";
-import { Link } from "react-router-dom";
 import { AnimatedNumber, formatAudio, formatTokens, formatUSD, renewsLabel, Shimmer, useBilling } from "../components/billing";
 import { currentMonth } from "../lib/months";
 
@@ -57,10 +56,20 @@ const PROVIDER_LABEL: Record<string, string> = {
   deepgram: "Deepgram",
 };
 
+// Groq se usa hoy con una API key gratuita: el monto es lo que costaría con
+// una paga, no algo que se esté pagando.
+const FREE_PROVIDERS: Record<string, string> = {
+  groq: "hoy no se paga: API key gratuita",
+};
+
 export function lineTitle(line: UsageLine): string {
   const who = PROVIDER_LABEL[line.provider] ?? line.provider;
   if (line.kind === "stt_final" && line.provider === "elevenlabs") return "Quién habló · ElevenLabs";
   return `${KIND_LABEL[line.kind] ?? line.kind} · ${who}`;
+}
+
+export function lineNote(line: UsageLine): string | null {
+  return FREE_PROVIDERS[line.provider] ?? null;
 }
 
 export function lineAmount(line: UsageLine): string {
@@ -158,7 +167,10 @@ export function Breakdown({ lines }: { lines: UsageLine[] }) {
       {lines.map((line) => (
         <li key={`${line.kind}-${line.provider}-${line.model}-${line.unit}`}>
           <div className="flex items-baseline justify-between gap-3 text-sm">
-            <span className="min-w-0 truncate font-medium text-ink-800">{lineTitle(line)}</span>
+            <span className="min-w-0 font-medium text-ink-800">
+              {lineTitle(line)}
+              {lineNote(line) && <span className="font-normal text-ink-500"> ({lineNote(line)})</span>}
+            </span>
             <span className="shrink-0 tabular-nums text-ink-900">
               {line.price_unknown && line.cost_usd === 0 ? "sin precio" : formatUSD(line.cost_usd)}
             </span>
@@ -210,21 +222,15 @@ function LeftBar({ used, total }: { used: number; total: number }) {
   );
 }
 
-/** Lo que le queda a la persona este mes (§4.9): quién habló y voz, con barras. */
+/** Lo que le queda a la persona este mes (§4.9): quién habló, con barra. */
 function WhatIsLeft() {
   const { data: billing } = useBilling();
-  const { data: voice } = useQuery({
-    queryKey: ["voice-status"],
-    queryFn: () => api<{ allowed: boolean; seconds_total: number | null; seconds_left: number | null; seconds_used: number }>(
-      "/api/voice/status",
-    ),
-  });
   if (!billing) return <Shimmer className="h-[132px]" />;
   const people = billing.people;
   const userPlan = billing.plans.find((plan) => plan.code === billing.user_plan);
   const hoursTotal = userPlan?.limits.people_hours_per_month;
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="grid gap-3">
       <div className="rounded-3xl border border-ink-100 bg-white p-5">
         <p className="text-xs font-medium text-ink-400">Quién habló</p>
         {people.mode === "always" && people.source === "individual" && people.people_hours_left != null && hoursTotal ? (
@@ -247,27 +253,6 @@ function WhatIsLeft() {
               De {people.credits_per_month} este mes (una de más de 1 h usa dos). Se renuevan el {renewsLabel(billing.renews_at)}.
             </p>
           </>
-        )}
-      </div>
-      <div className="rounded-3xl border border-ink-100 bg-white p-5">
-        <p className="text-xs font-medium text-ink-400">Hablar con Echo</p>
-        {voice?.allowed && voice.seconds_total != null && voice.seconds_left != null ? (
-          <>
-            <p className="mt-2 text-[22px] font-semibold tracking-tight text-ink-900">
-              Te quedan {Math.floor(voice.seconds_left / 60)} min
-            </p>
-            <LeftBar used={voice.seconds_total - voice.seconds_left} total={voice.seconds_total} />
-            <p className="mt-2 text-xs text-ink-500">De {Math.round(voice.seconds_total / 60)} min este mes.</p>
-          </>
-        ) : voice?.allowed ? (
-          <p className="mt-2 text-[17px] font-semibold tracking-tight text-ink-900">Sin tope</p>
-        ) : (
-          <p className="mt-2 text-sm text-ink-600">
-            Viene en el plan Individual + voz.{" "}
-            <Link to="/plans" className="font-medium text-ink-900 underline-offset-2 hover:underline">
-              Ver planes
-            </Link>
-          </p>
         )}
       </div>
     </div>

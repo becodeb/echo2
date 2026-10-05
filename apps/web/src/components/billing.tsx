@@ -20,7 +20,7 @@ export interface BillingInfo {
     people_hours_left: number | null;
     available: boolean;
   };
-  features: { transcription: boolean; minutes: boolean; tasks: boolean; chat: boolean; voice: boolean; paid: boolean };
+  features: { transcription: boolean; minutes: boolean; tasks: boolean; chat: boolean; paid: boolean };
   plans: PublicPlan[];
   requests: { id: string; plan: string; status: string; created_at: string }[];
   month_start: string;

@@ -32,7 +32,7 @@ export function Pricing() {
         Empezá gratis. Todas las reuniones se transcriben; los planes pagos suman reuniones largas, quién habló
         en más reuniones, preguntarle a Echo por todo el año y hablarle por voz.
       </p>
-      <div className="mt-12 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-12 grid gap-4 md:grid-cols-3">
         {plans === null
           ? [0, 1, 2, 3].map((index) => <div key={index} className="h-[440px] animate-pulse rounded-3xl bg-ink-100/70" />)
           : specs.map((spec, index) => {

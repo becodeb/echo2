@@ -23,7 +23,7 @@ from ..config import get_settings
 from ..db import get_db
 from ..deps import OrgContext, get_org_context
 from ..models import BillingPlan, Notification, OrganizationMember, PlanRequest, UsageEvent, User
-from ..models.billing import PLAN_COURTESY, PLAN_INSTITUTION
+from ..models.billing import PLAN_COURTESY, PLAN_INDIVIDUAL_VOICE, PLAN_INSTITUTION
 from ..services import plans
 from ..services.ai_settings import resolve_embeddings, resolve_llm
 from ..services.audit import audit
@@ -33,7 +33,11 @@ from ..services.mailer import send_mail
 router = APIRouter(prefix="/api/billing", tags=["billing"])
 
 # Planes que se pueden pedir desde la web. Cortesía no: la asigna Becode.
-REQUESTABLE = {"individual", "individual_voz", PLAN_INSTITUTION}
+REQUESTABLE = {"individual", PLAN_INSTITUTION}
+# Fuera del catálogo: Cortesía la asigna Becode, e "Individual + voz" quedó sin
+# su diferencia cuando se sacó Hablar con Echo (quien lo tenía sigue con lo de
+# Individual).
+HIDDEN_PLANS = (PLAN_COURTESY, PLAN_INDIVIDUAL_VOICE)
 # Un pedido abierto del mismo plan no se repite en este plazo.
 REQUEST_COOLDOWN = timedelta(days=7)
 
@@ -53,7 +57,6 @@ class FeaturesOut(BaseModel):
     minutes: bool
     tasks: bool
     chat: bool
-    voice: bool
     # Plan pago (individual o de la sede): reuniones de más de una hora,
     # preguntar sobre todas, Word / Google Docs / Drive, importar grabaciones.
     paid: bool = False
@@ -108,7 +111,7 @@ def _public(plan: BillingPlan) -> PublicPlanOut:
 
 async def _public_plans(db: AsyncSession) -> list[PublicPlanOut]:
     rows = (
-        await db.execute(select(BillingPlan).where(BillingPlan.code != PLAN_COURTESY).order_by(BillingPlan.sort))
+        await db.execute(select(BillingPlan).where(BillingPlan.code.notin_(HIDDEN_PLANS)).order_by(BillingPlan.sort))
     ).scalars().all()
     return [_public(plan) for plan in rows]
 
@@ -125,7 +128,7 @@ async def my_billing(ctx: OrgContext = Depends(get_org_context), db: AsyncSessio
     llm = await resolve_llm(db, ctx.org_id)
     embeddings = await resolve_embeddings(db, ctx.org_id)
     public = (
-        (await db.execute(select(BillingPlan).where(BillingPlan.code != PLAN_COURTESY).order_by(BillingPlan.sort)))
+        (await db.execute(select(BillingPlan).where(BillingPlan.code.notin_(HIDDEN_PLANS)).order_by(BillingPlan.sort)))
         .scalars()
         .all()
     )
@@ -160,7 +163,6 @@ async def my_billing(ctx: OrgContext = Depends(get_org_context), db: AsyncSessio
             minutes=llm is not None,
             tasks=llm is not None,
             chat=llm is not None and embeddings is not None,
-            voice=(await plans.voice_allowance(db, ctx.user))[0],
             paid=plans.is_paid(ctx.org, ctx.user),
         ),
         plans=[_public(plan) for plan in public],

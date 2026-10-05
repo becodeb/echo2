@@ -41,8 +41,8 @@ export default function Plans() {
       </header>
 
       {isLoading || !billing ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {[0, 1, 2, 3].map((index) => (
+        <div className="grid gap-4 md:grid-cols-3">
+          {[0, 1, 2].map((index) => (
             <Shimmer key={index} className="h-[420px]" />
           ))}
         </div>
@@ -135,7 +135,7 @@ function PlanGrid({ billing }: { billing: BillingInfo }) {
   const current = becode ? new Set<string>() : currentPlans(billing);
   const specs = planSpecs(billing.plans);
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-4 md:grid-cols-3">
       {specs.map((spec, index) => {
         const isCurrent = current.has(spec.plan.code);
         // Individual + voz ya trae todo lo de Individual.

@@ -40,7 +40,7 @@ class UserVoiceSample(PKMixin, TimestampMixin, Base):
 
 
 class VoiceSession(PKMixin, TimestampMixin, Base):
-    """Una charla de Hablar con Echo que entregó el servidor (routers/voice.py).
+    """Una charla de Hablar con Echo (se sacó el 5/10/2026; queda el historial).
 
     El tope de minutos lo aplica el servidor: decide cuánto puede durar
     (eligiendo el agente con esa duración máxima), deja una sola abierta por

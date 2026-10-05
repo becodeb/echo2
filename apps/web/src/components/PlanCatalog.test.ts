@@ -12,18 +12,19 @@ const PLANS: PublicPlan[] = [
 describe("catálogo de planes", () => {
   it("usa los topes de la base, no números fijos", () => {
     const specs = planSpecs(PLANS);
-    expect(specs.map((spec) => spec.plan.code)).toEqual(["base", "individual", "individual_voz", "institucion"]);
+    // "Individual + voz" ya no se ofrece: aunque llegue, no tiene tarjeta.
+    expect(specs.map((spec) => spec.plan.code)).toEqual(["base", "individual", "institucion"]);
     expect(specs[0].bullets).toContain("4 reuniones por mes con quién habló");
     expect(specs[1].bullets).toContain("6 h por mes con quién habló");
-    expect(specs[2].bullets.join(" ")).toContain("30 min por mes");
   });
 
   it("lo que es de los planes pagos no figura en Gratis", () => {
     const rows = Object.fromEntries(compareRows(PLANS).map((row) => [row.label, row.cells]));
-    expect(rows["Preguntale a Echo sobre todas"]).toEqual([false, true, true, true]);
+    expect(rows["Preguntale a Echo sobre todas"]).toEqual([false, true, true]);
     expect(rows["Word, Documento de Google y Drive"][0]).toBe(false);
     expect(rows["Duración de cada reunión"][0]).toBe("Hasta 1 h");
-    expect(rows["Hablar con Echo por voz"]).toEqual([false, false, "30 min / mes", false]);
+    expect(rows["Hablar con Echo por voz"]).toBeUndefined();
+    expect(Object.values(rows).every((cells) => cells.length === 3)).toBe(true);
   });
 
   it("Instituciones va a medida", () => {

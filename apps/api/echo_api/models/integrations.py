@@ -85,8 +85,8 @@ class ServerAISettings(PKMixin, TimestampMixin, Base):
     llm_model: Mapped[str | None] = mapped_column(String(120))
     llm_api_key_enc: Mapped[str | None] = mapped_column(Text)
     llm_base_url: Mapped[str | None] = mapped_column(String(300))
-    # Agente de ElevenLabs para la conversación por voz (services/voice_agent.py):
-    # lo crea un superadmin desde el panel, con la key de la instalación.
+    # Agente de ElevenLabs de Hablar con Echo, que se sacó el 5/10/2026: quedan
+    # las columnas para no migrar, sin uso.
     voice_agent_id: Mapped[str | None] = mapped_column(String(80))
     # Un agente por duración máxima de la charla: {"60": id, "180": id, "600": id}.
     voice_agents: Mapped[dict | None] = mapped_column(JSONB)

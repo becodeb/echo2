@@ -4,8 +4,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from conftest import EchoTestUser
-from test_levels import _sql
-from test_voice import _sql_rows
+from test_levels import _sql, _sql_rows
 
 
 def _link_for(admin_id: str) -> str:

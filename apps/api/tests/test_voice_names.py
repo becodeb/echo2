@@ -11,11 +11,11 @@ import uuid
 import numpy as np
 from conftest import EchoTestUser
 from test_final_pass import _cleanup, _meeting, _setup, _transcript
-from test_levels import _sql
-from test_voice import _sql_rows
+from test_levels import _sql, _sql_rows
 
 from echo_api.services import diarization, speaker_names, voiceprint
 from echo_api.services.speaker_names import Candidate, decide, said_names
+
 
 
 def _unit(*values: float) -> np.ndarray:

@@ -13,8 +13,7 @@ from pathlib import Path
 
 import httpx
 from conftest import EchoTestUser
-from test_levels import _sql
-from test_voice import _sql_rows
+from test_levels import _sql, _sql_rows
 from test_speakers import _tone
 
 from echo_api.config import get_settings

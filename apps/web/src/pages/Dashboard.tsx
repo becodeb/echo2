@@ -8,7 +8,6 @@ import { MeetingStatus } from "../components/MeetingStatus";
 import { Card, EmptyState, formatDate, formatDuration } from "../components/ui";
 import { EchoFace } from "../components/EchoFace";
 import { useAuth } from "../state/auth";
-import { useVoice } from "../state/voice";
 
 interface DashboardData {
   greeting_name: string;
@@ -29,7 +28,6 @@ interface DashboardData {
 export default function Dashboard() {
   const { activeOrg } = useAuth();
   const navigate = useNavigate();
-  const voice = useVoice();
   const { data } = useQuery({
     queryKey: ["dashboard", activeOrg?.id],
     queryFn: () => api<DashboardData>("/api/dashboard"),
@@ -144,20 +142,6 @@ export default function Dashboard() {
         </div>
 
         <div>
-          <button
-            type="button"
-            onClick={voice.open}
-            className="group mb-8 flex w-full items-center gap-4 rounded-3xl bg-ink-900 p-5 text-left text-white shadow-[0_12px_32px_-14px_rgba(20,24,36,0.6)] transition-transform duration-200 hover:-translate-y-0.5"
-          >
-            <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/10">
-              <span aria-hidden className="voice-bubble-wave absolute inset-0 rounded-full border-2 border-accent-400/50" />
-              <EchoFace mood="idle" size={26} />
-            </span>
-            <span className="min-w-0">
-              <span className="block font-semibold">Hablá con Echo</span>
-              <span className="mt-0.5 block text-sm text-white/70">Preguntale por tus reuniones, en voz alta.</span>
-            </span>
-          </button>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-400">Mis tareas</h2>
           <Card className="overflow-hidden p-0">
             {!data && (
@@ -239,7 +223,6 @@ const STEPS_KEY = "echo_primeros_pasos_ocultos";
 
 /** Primeros pasos para quien recién empieza; se van solos al completarlos (o al cerrarlos). */
 function FirstSteps({ hasMeetings }: { hasMeetings: boolean }) {
-  const voice = useVoice();
   const [hidden, setHidden] = useState(() => {
     try {
       return localStorage.getItem(STEPS_KEY) === "1";
@@ -256,7 +239,7 @@ function FirstSteps({ hasMeetings }: { hasMeetings: boolean }) {
   const steps = [
     { done: hasMeetings, label: "Grabá tu primera reunión", to: "/meetings?new=1" },
     { done: myVoice.has_sample, label: "Grabá tu voz para aparecer con tu nombre", to: "/settings/my-voice" },
-    { done: false, label: "Preguntale a Echo por una reunión", action: voice.open, optional: true },
+    { done: false, label: "Preguntale a Echo por una reunión", to: "/ask", optional: true },
   ];
   if (steps.filter((step) => !step.optional).every((step) => step.done)) return null;
   const close = () => {
@@ -292,11 +275,7 @@ function FirstSteps({ hasMeetings }: { hasMeetings: boolean }) {
           const className = "flex min-h-12 w-full items-center gap-3 rounded-2xl bg-ink-50/70 px-3.5 py-2.5 text-left text-sm hover:bg-ink-100";
           return (
             <li key={step.label}>
-              {step.action ? (
-                <button type="button" onClick={step.action} className={className}>{inner}</button>
-              ) : (
-                <Link to={step.to!} className={className}>{inner}</Link>
-              )}
+              <Link to={step.to} className={className}>{inner}</Link>
             </li>
           );
         })}

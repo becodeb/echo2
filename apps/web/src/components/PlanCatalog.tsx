@@ -50,18 +50,6 @@ export function planSpecs(plans: PublicPlan[]): PlanSpec[] {
       ],
     });
   }
-  if (code.individual_voz) {
-    const minutes = code.individual_voz.limits.voice_minutes_per_month ?? 30;
-    out.push({
-      plan: code.individual_voz,
-      tagline: "Para hablarle a Echo como a una persona.",
-      bullets: [
-        "Todo lo de Individual",
-        `${minutes} min por mes de conversación por voz con Echo`,
-        "Preguntale por tus reuniones sin escribir",
-      ],
-    });
-  }
   if (code.institucion) {
     out.push({
       plan: code.institucion,
@@ -81,28 +69,26 @@ export function planSpecs(plans: PublicPlan[]): PlanSpec[] {
 
 type Cell = boolean | string;
 
-/** La tabla "Comparar planes": Gratis, Individual, Individual + voz, Instituciones. */
+/** La tabla "Comparar planes": Gratis, Individual, Instituciones. */
 export function compareRows(plans: PublicPlan[]): { label: string; cells: Cell[] }[] {
   const code = byCode(plans);
   const credits = code.base?.limits.credits_per_month ?? 4;
   const hours = code.individual?.limits.people_hours_per_month ?? 5;
-  const minutes = code.individual_voz?.limits.voice_minutes_per_month ?? 30;
   return [
-    { label: "Transcripción en vivo", cells: [true, true, true, true] },
-    { label: "Duración de cada reunión", cells: ["Hasta 1 h", "Sin límite", "Sin límite", "Sin límite"] },
-    { label: "Quién habló", cells: [`${credits} reuniones / mes`, `${hours} h / mes`, `${hours} h / mes`, "Todas"] },
-    { label: "Acta, resumen y tareas", cells: [true, true, true, true] },
-    { label: "Los nombres no le llegan a la IA", cells: [true, true, true, true] },
-    { label: "Preguntale a Echo sobre cada reunión", cells: [true, true, true, true] },
-    { label: "Preguntale a Echo sobre todas", cells: [false, true, true, true] },
-    { label: "Exportar en PDF", cells: [true, true, true, true] },
-    { label: "Word, Documento de Google y Drive", cells: [false, true, true, true] },
-    { label: "Subir grabaciones (Zoom, Meet)", cells: [false, true, true, true] },
-    { label: "Hablar con Echo por voz", cells: [false, false, `${minutes} min / mes`, false] },
-    { label: "Membrete y actas numeradas", cells: [true, true, true, true] },
-    { label: "Sedes, niveles y consumo por docente", cells: [false, false, false, true] },
-    { label: "Echo Devices", cells: [false, false, false, true] },
-    { label: "Soporte", cells: ["Por mail", "Prioritario", "Prioritario", "Acompañamiento"] },
+    { label: "Transcripción en vivo", cells: [true, true, true] },
+    { label: "Duración de cada reunión", cells: ["Hasta 1 h", "Sin límite", "Sin límite"] },
+    { label: "Quién habló", cells: [`${credits} reuniones / mes`, `${hours} h / mes`, "Todas"] },
+    { label: "Acta, resumen y tareas", cells: [true, true, true] },
+    { label: "Los nombres no le llegan a la IA", cells: [true, true, true] },
+    { label: "Preguntale a Echo sobre cada reunión", cells: [true, true, true] },
+    { label: "Preguntale a Echo sobre todas", cells: [false, true, true] },
+    { label: "Exportar en PDF", cells: [true, true, true] },
+    { label: "Word, Documento de Google y Drive", cells: [false, true, true] },
+    { label: "Subir grabaciones (Zoom, Meet)", cells: [false, true, true] },
+    { label: "Membrete y actas numeradas", cells: [true, true, true] },
+    { label: "Sedes, niveles y consumo por docente", cells: [false, false, true] },
+    { label: "Echo Devices", cells: [false, false, true] },
+    { label: "Soporte", cells: ["Por mail", "Prioritario", "Acompañamiento"] },
   ];
 }
 

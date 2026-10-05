@@ -14,8 +14,6 @@ import { CommandPalette } from "./CommandPalette";
 import { Icon, type IconName } from "./icons";
 import { NotificationsPanel } from "./NotificationsPanel";
 import { VoicePrompt } from "./VoicePrompt";
-import { VoiceBubble } from "./VoiceBubble";
-import { VoiceProvider, useVoice } from "../state/voice";
 import { useTitle } from "../lib/useTitle";
 import { CreditDots, effectivePlan, PLAN_NAME, useBilling } from "./billing";
 
@@ -70,15 +68,6 @@ function pageTitle(pathname: string): string {
 }
 
 export function Layout({ children }: { children: ReactNode }) {
-  return (
-    <VoiceProvider>
-      <LayoutInner>{children}</LayoutInner>
-    </VoiceProvider>
-  );
-}
-
-function LayoutInner({ children }: { children: ReactNode }) {
-  const voice = useVoice();
   const routeTitle = pageTitle(useLocation().pathname);
   useTitle(routeTitle);
   const { user, activeOrg } = useAuth();
@@ -127,7 +116,6 @@ function LayoutInner({ children }: { children: ReactNode }) {
 
   // Con el panel de preguntas abierto (en la computadora) la barra queda en íconos.
   const collapsed = askOpen;
-  const showBubble = !live && !askOpen && location.pathname !== "/ask";
   const navLink = (item: NavItem) => (
     <NavLink
       key={item.to}
@@ -171,20 +159,6 @@ function LayoutInner({ children }: { children: ReactNode }) {
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-1" aria-label="Secciones">
           {NAV_MAIN.filter((item) => item.to !== "/internal" || seesInternal).map(navLink)}
-          <button
-            type="button"
-            onClick={() => {
-              setMobileNav(false);
-              voice.open();
-            }}
-            title={collapsed ? "Hablar con Echo" : undefined}
-            className={`flex w-full items-center gap-2.5 rounded-2xl px-2.5 py-[10px] text-[15px] font-medium text-ink-600 transition-colors duration-150 hover:bg-ink-50 hover:text-ink-900 md:py-[7px] md:text-[14px] ${
-              collapsed ? "md:justify-center md:px-0" : ""
-            }`}
-          >
-            <Icon name="voice" />
-            <span className={collapsed ? "md:hidden" : ""}>Hablar con Echo</span>
-          </button>
           {/* "Colegio" (personas, familias, proyectos, reportes) no va en una cuenta individual. */}
           {!activeOrg?.is_personal && (
             <>
@@ -254,8 +228,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
           />
         )}
 
-        {/* Con el globito de la voz, aire abajo para que no tape lo último de la página. */}
-        <main className={`min-h-0 flex-1 overflow-y-auto ${showBubble ? "pb-24" : ""}`}>
+        <main className="min-h-0 flex-1 overflow-y-auto">
           {/* Cada sección entra con un fundido corto en vez de aparecer de golpe. */}
           <div key={location.pathname} className="page-in h-full">
             {children}
@@ -285,9 +258,6 @@ function LayoutInner({ children }: { children: ReactNode }) {
       )}
       <AnnouncementPopup />
       <VoicePrompt />
-      {/* El globito no va en la reunión en vivo (el micrófono está grabando) ni
-          sobre "Preguntale a Echo", que ya tiene su micrófono. */}
-      {showBubble && !mobileNav && <VoiceBubble />}
     </div>
   );
 }

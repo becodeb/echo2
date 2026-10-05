@@ -7,7 +7,6 @@ import { AnswerText } from "./AnswerText";
 import { useBilling } from "./billing";
 import { EchoFace } from "./EchoFace";
 import { formatMs } from "./ui";
-import { useVoice } from "../state/voice";
 
 interface Message {
   role: "user" | "assistant";
@@ -49,7 +48,6 @@ export function EchoChat({
   const { data: billing } = useBilling();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const voice = useVoice();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -101,7 +99,6 @@ export function EchoChat({
   };
 
   const column = wide ? "mx-auto w-full max-w-3xl" : "w-full";
-  const canTalk = !!billing?.features.voice;
 
   if (billing && !billing.features.paid) {
     // Plan Gratis: se pregunta sobre cada reunión, desde su pestaña Chat.
@@ -185,20 +182,6 @@ export function EchoChat({
             enterKeyHint="send"
             className="max-h-40 min-h-[36px] flex-1 resize-none bg-transparent py-[7px] text-[16px] leading-snug text-ink-900 placeholder:text-ink-400 focus:outline-none md:text-[15px]"
           />
-          {canTalk && (
-            <button
-              type="button"
-              onClick={voice.open}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900 md:h-9 md:w-9"
-              aria-label="Hablar con Echo"
-              title="Hablar con Echo"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden>
-                <rect x="9" y="3" width="6" height="11" rx="3" />
-                <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
-              </svg>
-            </button>
-          )}
           <button
             type="submit"
             disabled={ask.isPending || !input.trim()}
@@ -210,14 +193,6 @@ export function EchoChat({
             </svg>
           </button>
         </form>
-        {!canTalk && billing && wide && (
-          <p className="mt-2 text-center text-xs text-ink-400">
-            ¿Preferís hablarle?{" "}
-            <Link to="/plans" className="font-medium text-ink-600 hover:text-ink-900">
-              Conversá con Echo por voz con el plan + voz
-            </Link>
-          </p>
-        )}
       </div>
     </div>
   );

@@ -12,7 +12,7 @@ import { PillSwitch } from "./SettingRows";
 /**
  * "Lo que va a hacer Echo" en una reunión nueva, según el plan y los créditos
  * (services/plans.py): transcripción, quién habló (y si gasta un crédito),
- * acta, tareas con responsables, chat, voz. Y el interruptor de menores: con
+ * acta, tareas con responsables y chat. Y el interruptor de menores: con
  * alumnos hablando, la reunión no se manda a separar voces.
  */
 export function MeetingAiPlan({
@@ -98,13 +98,6 @@ export function MeetingAiPlan({
           label="Chat con la IA sobre la reunión"
           hint={features.chat ? undefined : NO_AI}
         />
-        {features.voice && (
-          <Row
-            on
-            label="Conversación por voz"
-            hint="Después, preguntale por la reunión hablando, con Hablar con Echo."
-          />
-        )}
       </ul>
       {separates && (
         <p className="border-t border-ink-100 bg-accent-50/60 px-4 py-2.5 text-xs text-accent-700">

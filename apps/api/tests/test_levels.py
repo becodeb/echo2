@@ -24,6 +24,16 @@ def _sql(statement: str, **params):
     asyncio.run(run())
 
 
+def _sql_rows(statement: str, **params) -> list[tuple]:
+    from echo_api.db import SessionLocal
+
+    async def run():
+        async with SessionLocal() as db:
+            return [tuple(row) for row in (await db.execute(text(statement), params)).all()]
+
+    return asyncio.run(run())
+
+
 class Member:
     def __init__(self, client, owner: EchoTestUser, name: str):
         email = f"{name.lower()}-{uuid.uuid4().hex[:6]}@test.echo"

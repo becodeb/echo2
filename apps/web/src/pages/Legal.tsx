@@ -17,12 +17,10 @@ import { useTitle } from "../lib/useTitle";
  * - OpenAI (acta, resumen, chat e índice de búsqueda): la API no entrena con
  *   los datos salvo opt-in y guarda logs de abuso hasta 30 días
  *   (developers.openai.com, "Your data"). Desde el 1/10 no recibe audio.
- * - Hablar con Echo: ElevenLabs Agents (voz) con el LLM que elige el agente
- *   (services/voice_agent.py, AGENT_LLM), que ElevenLabs llama por su cuenta.
  * Antes de publicarlo como definitivo conviene que lo revise un abogado.
  */
 
-const UPDATED = "1 de octubre de 2026";
+const UPDATED = "5 de octubre de 2026";
 
 export default function Legal() {
   const { doc } = useParams();
@@ -136,8 +134,7 @@ function Privacy() {
           <li><strong>Las reuniones:</strong> el texto transcripto, quién habló, el acta, el resumen, las tareas y lo que le preguntes a Echo.</li>
           <li><strong>El audio</strong> de la reunión, solo mientras se procesa (ver más abajo cuánto dura).</li>
           <li><strong>Tu muestra de voz</strong>, si decidís grabarla en Mi voz.</li>
-          <li><strong>Las charlas con Hablar con Echo</strong>, si tu plan lo incluye.</li>
-          <li><strong>El consumo:</strong> cuántos minutos de audio y de voz y cuánta IA usa cada persona, para los planes y los créditos.</li>
+          <li><strong>El consumo:</strong> cuántos minutos de audio y cuánta IA usa cada persona, para los planes y los créditos.</li>
         </ul>
       </Section>
 
@@ -155,7 +152,7 @@ function Privacy() {
           />
           <Provider
             name="ElevenLabs"
-            what="Al terminar, separa quién habló en las reuniones que lo usan (según el plan o un crédito). También pone la voz de Hablar con Echo."
+            what="Al terminar, separa quién habló en las reuniones que lo usan (según el plan o un crédito)."
             facts={[
               "Nunca recibe audio de reuniones donde hablan menores de 18 años.",
               "En la cuenta de Echo está desactivado el uso de los datos para mejorar sus modelos.",
@@ -185,22 +182,6 @@ function Privacy() {
           en voz alta aunque no estén cargados. Ningún sistema automático es perfecto: un nombre poco común dicho al
           principio de una frase puede pasar.
         </p>
-      </Section>
-
-      <Section title="Hablar con Echo (conversación por voz)">
-        <ul>
-          <li>Es solo para mayores de 18 años y para los planes que la incluyen.</li>
-          <li>
-            Lo que decís y lo que responde Echo pasa por <strong>ElevenLabs</strong> (la voz) y por el modelo de lenguaje
-            que usa su agente (hoy, Gemini de Google, a través de ElevenLabs).
-          </li>
-          <li>
-            Para responder, Echo consulta tus reuniones con los nombres reemplazados por marcadores, pero la respuesta
-            hablada dice los nombres reales: por eso esos nombres sí llegan a ElevenLabs.
-          </li>
-          <li>Las reuniones donde hablan menores de 18 nunca se usan en la conversación por voz.</li>
-          <li>Echo no guarda el audio de la charla; guarda cuánto duró, para el consumo del plan.</li>
-        </ul>
       </Section>
 
       <Section title="Mi voz (reconocimiento por voz)">
@@ -319,7 +300,6 @@ function Terms() {
           <li>Avisar que la reunión se graba y contar con el consentimiento de quienes participan.</li>
           <li>Indicar al crear la reunión si hablan alumnos menores de 18.</li>
           <li>Usar Echo para las reuniones de tu institución o propias, y no para grabar a nadie sin que lo sepa.</li>
-          <li>Usar Hablar con Echo solo si sos mayor de 18 años.</li>
           <li>Cuidar el acceso a tu cuenta.</li>
         </ul>
       </Section>

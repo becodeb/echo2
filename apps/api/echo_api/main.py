@@ -64,7 +64,6 @@ def _include_optional_routers() -> None:
         "admin",
         "admin_billing",
         "billing",
-        "voice",
         "families",
         "attachments",
         "drive",
@@ -119,27 +118,6 @@ async def _start_recordings_cleanup() -> None:
 
     if settings.echo_env != "test":
         spawn(cleanup_loop(), name="recordings-cleanup")
-
-
-@app.on_event("startup")
-async def _ensure_voice_agent() -> None:
-    """Crea los agentes de voz si hay key de ElevenLabs y faltan, y los pone al
-    día solo si cambió su configuración (prompt, voz, LLM); y arranca la
-    conciliación del consumo de voz (routers/voice.py). Si falla, se ve en el
-    panel de Becode."""
-    from .db import SessionLocal
-    from .routers.voice import ensure_agents, reconcile_loop
-    from .services.background import spawn
-
-    if settings.echo_env == "test" or not settings.elevenlabs_api_key:
-        return
-    spawn(reconcile_loop(), name="voice-reconcile")
-    try:
-        async with SessionLocal() as db:
-            agents = await ensure_agents(db)
-            logging.getLogger("echo").info("agentes de voz listos: %s", agents)
-    except Exception:  # noqa: BLE001 - nunca impide que la API levante
-        logging.getLogger("echo").exception("no se pudo crear el agente de voz")
 
 
 @app.on_event("startup")
