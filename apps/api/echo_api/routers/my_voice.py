@@ -116,8 +116,8 @@ async def my_voice(user: User = Depends(get_current_user), db: AsyncSession = De
 
 @router.post("/prompt-seen", status_code=204)
 async def voice_prompt_seen(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """La invitación a grabar la voz se muestra una sola vez (al registrarse o
-    al volver a entrar, a quien no tiene muestra)."""
+    """"No volver a mostrar" en la invitación a grabar la voz. Sin esto, a
+    quien no tiene muestra la invitación le aparece cada vez que entra."""
     if user.voice_prompt_seen_at is None:
         user.voice_prompt_seen_at = datetime.now(UTC)
         await db.commit()
