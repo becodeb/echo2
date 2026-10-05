@@ -73,6 +73,17 @@ MAX_REALTIME_RATIO = 1.5
 router = APIRouter(tags=["live"])
 
 MAX_SEGMENT_CHARS = 2000
+# Tanto audio seguido sin que se transcriba nada = el micrófono no capta a
+# nadie, o es una videollamada sin su audio: se avisa mientras se puede
+# arreglar. La reunión del 5/10 (59 min) grabó solo el micrófono de quien
+# estaba en Meet y nadie se enteró hasta el acta.
+NO_SPEECH_WARN_MS = 3 * 60 * 1000
+NO_SPEECH_MESSAGE = {
+    1: "Hace 3 minutos que Echo no escucha a nadie. Si es una videollamada (Meet, Zoom, Teams), sumá el audio "
+    "de la llamada: si no, solo se escucha tu micrófono y no a los demás. Si es presencial, acercá el micrófono.",
+    2: "Hace 3 minutos que Echo no escucha a nadie. Revisá que la pestaña de la llamada se siga compartiendo con "
+    "audio y que el micrófono funcione.",
+}
 # Espera antes de cada reintento de un tramo que Groq no transcribió.
 LIVE_RETRY_WAITS = (1.0, 4.0)
 
@@ -240,6 +251,9 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
     base_audio_ms = 0
     hour_warned = False
     hour_reached = False
+    # Hasta dónde del audio se escuchó a alguien (para el aviso de NO_SPEECH_WARN_MS).
+    heard_until_ms: int | None = None
+    no_speech_warned = False
 
     async def forward_bus():
         try:
@@ -271,7 +285,9 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
         stream_offset_ms += duration_ms
         jobs.put_nowait((chunk, offset, final))
 
-    async def transcribe_chunk(chunk: bytes, offset: int, final: bool) -> None:
+    async def transcribe_chunk(chunk: bytes, offset: int, final: bool) -> int | None:
+        """Cuántos tramos se guardaron; None = no se sabe si hubo voz (sin
+        transcribir por el tope de audio o porque el motor no respondió)."""
         nonlocal stt_error_sent, segments_since_insights, previous_text
         mic_track: bytes | None = None
         system_track: bytes | None = None
@@ -289,12 +305,12 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
                 await live_bus.publish(
                     channel, {"type": "warning", "code": "audio_limit", "message": plans.AUDIO_LIMIT_MESSAGE}
                 )
-            return
+            return None
         # Whisper alucina créditos de subtitulado sobre silencio; además una
         # llamada por ventana muda es gasto puro.
         if all(is_silent(track, sample_rate) for track in tracks):
             del chunk
-            return
+            return 0
         # Un error suelto (timeout, 5xx, rate limit) se reintenta con espera:
         # sin eso el tramo se perdía entero. Si Groq sigue caído, el tramo no
         # se pierde igual: está en el audio de trabajo y la pasada final lo
@@ -327,8 +343,9 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
                         "se transcribe completo al finalizar.",
                     },
                 )
-            return
+            return None
         stt_error_sent = False
+        stored = 0
         await _record_live_usage(meeting, user.id, stt_provider, len(tracks[0]) / 2 / sample_rate)
         for seg in result.segments:
             text = strip_hallucinations(seg.text)
@@ -358,15 +375,39 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
             await live_bus.publish(channel, event)
             previous_text = text
             segments_since_insights += 1
+            stored += 1
         if segments_since_insights >= 8 or (final and segments_since_insights > 0):
             segments_since_insights = 0
             spawn(maybe_extract_live_insights(str(meeting.id)), name=f"insights:{meeting.id}")
+        return stored
+
+    async def check_heard(stored: int | None, offset: int, end: int) -> None:
+        """Avisa una vez por tramo largo sin que se escuche a nadie; se rearma
+        cuando vuelve a transcribirse algo."""
+        nonlocal heard_until_ms, no_speech_warned
+        if heard_until_ms is None:
+            heard_until_ms = offset
+        if stored is None:
+            return
+        if stored > 0:
+            heard_until_ms = end
+            no_speech_warned = False
+            return
+        if not no_speech_warned and end - heard_until_ms >= NO_SPEECH_WARN_MS:
+            no_speech_warned = True
+            log.info("live %s: %d s sin que se escuche a nadie", meeting.id, (end - heard_until_ms) // 1000)
+            await live_bus.publish(
+                channel,
+                {"type": "warning", "code": "no_speech", "message": NO_SPEECH_MESSAGE[channels], "channels": channels},
+            )
 
     async def transcriber() -> None:
         while True:
             chunk, offset, final = await jobs.get()
+            end = offset + int(len(chunk) / 2 / channels / sample_rate * 1000)
             try:
-                await transcribe_chunk(chunk, offset, final)
+                stored = await transcribe_chunk(chunk, offset, final)
+                await check_heard(stored, offset, end)
             except Exception as exc:  # noqa: BLE001 - un tramo no corta la reunión
                 log.warning("live %s: tramo sin transcribir: %s", meeting.id, exc)
             finally:

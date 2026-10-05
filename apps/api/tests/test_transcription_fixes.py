@@ -330,3 +330,53 @@ def test_a_device_with_minors_marks_the_meeting_it_joins(client, monkeypatch):
     with client.websocket_connect(f"/api/devices/stream?token={classroom}&meeting_id={meeting['id']}"):
         pass
     assert client.get(f"/api/meetings/{meeting['id']}", headers=owner.headers).json()["meta"]["minors"] is True
+
+
+def test_minutes_without_anyone_heard_warn_once_until_someone_speaks(client, monkeypatch):
+    # Reunión del 5/10: 59 minutos de Meet con "Incluir el audio de la llamada"
+    # apagado. Echo escuchó solo el micrófono y nadie se enteró hasta el acta.
+    import echo_api.routers.live as live_module
+    from echo_api.services.ai_settings import SttConfig
+
+    class QuietSTT:
+        async def transcribe_chunk(self, pcm16, sample_rate, language, vocabulary, offset_ms=0, context=None):
+            duration = len(pcm16) // 32
+            return SttResult(segments=[SttSegment(text="Hola, ¿se escucha?", start_ms=offset_ms, end_ms=offset_ms + duration)])
+
+    async def fake_resolve_stt(db, org_id):
+        return SttConfig(provider="groq", model=None, api_key="x")
+
+    monkeypatch.setattr(live_module, "resolve_stt", fake_resolve_stt)
+    monkeypatch.setattr(live_module, "get_stt_provider", lambda *args, **kwargs: QuietSTT())
+    monkeypatch.setattr(live_module, "NO_SPEECH_WARN_MS", 15_000)
+
+    user = EchoTestUser(client, org_name=f"Colegio {uuid.uuid4().hex[:4]}")
+    meeting = client.post("/api/meetings", json={"title": "x", "level": "primaria"}, headers=user.headers).json()
+    meeting_id = uuid.UUID(meeting["id"])
+
+    def send(websocket, audio: bytes) -> list[str]:
+        for start in range(0, len(audio), 3200):
+            websocket.send_bytes(audio[start:start + 3200])
+        websocket.send_text(json.dumps({"type": "flush"}))
+        seen = []
+        while (message := json.loads(websocket.receive_text()))["type"] != "flushed":
+            seen.append(message.get("code") or message["type"])
+        # Lo que viene por el canal de la reunión puede llegar justo después.
+        websocket.send_text(json.dumps({"type": "ping"}))
+        while (message := json.loads(websocket.receive_text()))["type"] != "pong":
+            seen.append(message.get("code") or message["type"])
+        return seen
+
+    with client.websocket_connect(f"/api/meetings/{meeting_id}/ws?token={user.token}") as websocket:
+        websocket.send_text(json.dumps({"type": "hello", "role": "recorder", "sample_rate": 16000}))
+        assert json.loads(websocket.receive_text())["type"] == "hello_ack"
+        # 10 s mudos: todavía no.
+        assert "no_speech" not in send(websocket, _silence(10.0))
+        # 10 s más: avisa, una sola vez aunque siga el silencio.
+        assert send(websocket, _silence(10.0)).count("no_speech") == 1
+        assert "no_speech" not in send(websocket, _silence(10.0))
+        # Alguien habla: se rearma, y otro tramo largo mudo vuelve a avisar.
+        assert "segment" in send(websocket, _tone(3.0))
+        assert "no_speech" not in send(websocket, _silence(10.0))
+        assert send(websocket, _silence(10.0)).count("no_speech") == 1
+    rec.pcm_path(meeting_id).unlink(missing_ok=True)

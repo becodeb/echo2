@@ -94,11 +94,23 @@ export default function MeetingLive() {
     }
   };
   const [captureSystem, setCaptureSystem] = useState(false);
+  // El mismo valor para el arranque y la conexión, que se arman en callbacks:
+  // así cambiarlo en medio de la reunión vale enseguida (addCallAudio).
+  const captureSystemRef = useRef(false);
+  const chooseCaptureSystem = useCallback((on: boolean) => {
+    captureSystemRef.current = on;
+    setCaptureSystem(on);
+  }, []);
+  // Canales que anunció la conexión abierta: si cambian, hace falta otra.
+  const wsChannelsRef = useRef(1);
   const [bridge, setBridge] = useState<BridgeHealth | null | "checking">("checking");
   const [engine, setEngine] = useState<EngineMode>("cloud");
   const [wsConnected, setWsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  // "Hace 3 minutos que Echo no escucha a nadie" (lo avisa el servidor). Se
+  // va solo cuando vuelve a transcribirse algo.
+  const [noSpeech, setNoSpeech] = useState<string | null>(null);
 
   // ── transcript en vivo ─────────────────────────────────────────
   const [lines, setLines] = useState<LiveLine[]>([]);
@@ -222,6 +234,7 @@ export default function MeetingLive() {
       switch (event.type) {
         case "segment":
           setPartial(null);
+          setNoSpeech(null);
           setLines((current) => {
             if (current.some((line) => line.key === event.id)) return current;
             return [
@@ -258,7 +271,8 @@ export default function MeetingLive() {
           }
           break;
         case "warning":
-          setWarning(event.message);
+          if (event.code === "no_speech") setNoSpeech(event.message);
+          else setWarning(event.message);
           break;
         case "limit":
           // Plan Gratis: la reunión llegó a la hora. Se termina sola.
@@ -320,15 +334,17 @@ export default function MeetingLive() {
       if (!token || !id) return reject(new Error("Sesión inválida"));
       const socket = new WebSocket(wsUrl(`/api/meetings/${id}/ws?token=${encodeURIComponent(token)}`));
       socket.binaryType = "arraybuffer";
+      const channels = captureSystemRef.current ? 2 : 1;
       socket.onopen = () => {
         // channels=2 avisa que el PCM viene intercalado L=micrófono, R=sistema,
         // que es como el servidor distingue quién habló.
+        wsChannelsRef.current = channels;
         socket.send(
           JSON.stringify({
             type: "hello",
             role: "recorder",
             sample_rate: 16000,
-            channels: captureSystem ? 2 : 1,
+            channels,
             // Con el bridge el texto viene de la máquina: si llega audio es
             // solo para grabarlo.
             transcribe: !bridgeMode,
@@ -371,7 +387,7 @@ export default function MeetingLive() {
         scheduleReconnect(0);
       };
     });
-  }, [id, handleLiveEvent, captureSystem, bridgeMode, scheduleReconnect]);
+  }, [id, handleLiveEvent, bridgeMode, scheduleReconnect]);
 
   useEffect(() => {
     openWsRef.current = openWs;
@@ -409,12 +425,21 @@ export default function MeetingLive() {
       // Nunca dos micrófonos a la vez: si quedó uno (reanudar), se cierra.
       await audioRef.current?.stop().catch(() => {});
       audioRef.current = null;
-      // Al reanudar la conexión sigue abierta: se reusa en vez de abrir otra.
+      // Al reanudar la conexión sigue abierta: se reusa en vez de abrir otra,
+      // salvo que cambie el audio (se sumó el de la llamada): el servidor
+      // necesita saber que ahora llegan dos canales.
+      const system = captureSystemRef.current;
       const current = wsRef.current;
-      const ws = current && current.readyState === WebSocket.OPEN ? current : await openWs();
+      const reuse = current && current.readyState === WebSocket.OPEN && wsChannelsRef.current === (system ? 2 : 1);
+      if (current && !reuse) {
+        // Primero se suelta: una conexión que no es la actual cierra sin reconectar.
+        wsRef.current = null;
+        current.close();
+      }
+      const ws = reuse ? current : await openWs();
       wsRef.current = ws;
 
-      const source: AudioSource = captureSystem
+      const source: AudioSource = system
         ? new SystemAudioSource(deviceId || undefined, () =>
             setWarning(
               "Se dejó de compartir el audio de la pestaña: ya no se escucha a quienes están del otro lado. Pausá y reanudá para volver a compartirlo.",
@@ -513,7 +538,7 @@ export default function MeetingLive() {
       startingRef.current = false;
       setStarting(false);
     }
-  }, [id, engine, bridge, deviceId, captureSystem, meeting?.language, lines, openWs, sendOrQueue]);
+  }, [id, engine, bridge, deviceId, meeting?.language, lines, openWs, sendOrQueue]);
 
   const pause = useCallback(async () => {
     if (!id) return;
@@ -534,17 +559,34 @@ export default function MeetingLive() {
     await start();
   }, [start]);
 
+  /** Suma el audio de la llamada sin terminar la reunión: pausa, pide la
+   *  pestaña de Meet/Zoom y sigue. Si se cancela, sigue con el micrófono. */
+  const addCallAudio = useCallback(async () => {
+    setNoSpeech(null);
+    await pause();
+    chooseCaptureSystem(true);
+    await start();
+    if (!audioRef.current) {
+      chooseCaptureSystem(false);
+      await start();
+      if (audioRef.current) {
+        setError(null);
+        setWarning("No se compartió el audio de la llamada: Echo sigue escuchando solo tu micrófono.");
+      }
+    }
+  }, [pause, start, chooseCaptureSystem]);
+
   /** Vuelve a abrir el micrófono con el mismo destino de frames. Llamado desde
    *  un toque sirve siempre; solo, iOS a veces deja el AudioContext suspendido
    *  hasta que haya un gesto, y ahí queda el botón del aviso. */
   const restartAudio = useCallback(async () => {
     const handler = frameHandlerRef.current;
-    if (!handler || captureSystem) return;
+    if (!handler || captureSystemRef.current) return;
     await audioRef.current?.stop().catch(() => {});
     const source = new MicrophoneSource(deviceId || undefined);
     audioRef.current = source;
     await source.start(handler, setLevel);
-  }, [captureSystem, deviceId]);
+  }, [deviceId]);
 
   // Detecta cortes del micrófono y los retoma. Corre también al volver a la
   // app, que es cuando iOS devuelve el control después de bloquear la pantalla.
@@ -882,6 +924,19 @@ export default function MeetingLive() {
           {warning}
         </p>
       )}
+      {recording && !paused && noSpeech && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-amber-200 bg-amber-50 px-6 py-3" role="alert">
+          <p className="min-w-0 flex-1 text-sm text-amber-900">{noSpeech}</p>
+          {!captureSystem && !bridgeMode && canCaptureSystemAudio() && (
+            <Button variant="soft" onClick={() => void addCallAudio()} disabled={starting} className="rounded-full">
+              Sumar el audio de la llamada
+            </Button>
+          )}
+          <button onClick={() => setNoSpeech(null)} className="text-xs font-medium text-amber-700 hover:underline">
+            Entendido
+          </button>
+        </div>
+      )}
 
       <div className="flex min-h-0 flex-1">
         {/* Transcript */}
@@ -925,11 +980,20 @@ export default function MeetingLive() {
                   {canCaptureSystemAudio() ? (
                     <SettingRow
                       label="Incluir el audio de la llamada"
-                      hint="Meet, Zoom, Teams o Discord: tu voz y la de los demás quedan separadas."
+                      hint={
+                        captureSystem ? (
+                          "Meet, Zoom, Teams o Discord: tu voz y la de los demás quedan separadas."
+                        ) : (
+                          <span className="text-amber-700">
+                            ¿Es por Meet, Zoom, Teams o Discord? Activalo: si no, Echo escucha solo tu micrófono y no a
+                            quienes están del otro lado.
+                          </span>
+                        )
+                      }
                       control={
                         <PillSwitch
                           checked={captureSystem}
-                          onChange={setCaptureSystem}
+                          onChange={chooseCaptureSystem}
                           label="Incluir el audio de la llamada"
                         />
                       }
