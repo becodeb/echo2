@@ -480,3 +480,29 @@ Pendiente de Bauti:
   tanto, "Olvidé mi contraseña" y el contacto llegan a la campanita de Becode.
 - Que un abogado revise /legal/privacidad y /legal/terminos.
 - Grabar una reunión de prueba con "Hola, soy…" y Mi voz para ver los nombres.
+
+## 9. Cambios del 5/10 (pedidos de Bauti)
+
+- **Hablar con Echo, fuera.** Funcionaba mal. Se sacó de la app (globito,
+  barra lateral, Inicio, micrófono de Preguntale a Echo, Consumo, Privacidad),
+  del servidor (`routers/voice.py`, `services/voice_agent.py` y el arranque de
+  los agentes) y del catálogo: "Individual + voz" ya no se ofrece ni se puede
+  pedir; quien lo tiene sigue con todo lo de Individual. Quedan las tablas y
+  columnas (`voice_sessions`, `voice_agent*`) y el consumo viejo, sin uso.
+  Queda Preguntale a Echo por texto (arriba a la derecha) y el chat de cada
+  reunión.
+- **Aviso en vivo "no se escucha a nadie"** (reunión del 5/10: 59 min de Meet
+  con solo el micrófono). Tres minutos de audio sin que se transcriba nada →
+  el servidor avisa (`no_speech`, `routers/live.py`); en la pantalla, un botón
+  suma el audio de la llamada sin cortar la reunión. Antes de empezar, con
+  "Incluir el audio de la llamada" apagado, se avisa qué pasa si es una
+  videollamada. No se agregó un filtro de voz más agresivo: cortaría habla
+  real bajita.
+- **Mi voz:** la invitación aparece cada vez que se entra a Echo, a quien no
+  grabó su voz, hasta "No volver a mostrar" (migración 0024: vacía el "ya la
+  vio" anterior, que era cerrar con "Ahora no").
+- **Tareas:** las que detecta Echo van a quien grabó, que las reparte entre las
+  personas de la sede (con su rol) desde Mi trabajo o la reunión. Quien se
+  nombró en la reunión queda como sugerencia (`suggested_assignee`, migración
+  0025) y es el responsable que va al acta.
+- **Consumo:** Groq dice "(hoy no se paga: API key gratuita)".
