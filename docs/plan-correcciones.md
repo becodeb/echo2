@@ -506,3 +506,32 @@ Pendiente de Bauti:
   nombró en la reunión queda como sugerencia (`suggested_assignee`, migración
   0025) y es el responsable que va al acta.
 - **Consumo:** Groq dice "(hoy no se paga: API key gratuita)".
+
+## 10. Cambios del 6/10 (pedidos de Bauti; commits locales, deploy cuando lo diga)
+
+- **Northfield, Puertos o Nordelta:** el código ya preguntaba la sede cuando un
+  dominio está en más de una organización. Faltaba poder armarlo: en el Panel
+  de Becode ahora se renombra una organización y se crea una sede nueva con sus
+  reglas de alta. Para Northfield: renombrar la actual a "Northfield Puertos",
+  crear "Northfield Nordelta" con `northfield.edu.ar`, y que la actual también
+  tenga `northfield.edu.ar` en sus reglas (o los dos slugs en
+  `AUTO_JOIN_DOMAINS`). Quien ya está en una sede no cambia.
+- **Número de acta a mano:** generar el acta ya no inventa el número (hay actas
+  que se hacen fuera de Echo). Al hacer o regenerar el acta se pide el número
+  (Echo sugiere el siguiente al más alto); si el acta quedó sin número, la
+  pestaña Acta lo pide arriba y la hoja de impresión también. No se repite
+  dentro de la sede (409). `PUT /api/meetings/{id}/minutes/number`.
+- **Indicaciones para el acta:** opcional y plegado en la misma ventana: qué
+  tiene que estar y qué no. Va al prompt debajo de "no inventar" y queda en la
+  nota de la versión.
+- **Personas:** cuentan las reuniones que grabó, en las que Echo la reconoció
+  hablando o donde figura como participante, y sus tareas por cuenta (antes
+  solo participantes por nombre exacto: todos en 0).
+- **Mi voz:** se vuelve a pedir a todos (migración 0026), sin cruz ni "Ahora
+  no": se cierra grabando o con "No volver a mostrar". 12 s en vez de 10. No
+  aparece en la reunión en vivo.
+- **Nombres por voz:** "qué tan seguro" en % (0 % = coseno 0,70, donde llegan
+  dos personas distintas; 100 % = 0,85). 80 % o más, el nombre; 50-80 %,
+  "¿Es X? 67 %"; menos, nada. La IA, con la misma regla.
+- **Tareas viejas:** las detectadas antes del 5/10 sin persona pasan a quien
+  grabó (migración 0027), con lo que dijo la IA como sugerencia.
