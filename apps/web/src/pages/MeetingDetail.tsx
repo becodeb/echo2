@@ -640,7 +640,13 @@ function SpeakerEditor({ meeting, onChanged }: { meeting: MeetingOut; onChanged:
               className="ml-1 inline-flex min-h-8 items-center gap-1 rounded-full bg-accent-50 px-2.5 py-1 text-xs font-medium text-accent-700 hover:bg-accent-100"
               title="Confirmar"
             >
-              ¿Es {speaker.identity_suggestion.person_name}? Sí
+              ¿Es {speaker.identity_suggestion.person_name}?
+              {speaker.identity_suggestion.confidence != null && (
+                <span className="font-normal text-accent-600/80">
+                  {Math.round(speaker.identity_suggestion.confidence * 100)} %
+                </span>
+              )}{" "}
+              Sí
             </button>
           )}
           {speaker.identity_suggestion?.voice_says && (

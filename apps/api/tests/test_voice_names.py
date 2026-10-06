@@ -55,14 +55,21 @@ def test_each_voice_gets_its_name_and_nobody_twice():
     assert not any(n.accepted for n in names.values())
 
 
-def test_a_doubtful_voice_is_only_a_suggestion():
+def test_the_name_goes_by_how_sure_echo_is():
+    # Bauti (6/10): con 80 % o más, el nombre; entre 50 y 80 %, "¿Es X?";
+    # menos, nada. Antes cualquiera con Mi voz salía "¿Es…?" en todas las reuniones.
     bauti = Candidate("Bautista Goñi", uuid.uuid4(), BAUTI)
-    # Coseno ~0,7: como dos personas distintas en la misma sala (banco del 1/10).
-    names = decide([], [bauti], {"speaker_1": _near(BAUTI, 1.0)})
-    assert names["speaker_1"].accepted is False
-    assert names["speaker_1"].suggestion()["person_name"] == "Bautista Goñi"
-    # Muy lejos: ni sugerencia.
+    # Coseno ~0,71: como dos personas distintas en la misma sala (banco del 1/10). Nada.
+    assert decide([], [bauti], {"speaker_1": _near(BAUTI, 1.0)}) == {}
     assert decide([], [bauti], {"speaker_1": OTHER}) == {}
+    # Coseno 0,80 (~67 %): se pregunta, con cuánta seguridad.
+    doubtful = decide([], [bauti], {"speaker_1": _near(BAUTI, 0.75)})["speaker_1"]
+    assert doubtful.accepted is False
+    assert doubtful.suggestion()["person_name"] == "Bautista Goñi"
+    assert 0.6 <= doubtful.suggestion()["confidence"] <= 0.7
+    # Coseno ~0,89 (100 %): se nombra solo.
+    assert decide([], [bauti], {"speaker_1": _near(BAUTI, 0.5)})["speaker_1"].accepted is True
+    assert voiceprint.certainty(0.82) >= 0.8 > voiceprint.certainty(0.81)
 
 
 def test_what_someone_says_names_them():

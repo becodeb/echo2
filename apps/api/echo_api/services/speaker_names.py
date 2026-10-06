@@ -76,10 +76,13 @@ class Naming:
     extra: dict = field(default_factory=dict)
 
     def suggestion(self) -> dict:
+        # Por la voz, qué tan seguro (0-1, lo que la pantalla muestra en %),
+        # no el coseno crudo.
+        confidence = voiceprint.certainty(self.score) if self.source == "voz" else self.score
         return {
             "person_name": self.name,
             "user_id": str(self.user_id) if self.user_id else None,
-            "confidence": round(self.score, 2),
+            "confidence": round(confidence, 2),
             "source": self.source,
             **self.extra,
         }

@@ -39,10 +39,29 @@ MIN_PERSON_MS = 3000
 # Coseno entre la huella de "Mi voz" y la de la persona en la reunión. En el
 # banco (1/10): misma persona 0,81-0,97 (también entre reuniones de días
 # distintos); dos personas distintas en la misma sala 0,67-0,73, porque la
-# sala y el micrófono pesan. Por eso el umbral es alto y además se pide margen.
-ACCEPT = 0.75
-MARGIN = 0.10
-SUGGEST = 0.65
+# sala y el micrófono pesan.
+#
+# Se lleva a "qué tan seguro" (0-100 %): 0 % donde llegan dos personas
+# distintas, 100 % bien adentro de la misma persona. Decisión de Bauti (6/10):
+# con 80 % o más se pone el nombre; entre 50 y 80 %, "¿Es X?"; menos, nada. Con
+# 0,65 de piso, cualquiera con Mi voz grabada aparecía como "¿Es…?" en todas
+# las reuniones.
+CERTAIN_FROM = 0.70  # 0 %
+CERTAIN_AT = 0.85  # 100 %
+ACCEPT_CERTAINTY = 0.80
+SUGGEST_CERTAINTY = 0.50
+
+
+def certainty(score: float) -> float:
+    """Coseno → qué tan seguro (0 a 1)."""
+    return round(float(min(1.0, max(0.0, (score - CERTAIN_FROM) / (CERTAIN_AT - CERTAIN_FROM)))), 4)
+
+
+ACCEPT = round(CERTAIN_FROM + ACCEPT_CERTAINTY * (CERTAIN_AT - CERTAIN_FROM), 4)  # 0,82
+SUGGEST = round(CERTAIN_FROM + SUGGEST_CERTAINTY * (CERTAIN_AT - CERTAIN_FROM), 4)  # 0,775
+# Además del umbral, la persona tiene que ganarle por esto a la segunda opción
+# (dos voces parecidas no se nombran solas).
+MARGIN = 0.08
 
 _lock = threading.Lock()
 _extractor = None

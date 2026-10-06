@@ -1014,12 +1014,14 @@ async def name_speakers(meeting_id: uuid.UUID, provider) -> int:
                 # participantes, y adivinar quién es quién sale cruzado (reunión
                 # 89ddbc9d: puso "Bau" a la voz de Delfi). Queda como sugerencia
                 # para que la persona lo confirme con un toque.
-                confidence = min(confidence, 0.74)
-            if confidence >= 0.75:
+                confidence = min(confidence, 0.79)
+            # La misma regla que la voz (Bauti, 6/10): 80 % o más, el nombre;
+            # entre 50 y 80 %, "¿Es X?"; menos, nada: no se tira a adivinar.
+            if confidence >= 0.8:
                 speaker.display_name = shown[:200]
                 speaker.name_source = "ia"
                 count += 1
-            elif confidence >= 0.4 and not speaker.identity_suggestion:
+            elif confidence >= 0.5 and not speaker.identity_suggestion:
                 # Una sugerencia por voz vale más que la de la IA: no se pisa.
                 speaker.identity_suggestion = {"person_name": shown[:200], "confidence": round(confidence, 2), "source": "ia"}
         await db.commit()
