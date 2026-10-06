@@ -16,7 +16,7 @@ export interface MyVoice {
   warning?: string | null;
 }
 
-const SECONDS = 10;
+const SECONDS = 12;
 
 const WARNINGS: Record<string, string> = {
   baja: "Quedó muy baja. Si podés, grabala de nuevo más cerca del micrófono.",
@@ -27,7 +27,7 @@ type Stage = "idle" | "recording" | "review" | "saving" | "saved";
 
 /**
  * Grabar "Mi voz" de punta a punta (docs/plan-correcciones.md §7.5): texto
- * para leer (~10 s), medidor de nivel mientras se graba, escucharla antes de
+ * para leer (~12 s), medidor de nivel mientras se graba, escucharla antes de
  * guardar, y aviso si quedó baja o con ruido. Se usa en el aviso de
  * bienvenida (sin ir a Ajustes) y en Ajustes → Mi voz.
  */

@@ -1,7 +1,7 @@
 """Mi voz: la muestra con la que Echo reconoce a cada persona en las reuniones.
 
 La graba la propia persona, con consentimiento explícito, y la puede borrar
-cuando quiera. Se guarda como WAV 16 kHz mono de hasta 10 s, con su huella
+cuando quiera. Se guarda como WAV 16 kHz mono de hasta 12 s, con su huella
 (services/voiceprint.py), que se calcula acá, en el servidor de Echo.
 
 "Mejorar el reconocimiento con mis reuniones" (§7.4) viene prendido al
@@ -29,7 +29,7 @@ router = APIRouter(prefix="/api/me/voice", tags=["voice"])
 
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 MIN_SPEECH_MS = 3000
-MAX_MS = 10000
+MAX_MS = 12000
 # Calidad de la muestra (§7.5): voz por debajo de esto (dBFS) quedó baja;
 # menos de esta diferencia entre voz y fondo (dB), con ruido.
 LOW_LEVEL_DBFS = -38.0
@@ -87,7 +87,7 @@ async def _to_pcm16(data: bytes) -> bytes:
 
 
 def _trim_to_speech(pcm: bytes) -> bytes:
-    """Saca el silencio del principio y del final y deja hasta 10 s."""
+    """Saca el silencio del principio y del final y deja hasta 12 s."""
     samples = np.frombuffer(pcm[: len(pcm) // 2 * 2], dtype=np.int16).astype(np.float32)
     frame = 1600  # 100 ms
     count = len(samples) // frame

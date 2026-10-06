@@ -100,6 +100,9 @@ const FOCUSABLE =
  * Ventana sobre la página (§4.5): entra y sale con una animación corta, el
  * foco queda adentro mientras está abierta (Tab da la vuelta) y al cerrarla
  * vuelve a lo que la abrió. Escape o tocar afuera la cierran.
+ *
+ * `dismissible={false}`: sin cruz, ni Escape, ni tocar afuera; se sale solo
+ * por los botones de adentro (la invitación a grabar "Mi voz").
  */
 export function Modal({
   open,
@@ -107,13 +110,17 @@ export function Modal({
   title,
   children,
   wide = false,
+  dismissible = true,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
   wide?: boolean;
+  dismissible?: boolean;
 }) {
+  const dismissibleRef = useRef(dismissible);
+  dismissibleRef.current = dismissible;
   // Sigue montada un momento después de cerrar, para la animación de salida.
   const [mounted, setMounted] = useState(open);
   const [leaving, setLeaving] = useState(false);
@@ -148,7 +155,7 @@ export function Modal({
     });
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        onCloseRef.current();
+        if (dismissibleRef.current) onCloseRef.current();
         return;
       }
       if (event.key !== "Tab" || !panel.current) return;
@@ -190,7 +197,7 @@ export function Modal({
         leaving ? "modal-leaving" : ""
       }`}
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget && dismissible) onClose();
       }}
     >
       <div
@@ -203,15 +210,19 @@ export function Modal({
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-ink-900">{title}</h2>
-          <button
-            onClick={onClose}
-            className="-mr-1 flex h-11 w-11 items-center justify-center rounded-full text-ink-400 hover:bg-ink-100 hover:text-ink-700"
-            aria-label="Cerrar"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-            </svg>
-          </button>
+          {dismissible ? (
+            <button
+              onClick={onClose}
+              className="-mr-1 flex h-11 w-11 items-center justify-center rounded-full text-ink-400 hover:bg-ink-100 hover:text-ink-700"
+              aria-label="Cerrar"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </button>
+          ) : (
+            <span className="h-11" aria-hidden />
+          )}
         </div>
         {children}
       </div>

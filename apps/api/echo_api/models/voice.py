@@ -1,6 +1,6 @@
 """Muestra de voz de una persona, para reconocerla por nombre en las reuniones.
 
-Es un audio corto (hasta 10 s, WAV 16 kHz mono) que la persona graba ella
+Es un audio corto (hasta 12 s, WAV 16 kHz mono) que la persona graba ella
 misma en Mi voz, con su consentimiento explícito, y puede borrar cuando
 quiera. De la muestra se saca una huella (services/voiceprint.py), en el
 servidor de Echo, y después de cada reunión se compara con la de cada

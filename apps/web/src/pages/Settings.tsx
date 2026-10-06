@@ -1306,7 +1306,7 @@ function MyVoiceSection() {
         <div>
           <h2 className="text-[15px] font-semibold text-ink-900">Mi voz</h2>
           <p className="mt-1 text-sm text-ink-500">
-            Grabá tu voz una vez, 10 segundos, y Echo te va a reconocer en las reuniones: en el transcript y en el acta
+            Grabá tu voz una vez, 12 segundos, y Echo te va a reconocer en las reuniones: en el transcript y en el acta
             aparece tu nombre en lugar de «Persona 1». Se procesa en el servidor de Echo y no se manda a nadie más.
           </p>
         </div>
