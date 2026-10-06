@@ -316,7 +316,12 @@ def test_the_last_credit_is_spent_once_when_two_meetings_end_together(client, mo
     user, first = _meeting(client, 20.4, [(0, 20400, "Hola.", None)], people=True)
     second = uuid.UUID(client.post("/api/meetings", json={"title": "Otra", "level": "primaria"},
                                    headers=user.headers).json()["id"])
-    _sql("UPDATE meetings SET meta = CAST('{\"people\": true}' AS jsonb) WHERE id = :id", id=str(second))
+    # Las dos piden quién habló: cuál de las dos toma la reserva depende de
+    # cuál termina primero (antes solo la segunda lo pedía y el test fallaba
+    # cuando ganaba ella).
+    for meeting in (first, second):
+        _sql("UPDATE meetings SET meta = COALESCE(meta, '{}'::jsonb) || CAST('{\"people\": true}' AS jsonb)"
+             " WHERE id = :id", id=str(meeting))
     rec.pcm_path(second).write_bytes(_tone(20.4))
     # Le queda un solo crédito de los 4.
     _sql("INSERT INTO usage_events (id, kind, provider, unit, quantity, cost_usd, credits, user_id, organization_id,"
@@ -422,7 +427,12 @@ def test_individual_hours_are_reserved_when_two_meetings_end_together(client, mo
          " WHERE id = :id", id=first_user.user_id)
     second = uuid.UUID(client.post("/api/meetings", json={"title": "Otra", "level": "primaria"},
                                    headers=first_user.headers).json()["id"])
-    _sql("UPDATE meetings SET meta = CAST('{\"people\": true}' AS jsonb) WHERE id = :id", id=str(second))
+    # Las dos piden quién habló: cuál de las dos toma la reserva depende de
+    # cuál termina primero (antes solo la segunda lo pedía y el test fallaba
+    # cuando ganaba ella).
+    for meeting in (first, second):
+        _sql("UPDATE meetings SET meta = COALESCE(meta, '{}'::jsonb) || CAST('{\"people\": true}' AS jsonb)"
+             " WHERE id = :id", id=str(meeting))
     rec.pcm_path(second).write_bytes(_tone(20.4))
 
     async def both():
