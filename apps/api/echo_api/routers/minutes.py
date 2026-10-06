@@ -135,10 +135,19 @@ def _can_confirm(ctx: OrgContext, meeting) -> bool:
     return meeting.created_by == ctx.user.id or ROLE_ORDER.get(ctx.role, -1) >= ROLE_ORDER["admin"]
 
 
+class MinutesGenerateIn(BaseModel):
+    # El número lo pone quien hace el acta; sin número, el acta queda sin
+    # numerar hasta que se lo ponga (o al imprimir).
+    number: int | None = Field(default=None, ge=1, le=10_000_000)
+    # Opcional: qué incluir y qué dejar afuera.
+    instructions: str | None = Field(default=None, max_length=1000)
+
+
 @router.post("/api/meetings/{meeting_id}/minutes/generate", status_code=202)
 async def regenerate_minutes(
     meeting_id: uuid.UUID,
     background: BackgroundTasks,
+    data: MinutesGenerateIn | None = None,
     ctx: OrgContext = Depends(get_org_context),
     db: AsyncSession = Depends(get_db),
 ):
@@ -174,11 +183,17 @@ async def regenerate_minutes(
             current_version=0,
         )
         db.add(minutes)
+    if data and data.number is not None:
+        await db.flush()
+        try:
+            await acta_number.set_number(db, minutes.id, data.number)
+        except acta_number.NumberTaken as error:
+            raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error
     minutes.generation_status = "generating"
     minutes.generation_error = None
     minutes.generation_started_at = datetime.now(UTC)
 
-    background.add_task(generate_minutes, meeting.id, provider)
+    background.add_task(generate_minutes, meeting.id, provider, data.instructions if data else None)
     await audit(db, ctx.org_id, ctx.user.id, "minutes.regenerate", "meeting", str(meeting.id))
     await db.commit()
     return {"status": "generating"}
@@ -312,6 +327,35 @@ async def assign_minutes_number(
     number = await acta_number.ensure_number(db, minutes.id)
     if not had_number:
         await audit(db, ctx.org_id, ctx.user.id, "minutes.number", "minutes", str(minutes.id))
+    await db.commit()
+    return {"number": number}
+
+
+class MinutesNumberIn(BaseModel):
+    number: int = Field(ge=1, le=10_000_000)
+
+
+@router.put("/api/meetings/{meeting_id}/minutes/number")
+async def set_minutes_number(
+    meeting_id: uuid.UUID,
+    data: MinutesNumberIn,
+    ctx: OrgContext = Depends(get_org_context),
+    db: AsyncSession = Depends(get_db),
+):
+    """El número que elige quien hace el acta (o lo corrige)."""
+    meeting = await get_meeting_or_404(meeting_id, ctx, db, minimum_role="editor")
+    if not can_edit_meeting(ctx, meeting):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Sin permiso")
+    minutes = (
+        await db.execute(select(Minutes).where(Minutes.meeting_id == meeting.id))
+    ).scalar_one_or_none()
+    if not minutes:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No hay acta para esta reunión")
+    try:
+        number = await acta_number.set_number(db, minutes.id, data.number)
+    except acta_number.NumberTaken as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error
+    await audit(db, ctx.org_id, ctx.user.id, "minutes.number", "minutes", str(minutes.id))
     await db.commit()
     return {"number": number}
 

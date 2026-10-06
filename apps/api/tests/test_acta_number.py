@@ -110,3 +110,64 @@ def test_new_organization_starts_with_default_reasons(client):
     assert "Desempeño académico" in names
     assert "Conducta" in names
     assert len(names) >= 10
+
+
+def test_whoever_makes_the_acta_sets_its_number(client):
+    # Bauti (6/10): hay actas que se hacen fuera de Echo, así que el número lo
+    # pone la persona. Echo sugiere el siguiente al más alto y no deja repetir.
+    user = EchoTestUser(client, org_name="Colegio Número a mano")
+    first, _ = _meeting_with_minutes(client, user)
+    second, _ = _meeting_with_minutes(client, user)
+
+    set_first = client.put(f"/api/meetings/{first}/minutes/number", json={"number": 120}, headers=user.headers)
+    assert set_first.status_code == 200 and set_first.json()["number"] == 120
+    assert client.get("/api/org/minutes-numbering", headers=user.headers).json()["next_number"] == 121
+    repeated = client.put(f"/api/meetings/{second}/minutes/number", json={"number": 120}, headers=user.headers)
+    assert repeated.status_code == 409 and "120" in repeated.json()["detail"]
+    # Corregirlo a uno libre, aunque sea menor, sí.
+    assert client.put(f"/api/meetings/{second}/minutes/number", json={"number": 118},
+                      headers=user.headers).json()["number"] == 118
+    assert client.get(f"/api/meetings/{second}/minutes", headers=user.headers).json()["number"] == 118
+
+
+def test_instructions_reach_the_acta_prompt():
+    from echo_api.services.minutes_gen import instructions_block
+
+    assert instructions_block(None) == "" and instructions_block("   ") == ""
+    block = instructions_block("No incluir lo del hermano.\n\nQue figure la reunión con la psicopedagoga.")
+    assert "No incluir lo del hermano. Que figure la reunión con la psicopedagoga." in block
+    assert "sin inventar" in block
+    assert len(instructions_block("x" * 5000)) < 1300
+
+
+def test_making_the_acta_takes_the_number_and_the_instructions(client, monkeypatch):
+    import echo_api.routers.minutes as minutes_router
+    from echo_api.services.ai_settings import LLMConfig
+
+    calls = []
+
+    async def fake_resolve_llm(db, org_id):
+        return LLMConfig("groq", "openai/gpt-oss-120b", "x")
+
+    async def fake_generate(meeting_id, provider, instructions=None):
+        calls.append(instructions)
+
+    monkeypatch.setattr(minutes_router, "resolve_llm", fake_resolve_llm)
+    monkeypatch.setattr(minutes_router, "generate_minutes", fake_generate)
+    user = EchoTestUser(client, org_name="Colegio Hacer el acta")
+    taken, _ = _meeting_with_minutes(client, user)
+    client.put(f"/api/meetings/{taken}/minutes/number", json={"number": 7}, headers=user.headers)
+    meeting_id = client.post("/api/meetings", json={"title": "Familia Romero"}, headers=user.headers).json()["id"]
+
+    repeated = client.post(f"/api/meetings/{meeting_id}/minutes/generate", json={"number": 7}, headers=user.headers)
+    assert repeated.status_code == 409 and calls == []
+    started = client.post(
+        f"/api/meetings/{meeting_id}/minutes/generate",
+        json={"number": 8, "instructions": "No incluir lo del hermano."},
+        headers=user.headers,
+    )
+    assert started.status_code == 202, started.text
+    assert calls == ["No incluir lo del hermano."]
+    assert client.get(f"/api/meetings/{meeting_id}/minutes", headers=user.headers).json()["number"] == 8
+    # Sin cuerpo sigue andando (el pipeline y los reintentos).
+    assert client.post(f"/api/meetings/{meeting_id}/minutes/generate", headers=user.headers).status_code == 202

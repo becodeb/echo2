@@ -6,6 +6,7 @@ import { api } from "../api/client";
 import type { LetterheadOut, MeetingOut, MinutesOut } from "../api/types";
 import { InterviewSheet } from "../components/InterviewSheet";
 import { MarkdownView } from "../components/MarkdownView";
+import { parseActaNumber, useNextActaNumber } from "../components/ActaNumber";
 import { Spinner, formatDate, formatDuration } from "../components/ui";
 import "./acta-print.css";
 
@@ -49,16 +50,28 @@ export default function ActaPrint() {
   const [printError, setPrintError] = useState<string | null>(null);
   const autoPrintedFor = useRef<string | null>(null);
   const number = minutes?.number ?? (assigned && assigned.meetingId === id ? assigned.number : null);
+  // Sin número, quien imprime lo pone (Echo sugiere el siguiente): hay actas
+  // que se hacen fuera de Echo y el contador no las conoce.
+  const suggested = useNextActaNumber(!!minutes?.version && minutes.number == null);
+  const [typed, setTyped] = useState<string | null>(null);
+  const chosen = parseActaNumber(typed ?? String(suggested ?? ""));
 
-  // Imprimir = pedir el número (si el acta no tenía) y recién después abrir el
-  // diálogo. Sin número no se imprime: un acta sin numerar es justo lo que
+  // Imprimir = guardar el número (si el acta no tenía) y recién después abrir
+  // el diálogo. Sin número no se imprime: un acta sin numerar es justo lo que
   // esto tiene que evitar.
   const printNow = async () => {
     setPrintError(null);
     if (minutes?.version && number == null) {
+      if (chosen == null) {
+        setPrintError("poné el número de acta");
+        return;
+      }
       setPrinting(true);
       try {
-        const result = await api<{ number: number }>(`/api/meetings/${id}/minutes/number`, { method: "POST" });
+        const result = await api<{ number: number }>(`/api/meetings/${id}/minutes/number`, {
+          method: "PUT",
+          body: JSON.stringify({ number: chosen }),
+        });
         // flushSync: el número tiene que estar en la hoja antes de que se abra
         // el diálogo de impresión, que congela lo que hay pintado.
         flushSync(() => setAssigned({ meetingId: id!, number: result.number }));
@@ -73,7 +86,8 @@ export default function ActaPrint() {
   };
 
   useEffect(() => {
-    if (!ready || params.get("print") !== "1" || autoPrintedFor.current === id) return;
+    // Sin número no se imprime solo: primero hay que ponerlo.
+    if (!ready || params.get("print") !== "1" || autoPrintedFor.current === id || number == null) return;
     autoPrintedFor.current = id ?? null;
     // Un respiro para que el logo (data URL) y las fuentes estén pintados.
     const timer = window.setTimeout(() => void printNow(), 400);
@@ -104,6 +118,18 @@ export default function ActaPrint() {
         </Link>
         <div className="flex items-center gap-3">
           {minutes?.status !== "approved" && <span className="text-sm text-ink-500">Borrador</span>}
+          {minutes?.version && number == null && (
+            <label className="flex items-center gap-2 text-sm text-ink-700">
+              N.º de acta
+              <input
+                inputMode="numeric"
+                value={typed ?? String(suggested ?? "")}
+                onChange={(event) => setTyped(event.target.value)}
+                className="w-20 rounded-full border border-ink-200 px-3 py-1.5 text-sm"
+                aria-label="Número de acta"
+              />
+            </label>
+          )}
           <button type="button" className="acta-print-btn" onClick={() => void printNow()} disabled={printing}>
             {printing ? <Spinner /> : "Imprimir"}
           </button>

@@ -120,3 +120,53 @@ async def set_next_number(
     counter.next_number = next_number
     await db.flush()
     return next_number
+
+
+class NumberTaken(ValueError):
+    """Otra acta de la sede ya tiene ese número."""
+
+    def __init__(self, number: int, title: str | None):
+        where = f" (reunión «{title}»)" if title else ""
+        super().__init__(f"El acta N.º {number} ya existe{where}. Poné otro número.")
+        self.number = number
+
+
+async def set_number(db: AsyncSession, minutes_id: uuid.UUID, number: int) -> int:
+    """Pone el número que eligió quien hace el acta. No hace commit.
+
+    Hay actas que se hacen fuera de Echo (presenciales, en papel), así que el
+    contador no puede saber cuál sigue: lo decide la persona (Bauti, 6/10). El
+    contador queda después del más alto, para sugerir el próximo.
+    """
+    from ..models import Meeting
+
+    minutes = (
+        await db.execute(
+            select(Minutes)
+            .where(Minutes.id == minutes_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+    ).scalar_one()
+    if minutes.number == number:
+        return number
+    counter = await _locked_counter(db, minutes.organization_id, SERIES_GENERAL)
+    taken = (
+        await db.execute(
+            select(Meeting.title)
+            .join(Minutes, Minutes.meeting_id == Meeting.id)
+            .where(
+                Minutes.organization_id == minutes.organization_id,
+                Minutes.number_series == SERIES_GENERAL,
+                Minutes.number == number,
+                Minutes.id != minutes.id,
+            )
+        )
+    ).first()
+    if taken:
+        raise NumberTaken(number, taken[0])
+    minutes.number = number
+    minutes.number_series = SERIES_GENERAL
+    counter.next_number = max(counter.next_number, number + 1)
+    await db.flush()
+    return number

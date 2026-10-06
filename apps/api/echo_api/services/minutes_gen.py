@@ -32,7 +32,6 @@ from ..models import (
     Question,
 )
 from . import acta_entrevista
-from .acta_number import ensure_number
 from .llm import LLMError, LLMProvider
 from .transcript_util import format_ms, load_transcript_lines, transcript_to_text
 
@@ -159,20 +158,35 @@ async def _set_generation_state(
         await db.commit()
 
 
-async def generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider) -> None:
+# Lo que quien pide el acta quiere que esté o que no esté (opcional, al
+# generar o regenerar). Nunca habilita a inventar: va debajo de las reglas.
+MAX_INSTRUCTIONS = 1000
+
+
+def instructions_block(instructions: str | None) -> str:
+    text = " ".join((instructions or "").split())[:MAX_INSTRUCTIONS]
+    if not text:
+        return ""
+    return (
+        "\n\nINDICACIONES DE QUIEN PIDE EL ACTA (qué incluir y qué dejar afuera; respetalas, "
+        "pero sin inventar nada que no se haya dicho en la reunión):\n" + text
+    )
+
+
+async def generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instructions: str | None = None) -> None:
     """Genera el acta y deja registrado cómo terminó.
 
     Corre como BackgroundTask, o sea que nadie está esperando el resultado: si
     revienta y no lo anotamos, la falla no existe para nadie.
     """
     try:
-        await _generate_minutes(meeting_id, provider)
+        await _generate_minutes(meeting_id, provider, instructions)
     except Exception as exc:  # noqa: BLE001 - cualquier falla tiene que quedar registrada
         log.exception("falló la generación del acta de %s", meeting_id)
         await _set_generation_state(meeting_id, "failed", friendly_generation_error(exc))
 
 
-async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider) -> None:
+async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instructions: str | None = None) -> None:
     async with SessionLocal() as db:
         meeting = await db.get(Meeting, meeting_id)
         if not meeting:
@@ -282,7 +296,7 @@ DATOS DE LA REUNIÓN (lo "cargado" lo ingresó una persona: tiene prioridad):
 
 TRANSCRIPT (con timestamps [MM:SS] y hablantes):
 
-{transcript_text}
+{transcript_text}{instructions_block(instructions)}
 
 Devolvé JSON:
 {{
@@ -311,7 +325,7 @@ Devolvé JSON:
                 fields["curso"] = str(student.extra["curso"])
         await _publish_and_verify(
             meeting_id, org_id, template.id, acta_entrevista.render_markdown(fields),
-            acta_entrevista.to_blocks(fields), result, lines, provider,
+            acta_entrevista.to_blocks(fields), result, lines, provider, instructions,
         )
         return
 
@@ -324,7 +338,7 @@ DATOS ESTRUCTURADOS DE LA REUNIÓN:
 
 TRANSCRIPT (con timestamps [MM:SS] y hablantes):
 
-{transcript_text}
+{transcript_text}{instructions_block(instructions)}
 
 Devolvé JSON:
 {{
@@ -342,7 +356,7 @@ Devolvé JSON:
         raise LLMError("El generador de actas no devolvió contenido")
 
     await _publish_and_verify(
-        meeting_id, org_id, template.id, str(result["markdown"]), None, result, lines, provider
+        meeting_id, org_id, template.id, str(result["markdown"]), None, result, lines, provider, instructions
     )
 
 
@@ -355,13 +369,14 @@ async def _publish_and_verify(
     result: dict,
     lines: list[dict],
     provider: LLMProvider,
+    instructions: str | None = None,
 ) -> None:
     claims = [c for c in (result.get("claims") or []) if isinstance(c, dict) and c.get("text")]
 
     # ── Guardar primero: el acta se ve apenas existe ─────────────
     # La verificación tarda (una consulta por afirmación) y no cambia el
     # texto, así que corre después, con el acta ya publicada en "verifying".
-    version_id = await _store_version(meeting_id, org_id, template_id, markdown, provider, blocks)
+    version_id = await _store_version(meeting_id, org_id, template_id, markdown, provider, blocks, instructions)
 
     # ── Verificación contra el transcript ────────────────────────
     try:
@@ -410,6 +425,7 @@ async def _store_version(
     markdown: str,
     provider: LLMProvider,
     blocks: dict | None = None,
+    instructions: str | None = None,
 ) -> uuid.UUID:
     """Publica el acta como versión nueva y deja el estado en "verifying"."""
     async with SessionLocal() as db:
@@ -435,7 +451,11 @@ async def _store_version(
             body_markdown=markdown,
             blocks=blocks,
             verification=None,
-            note="Generada automáticamente",
+            note=(
+                f"Generada con indicaciones: {' '.join(instructions.split())}"[:300]
+                if instructions and instructions.strip()
+                else "Generada automáticamente"
+            ),
             model_used=getattr(provider, "model", provider.name),
         )
         db.add(row)
@@ -444,9 +464,8 @@ async def _store_version(
         minutes.current_version = next_version
         minutes.generation_status = "verifying"
         minutes.generation_error = None
-        # El número sale al generarse (o al imprimir, si se imprime antes).
-        # Si ya tenía, regenerar lo conserva.
-        await ensure_number(db, minutes.id)
+        # El número no sale solo: lo pone quien hace el acta (Bauti, 6/10),
+        # porque hay actas que se hacen fuera de Echo y el contador no las ve.
         await db.commit()
         return version_id
 

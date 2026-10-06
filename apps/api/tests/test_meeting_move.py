@@ -77,8 +77,10 @@ def test_meeting_recorded_in_wrong_org_moves_and_gets_the_campus_acta(client, fa
     minutes = client.get(f"/api/meetings/{meeting_id}/minutes", headers=campus.headers).json()
     assert minutes["number"] is None  # el número era de la otra numeración
 
-    # Regenerada en la sede, sale con el formulario de la sede y numeración nueva.
-    assert client.post(f"/api/meetings/{meeting_id}/minutes/generate", headers=campus.headers).status_code == 202
+    # Regenerada en la sede, sale con el formulario de la sede y el número que
+    # se pone al hacerla (la numeración es de la sede nueva).
+    assert client.post(f"/api/meetings/{meeting_id}/minutes/generate", json={"number": 1},
+                       headers=campus.headers).status_code == 202
     regenerated = _wait(
         client, campus, meeting_id,
         lambda: (lambda m: m if m["version"]["blocks"] else None)(

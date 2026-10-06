@@ -17,6 +17,7 @@ import { MarkdownView } from "../components/MarkdownView";
 import { InterviewReview } from "../components/InterviewReview";
 import { Select } from "../components/Select";
 import { TaskAssignee } from "../components/TaskAssignee";
+import { ActaNumberCard, GenerateActaModal } from "../components/ActaNumber";
 import { LEVELS, LEVEL_LABEL, useMyAccess, type Level } from "../state/access";
 
 const TASK_STATUS_OPTIONS = [
@@ -684,6 +685,10 @@ function MinutesTab({ meetingId, minutesTitle }: { meetingId: string; minutesTit
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
+  // "Hacer el acta" / "Regenerar" pasan por una ventana que pide el número
+  // (y, si se quiere, qué tiene que estar y qué no).
+  const [asking, setAsking] = useState(false);
+  const [editingNumber, setEditingNumber] = useState(false);
 
   const { data: minutes, isLoading } = useQuery({
     queryKey: ["minutes", meetingId],
@@ -767,11 +772,22 @@ function MinutesTab({ meetingId, minutesTitle }: { meetingId: string; minutesTit
           <p className="mb-4">
             {generationFailed
               ? minutes?.generation_error
-              : "El acta se genera automáticamente al finalizar la reunión (requiere IA configurada)."}
+              : "Echo arma el acta al finalizar la reunión (requiere IA configurada). Si no está, hacela desde acá."}
           </p>
-          <Button onClick={() => regenerate.mutate()} disabled={regenerate.isPending}>
-            {regenerate.isPending ? <Spinner /> : generationFailed ? "Reintentar" : "Generar acta ahora"}
+          <Button
+            onClick={() => (generationFailed ? regenerate.mutate() : setAsking(true))}
+            disabled={regenerate.isPending}
+          >
+            {regenerate.isPending ? <Spinner /> : generationFailed ? "Reintentar" : "Hacer el acta"}
           </Button>
+          {asking && (
+            <GenerateActaModal
+              meetingId={meetingId}
+              currentNumber={minutes?.number ?? null}
+              regenerating={false}
+              onClose={() => setAsking(false)}
+            />
+          )}
           {regenerate.isError && (
             <p className="mt-2 text-sm text-red-600">
               {regenerate.error instanceof Error ? regenerate.error.message : "No se pudo iniciar la generación"}
@@ -792,6 +808,22 @@ function MinutesTab({ meetingId, minutesTitle }: { meetingId: string; minutesTit
   const weak = verification.filter((claim) => claim.status !== "verified");
   const interview = minutes.version.blocks?.kind === "entrevista" ? minutes.version.blocks.fields : null;
 
+  const numberCard = (minutes.number == null || editingNumber) && !editing && (
+    <ActaNumberCard
+      meetingId={meetingId}
+      current={minutes.number}
+      onDone={minutes.number != null ? () => setEditingNumber(false) : undefined}
+    />
+  );
+  const askModal = asking && (
+    <GenerateActaModal
+      meetingId={meetingId}
+      currentNumber={minutes.number}
+      regenerating
+      onClose={() => setAsking(false)}
+    />
+  );
+
   // Acta de entrevista (formulario del colegio): se revisa campo por campo y
   // la confirma quien grabó; recién ahí se imprime.
   if (interview) {
@@ -802,6 +834,8 @@ function MinutesTab({ meetingId, minutesTitle }: { meetingId: string; minutesTit
             <Spinner /> Echo está redactando una versión nueva…
           </div>
         )}
+        {numberCard}
+        {askModal}
         <InterviewReview
           key={minutes.version.version}
           meetingId={meetingId}
@@ -825,15 +859,12 @@ function MinutesTab({ meetingId, minutesTitle }: { meetingId: string; minutesTit
           </Card>
         )}
         <div className="flex justify-end">
-          <Button
-            variant="ghost"
-            onClick={() => {
-              if (window.confirm("Echo va a redactar el acta de nuevo y se pierden las correcciones hechas a mano. ¿Seguir?")) {
-                regenerate.mutate();
-              }
-            }}
-            disabled={regenerate.isPending}
-          >
+          {minutes.number != null && !editingNumber && (
+            <Button variant="ghost" onClick={() => setEditingNumber(true)}>
+              Cambiar el N.º de acta
+            </Button>
+          )}
+          <Button variant="ghost" onClick={() => setAsking(true)} disabled={regenerate.isPending}>
             Volver a generar con IA
           </Button>
         </div>
@@ -859,8 +890,14 @@ function MinutesTab({ meetingId, minutesTitle }: { meetingId: string; minutesTit
           <Spinner /> El acta ya está lista. Echo sigue verificando cada afirmación contra el transcript…
         </div>
       )}
+      {numberCard}
+      {askModal}
       <div className="flex flex-wrap items-center gap-2">
-        {minutes.number != null && <Badge tone="indigo">Acta N.º {minutes.number}</Badge>}
+        {minutes.number != null && (
+          <button type="button" onClick={() => setEditingNumber(true)} title="Cambiar el número">
+            <Badge tone="indigo">Acta N.º {minutes.number}</Badge>
+          </button>
+        )}
         {statusBadge}
         <span className="text-xs text-ink-400">
           v{minutes.version.version} · {minutes.version.note}
@@ -880,7 +917,7 @@ function MinutesTab({ meetingId, minutesTitle }: { meetingId: string; minutesTit
                   {minutes.status === "draft" ? "Enviar a revisión" : "Aprobar"}
                 </Button>
               )}
-              <Button variant="soft" onClick={() => regenerate.mutate()} disabled={regenerate.isPending}>
+              <Button variant="soft" onClick={() => setAsking(true)} disabled={regenerate.isPending}>
                 Regenerar
               </Button>
               <ExportMenu meetingId={meetingId} kind="minutes" title={minutesTitle} />
