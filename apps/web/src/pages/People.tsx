@@ -16,6 +16,13 @@ interface Person {
   open_task_count: number;
 }
 
+const ROLE_LABEL: Record<string, string> = {
+  owner: "Dueño",
+  admin: "Administra",
+  member: "Miembro",
+  viewer: "Solo lectura",
+};
+
 export default function People() {
   const { activeOrg } = useAuth();
   const { data: people, isLoading } = useQuery({
@@ -37,10 +44,11 @@ export default function People() {
                 <p className="truncate font-medium text-ink-900">{person.name}</p>
                 <p className="truncate text-xs text-ink-400">{person.job_title ?? person.email}</p>
                 <p className="mt-1 text-xs text-ink-500">
-                  {person.meeting_count} reuniones · {person.open_task_count} tareas abiertas
+                  {person.meeting_count} {person.meeting_count === 1 ? "reunión" : "reuniones"} ·{" "}
+                  {person.open_task_count} {person.open_task_count === 1 ? "tarea abierta" : "tareas abiertas"}
                 </p>
               </div>
-              <Badge tone={person.role === "owner" ? "indigo" : "gray"}>{person.role}</Badge>
+              <Badge tone={person.role === "owner" ? "indigo" : "gray"}>{ROLE_LABEL[person.role] ?? person.role}</Badge>
             </Card>
           </Link>
         ))}

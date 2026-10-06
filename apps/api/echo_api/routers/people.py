@@ -2,7 +2,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
@@ -19,6 +19,41 @@ from ..models import (
 )
 
 router = APIRouter(prefix="/api/people", tags=["people"])
+
+
+def _in_meeting(user: User):
+    """La reunión es de esta persona: la grabó, Echo la reconoció hablando
+    (o alguien la nombró a mano) o figura como participante. Antes se miraba
+    solo la lista de participantes, que casi nunca se llena con la cuenta de
+    la persona: todos daban 0 reuniones."""
+    return or_(
+        Meeting.created_by == user.id,
+        exists().where(Speaker.meeting_id == Meeting.id, Speaker.user_id == user.id),
+        exists().where(
+            MeetingParticipant.meeting_id == Meeting.id,
+            or_(MeetingParticipant.user_id == user.id, func.lower(MeetingParticipant.name) == func.lower(user.name)),
+        ),
+    )
+
+
+def _owns_task(user: User):
+    """Asignada a la persona (o, las viejas sin cuenta, con su nombre completo)."""
+    return or_(
+        ActionItem.assignee_user_id == user.id,
+        and_(ActionItem.assignee_user_id.is_(None), func.lower(ActionItem.assignee_name) == func.lower(user.name)),
+    )
+
+
+def _visible_meetings(ctx: OrgContext, scope):
+    return (Meeting.organization_id == ctx.org_id, Meeting.deleted_at.is_(None), meeting_filter(scope))
+
+
+def _open_tasks(ctx: OrgContext, scope):
+    return (
+        ActionItem.organization_id == ctx.org_id,
+        ActionItem.status.in_(["pending", "in_progress"]),
+        or_(ActionItem.meeting_id.is_(None), meeting_id_filter(scope, ActionItem.meeting_id)),
+    )
 
 
 @router.get("")
@@ -38,27 +73,11 @@ async def list_people(ctx: OrgContext = Depends(get_org_context), db: AsyncSessi
     for user, role in members:
         meeting_count = (
             await db.execute(
-                select(func.count(MeetingParticipant.id))
-                .join(Meeting, Meeting.id == MeetingParticipant.meeting_id)
-                .where(
-                    Meeting.organization_id == ctx.org_id,
-                    Meeting.deleted_at.is_(None),
-                    meeting_filter(scope),
-                    (MeetingParticipant.user_id == user.id)
-                    | (MeetingParticipant.name.ilike(user.name)),
-                )
+                select(func.count(func.distinct(Meeting.id))).where(*_visible_meetings(ctx, scope), _in_meeting(user))
             )
         ).scalar()
         open_tasks = (
-            await db.execute(
-                select(func.count(ActionItem.id)).where(
-                    ActionItem.organization_id == ctx.org_id,
-                    ActionItem.status.in_(["pending", "in_progress"]),
-                    or_(ActionItem.meeting_id.is_(None), meeting_id_filter(scope, ActionItem.meeting_id)),
-                    (ActionItem.assignee_user_id == user.id)
-                    | (ActionItem.assignee_name.ilike(user.name)),
-                )
-            )
+            await db.execute(select(func.count(ActionItem.id)).where(*_open_tasks(ctx, scope), _owns_task(user)))
         ).scalar()
         output.append(
             {
@@ -100,18 +119,17 @@ async def person_detail(
     meetings = (
         await db.execute(
             select(Meeting)
-            .join(MeetingParticipant, MeetingParticipant.meeting_id == Meeting.id)
-            .where(
-                Meeting.organization_id == ctx.org_id,
-                Meeting.deleted_at.is_(None),
-                meeting_filter(scope),
-                (MeetingParticipant.user_id == user.id)
-                | (MeetingParticipant.name.ilike(user.name)),
-            )
+            .where(*_visible_meetings(ctx, scope), _in_meeting(user))
             .order_by(Meeting.created_at.desc())
             .limit(15)
         )
     ).scalars().all()
+    meeting_count = (
+        await db.execute(select(func.count(func.distinct(Meeting.id))).where(*_visible_meetings(ctx, scope), _in_meeting(user)))
+    ).scalar()
+    open_task_count = (
+        await db.execute(select(func.count(ActionItem.id)).where(*_open_tasks(ctx, scope), _owns_task(user)))
+    ).scalar()
 
     tasks = (
         await db.execute(
@@ -120,8 +138,7 @@ async def person_detail(
             .where(
                 ActionItem.organization_id == ctx.org_id,
                 or_(ActionItem.meeting_id.is_(None), meeting_id_filter(scope, ActionItem.meeting_id)),
-                (ActionItem.assignee_user_id == user.id)
-                | (ActionItem.assignee_name.ilike(user.name)),
+                _owns_task(user),
             )
             .order_by(ActionItem.created_at.desc())
             .limit(20)
@@ -138,7 +155,7 @@ async def person_detail(
                 TranscriptSegment.organization_id == ctx.org_id,
                 Meeting.deleted_at.is_(None),
                 meeting_filter(scope),
-                Speaker.display_name.ilike(user.name.split()[0] + "%"),
+                or_(Speaker.user_id == user.id, Speaker.display_name.ilike(user.name.split()[0] + "%")),
             )
             .order_by(TranscriptSegment.created_at.desc())
             .limit(10)
@@ -153,6 +170,9 @@ async def person_detail(
         "avatar_url": user.avatar_url,
         "job_title": user.job_title,
         "role": role,
+        # Totales (las listas de abajo vienen recortadas).
+        "meeting_count": meeting_count or 0,
+        "open_task_count": open_task_count or 0,
         "meetings": [
             {
                 "id": str(m.id),

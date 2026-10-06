@@ -11,6 +11,9 @@ interface PersonDetailData {
   avatar_url?: string | null;
   job_title: string | null;
   role: string;
+  /** Totales: las listas vienen recortadas. */
+  meeting_count?: number;
+  open_task_count?: number;
   meetings: { id: string; title: string; status: string; started_at: string | null }[];
   tasks: { id: string; text: string; status: string; due_date: string | null; meeting_title: string | null }[];
   interventions: { meeting_id: string; meeting_title: string; start_ms: number; text: string }[];
@@ -37,7 +40,8 @@ export default function PersonDetail() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-ink-900">{person.name}</h1>
           <p className="text-sm text-ink-500">
-            {person.job_title ?? person.email} · {person.meetings.length} reuniones · {openTasks.length} tareas abiertas
+            {person.job_title ?? person.email} · {person.meeting_count ?? person.meetings.length} reuniones ·{" "}
+            {person.open_task_count ?? openTasks.length} tareas abiertas
           </p>
         </div>
       </header>
