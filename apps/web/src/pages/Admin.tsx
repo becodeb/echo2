@@ -75,7 +75,7 @@ function OrgRow({ org }: { org: AdminOrgOut }) {
     <Card className="space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-[15px] font-semibold text-ink-900">{org.name}</h3>
+          <OrgName org={org} />
           <p className="mt-0.5 text-sm text-ink-500">
             {org.members} {org.members === 1 ? "miembro" : "miembros"} · {org.meetings}{" "}
             {org.meetings === 1 ? "reunión" : "reuniones"}
@@ -172,6 +172,103 @@ function OrgRow({ org }: { org: AdminOrgOut }) {
           </div>
         </div>
       )}
+    </Card>
+  );
+}
+
+/** El nombre, que es lo que ve quien elige sede al registrarse ("Northfield Puertos"). */
+function OrgName({ org }: { org: AdminOrgOut }) {
+  const queryClient = useQueryClient();
+  const [draft, setDraft] = useState<string | null>(null);
+  const rename = useMutation({
+    mutationFn: (name: string) =>
+      api(`/api/admin/organizations/${org.id}`, { method: "PATCH", skipOrg: true, body: JSON.stringify({ name }) }),
+    onSuccess: () => {
+      setDraft(null);
+      queryClient.invalidateQueries({ queryKey: ["admin-orgs"] });
+    },
+  });
+  if (draft == null) {
+    return (
+      <h3 className="text-[15px] font-semibold text-ink-900">
+        {org.name}{" "}
+        <button onClick={() => setDraft(org.name)} className="text-xs font-medium text-accent-600 hover:underline">
+          Renombrar
+        </button>
+      </h3>
+    );
+  }
+  return (
+    <form
+      className="flex items-center gap-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (draft.trim().length >= 2) rename.mutate(draft.trim());
+      }}
+    >
+      <Input value={draft} onChange={(event) => setDraft(event.target.value)} aria-label="Nombre" autoFocus />
+      <Button type="submit" disabled={rename.isPending}>{rename.isPending ? <Spinner /> : "Guardar"}</Button>
+      <Button type="button" variant="ghost" onClick={() => setDraft(null)}>Cancelar</Button>
+    </form>
+  );
+}
+
+/**
+ * Una sede nueva sin miembros (ej. "Northfield Nordelta"). Con el mismo
+ * dominio que otra sede, a quien se registra se le pregunta de cuál es.
+ */
+function NewCampus() {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [rules, setRules] = useState("");
+  const create = useMutation({
+    mutationFn: () =>
+      api("/api/admin/organizations", {
+        method: "POST",
+        skipOrg: true,
+        body: JSON.stringify({
+          name: name.trim(),
+          join_rules: rules.split(/[\n,]/).map((rule) => rule.trim()).filter(Boolean),
+        }),
+      }),
+    onSuccess: () => {
+      setOpen(false);
+      setName("");
+      setRules("");
+      queryClient.invalidateQueries({ queryKey: ["admin-orgs"] });
+    },
+  });
+  if (!open) {
+    return (
+      <Button variant="soft" onClick={() => setOpen(true)}>
+        + Nueva sede
+      </Button>
+    );
+  }
+  return (
+    <Card className="space-y-3">
+      <h3 className="text-[15px] font-semibold text-ink-900">Nueva sede</h3>
+      <Input label="Nombre" value={name} onChange={(event) => setName(event.target.value)} placeholder="Northfield Nordelta" />
+      <Input
+        label="Se unen solos (dominio o emails, separados por coma)"
+        value={rules}
+        onChange={(event) => setRules(event.target.value)}
+        placeholder="northfield.edu.ar"
+      />
+      <p className="text-xs text-ink-400">
+        Si otra sede ya tiene el mismo dominio, a quien se registre con ese mail se le pregunta de cuál es. Quienes ya
+        están en una sede no cambian.
+      </p>
+      {create.isError && (
+        <p className="text-sm text-red-600">{create.error instanceof Error ? create.error.message : "No se pudo crear"}</p>
+      )}
+      <div className="flex gap-2">
+        <Button onClick={() => create.mutate()} disabled={create.isPending || name.trim().length < 2}>
+          {create.isPending ? <Spinner /> : "Crear sede"}
+        </Button>
+        <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+      </div>
     </Card>
   );
 }
@@ -486,6 +583,8 @@ function Organizations() {
       </div>
 
       <ServerDefaultCard />
+
+      <NewCampus />
 
       {sinIA > 0 && (
         <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">

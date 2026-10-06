@@ -138,6 +138,59 @@ async def list_organizations(
     return out
 
 
+class NewOrganizationIn(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    join_rules: list[str] = Field(default_factory=list, max_length=100)
+
+
+@router.post("/organizations", status_code=201)
+async def create_campus(
+    data: NewOrganizationIn,
+    admin: User = Depends(get_superadmin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Una sede nueva (ej. Northfield Nordelta), sin miembros: se suman solos
+    por las reglas de alta, o por invitación. Con el mismo dominio que otra
+    sede, a quien se registra se le pregunta de cuál es."""
+    from ..services.default_reasons import add_default_reasons
+    from .auth import _slugify
+
+    try:
+        rules = org_join.normalize_rules(data.join_rules)
+    except org_join.InvalidRule as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(error)) from error
+    org = Organization(name=data.name.strip(), slug=_slugify(data.name), join_rules=rules)
+    db.add(org)
+    await db.flush()
+    add_default_reasons(db, org.id)
+    await audit(db, org.id, admin.id, "admin.org_create", "organization", str(org.id),
+                detail={"by": admin.email, "rules": rules})
+    await db.commit()
+    return {"id": str(org.id), "name": org.name, "slug": org.slug, "join_rules": rules}
+
+
+class RenameIn(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+
+
+@router.patch("/organizations/{org_id}")
+async def rename_organization(
+    org_id: uuid.UUID,
+    data: RenameIn,
+    admin: User = Depends(get_superadmin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Cambia el nombre (el que se ve al elegir sede: "Northfield Puertos")."""
+    org = await db.get(Organization, org_id)
+    if not org or org.deleted_at is not None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Organización no encontrada")
+    org.name = data.name.strip()
+    await audit(db, org_id, admin.id, "admin.org_rename", "organization", str(org_id),
+                detail={"by": admin.email, "name": org.name})
+    await db.commit()
+    return {"id": str(org.id), "name": org.name}
+
+
 class JoinRulesIn(BaseModel):
     rules: list[str] = Field(max_length=100)
 

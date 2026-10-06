@@ -193,3 +193,32 @@ def test_the_google_photo_is_kept_only_if_it_comes_from_google(client):
     _sql("UPDATE users SET avatar_url = 'https://lh3.googleusercontent.com/a/x' WHERE id = :id", id=user.user_id)
     members = client.get("/api/org/members", headers=user.headers).json()
     assert members[0]["avatar_url"] == "https://lh3.googleusercontent.com/a/x"
+
+
+def test_becode_adds_a_second_campus_and_new_people_choose(client):
+    """Bauti (6/10): quien se registra con @northfield elige Puertos o Nordelta.
+    Desde el Panel de Becode se renombra la sede que había y se crea la otra
+    con el mismo dominio."""
+    admin = EchoTestUser(client, org_name="Northfield")
+    _sql("update users set is_superadmin = true where id = :id", id=admin.user_id)
+    domain = _domain()
+    _set_rules(admin.org_id, [domain])
+
+    renamed = client.patch(f"/api/admin/organizations/{admin.org_id}", json={"name": "Northfield Puertos"},
+                           headers=admin.headers)
+    assert renamed.status_code == 200, renamed.text
+    created = client.post("/api/admin/organizations", json={"name": "Northfield Nordelta", "join_rules": [domain]},
+                          headers=admin.headers)
+    assert created.status_code == 201, created.text
+    assert created.json()["join_rules"] == [domain]
+
+    email = f"maestra@{domain}"
+    headers = _register(client, email)
+    _link_google(email)
+    assert _refresh(client)["organizations"] == []
+    options = client.get("/api/auth/join-options", headers=headers).json()
+    assert sorted(org["name"] for org in options["organizations"]) == ["Northfield Nordelta", "Northfield Puertos"]
+
+    # Solo Becode crea sedes.
+    teacher = EchoTestUser(client, org_name="Otra")
+    assert client.post("/api/admin/organizations", json={"name": "X"}, headers=teacher.headers).status_code == 404
