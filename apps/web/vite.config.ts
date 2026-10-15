@@ -4,6 +4,11 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  define: {
+    // Cambia con cada build: la caché que guarda el navegador (lib/persistCache.ts)
+    // no se reusa con otra versión de la app.
+    __BUILD_ID__: JSON.stringify(Date.now().toString(36)),
+  },
   server: {
     port: 5173,
     proxy: {

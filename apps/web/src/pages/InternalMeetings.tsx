@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
-import type { InternalGroupOut, MeetingListItem } from "../api/types";
+import type { InternalGroupOut } from "../api/types";
+import { useMeetingPages } from "../lib/meetingPages";
 import { MeetingList } from "../components/MeetingList";
 import { NewMeetingModal } from "../components/NewMeetingModal";
 import { Select } from "../components/Select";
@@ -24,12 +25,11 @@ export default function InternalMeetings() {
 
   const myGroups = (groupsData?.groups ?? []).filter((group) => group.is_member);
 
-  const { data: meetings, isLoading } = useQuery({
-    queryKey: ["meetings", activeOrg?.id, "interna", groupFilter],
-    queryFn: () =>
-      api<MeetingListItem[]>(`/api/meetings?kind=interna${groupFilter ? `&group_id=${groupFilter}` : ""}`),
-    enabled: !!activeOrg,
-  });
+  const { meetings, isLoading, hasNextPage, fetchNextPage, isFetchingNextPage } = useMeetingPages(
+    ["meetings", activeOrg?.id, "interna", groupFilter],
+    `/api/meetings?kind=interna${groupFilter ? `&group_id=${groupFilter}` : ""}`,
+    !!activeOrg,
+  );
 
   return (
     <div className="mx-auto max-w-4xl space-y-5 px-6 py-10">
@@ -102,7 +102,9 @@ export default function InternalMeetings() {
         </Card>
       )}
 
-      {meetings && meetings.length > 0 && <MeetingList meetings={meetings} />}
+      {meetings && meetings.length > 0 && (
+        <MeetingList meetings={meetings} hasMore={hasNextPage} loadingMore={isFetchingNextPage} onMore={() => fetchNextPage()} />
+      )}
 
       <NewMeetingModal open={creating} onClose={() => setCreating(false)} initialKind="equipo" initialGroup={groupFilter} />
       {groupsData?.can_manage && (

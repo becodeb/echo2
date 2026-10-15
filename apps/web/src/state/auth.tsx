@@ -4,11 +4,14 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import { api, setAccessToken, setActiveOrg, getActiveOrg } from "../api/client";
 import type { OrgOut, SessionOut, UserOut } from "../api/types";
+import { useQueryClient } from "@tanstack/react-query";
+import { clearPersistedCache, persistCache, restorePersistedCache } from "../lib/persistCache";
 
 interface AuthState {
   loading: boolean;
@@ -31,7 +34,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [organizations, setOrganizations] = useState<OrgOut[]>([]);
   const [activeOrgId, setActiveOrgId] = useState<string | null>(getActiveOrg());
 
+  const queryClient = useQueryClient();
+  const restoredFor = useRef<string | null>(null);
+
   const applySession = useCallback((session: SessionOut) => {
+    // Antes de dibujar: lo último que vio esta persona aparece al instante.
+    if (restoredFor.current !== session.user.id) {
+      restoredFor.current = session.user.id;
+      restorePersistedCache(queryClient, session.user.id);
+    }
     setAccessToken(session.access_token);
     setUser(session.user);
     setOrganizations(session.organizations);
@@ -41,7 +52,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setActiveOrg(next);
       return next;
     });
-  }, []);
+  }, [queryClient]);
+
+  useEffect(() => {
+    if (!user) return;
+    return persistCache(queryClient, user.id);
+  }, [queryClient, user]);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,6 +80,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
 
     const onLogout = () => {
+      clearPersistedCache();
+      queryClient.clear();
+      restoredFor.current = null;
       setUser(null);
       setOrganizations([]);
       setAccessToken(null);
@@ -78,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("echo:logout", onLogout);
       window.removeEventListener("echo:session", onSession);
     };
-  }, [applySession]);
+  }, [applySession, queryClient]);
 
   const login = useCallback(
     async (email: string, password: string) => {
@@ -110,11 +129,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await api("/api/auth/logout", { method: "POST", skipOrg: true });
     } finally {
+      clearPersistedCache();
+      queryClient.clear();
+      restoredFor.current = null;
       setAccessToken(null);
       setUser(null);
       setOrganizations([]);
     }
-  }, []);
+  }, [queryClient]);
 
   const createOrganization = useCallback(async (name: string) => {
     const org = await api<OrgOut>("/api/auth/organizations", {

@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { useAuth } from "../state/auth";
 import { EchoFace } from "./EchoFace";
 import { Modal } from "./ui";
-import { VoiceRecorder } from "./VoiceRecorder";
+
+// Se muestra una sola vez: el grabador no viaja en el arranque de la app.
+const VoiceRecorder = lazy(() => import("./VoiceRecorder").then((module) => ({ default: module.VoiceRecorder })));
 
 interface VoiceState {
   has_sample: boolean;
@@ -75,7 +77,9 @@ export function VoicePrompt() {
             forma más segura de que Echo sepa quién habló. Se usa solo para eso y la podés borrar cuando quieras.
           </p>
         </div>
-        <VoiceRecorder compact onSaved={() => setSaved(true)} />
+        <Suspense fallback={null}>
+          <VoiceRecorder compact onSaved={() => setSaved(true)} />
+        </Suspense>
         {saved ? (
           <button
             onClick={() => setClosed(true)}

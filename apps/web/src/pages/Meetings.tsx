@@ -1,12 +1,10 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { api } from "../api/client";
-import type { MeetingListItem } from "../api/types";
 import { MeetingList } from "../components/MeetingList";
 import { NewMeetingModal } from "../components/NewMeetingModal";
 import { Button, Card, EmptyState, Spinner } from "../components/ui";
 import { useAuth } from "../state/auth";
+import { useMeetingPages } from "../lib/meetingPages";
 
 export default function Meetings() {
   const { activeOrg } = useAuth();
@@ -17,12 +15,12 @@ export default function Meetings() {
     if (params.get("new") === "1") setShowNew(true);
   }, [params]);
 
-  const { data: meetings, isLoading } = useQuery({
-    queryKey: ["meetings", activeOrg?.id, "familia"],
-    // Las internas tienen su sección (pages/InternalMeetings.tsx).
-    queryFn: () => api<MeetingListItem[]>("/api/meetings?kind=familia"),
-    enabled: !!activeOrg,
-  });
+  // Las internas tienen su sección (pages/InternalMeetings.tsx).
+  const { meetings, isLoading, hasNextPage, fetchNextPage, isFetchingNextPage } = useMeetingPages(
+    ["meetings", activeOrg?.id, "familia"],
+    "/api/meetings?kind=familia",
+    !!activeOrg,
+  );
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-10">
@@ -45,7 +43,9 @@ export default function Meetings() {
         </Card>
       )}
 
-      {meetings && meetings.length > 0 && <MeetingList meetings={meetings} />}
+      {meetings && meetings.length > 0 && (
+        <MeetingList meetings={meetings} hasMore={hasNextPage} loadingMore={isFetchingNextPage} onMore={() => fetchNextPage()} />
+      )}
 
       <NewMeetingModal
         open={showNew}

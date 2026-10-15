@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MeetingStatus, StatusIcons, StatusPill } from "../components/MeetingStatus";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { AdminOrgOut, ChatOut, InsightsOut, MeetingOut, MinutesOut, SegmentOut } from "../api/types";
 import { Tabs } from "../components/Tabs";
@@ -19,6 +19,8 @@ import { Select } from "../components/Select";
 import { TaskAssignee } from "../components/TaskAssignee";
 import { ActaNumberCard, GenerateActaModal } from "../components/ActaNumber";
 import { LEVELS, LEVEL_LABEL, useMyAccess, type Level } from "../state/access";
+import { insightsQuery, meetingQuery, summaryQuery, transcriptQuery, type TranscriptPage } from "../lib/prefetch";
+import { useDebounced } from "../lib/useDebounced";
 
 const TASK_STATUS_OPTIONS = [
   { value: "pending", label: "Pendiente" },
@@ -52,8 +54,7 @@ export default function MeetingDetail() {
   const jumpMs = params.get("t");
 
   const { data: meeting, refetch } = useQuery({
-    queryKey: ["meeting", id],
-    queryFn: () => api<MeetingOut>(`/api/meetings/${id}`),
+    ...meetingQuery(id ?? ""),
     enabled: !!id,
     refetchInterval: (query) =>
       query.state.data?.status === "processing" || query.state.data?.recording?.status === "processing"
@@ -291,17 +292,8 @@ function LevelControl({ meeting }: { meeting: MeetingOut }) {
 // ── Resumen ──────────────────────────────────────────────────────
 
 function SummaryTab({ meeting, onJump }: { meeting: MeetingOut; onJump: (ms: number) => void }) {
-  const { data: summaries } = useQuery({
-    queryKey: ["summary", meeting.id],
-    queryFn: () =>
-      api<Record<string, { content: { points?: string[]; markdown?: string } }>>(
-        `/api/meetings/${meeting.id}/summary`,
-      ),
-  });
-  const { data: insights } = useQuery({
-    queryKey: ["insights", meeting.id],
-    queryFn: () => api<InsightsOut>(`/api/meetings/${meeting.id}/insights`),
-  });
+  const { data: summaries } = useQuery(summaryQuery(meeting.id));
+  const { data: insights } = useQuery(insightsQuery(meeting.id));
 
   const timeline = meeting.meta?.timeline ?? [];
   const nextSteps = meeting.meta?.next_steps ?? [];
@@ -439,8 +431,12 @@ function TranscriptTab({
 }) {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [pages, setPages] = useState<SegmentOut[]>([]);
-  const [nextAfter, setNextAfter] = useState<number | null>(0);
+  // Buscar espera a que se deje de tipear: antes salía un pedido por tecla.
+  const term = useDebounced(search.trim(), 250);
+  // En caché: volver a la reunión (o abrirla después de pasarle el mouse en
+  // la lista) muestra el transcript al instante y lo revalida de fondo.
+  const transcript = useInfiniteQuery({ ...transcriptQuery(meeting.id, term), placeholderData: keepPreviousData });
+  const pages = useMemo(() => transcript.data?.pages.flatMap((page) => page.segments) ?? [], [transcript.data]);
   const [editing, setEditing] = useState<SegmentOut | null>(null);
   const [editText, setEditText] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
@@ -454,20 +450,15 @@ function TranscriptTab({
     return map;
   }, [meeting.speakers]);
 
-  const load = async (after: number, replace = false) => {
-    const query = new URLSearchParams({ after_seq: String(after), limit: "300" });
-    if (search.trim()) query.set("search", search.trim());
-    const page = await api<{ segments: SegmentOut[]; next_after: number | null }>(
-      `/api/meetings/${meeting.id}/transcript?${query}`,
-    );
-    setPages((current) => (replace ? page.segments : [...current, ...page.segments]));
-    setNextAfter(page.next_after);
-  };
-
+  // Cuando termina de procesarse, el transcript final reemplaza al de en vivo.
+  // Solo ante un cambio: al abrir la reunión vale lo que ya estaba en caché.
+  const progress = [meeting.status, meeting.processing_state?.stage, meeting.meta?.text_status, meeting.meta?.people_status].join("|");
+  const lastProgress = useRef(progress);
   useEffect(() => {
-    load(0, true).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meeting.id, search]);
+    if (lastProgress.current === progress) return;
+    lastProgress.current = progress;
+    queryClient.invalidateQueries({ queryKey: ["transcript", meeting.id] });
+  }, [queryClient, meeting.id, progress]);
 
   useEffect(() => {
     if (jumpMs == null || pages.length === 0) return;
@@ -484,7 +475,15 @@ function TranscriptTab({
         body: JSON.stringify({ text: editText }),
       }),
     onSuccess: (updated) => {
-      setPages((current) => current.map((segment) => (segment.id === updated.id ? updated : segment)));
+      queryClient.setQueriesData<InfiniteData<TranscriptPage>>({ queryKey: ["transcript", meeting.id] }, (data) =>
+        data && {
+          ...data,
+          pages: data.pages.map((page) => ({
+            ...page,
+            segments: page.segments.map((segment) => (segment.id === updated.id ? updated : segment)),
+          })),
+        },
+      );
       setEditing(null);
     },
   });
@@ -516,7 +515,7 @@ function TranscriptTab({
             <div
               key={segment.id}
               id={`seg-${segment.id}`}
-              className={`group rounded-xl px-3 py-2 transition-colors ${highlighted ? "bg-accent-500/10" : "hover:bg-ink-50"}`}
+              className={`transcript-row group rounded-xl px-3 py-2 transition-colors ${highlighted ? "bg-accent-500/10" : "hover:bg-ink-50"}`}
             >
               <div className="mb-0.5 flex items-baseline gap-2 text-xs">
                 <span className="font-mono tabular-nums text-ink-400">{formatMs(segment.start_ms)}</span>
@@ -543,12 +542,19 @@ function TranscriptTab({
             </div>
           );
         })}
-        {pages.length === 0 && (
-          <EmptyState title={search ? "Sin coincidencias" : "Sin transcripción"} mood="idle" />
+        {transcript.isPending && (
+          <div className="flex justify-center py-10 text-ink-300">
+            <Spinner className="h-6 w-6" />
+          </div>
         )}
-        {nextAfter != null && pages.length > 0 && (
+        {!transcript.isPending && pages.length === 0 && (
+          <EmptyState title={term ? "Sin coincidencias" : "Sin transcripción"} mood="idle" />
+        )}
+        {transcript.hasNextPage && pages.length > 0 && (
           <div className="flex justify-center py-2">
-            <Button variant="soft" onClick={() => load(nextAfter)}>Cargar más</Button>
+            <Button variant="soft" onClick={() => transcript.fetchNextPage()} disabled={transcript.isFetchingNextPage}>
+              {transcript.isFetchingNextPage ? <Spinner /> : "Cargar más"}
+            </Button>
           </div>
         )}
       </div>

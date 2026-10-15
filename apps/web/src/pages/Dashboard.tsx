@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { effectivePlan, PLAN_NAME, useBilling } from "../components/billing";
 import { api } from "../api/client";
 import { DeleteDraft } from "../components/DeleteDraft";
@@ -8,6 +8,7 @@ import { MeetingStatus } from "../components/MeetingStatus";
 import { Card, EmptyState, formatDate, formatDuration } from "../components/ui";
 import { EchoFace } from "../components/EchoFace";
 import { useAuth } from "../state/auth";
+import { prefetchMeeting } from "../lib/prefetch";
 
 interface DashboardData {
   greeting_name: string;
@@ -28,6 +29,7 @@ interface DashboardData {
 export default function Dashboard() {
   const { activeOrg } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data } = useQuery({
     queryKey: ["dashboard", activeOrg?.id],
     queryFn: () => api<DashboardData>("/api/dashboard"),
@@ -94,14 +96,15 @@ export default function Dashboard() {
               </EmptyState>
             )}
             {data?.recent_meetings.map((meeting) => {
+              const live = meeting.status === "live" || meeting.status === "paused" || meeting.status === "draft";
+              const warm = live ? undefined : () => prefetchMeeting(queryClient, meeting.id);
               return (
                 <Link
                   key={meeting.id}
-                  to={
-                    meeting.status === "live" || meeting.status === "paused" || meeting.status === "draft"
-                      ? `/meetings/${meeting.id}/live`
-                      : `/meetings/${meeting.id}`
-                  }
+                  to={live ? `/meetings/${meeting.id}/live` : `/meetings/${meeting.id}`}
+                  onMouseEnter={warm}
+                  onFocus={warm}
+                  onTouchStart={warm}
                   className="group flex items-center justify-between gap-4 px-5 py-3.5 transition-colors hover:bg-ink-50"
                 >
                   <div className="min-w-0">

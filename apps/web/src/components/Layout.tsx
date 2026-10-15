@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
@@ -9,12 +9,13 @@ import { useSeesInternal } from "../state/internalGroups";
 import { Avatar } from "./ui";
 import { EchoFace } from "./EchoFace";
 import { AnnouncementPopup } from "./AnnouncementPopup";
-import { AskPanel } from "./AskPanel";
 import { CommandPalette } from "./CommandPalette";
 import { Icon, type IconName } from "./icons";
 import { NotificationsPanel } from "./NotificationsPanel";
 import { VoicePrompt } from "./VoicePrompt";
 import { useTitle } from "../lib/useTitle";
+// El panel de preguntas trae react-markdown: se baja recién al abrirlo, no al entrar.
+const AskPanel = lazy(() => import("./AskPanel").then((module) => ({ default: module.AskPanel })));
 import { CreditDots, effectivePlan, PLAN_NAME, useBilling } from "./billing";
 
 interface NavItem {
@@ -238,14 +239,14 @@ export function Layout({ children }: { children: ReactNode }) {
 
       {/* Panel de preguntas: al costado en la computadora, pantalla completa en el celular. */}
       {askOpen && (
-        <>
+        <Suspense fallback={null}>
           <div className="animate-slide-in hidden w-[380px] shrink-0 md:flex">
             <AskPanel onClose={() => setAskOpen(false)} />
           </div>
           <div className="animate-fade-up fixed inset-0 z-50 flex bg-[#f6f7f9] md:hidden">
             <AskPanel onClose={() => setAskOpen(false)} />
           </div>
-        </>
+        </Suspense>
       )}
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
