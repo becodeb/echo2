@@ -258,7 +258,8 @@ class MemoryEntity(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
     # ningún error visible.
     # `alembic check` ya reporta `Detected removed index` acá: es ruido
     # ESPERADO. Si autogenerás, borrá a mano el `drop_index` del resultado.
-    embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM))
+    # deferred: solo se usa dentro de SQL; no se decodifica al listar entidades.
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM), deferred=True)
 
 
 class MemoryRelation(PKMixin, TimestampMixin, Base):

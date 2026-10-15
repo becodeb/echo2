@@ -182,7 +182,10 @@ class TranscriptSegment(PKMixin, TimestampMixin, Base):
     confidence: Mapped[float | None] = mapped_column(Float)
     is_final: Mapped[bool] = mapped_column(Boolean, default=True)
     edited: Mapped[bool] = mapped_column(Boolean, default=False)
-    tsv: Mapped[str | None] = mapped_column(TSVECTOR)  # full-text search
+    # tsv y embedding no se cargan al leer frases (deferred): solo se usan
+    # dentro de SQL (búsqueda y RAG), y decodificar 1536 floats por frase
+    # hacía tardar segundos el transcript de una reunión larga.
+    tsv: Mapped[str | None] = mapped_column(TSVECTOR, deferred=True)  # full-text search
     # ⚠️ TRAMPA DE AUTOGENERATE — LEER ANTES DE TOCAR MIGRACIONES ⚠️
     # El índice HNSW de esta columna (`ix_segments_embedding`) NO está
     # declarado acá: lo crea por SQL crudo `alembic/versions/0001_initial.py`,
@@ -195,7 +198,7 @@ class TranscriptSegment(PKMixin, TimestampMixin, Base):
     # `alembic check` ya reporta `Detected removed index` para este índice: es
     # ruido ESPERADO, no un drift que haya que "arreglar" declarándolo.
     # Si autogenerás: borrá a mano el `drop_index` del archivo resultante.
-    embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM))
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM), deferred=True)
     topic: Mapped[str | None] = mapped_column(String(200))
     # hint de diarización en vivo (canal/cluster del bridge o dispositivo)
     speaker_hint: Mapped[str | None] = mapped_column(String(60))

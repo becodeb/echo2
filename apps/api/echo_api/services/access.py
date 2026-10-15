@@ -25,7 +25,7 @@ cambia una, se cambia la otra; los tests de test_levels.py cubren las dos.
 import uuid
 from dataclasses import dataclass
 
-from sqlalchemy import and_, exists, false, func, or_, select
+from sqlalchemy import String, and_, cast, exists, false, func, literal, null, or_, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
 
@@ -74,26 +74,22 @@ class Scope:
 
 
 async def load_scope(db: AsyncSession, org_id: uuid.UUID, user_id: uuid.UUID, role: str) -> Scope:
-    rows = (
-        await db.execute(
-            select(MemberLevelAccess.level, MemberLevelAccess.access).where(
-                MemberLevelAccess.organization_id == org_id, MemberLevelAccess.user_id == user_id
-            )
-        )
-    ).all()
-    groups = (
-        await db.execute(
-            select(InternalGroupMember.group_id).where(
-                InternalGroupMember.organization_id == org_id, InternalGroupMember.user_id == user_id
-            )
-        )
-    ).scalars().all()
+    # Niveles y grupos en una sola ida a la base: casi todos los pedidos pasan
+    # por acá y con el servidor cargado cada ida y vuelta se nota.
+    levels = select(
+        literal("nivel").label("tipo"), MemberLevelAccess.level.label("clave"), MemberLevelAccess.access.label("valor")
+    ).where(MemberLevelAccess.organization_id == org_id, MemberLevelAccess.user_id == user_id)
+    groups = select(
+        literal("grupo").label("tipo"), cast(InternalGroupMember.group_id, String).label("clave"),
+        cast(null(), String).label("valor"),
+    ).where(InternalGroupMember.organization_id == org_id, InternalGroupMember.user_id == user_id)
+    rows = (await db.execute(union_all(levels, groups))).all()
     return Scope(
         user_id=user_id,
         org_id=org_id,
         sees_everything=role in ("admin", "owner"),
-        access={level: access for level, access in rows},
-        groups=frozenset(groups),
+        access={key: value for kind, key, value in rows if kind == "nivel"},
+        groups=frozenset(uuid.UUID(key) for kind, key, _ in rows if kind == "grupo"),
     )
 
 
