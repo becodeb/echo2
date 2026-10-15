@@ -147,3 +147,32 @@
   /* min-height de A4 exacto puede redondear y tirar una hoja en blanco. */
   .entrevista-hoja { box-shadow: none; margin: 0; min-height: 0; }
 }
+
+/* "Acta de reunión" (Nordelta): copia del Word del colegio. Trebuchet 12pt,
+ * membrete negro a la izquierda, logo arriba a la derecha y prosa justificada. */
+.reunion-hoja { padding-top: 14mm; }
+.reu-encabezado {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12pt;
+}
+.reu-membrete p { font-size: 12pt; line-height: 15pt; }
+.reu-logo { height: 46pt; width: auto; flex: none; }
+.reu-titulo { margin-top: 18pt; }
+.reu-cuerpo {
+  margin-top: 16pt;
+  text-align: justify;
+  line-height: 1.5;
+}
+.reunion-hoja .reu-cuerpo p { margin-top: 10pt; }
+.reu-cuerpo .ent-fill { border-bottom: none; padding: 0; }
+.reu-cuerpo .ent-vacio { border-bottom: 1pt dotted #000000; }
+/* Las firmas del modelo son líneas de puntos, no una raya. */
+.reu-firmas { margin-top: 56pt; }
+.reu-firmas span { border-top: 1pt dotted #000000; min-height: 12pt; }
+
+@media screen and (max-width: 232mm) {
+  .reu-encabezado { flex-direction: column-reverse; }
+  .reunion-hoja .reu-logo { height: 36pt; }
+}

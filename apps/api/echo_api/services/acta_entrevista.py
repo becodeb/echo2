@@ -8,7 +8,15 @@ el generador no redacta texto libre: completa estos campos, que viajan en
 
 El markdown se sigue guardando, armado acá a partir de los campos, porque de
 él viven la búsqueda, el chat y las exportaciones.
+
+Hay dos formularios, según el modelo de acta de cada sede:
+- "entrevista" (Puertos): alumno, curso, solicitada por y motivo arriba, el
+  párrafo fijo y el desarrollo sobre renglones.
+- "reunion" (Nordelta, modelo con `{{hora}}`): "ACTA DE REUNIÓN" en prosa;
+  "A los … días … siendo las HH:MM hs, se reúnen {familia} con {colegio}.",
+  el desarrollo y el cierre fijo de lectura y firma.
 """
+import re
 from datetime import date, datetime, timedelta, timezone
 
 KIND = "entrevista"
@@ -24,6 +32,14 @@ MESES = (
 
 TEXT_FIELDS = ("alumno", "curso", "motivo", "reunen", "con", "desarrollo")
 SOLICITANTES = ("familia", "colegio")
+FORMATOS = ("entrevista", "reunion")
+_HORA_RE = re.compile(r"^([01]?\d|2[0-3]):([0-5]\d)$")
+
+# Cierre del acta de reunión: va siempre igual, lo pone la hoja y no la IA.
+CIERRE_REUNION = (
+    "Sin más temas que abordar, se da por finalizada la reunión.",
+    "Previa lectura por las partes, y estando todos de acuerdo con su contenido, se firma el presente documento.",
+)
 
 GENERATOR_SYSTEM = """Sos el redactor de actas de entrevista de un colegio. Completás los campos
 del formulario institucional usando EXCLUSIVAMENTE lo que surge del transcript
@@ -48,9 +64,40 @@ FIELDS_SPEC = """Campos del formulario (todos texto plano):
   entrevista si se fijó. Cerrá con "Sin más asuntos que tratar, se da por
   finalizada la entrevista, firmando al pie los presentes en conformidad."."""
 
+FIELDS_SPEC_REUNION = """Campos del acta de reunión (todos texto plano):
+- "alumno": apellido y nombre del estudiante del que se habla ("APELLIDO, Nombre" si se sabe).
+- "curso": curso o grado (ej. "6to Eco.", "3N EP").
+- "motivo": motivo general en pocas palabras (ej. "Acreditación de materias").
+- "con": quiénes vienen por la familia u otros, con nombre y vínculo
+  (ej. "la Sra. Roxana Pérez, madre del estudiante Tomás Pérez").
+- "reunen": quiénes participan por el colegio, con nombre y cargo
+  (ej. "Natalia Miranda, Directora del Nivel, y Rocío Gómez, Tutora de 6to Eco.").
+- "desarrollo": el cuerpo del acta en prosa, en párrafos separados por una
+  línea en blanco. Empezá con el propósito ("En el día de la fecha, se convoca
+  a la familia de … para …") y seguí con lo que planteó cada parte, tema por
+  tema ("En relación con …"), acuerdos y compromisos con responsable y fecha.
+  NO escribas el cierre ("Sin más temas que abordar…" ni "Previa lectura…"):
+  lo agrega el formulario."""
+
 
 def is_interview_template(body_markdown: str | None) -> bool:
     return "{{alumno}}" in (body_markdown or "")
+
+
+def template_format(body_markdown: str | None) -> str:
+    """Qué formulario pide el modelo de acta: el de reunión lleva la hora."""
+    return "reunion" if "{{hora}}" in (body_markdown or "") else "entrevista"
+
+
+def fields_spec(formato: str) -> str:
+    return FIELDS_SPEC_REUNION if formato == "reunion" else FIELDS_SPEC
+
+
+def meeting_time(started_at: datetime | None) -> str:
+    moment = started_at or datetime.now(timezone.utc)
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(ARGENTINA).strftime("%H:%M")
 
 
 def meeting_date(started_at: datetime | None) -> date:
@@ -60,7 +107,7 @@ def meeting_date(started_at: datetime | None) -> date:
     return moment.astimezone(ARGENTINA).date()
 
 
-def normalize_fields(raw: dict | None, fallback_date: date) -> dict:
+def normalize_fields(raw: dict | None, fallback_date: date, fallback_time: str = "") -> dict:
     """Deja los campos con forma conocida, pase lo que pase en la entrada.
 
     Tanto el LLM como el formulario de la web pueden mandar de más, de menos
@@ -77,6 +124,12 @@ def normalize_fields(raw: dict | None, fallback_date: date) -> dict:
         out["fecha"] = date.fromisoformat(str(raw.get("fecha"))).isoformat()
     except ValueError:
         out["fecha"] = fallback_date.isoformat()
+    # Las actas de antes no traen formato: eran todas de entrevista.
+    formato = str(raw.get("formato") or "").strip().lower()
+    out["formato"] = formato if formato in FORMATOS else "entrevista"
+    if out["formato"] == "reunion":
+        hora = _HORA_RE.match(str(raw.get("hora") or "").strip())
+        out["hora"] = f"{int(hora.group(1)):02d}:{hora.group(2)}" if hora else fallback_time
     return out
 
 
@@ -94,6 +147,17 @@ def render_markdown(fields: dict) -> str:
     """El acta como texto, para búsqueda, chat y exportaciones."""
     fecha = date.fromisoformat(fields["fecha"])
     blank = "……………"
+    if fields.get("formato") == "reunion":
+        hora = f", siendo las {fields['hora']} hs" if fields.get("hora") else ""
+        parts = [
+            "# ACTA DE REUNIÓN",
+            f"A los {fecha.day} días del mes de {MESES[fecha.month - 1]} del {fecha.year} en la sede de la "
+            f"institución{hora}, se reúnen {fields['con'] or blank} con {fields['reunen'] or blank}"
+            f"{'' if fields['reunen'].endswith(('.', ':')) else '.'}",
+            fields["desarrollo"],
+            *CIERRE_REUNION,
+        ]
+        return "\n\n".join(part for part in parts if part) + "\n"
     solicitada = {"familia": "Familia", "colegio": "Colegio"}.get(fields["solicitada_por"], blank)
     parts = [
         "# ACTA DE ENTREVISTA",

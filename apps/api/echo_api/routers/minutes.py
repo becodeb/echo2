@@ -229,8 +229,9 @@ async def save_minutes_edit(
     blocks = None
     body_markdown = data.body_markdown
     if data.fields is not None:
+        moment = meeting.started_at or meeting.created_at
         fields = acta_entrevista.normalize_fields(
-            data.fields, acta_entrevista.meeting_date(meeting.started_at or meeting.created_at)
+            data.fields, acta_entrevista.meeting_date(moment), acta_entrevista.meeting_time(moment)
         )
         blocks = acta_entrevista.to_blocks(fields)
         body_markdown = acta_entrevista.render_markdown(fields)
@@ -487,6 +488,7 @@ ACTA_FONTS = {
     "arial": ("Arial", "Helvetica"),
     "calibri": ("Calibri", "Helvetica"),
     "times": ("Times New Roman", "Times-Roman"),
+    "trebuchet": ("Trebuchet MS", "Helvetica"),
 }
 
 
@@ -504,7 +506,7 @@ class LetterheadIn(BaseModel):
     interview_place: str = Field(default="", max_length=400)
     # La fuente del acta (impresa, Word y PDF): hay colegios que tienen que
     # presentarlas en una en particular.
-    font: Literal["arial", "calibri", "times"] = "arial"
+    font: Literal["arial", "calibri", "times", "trebuchet"] = "arial"
 
     @field_validator("lines", "signatures")
     @classmethod

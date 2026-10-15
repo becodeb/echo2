@@ -24,6 +24,7 @@ export function InterviewSheet({
   /** Número de acta; sin número (todavía no se imprimió) no se muestra. */
   number?: number | null;
 }) {
+  if (fields.formato === "reunion") return <ReunionSheet fields={fields} letterhead={letterhead} number={number} />;
   const [year, month, day] = fields.fecha.split("-").map(Number);
   const place = letterhead.interview_place || `la institución ${letterhead.institution}`;
   const paragraphs = fields.desarrollo.split(/\n\s*\n|\n/).map((text) => text.trim()).filter(Boolean);
@@ -80,6 +81,64 @@ export function InterviewSheet({
           ))}
         </footer>
       )}
+    </article>
+  );
+}
+
+/**
+ * El "Acta de reunión" de Nordelta: membrete a la izquierda y logo a la
+ * derecha, título centrado y todo en prosa justificada, con el cierre fijo de
+ * lectura y firma. Sin renglones ni casilleros: así es el Word del colegio.
+ */
+function ReunionSheet({
+  fields,
+  letterhead,
+  number,
+}: {
+  fields: InterviewFields;
+  letterhead: LetterheadOut;
+  number: number | null;
+}) {
+  const [year, month, day] = fields.fecha.split("-").map(Number);
+  const place = letterhead.interview_place || `la sede de ${letterhead.institution}`;
+  const paragraphs = fields.desarrollo.split(/\n\s*\n|\n/).map((text) => text.trim()).filter(Boolean);
+  // Sin etiquetas cargadas, igual van las dos líneas de firma del modelo.
+  const signatures = letterhead.signatures.length > 0 ? letterhead.signatures : ["", ""];
+
+  return (
+    <article className="entrevista-hoja reunion-hoja">
+      {number != null && <p className="ent-numero">Acta N.º {number}</p>}
+      <header className="reu-encabezado">
+        <div className="reu-membrete">
+          {letterhead.lines.map((line, index) => (
+            <p key={index}>{line}</p>
+          ))}
+        </div>
+        {letterhead.logo_data_url && (
+          <img src={letterhead.logo_data_url} alt={letterhead.institution} className="reu-logo" />
+        )}
+      </header>
+      <h1 className="ent-titulo reu-titulo">{letterhead.title || "ACTA DE REUNIÓN"}</h1>
+
+      <div className="reu-cuerpo">
+        <p>
+          A los <Fill>{day ? String(day) : ""}</Fill> días del mes de <Fill>{month ? MESES[month - 1] : ""}</Fill> del{" "}
+          {year || "……"} en {place}, siendo las <Fill>{fields.hora ?? ""}</Fill> hs, se reúnen <Fill>{fields.con}</Fill>{" "}
+          con <Fill>{fields.reunen}</Fill>
+          {/[.:]$/.test(fields.reunen) ? "" : "."}
+        </p>
+        {paragraphs.map((text, index) => (
+          <p key={index}>{text}</p>
+        ))}
+        <p>Sin más temas que abordar, se da por finalizada la reunión.</p>
+        <p>Previa lectura por las partes, y estando todos de acuerdo con su contenido, se firma el presente documento.</p>
+      </div>
+
+      <footer className="ent-firmas reu-firmas">
+        {signatures.map((label, index) => (
+          <span key={index}>{label}</span>
+        ))}
+      </footer>
     </article>
   );
 }

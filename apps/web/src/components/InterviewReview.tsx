@@ -56,6 +56,8 @@ export function InterviewReview({ meetingId, minutes, fields }: {
 
   const set = (key: keyof InterviewFields) => (value: string) => setForm((current) => ({ ...current, [key]: value }));
   const error = confirm.error ?? save.error;
+  // El acta de reunión (Nordelta) no tiene "Solicitada por" y lleva la hora.
+  const reunion = form.formato === "reunion";
 
   if (!editing) {
     return (
@@ -96,29 +98,43 @@ export function InterviewReview({ meetingId, minutes, fields }: {
         <Input label="Curso" value={form.curso} onChange={(e) => set("curso")(e.target.value)} />
       </div>
 
-      <fieldset>
-        <legend className="mb-1.5 text-sm font-medium text-ink-700">Solicitada por</legend>
-        <div className="flex gap-5">
-          {(["familia", "colegio"] as const).map((option) => (
-            <label key={option} className="flex items-center gap-2 text-sm text-ink-800">
-              <input
-                type="radio"
-                name="solicitada_por"
-                checked={form.solicitada_por === option}
-                onChange={() => set("solicitada_por")(option)}
-              />
-              {option === "familia" ? "Familia" : "Colegio"}
-            </label>
-          ))}
-        </div>
-      </fieldset>
+      {!reunion && (
+        <fieldset>
+          <legend className="mb-1.5 text-sm font-medium text-ink-700">Solicitada por</legend>
+          <div className="flex gap-5">
+            {(["familia", "colegio"] as const).map((option) => (
+              <label key={option} className="flex items-center gap-2 text-sm text-ink-800">
+                <input
+                  type="radio"
+                  name="solicitada_por"
+                  checked={form.solicitada_por === option}
+                  onChange={() => set("solicitada_por")(option)}
+                />
+                {option === "familia" ? "Familia" : "Colegio"}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-[1fr_10rem]">
         <Input label="Motivo general" value={form.motivo} onChange={(e) => set("motivo")(e.target.value)} />
         <Input label="Fecha" type="date" value={form.fecha} onChange={(e) => set("fecha")(e.target.value)} />
       </div>
-      <Input label="Se reúnen (por el colegio)" value={form.reunen} onChange={(e) => set("reunen")(e.target.value)} />
-      <Input label="Con (familia u otros)" value={form.con} onChange={(e) => set("con")(e.target.value)} />
+      {reunion ? (
+        <>
+          <div className="sm:w-40">
+            <Input label="Hora" type="time" value={form.hora ?? ""} onChange={(e) => set("hora")(e.target.value)} />
+          </div>
+          <Input label="Se reúnen (familia u otros)" value={form.con} onChange={(e) => set("con")(e.target.value)} />
+          <Input label="Con (por el colegio)" value={form.reunen} onChange={(e) => set("reunen")(e.target.value)} />
+        </>
+      ) : (
+        <>
+          <Input label="Se reúnen (por el colegio)" value={form.reunen} onChange={(e) => set("reunen")(e.target.value)} />
+          <Input label="Con (familia u otros)" value={form.con} onChange={(e) => set("con")(e.target.value)} />
+        </>
+      )}
 
       <label className="block">
         <span className="mb-1.5 block text-sm font-medium text-ink-700">Desarrollo</span>

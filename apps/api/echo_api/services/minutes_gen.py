@@ -283,13 +283,15 @@ async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instru
 
     if acta_entrevista.is_interview_template(template.body_markdown):
         fecha = acta_entrevista.meeting_date(meeting.started_at or meeting.created_at)
+        hora = acta_entrevista.meeting_time(meeting.started_at or meeting.created_at)
+        formato = acta_entrevista.template_format(template.body_markdown)
         hints = {**structured, "motivo_cargado": reason_name, "familia_cargada": family_hint}
         result = await provider.chat_json(
             acta_entrevista.GENERATOR_SYSTEM.format(language=language),
             [
                 {
                     "role": "user",
-                    "content": f"""{acta_entrevista.FIELDS_SPEC}
+                    "content": f"""{acta_entrevista.fields_spec(formato)}
 
 DATOS DE LA REUNIÓN (lo "cargado" lo ingresó una persona: tiene prioridad):
 {json.dumps(hints, ensure_ascii=False, indent=1)}
@@ -310,7 +312,9 @@ Devolvé JSON:
         )
         if not isinstance(result, dict) or not isinstance(result.get("fields"), dict):
             raise LLMError("El generador de actas no devolvió contenido")
-        fields = acta_entrevista.normalize_fields({**result["fields"], "fecha": fecha.isoformat()}, fecha)
+        fields = acta_entrevista.normalize_fields(
+            {**result["fields"], "fecha": fecha.isoformat(), "formato": formato, "hora": hora}, fecha, hora
+        )
         if reason_name and not fields["motivo"]:
             fields["motivo"] = reason_name
         # Si la IA nombró al alumno con su marcador, sabemos exactamente quién

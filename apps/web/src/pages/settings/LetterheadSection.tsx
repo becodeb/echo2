@@ -126,6 +126,7 @@ export function LetterheadSection() {
             { value: "arial", label: "Arial (sans serif)" },
             { value: "calibri", label: "Calibri (sans serif)" },
             { value: "times", label: "Times New Roman (con serif)" },
+            { value: "trebuchet", label: "Trebuchet MS (sans serif)" },
           ]}
         />
         <p className="-mt-2 text-xs text-ink-400">Se usa en el acta impresa, en Word y en PDF.</p>

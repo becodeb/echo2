@@ -264,7 +264,7 @@ export interface MinutesOut {
   can_confirm: boolean;
 }
 
-/** Campos del formulario "Acta de entrevista" del colegio. */
+/** Campos del formulario del acta del colegio (de entrevista o de reunión). */
 export interface InterviewFields {
   alumno: string;
   curso: string;
@@ -275,6 +275,10 @@ export interface InterviewFields {
   reunen: string;
   con: string;
   desarrollo: string;
+  /** "reunion": el acta de reunión en prosa (Nordelta); sin dato, la de entrevista. */
+  formato?: "entrevista" | "reunion";
+  /** HH:MM, solo en el acta de reunión ("siendo las 11:30 hs"). */
+  hora?: string;
 }
 
 /** Membrete del acta impresa (Ajustes → Membrete). */
@@ -289,7 +293,7 @@ export interface LetterheadOut {
   logo_data_url: string | null;
   interview_place: string;
   /** Fuente del acta impresa, en Word y en PDF. */
-  font: "arial" | "calibri" | "times";
+  font: "arial" | "calibri" | "times" | "trebuchet";
 }
 
 export interface FamilyMemberOut {

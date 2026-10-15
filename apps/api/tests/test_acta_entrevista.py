@@ -106,7 +106,7 @@ class TestCampos:
         )
         assert out == {
             "alumno": "Ana", "curso": "", "motivo": "", "reunen": "", "con": "", "desarrollo": "",
-            "solicitada_por": "", "fecha": "2026-09-22",
+            "solicitada_por": "", "fecha": "2026-09-22", "formato": "entrevista",
         }
 
     def test_fecha_en_hora_argentina(self):
@@ -120,3 +120,63 @@ class TestCampos:
     def test_detecta_el_modelo_de_entrevista(self):
         assert acta_entrevista.is_interview_template(TEMPLATE)
         assert not acta_entrevista.is_interview_template("# ACTA\n{{desarrollo}}")
+        assert acta_entrevista.template_format(TEMPLATE) == "entrevista"
+        assert acta_entrevista.template_format(TEMPLATE_REUNION) == "reunion"
+
+
+class TestActaDeReunion:
+    def test_hora_valida_o_la_de_la_reunion(self):
+        base = {"formato": "reunion", "fecha": "2026-10-06"}
+        assert acta_entrevista.normalize_fields({**base, "hora": "9:05"}, date(2026, 1, 1))["hora"] == "09:05"
+        assert acta_entrevista.normalize_fields({**base, "hora": "25:00"}, date(2026, 1, 1), "11:30")["hora"] == "11:30"
+        # El acta de entrevista no lleva hora.
+        assert "hora" not in acta_entrevista.normalize_fields({"hora": "10:00"}, date(2026, 1, 1))
+
+    def test_hora_en_hora_argentina(self):
+        assert acta_entrevista.meeting_time(datetime(2026, 10, 6, 14, 30, tzinfo=UTC)) == "11:30"
+
+    def test_markdown_con_el_parrafo_y_el_cierre_del_modelo(self):
+        fields = acta_entrevista.normalize_fields(
+            {
+                "formato": "reunion", "hora": "11:30", "fecha": "2026-10-06",
+                "con": "Roxana Pérez, madre del estudiante", "reunen": "Natalia Miranda, Directora del Nivel",
+                "desarrollo": "En el día de la fecha, se convoca a la familia.",
+            },
+            date(2026, 1, 1),
+        )
+        markdown = acta_entrevista.render_markdown(fields)
+        assert markdown.startswith("# ACTA DE REUNIÓN")
+        assert (
+            "A los 6 días del mes de octubre del 2026 en la sede de la institución, siendo las 11:30 hs, "
+            "se reúnen Roxana Pérez, madre del estudiante con Natalia Miranda, Directora del Nivel."
+        ) in markdown
+        assert markdown.rstrip().endswith("se firma el presente documento.")
+        assert "Solicitada por" not in markdown
+
+
+TEMPLATE_REUNION = "# ACTA DE REUNIÓN\n\nA las {{hora}} se reúnen {{con}} con {{reunen}} por {{alumno}}.\n\n{{desarrollo}}\n"
+
+
+def test_reunion_acta_generada_con_hora_y_editable(client, fake_ai):
+    owner = EchoTestUser(client, name="Directora", org_name="Colegio Reuniones")
+    saved = client.put(
+        "/api/org/minutes-template",
+        json={"name": "Acta de reunión", "body_markdown": TEMPLATE_REUNION},
+        headers=owner.headers,
+    )
+    assert saved.status_code == 200, saved.text
+    meeting_id = _finished_meeting(client, owner)
+    minutes = client.get(f"/api/meetings/{meeting_id}/minutes", headers=owner.headers).json()
+    fields = minutes["version"]["blocks"]["fields"]
+    assert fields["formato"] == "reunion"
+    assert len(fields["hora"]) == 5
+    assert minutes["version"]["body_markdown"].startswith("# ACTA DE REUNIÓN")
+
+    edited = client.post(
+        f"/api/meetings/{meeting_id}/minutes/versions",
+        json={"fields": {**fields, "hora": "11:30"}},
+        headers=owner.headers,
+    )
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["version"]["blocks"]["fields"]["hora"] == "11:30"
+    assert "siendo las 11:30 hs" in edited.json()["version"]["body_markdown"]

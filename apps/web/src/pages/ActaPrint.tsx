@@ -20,6 +20,7 @@ export const ACTA_FONT_CSS: Record<string, string> = {
   arial: 'Arial, Helvetica, "Liberation Sans", sans-serif',
   calibri: 'Calibri, Carlito, "Segoe UI", Arial, sans-serif',
   times: '"Times New Roman", Times, "Liberation Serif", serif',
+  trebuchet: '"Trebuchet MS", "Segoe UI", Arial, sans-serif',
 };
 
 export default function ActaPrint() {
