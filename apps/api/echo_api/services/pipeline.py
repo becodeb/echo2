@@ -30,6 +30,7 @@ configurado, las etapas de IA se saltean y quedan marcadas como "skipped"
 import asyncio
 import json
 import logging
+import time
 import uuid
 from datetime import UTC, datetime
 
@@ -60,6 +61,7 @@ from .insights_prompts import (
     build_final_extract_prompt,
     build_section_summary_prompt,
     build_summary_prompt,
+    language_name,
 )
 from .live_bus import live_bus
 from .llm import LLMError, get_llm_provider
@@ -71,7 +73,7 @@ from .minutes_gen import generate_minutes
 from .rag import embed_meeting_segments
 from .task_owner import task_owner
 from .insights_live import _is_duplicate
-from .transcript_util import format_ms, load_transcript_lines, transcript_to_text
+from .transcript_util import format_ms, is_grounded, load_transcript_lines, transcript_to_text
 
 log = logging.getLogger("echo.pipeline")
 
@@ -125,6 +127,13 @@ async def run_finalize_pipeline(meeting_id_str: str) -> None:
 
 async def _run(meeting_id: uuid.UUID) -> None:
     skipped: list[str] = []
+    # Cuánto tarda cada paso, en segundos desde "Finalizar": queda en
+    # processing_state["timings"] para medir (capacitación 26/10: "tarda mucho").
+    started = time.monotonic()
+    timings: dict[str, float] = {}
+
+    def mark(step: str) -> None:
+        timings[step] = round(time.monotonic() - started, 1)
 
     # 1. Quién habló: con el audio completo si se puede; si no, lo de siempre.
     await _set_stage(meeting_id, "speakers", 5)
@@ -136,6 +145,7 @@ async def _run(meeting_id: uuid.UUID) -> None:
         skipped.append("speakers:separacion_fallida")
     if not diarized:
         await consolidate_speakers(meeting_id)
+    mark("transcripcion")
 
     async with SessionLocal() as db:
         meeting = await db.get(Meeting, meeting_id)
@@ -146,7 +156,12 @@ async def _run(meeting_id: uuid.UUID) -> None:
         internal = meeting.kind == "interna"
         # Las internas solo arman acta si se pidió al crearlas (meta.minutes).
         wants_minutes = not internal or bool((meeting.meta or {}).get("minutes"))
-        language = meeting.language
+        # Resumen, tareas y acta van en el idioma de actas de la sede, aunque
+        # se haya hablado en otro (reuniones en inglés, un traductor).
+        from .ai_settings import get_org_ai_settings
+
+        ai_settings = await get_org_ai_settings(db, org_id)
+        language = language_name(ai_settings.minutes_language if ai_settings else None)
         reference_date = (meeting.started_at or meeting.created_at).date()
         llm_config = await resolve_llm(db, org_id)
         embeddings_config = await resolve_embeddings(db, org_id)
@@ -188,44 +203,55 @@ async def _run(meeting_id: uuid.UUID) -> None:
                         lines = await load_transcript_lines(db, meeting_id)
             except Exception as exc:  # noqa: BLE001 - sin nombres queda "Persona 1"
                 log.warning("nombres de hablantes fallaron meeting=%s: %s", meeting_id, exc)
+        mark("nombres")
 
-    # 2. Extracción estructurada final (+ resolución de fechas al persistir)
-    insights: dict = {}
-    if provider:
-        await _set_stage(meeting_id, "insights", 20)
-        try:
-            insights = await _extract_final(provider, lines, bookmarks_text)
-            await _persist_insights(meeting_id, insights, reference_date)
-        except LLMError as exc:
-            log.warning("extraccion final fallo: %s", exc)
-            skipped.append(f"insights:{exc}")
-    else:
-        skipped.append("insights:llm_no_configurado")
-
-    # 4. Acta: arranca apenas hay insights y corre en paralelo con embeddings y
-    #    resúmenes. Es lo primero que la persona quiere ver al terminar, así
-    #    que no espera a nada más. generate_minutes registra sus propias fallas.
+    # 2–6 en paralelo. Antes el acta esperaba a la extracción de tareas y
+    # decisiones, y eran dos llamadas largas a la IA una detrás de la otra con
+    # la familia esperando. El acta sale del transcript; lo estructurado que ya
+    # haya (lo detectado en vivo) le sirve de pista.
     minutes_task: asyncio.Task | None = None
     if not wants_minutes:
         pass  # interna sin acta: lo que se quiere es el resumen y poder preguntarle
     elif provider:
-        await _set_stage(meeting_id, "minutes", 30)
-        minutes_task = asyncio.create_task(generate_minutes(meeting_id, provider))
+        await _set_stage(meeting_id, "minutes", 20)
+
+        async def _minutes() -> None:
+            await generate_minutes(meeting_id, provider)
+            mark("acta")
+
+        minutes_task = asyncio.create_task(_minutes())
     else:
         skipped.append("minutes:llm_no_configurado")
 
-    # 5. Embeddings para RAG
-    if embeddings_config:
-        await _set_stage(meeting_id, "embeddings", 45)
+    async def _embeddings() -> None:
+        if not embeddings_config:
+            skipped.append("embeddings:no_configurado")
+            return
         try:
             await embed_meeting_segments(meeting_id, embeddings_config)
         except Exception as exc:
             log.warning("embeddings fallo: %s", exc)
             skipped.append(f"embeddings:{exc}")
-    else:
-        skipped.append("embeddings:no_configurado")
+        mark("embeddings")
 
-    # 6. Resúmenes
+    embeddings_task = asyncio.create_task(_embeddings())
+
+    # Extracción estructurada final (+ resolución de fechas al persistir)
+    insights: dict = {}
+    if provider:
+        try:
+            insights = await _extract_final(provider, lines, bookmarks_text, language)
+            # Solo tareas con la frase que las respalda (transcript_util.is_grounded).
+            insights["tasks"] = [item for item in insights.get("tasks") or [] if is_grounded(item, lines)]
+            await _persist_insights(meeting_id, insights, reference_date)
+        except LLMError as exc:
+            log.warning("extraccion final fallo: %s", exc)
+            skipped.append(f"insights:{exc}")
+        mark("tareas")
+    else:
+        skipped.append("insights:llm_no_configurado")
+
+    # Resúmenes (usan lo extraído para no contradecirlo), mientras el acta sigue.
     if provider:
         await _set_stage(meeting_id, "summary", 60)
         try:
@@ -233,8 +259,10 @@ async def _run(meeting_id: uuid.UUID) -> None:
         except LLMError as exc:
             log.warning("resumen fallo: %s", exc)
             skipped.append(f"summary:{exc}")
+        mark("resumen")
 
-    # 7. Esperar el acta si todavía no terminó (generación + verificación)
+    await embeddings_task
+    # Esperar el acta si todavía no terminó (generación + verificación)
     if minutes_task is not None:
         if not minutes_task.done():
             await _set_stage(meeting_id, "minutes", 75)
@@ -254,10 +282,12 @@ async def _run(meeting_id: uuid.UUID) -> None:
             log.warning("memoria fallo: %s", exc)
             skipped.append(f"memory:{exc}")
 
-    await _finish(meeting_id, skipped)
+    mark("total")
+    log.info("pipeline %s: %s", meeting_id, timings)
+    await _finish(meeting_id, skipped, timings)
 
 
-async def _finish(meeting_id: uuid.UUID, skipped: list[str]) -> None:
+async def _finish(meeting_id: uuid.UUID, skipped: list[str], timings: dict | None = None) -> None:
     async with SessionLocal() as db:
         meeting = await db.get(Meeting, meeting_id)
         if not meeting:
@@ -268,6 +298,7 @@ async def _finish(meeting_id: uuid.UUID, skipped: list[str]) -> None:
             "progress": 100,
             "skipped": skipped,
             "finished_at": datetime.now(UTC).isoformat(),
+            **({"timings": timings} if timings else {}),
         }
         # Avisar que está lista solo a quienes la pueden ver: el aviso lleva el
         # título, y el título ya dice de qué familia o tema fue.
@@ -358,11 +389,11 @@ async def consolidate_speakers(meeting_id: uuid.UUID) -> None:
 # ── Extracción final (single-pass o jerárquica) ──────────────────
 
 
-async def _extract_final(provider, lines: list[dict], bookmarks_text: str) -> dict:
+async def _extract_final(provider, lines: list[dict], bookmarks_text: str, language: str = "castellano") -> dict:
     full_text = transcript_to_text(lines)
     if len(full_text) <= SINGLE_PASS_CHAR_LIMIT:
         result = await provider.chat_json(
-            FINAL_EXTRACT_SYSTEM,
+            FINAL_EXTRACT_SYSTEM.format(language=language),
             [{"role": "user", "content": build_final_extract_prompt(full_text, bookmarks_text)}],
             temperature=0.1,
             max_tokens=8000,
@@ -380,7 +411,7 @@ async def _extract_final(provider, lines: list[dict], bookmarks_text: str) -> di
         section_text = transcript_to_text(section_lines)
         try:
             partial = await provider.chat_json(
-                FINAL_EXTRACT_SYSTEM,
+                FINAL_EXTRACT_SYSTEM.format(language=language),
                 [{"role": "user", "content": build_final_extract_prompt(section_text, bookmarks_text)}],
                 temperature=0.1,
                 max_tokens=8000,
@@ -435,12 +466,13 @@ async def _persist_insights(meeting_id: uuid.UUID, insights: dict, reference_dat
         for model in (MeetingTopic, Decision, Question, Risk):
             await db.execute(delete(model).where(model.meeting_id == meeting_id))
         # Las tareas en vivo pueden tener estado cambiado (o estar repartidas)
-        # a mano: solo borrar las "ai" intactas. Repartir una la pasa a "manual".
+        # a mano: solo borrar las "ai" intactas. Repartir o confirmar una la
+        # pasa a "manual"; las descartadas quedan para no volver a sugerirlas.
         await db.execute(
             delete(ActionItem).where(
                 ActionItem.meeting_id == meeting_id,
                 ActionItem.source == "ai",
-                ActionItem.status == "pending",
+                ActionItem.status.in_(("pending", "suggested")),
             )
         )
 
@@ -483,10 +515,12 @@ async def _persist_insights(meeting_id: uuid.UUID, insights: dict, reference_dat
         kept = list(
             (await db.execute(select(ActionItem.text).where(ActionItem.meeting_id == meeting_id))).scalars().all()
         )
+        suggested = 0
         for item in insights.get("tasks", []) or []:
             text = str(item.get("text", "")).strip()
             if not text or _is_duplicate(text, kept):
                 continue
+            suggested += 1
             assignee = (str(item.get("assignee") or "").strip() or None)
             due_text = item.get("due")
             db.add(
@@ -501,6 +535,19 @@ async def _persist_insights(meeting_id: uuid.UUID, insights: dict, reference_dat
                     due_date=resolve_relative_date(due_text, reference_date),
                     evidence_start_ms=_ms(item.get("evidence_start_ms")),
                     evidence_end_ms=_ms(item.get("evidence_end_ms")),
+                    # La IA se equivoca: una persona la confirma antes de que cuente.
+                    status="suggested",
+                )
+            )
+        if suggested and owner_id:
+            db.add(
+                Notification(
+                    user_id=owner_id,
+                    organization_id=org_id,
+                    kind="tasks_suggested",
+                    title=f"Echo sugirió {suggested} {'tarea' if suggested == 1 else 'tareas'} en «{meeting.title}»",
+                    body="Confirmá las que correspondan; hasta entonces no se asignan ni aparecen en Mi trabajo.",
+                    link=f"/meetings/{meeting_id}?tab=tasks",
                 )
             )
         for item in insights.get("questions", []) or []:
@@ -580,7 +627,7 @@ async def _generate_summaries(
         await db.execute(
             delete(MeetingSummary).where(
                 MeetingSummary.meeting_id == meeting_id,
-                MeetingSummary.kind.in_(["executive", "detailed"]),
+                MeetingSummary.kind.in_(["executive", "detailed", "by_person"]),
             )
         )
         model_name = getattr(provider, "model", provider.name)
@@ -596,6 +643,19 @@ async def _generate_summaries(
                 MeetingSummary(
                     meeting_id=meeting_id, organization_id=org_id, kind="detailed",
                     content={"markdown": result["detailed"]}, model_used=model_name,
+                )
+            )
+        # "Qué dijo cada uno": lo pidió Karina para las reuniones de equipo (26/10).
+        people = [
+            {"name": str(entry.get("persona") or "").strip()[:200], "points": [str(p) for p in entry.get("puntos") or []][:8]}
+            for entry in result.get("by_person") or []
+            if isinstance(entry, dict) and entry.get("persona") and entry.get("puntos")
+        ]
+        if people:
+            db.add(
+                MeetingSummary(
+                    meeting_id=meeting_id, organization_id=org_id, kind="by_person",
+                    content={"people": people}, model_used=model_name,
                 )
             )
         await db.commit()

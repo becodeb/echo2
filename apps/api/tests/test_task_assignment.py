@@ -33,9 +33,13 @@ def test_echo_tasks_go_to_who_recorded_and_can_be_handed_out(client):
     assert coordinar["assignee_user_id"] == owner.user_id and coordinar["assignee_name"] == "Bauti Goñi"
     assert coordinar["suggested_assignee"] == "Directora"
     assert tasks["Mandar el informe a la familia"]["suggested_assignee"] is None
-    # Todas en "Mi trabajo" de quien grabó.
+    # Llegan sugeridas: no están en "Mi trabajo" hasta que alguien las confirma.
+    assert {t["status"] for t in tasks.values()} == {"suggested"}
+    assert client.get("/api/tasks/my-work", headers=owner.headers).json()["tasks"] == []
+    confirmed = client.patch(f"/api/tasks/{tasks['Mandar el informe a la familia']['id']}", json={"status": "pending"}, headers=owner.headers)
+    assert confirmed.status_code == 200 and confirmed.json()["source"] == "manual"
     mine = {t["text"] for t in client.get("/api/tasks/my-work", headers=owner.headers).json()["tasks"]}
-    assert mine == set(tasks)
+    assert mine == {"Mandar el informe a la familia"}
 
     # La reparte: pasa a la directora con su nombre, y le llega el aviso.
     handed = client.patch(f"/api/tasks/{coordinar['id']}", json={"assignee_user_id": directora.user_id}, headers=owner.headers)

@@ -15,7 +15,12 @@ export const meetingQuery = (id: string) => ({
 export const summaryQuery = (id: string) => ({
   queryKey: ["summary", id] as const,
   queryFn: () =>
-    api<Record<string, { content: { points?: string[]; markdown?: string } }>>(`/api/meetings/${id}/summary`),
+    api<
+      Record<
+        string,
+        { content: { points?: string[]; markdown?: string; people?: { name: string; points: string[] }[] } }
+      >
+    >(`/api/meetings/${id}/summary`),
 });
 
 export const insightsQuery = (id: string) => ({

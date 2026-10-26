@@ -90,6 +90,8 @@ export interface MeetingOut {
     /** Se pidió separar quién habló / hablan menores (NewMeetingModal). */
     people?: boolean;
     minors?: boolean;
+    /** Entre las dos sedes: el acta sale sin el formato de ninguna. */
+    intersede?: boolean;
     /** pending: ElevenLabs falló y se reintenta solo (services/diarization.py). */
     people_status?: "pending" | "done" | "failed" | "skipped";
     /** pending: Groq no respondió en la pasada final y se reintenta solo. */
@@ -203,7 +205,8 @@ export interface TaskOut {
   suggested_assignee?: string | null;
   due_text: string | null;
   due_date: string | null;
-  status: "pending" | "in_progress" | "done" | "cancelled";
+  /** suggested: la detectó Echo y nadie la confirmó; dismissed: descartada. */
+  status: "suggested" | "pending" | "in_progress" | "done" | "cancelled" | "dismissed";
   source: string;
   meeting_id: string | null;
   meeting_title: string | null;
@@ -308,6 +311,9 @@ export interface FamilyMemberOut {
   is_guardian: boolean;
   email: string | null;
   phone: string | null;
+  /** Estudiantes: curso ("3N EP") y nivel. */
+  curso?: string | null;
+  level?: string | null;
 }
 
 export interface ProfessionalOut {
@@ -405,6 +411,8 @@ export interface ClassificationOut {
   attendance: AttendanceRow[];
   /** null = no hay registro de asistencia, que no es lo mismo que "faltaron". */
   all_guardians_present: boolean | null;
+  /** De qué hijo(s) de la familia es la reunión. */
+  student_ids: string[];
 }
 
 export interface ReportOut {

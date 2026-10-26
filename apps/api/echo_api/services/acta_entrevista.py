@@ -80,6 +80,40 @@ FIELDS_SPEC_REUNION = """Campos del acta de reunión (todos texto plano):
   lo agrega el formulario."""
 
 
+def initials(name: str) -> str:
+    """Iniciales del alumno para el acta: "MUNAFO, Allegra" o "Allegra Munafo" → "A. M.".
+
+    El acta lleva solo las iniciales (pedido de Northfield, 26/10): el nombre
+    completo queda en Echo pero no sale impreso.
+    """
+    name = " ".join((name or "").split())
+    if "," in name:
+        surnames, given = name.split(",", 1)
+        words = given.split() + surnames.split()
+    else:
+        words = name.split()
+    return " ".join(f"{word[0].upper()}." for word in words if word[:1].isalpha())
+
+
+def hide_student_names(text: str, students: list[tuple[str, str]]) -> str:
+    """Reemplaza en el texto del acta cada forma del nombre del alumno por sus iniciales.
+
+    `students`: [(nombre como se cargó, iniciales)]. Cubre "Nombre Apellido",
+    "APELLIDO, Nombre", "Apellido" solo y "Nombre" solo, sin distinguir mayúsculas.
+    """
+    for full, short in students:
+        full = " ".join(full.split())
+        if "," in full:
+            surnames, given = (part.strip() for part in full.split(",", 1))
+        else:
+            parts = full.split()
+            given, surnames = " ".join(parts[:1]), " ".join(parts[1:])
+        variants = [full, f"{given} {surnames}".strip(), f"{surnames}, {given}".strip(", "), surnames, given]
+        for variant in sorted({v for v in variants if len(v) >= 3}, key=len, reverse=True):
+            text = re.sub(rf"(?<!\w){re.escape(variant)}(?!\w)", short, text, flags=re.IGNORECASE)
+    return text
+
+
 def is_interview_template(body_markdown: str | None) -> bool:
     return "{{alumno}}" in (body_markdown or "")
 

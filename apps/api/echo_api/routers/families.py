@@ -7,7 +7,7 @@ práctica se completa de una sola sentada, al terminar la reunión.
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -17,6 +17,7 @@ from ..db import get_db
 from ..deps import OrgContext, can_edit_meeting, get_meeting_or_404, get_org_context
 from ..models import (
     AUDIENCES,
+    LEVELS,
     RELATIONSHIPS,
     SEVERITIES,
     Family,
@@ -50,6 +51,8 @@ class FamilyMemberOut(BaseModel):
     is_guardian: bool
     email: str | None
     phone: str | None
+    curso: str | None = None
+    level: str | None = None
 
     class Config:
         from_attributes = True
@@ -127,6 +130,9 @@ class FamilyMemberIn(BaseModel):
     is_guardian: bool = True
     email: str | None = Field(default=None, max_length=320)
     phone: str | None = Field(default=None, max_length=40)
+    # Estudiantes: curso y nivel.
+    curso: str | None = Field(default=None, max_length=60)
+    level: str | None = Field(default=None, max_length=20)
 
 
 class ReasonIn(BaseModel):
@@ -146,6 +152,8 @@ class ClassificationIn(BaseModel):
     # Ids de los integrantes que asistieron. Mandar la lista completa: lo que
     # no viene se marca como ausente.
     attended_member_ids: list[uuid.UUID] | None = None
+    # De qué hijo(s) es la reunión (integrantes "estudiante" de la familia).
+    student_ids: list[uuid.UUID] | None = None
 
 
 class ClassificationOut(BaseModel):
@@ -159,6 +167,8 @@ class ClassificationOut(BaseModel):
     attendance: list[dict]
     all_guardians_present: bool | None
     professionals: list[dict] = []
+    # De qué hijo(s) de la familia es la reunión.
+    student_ids: list[uuid.UUID] = []
 
 
 # ── Familias ─────────────────────────────────────────────────────
@@ -313,6 +323,56 @@ async def set_family_assignees(
     )
 
 
+# Una planilla de toda la escuela entra holgada; más que esto no es una nómina.
+IMPORT_MAX_BYTES = 5 * 1024 * 1024
+
+
+@router.post("/api/families/import")
+async def import_families(
+    file: UploadFile = File(...),
+    preview: bool = Query(default=True),
+    ctx: OrgContext = Depends(get_org_context),
+    db: AsyncSession = Depends(get_db),
+):
+    """Familias y alumnos desde el CSV del colegio (services/family_import.py).
+
+    Primero se llama con preview=true (no guarda: muestra qué va a crear) y
+    después con preview=false. Lo hacen los directivos o quien administra.
+    """
+    from ..services.family_import import apply_import, parse_csv
+    from ..services.privacy import forget_org_cache
+
+    if scope_rank(await ctx.scope(db)) < RANK_DIRECTIVO:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Importan familias los directivos de la sede")
+    data = await file.read(IMPORT_MAX_BYTES + 1)
+    if len(data) > IMPORT_MAX_BYTES:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "El archivo es demasiado grande (máximo 5 MB)")
+    try:
+        parsed = parse_csv(data)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+    counts = await apply_import(db, ctx.org_id, parsed, write=not preview)
+    out = {
+        **counts,
+        "skipped_rows": parsed.skipped,
+        "columns": parsed.columns,
+        "sample": [
+            {
+                "name": family.name,
+                "students": [f"{s['name']}{' · ' + s['curso'] if s['curso'] else ''}" for s in family.students],
+                "guardians": [g["name"] for g in family.guardians],
+            }
+            for family in parsed.families[:5]
+        ],
+    }
+    if not preview:
+        await audit(db, ctx.org_id, ctx.user.id, "family.import", "organization", str(ctx.org_id),
+                    detail={**counts, "file": (file.filename or "")[:120]})
+        await db.commit()
+        forget_org_cache(ctx.org_id)  # los nombres nuevos se protegen desde ya
+    return out
+
+
 @router.post("/api/families", response_model=FamilyOut, status_code=201)
 async def create_family(
     data: FamilyIn,
@@ -404,6 +464,8 @@ async def add_member(
         is_guardian=data.is_guardian,
         email=(data.email or "").strip() or None,
         phone=(data.phone or "").strip() or None,
+        curso=(data.curso or "").strip() or None,
+        level=data.level if data.level in LEVELS else None,
     )
     db.add(member)
     await db.flush()
@@ -430,6 +492,8 @@ async def update_member(
     member.is_guardian = data.is_guardian
     member.email = (data.email or "").strip() or None
     member.phone = (data.phone or "").strip() or None
+    member.curso = (data.curso or "").strip() or None
+    member.level = data.level if data.level in LEVELS else None
     await db.commit()
     return FamilyMemberOut.model_validate(member)
 
@@ -903,6 +967,7 @@ async def _classification_out(meeting: Meeting, db: AsyncSession) -> Classificat
         attendance=attendance,
         all_guardians_present=all_present,
         professionals=professionals,
+        student_ids=[uuid.UUID(student_id) for student_id in meeting.student_ids or []],
     )
 
 
@@ -941,6 +1006,22 @@ async def set_classification(
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Motivo no encontrado")
 
     family_changed = data.family_id != meeting.family_id
+    if data.student_ids is not None or family_changed:
+        wanted_students = set(data.student_ids or [])
+        valid = set()
+        if wanted_students and data.family_id:
+            valid = set(
+                (
+                    await db.execute(
+                        select(FamilyMember.id).where(
+                            FamilyMember.family_id == data.family_id, FamilyMember.id.in_(wanted_students)
+                        )
+                    )
+                ).scalars()
+            )
+        if valid != wanted_students:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Ese alumno no es de la familia")
+        meeting.student_ids = sorted(str(student_id) for student_id in valid) or None
     folder_changed = family_changed or data.reason_id != meeting.reason_id
     meeting.family_id = data.family_id
     meeting.reason_id = data.reason_id

@@ -167,7 +167,8 @@ class SmartFakeLLM:
                          "evidence_start_ms": 4000, "evidence_end_ms": 6000}
                     ],
                     "tasks": [
-                        {"text": "Pedir tres presupuestos", "assignee": "Marcos", "due": "viernes",
+                        {"text": "Pedir tres presupuestos", "quote": "Yo puedo pedir los presupuestos, los pido el viernes",
+                         "assignee": "Marcos", "due": "viernes",
                          "evidence_start_ms": 2000, "evidence_end_ms": 4000}
                     ],
                     "questions": [{"text": "¿Cuánto cuesta la licencia anual?", "evidence_start_ms": 6000, "evidence_end_ms": 7000}],

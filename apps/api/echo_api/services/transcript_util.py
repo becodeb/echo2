@@ -1,10 +1,47 @@
 """Utilidades compartidas sobre el transcript."""
+import re
+import unicodedata
 import uuid
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import Speaker, TranscriptSegment
+
+
+def _words(text: str) -> list[str]:
+    plain = unicodedata.normalize("NFD", (text or "").lower())
+    plain = "".join(char for char in plain if unicodedata.category(char) != "Mn")
+    # Los marcadores de seudónimos ([PERSONA_3]) no cuentan: el transcript tiene el nombre.
+    plain = re.sub(r"\[[^\]]*\]", " ", plain)
+    return [word for word in re.findall(r"[a-z0-9]+", plain) if len(word) >= 3]
+
+
+# Ventana alrededor de la evidencia donde tiene que estar la frase citada.
+QUOTE_WINDOW_MS = 120_000
+
+
+def is_grounded(item: dict, lines: list[dict]) -> bool:
+    """La tarea trae una cita ("quote") que de verdad se dijo cerca de su evidencia.
+
+    Las tareas inventadas (26/10: "generó tareas no reales") salían de temas
+    de la charla convertidos en pendientes. Sin una frase que lo muestre, no
+    hay tarea: alcanza con que el 70% de sus palabras estén en lo que se dijo
+    en los dos minutos alrededor.
+    """
+    quote = _words(str(item.get("quote") or ""))
+    if len(quote) < 2:
+        return False
+    try:
+        at = int(item.get("evidence_start_ms")) if item.get("evidence_start_ms") is not None else None
+    except (TypeError, ValueError):
+        at = None
+    window = [
+        line for line in lines
+        if at is None or abs((line.get("start_ms") or 0) - at) <= QUOTE_WINDOW_MS
+    ] or lines
+    said = set(_words(" ".join(str(line.get("text") or "") for line in window)))
+    return sum(word in said for word in quote) / len(quote) >= 0.7
 
 
 def format_ms(ms: int | None) -> str:

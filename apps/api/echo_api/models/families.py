@@ -95,6 +95,11 @@ class FamilyMember(PKMixin, TimestampMixin, Base):
     is_guardian: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     email: Mapped[str | None] = mapped_column(String(320))
     phone: Mapped[str | None] = mapped_column(String(40))
+    # Solo para estudiantes: curso ("3N EP") y nivel (inicial|primaria|secundaria).
+    # Una familia puede tener varios hijos; cada reunión dice de cuál es
+    # (Meeting.student_ids) y eso va al acta con iniciales y curso.
+    curso: Mapped[str | None] = mapped_column(String(60))
+    level: Mapped[str | None] = mapped_column(String(20))
 
     family: Mapped["Family"] = relationship(back_populates="members")
 

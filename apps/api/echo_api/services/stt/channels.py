@@ -273,6 +273,30 @@ _SOUND_WORDS = {
 }
 _LATIN_LANGUAGES = {"es", "en", "pt", "it", "fr", "de"}
 
+# "Varios idiomas": la reunión mezcla castellano con inglés, o hay alguien que
+# habla ruso con un traductor (capacitación de Northfield, 26/10).
+MULTI = "multi"
+
+
+def stt_language(meeting_language: str | None) -> str | None:
+    """El idioma que se le pide al motor de transcripción.
+
+    Con "auto" (lo viejo) se fija castellano: Whisper adivinando tramo a tramo
+    escribía en árabe sobre el ruido. Con "varios idiomas" no se fija ninguno
+    (None): cada tramo sale en el idioma en que se habló, y el filtro de ruido
+    deja pasar también el cirílico y el griego.
+    """
+    if meeting_language == MULTI:
+        return None
+    if not meeting_language or meeting_language == "auto":
+        return "es"
+    return meeting_language
+
+
+def _readable(char: str) -> bool:
+    code = ord(char)
+    return code < 0x250 or 0x370 <= code <= 0x52F  # latino, griego y cirílico
+
 
 def is_noise_transcript(text: str, language: str | None) -> bool:
     """Texto que no puede ser lo que se dijo en una reunión en ese idioma.
@@ -280,15 +304,20 @@ def is_noise_transcript(text: str, language: str | None) -> bool:
     En una reunión en castellano, un tramo escrito en otro alfabeto (árabe,
     chino, hebreo, cirílico, cingalés...) es el modelo adivinando sobre ruido,
     no alguien que habló. Lo mismo una sola palabra que describe un sonido.
+    Con varios idiomas (`language` None) pasan también el cirílico y el griego.
     """
     stripped = text.strip().strip(".,;:!?¡¿。、…").strip()
     if not stripped:
         return True
     if stripped.lower() in _SOUND_WORDS:
         return True
-    if (language or "es") not in _LATIN_LANGUAGES:
-        return False
     letters = [char for char in stripped if char.isalpha()]
+    if language is None or language == MULTI:
+        if not letters:
+            return True
+        return sum(1 for char in letters if _readable(char)) / len(letters) < 0.5
+    if language not in _LATIN_LANGUAGES:
+        return False
     if not letters:
         return True
     latin = sum(1 for char in letters if ord(char) < 0x250)

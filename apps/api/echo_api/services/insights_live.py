@@ -14,12 +14,12 @@ from ..db import SessionLocal
 from ..models import ActionItem, Decision, Meeting, Question, TranscriptSegment
 from .ai_settings import resolve_llm
 from .dates import resolve_relative_date
-from .insights_prompts import LIVE_EXTRACT_SYSTEM, build_live_extract_prompt
+from .insights_prompts import LIVE_EXTRACT_SYSTEM, build_live_extract_prompt, language_name
 from .live_bus import live_bus
 from .llm import LLMError, get_llm_provider
 from .privacy import protect
 from .task_owner import task_owner
-from .transcript_util import load_transcript_lines, transcript_to_text
+from .transcript_util import is_grounded, load_transcript_lines, transcript_to_text
 
 log = logging.getLogger("echo.insights")
 
@@ -46,6 +46,10 @@ async def _extract(meeting_id: str) -> None:
         config = await resolve_llm(db, meeting.organization_id)
         if config is None:
             return  # sin LLM configurado: la UI muestra "IA no configurada"
+        from .ai_settings import get_org_ai_settings
+
+        ai_settings = await get_org_ai_settings(db, meeting.organization_id)
+        language = language_name(ai_settings.minutes_language if ai_settings else None)
 
         state = meeting.processing_state or {}
         last_seq = int(state.get("live_extract_seq", 0))
@@ -87,7 +91,7 @@ async def _extract(meeting_id: str) -> None:
     prompt = build_live_extract_prompt(window_text, list(existing_decisions), list(existing_tasks))
     try:
         result = await provider.chat_json(
-            LIVE_EXTRACT_SYSTEM, [{"role": "user", "content": prompt}], temperature=0.1
+            LIVE_EXTRACT_SYSTEM.format(language=language), [{"role": "user", "content": prompt}], temperature=0.1
         )
     except LLMError as exc:
         log.warning("live extract llm error: %s", exc)
@@ -122,7 +126,7 @@ async def _extract(meeting_id: str) -> None:
 
         for item in result.get("tasks", []) or []:
             text = str(item.get("text", "")).strip()
-            if not text or _is_duplicate(text, existing_tasks):
+            if not text or _is_duplicate(text, existing_tasks) or not is_grounded(item, lines):
                 continue
             due_text = item.get("due")
             assignee = str(item.get("assignee") or "").strip() or None
@@ -138,6 +142,7 @@ async def _extract(meeting_id: str) -> None:
                     due_date=resolve_relative_date(due_text, reference_date),
                     evidence_start_ms=_ms(item.get("evidence_start_ms")),
                     evidence_end_ms=_ms(item.get("evidence_end_ms")),
+                    status="suggested",
                 )
             )
             new_counts["tasks"] += 1

@@ -32,6 +32,7 @@ from ..models import (
     Question,
 )
 from . import acta_entrevista
+from .insights_prompts import language_name
 from .llm import LLMError, LLMProvider
 from .transcript_util import format_ms, load_transcript_lines, transcript_to_text
 
@@ -97,6 +98,37 @@ Respondé JSON: {"status": "verified"|"weak"|"missing", "evidence_ms": <int o nu
 - verified: el transcript la respalda claramente.
 - weak: hay algo relacionado pero no es concluyente.
 - missing: no hay evidencia en el transcript."""
+
+
+# Reuniones entre las dos sedes (Nordelta y Puertos): el acta sale con el
+# modelo genérico de Echo, sin el formulario de ninguna sede.
+INTERSEDE_TEMPLATE_NAME = "Intersede (sin formato de sede)"
+
+
+async def template_for(db, meeting: Meeting) -> MinutesTemplate:
+    """El modelo de acta de esta reunión: el de la sede, o el genérico si es intersede."""
+    if not (meeting.meta or {}).get("intersede"):
+        return await get_active_template(db, meeting.organization_id)
+    template = (
+        await db.execute(
+            select(MinutesTemplate).where(
+                MinutesTemplate.organization_id == meeting.organization_id,
+                MinutesTemplate.name == INTERSEDE_TEMPLATE_NAME,
+            )
+        )
+    ).scalars().first()
+    if template is None:
+        template = MinutesTemplate(
+            organization_id=meeting.organization_id,
+            name=INTERSEDE_TEMPLATE_NAME,
+            body_markdown=DEFAULT_TEMPLATE,
+            is_default=False,
+            is_provisional=False,
+        )
+        db.add(template)
+        await db.commit()
+        await db.refresh(template)
+    return template
 
 
 async def get_active_template(db, org_id: uuid.UUID) -> MinutesTemplate:
@@ -200,7 +232,7 @@ async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instru
         if not meeting:
             return
         org_id = meeting.organization_id
-        template = await get_active_template(db, org_id)
+        template = await template_for(db, meeting)
         lines = await load_transcript_lines(db, meeting_id)
         participants = (
             (
@@ -217,7 +249,11 @@ async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instru
             .all()
         )
         tasks = (
-            (await db.execute(select(ActionItem).where(ActionItem.meeting_id == meeting_id)))
+            (
+                await db.execute(
+                    select(ActionItem).where(ActionItem.meeting_id == meeting_id, ActionItem.status != "dismissed")
+                )
+            )
             .scalars()
             .all()
         )
@@ -234,7 +270,9 @@ async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instru
         from .ai_settings import get_org_ai_settings
 
         ai_settings = await get_org_ai_settings(db, org_id)
-        language = ai_settings.minutes_language if ai_settings else meeting.language
+        # El acta sale en el idioma de actas de la sede aunque se haya
+        # hablado en otro ("varios idiomas": inglés, un traductor).
+        language = language_name(ai_settings.minutes_language if ai_settings else None)
 
         # Lo que se cargó a mano en la clasificación vale más que lo que el
         # modelo pueda deducir del audio: va como pista explícita.
@@ -243,6 +281,9 @@ async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instru
             reason = await db.get(MeetingReason, meeting.reason_id)
             reason_name = reason.name if reason else None
         family_hint = None
+        # De qué hijo(s) es la reunión: lo eligió quien la creó; si la familia
+        # tiene un solo estudiante, es ese. Van al acta con iniciales y curso.
+        students: list[FamilyMember] = []
         if meeting.family_id:
             family = await db.get(Family, meeting.family_id)
             if family is not None:
@@ -251,10 +292,21 @@ async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instru
                     .scalars()
                     .all()
                 )
+                chosen = {str(student_id) for student_id in meeting.student_ids or []}
+                kids = [m for m in members if m.relationship_type == "estudiante"]
+                students = [m for m in kids if str(m.id) in chosen] or (kids if len(kids) == 1 else [])
                 family_hint = {
                     "familia": family.name,
-                    "integrantes": [{"nombre": m.name, "vinculo": m.relationship_type} for m in members],
+                    "integrantes": [
+                        {"nombre": m.name, "vinculo": m.relationship_type, **({"curso": m.curso} if m.curso else {})}
+                        for m in members
+                    ],
                 }
+                if students:
+                    family_hint["alumno_de_la_reunion"] = [
+                        {"iniciales": acta_entrevista.initials(m.name), **({"curso": m.curso} if m.curso else {})}
+                        for m in students
+                    ]
 
     # El pipeline no pasa por el endpoint de regenerar: sin esto la pantalla
     # dice "todavía no hay acta" mientras el acta se está escribiendo.
@@ -288,12 +340,19 @@ async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instru
         ],
         "pendientes": [q.text for q in questions if not q.resolved],
     }
+    if students:
+        # Cargado por quien creó la reunión: el acta nombra al alumno solo así.
+        structured["alumno"] = [
+            {"iniciales": acta_entrevista.initials(m.name), **({"curso": m.curso} if m.curso else {})}
+            for m in students
+        ]
 
     if acta_entrevista.is_interview_template(template.body_markdown):
         fecha = acta_entrevista.meeting_date(meeting.started_at or meeting.created_at)
         hora = acta_entrevista.meeting_time(meeting.started_at or meeting.created_at)
         formato = acta_entrevista.template_format(template.body_markdown)
         hints = {**structured, "motivo_cargado": reason_name, "familia_cargada": family_hint}
+        hidden = [(m.name, acta_entrevista.initials(m.name)) for m in students]
         result = await provider.chat_json(
             acta_entrevista.GENERATOR_SYSTEM.format(language=language),
             [
@@ -329,12 +388,23 @@ Devolvé JSON:
         # es: va como figura en la nómina ("MUNAFO, Allegra") y con su curso.
         pseudonymizer = getattr(provider, "pseudonymizer", None)
         student = pseudonymizer.person_for_token_text(fields["alumno"]) if pseudonymizer else None
-        if student is not None:
-            fields["alumno"] = student.formal or student.display
+        if students:
+            # Lo cargado gana: el alumno elegido al crear la reunión, con su curso.
+            fields["alumno"] = ", ".join(acta_entrevista.initials(m.name) for m in students)
+            cursos = [m.curso for m in students if m.curso]
+            if cursos:
+                fields["curso"] = ", ".join(dict.fromkeys(cursos))
+        elif student is not None:
+            full = student.formal or student.display
+            fields["alumno"] = acta_entrevista.initials(full)
+            hidden.append((full, fields["alumno"]))
             # El curso de la nómina ("1F EP") gana sobre cómo se dijo en voz
             # alta ("primero F"): es el formato del registro del colegio.
             if student.extra.get("curso"):
                 fields["curso"] = str(student.extra["curso"])
+        # El acta nombra al alumno solo con sus iniciales, también en el desarrollo.
+        for key in ("desarrollo", "con", "reunen", "motivo"):
+            fields[key] = acta_entrevista.hide_student_names(fields[key], hidden)
         await _publish_and_verify(
             meeting_id, org_id, template.id, acta_entrevista.render_markdown(fields),
             acta_entrevista.to_blocks(fields), result, lines, provider, instructions,
@@ -367,8 +437,12 @@ Devolvé JSON:
     if not isinstance(result, dict) or not result.get("markdown"):
         raise LLMError("El generador de actas no devolvió contenido")
 
+    # El acta nombra al alumno solo con sus iniciales.
+    markdown = acta_entrevista.hide_student_names(
+        str(result["markdown"]), [(m.name, acta_entrevista.initials(m.name)) for m in students]
+    )
     await _publish_and_verify(
-        meeting_id, org_id, template.id, str(result["markdown"]), None, result, lines, provider, instructions
+        meeting_id, org_id, template.id, markdown, None, result, lines, provider, instructions
     )
 
 

@@ -76,6 +76,8 @@ class MeetingCreateIn(BaseModel):
     people: bool = False
     # Hablan alumnos menores de 18: la reunión nunca va a ElevenLabs.
     minors: bool = False
+    # Entre las dos sedes: el acta sale sin el formulario de ninguna.
+    intersede: bool = False
 
 
 class ParticipantOut(BaseModel):
@@ -298,6 +300,7 @@ async def create_meeting(
             **({"minutes": data.minutes} if data.kind == "interna" else {}),
             **({"people": True} if data.people else {}),
             **({"minors": True} if data.minors else {}),
+            **({"intersede": True} if data.intersede else {}),
         },
         level=level,
         kind=data.kind,

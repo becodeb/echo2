@@ -60,6 +60,7 @@ from ..services.stt.channels import (
     repeats_previous,
     split_channels,
     strip_hallucinations,
+    stt_language,
 )
 
 log = logging.getLogger("echo.live")
@@ -232,9 +233,10 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
     # El último tramo guardado: un tramo que lo repite entero es el modelo
     # devolviendo lo anterior, no alguien que habló.
     previous_text = ""
-    # Idioma fijo: con "auto", Whisper adivina el idioma de cada tramo y sobre
-    # ruido escribe en árabe o en inglés.
-    language = meeting.language if meeting.language and meeting.language != "auto" else "es"
+    # Idioma fijo salvo "varios idiomas" (services/stt/channels.stt_language):
+    # con "auto", Whisper adivina el idioma de cada tramo y sobre ruido
+    # escribe en árabe o en inglés.
+    language = stt_language(meeting.language)
     # Control de ritmo: cuánto audio llegó desde que empezó a llegar.
     audio_started_at: float | None = None
     audio_received_ms = 0

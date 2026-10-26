@@ -82,6 +82,10 @@ class Meeting(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
     # Carpeta "fecha — motivo" de la reunión en el Drive de la sede, dentro de
     # la de su familia: ahí van el acta y la grabación (services/drive.py).
     drive_folder_id: Mapped[str | None] = mapped_column(String(120))
+    # De qué hijo(s) de la familia es la reunión (ids de FamilyMember). Lo
+    # elige quien la crea: el acta lleva sus iniciales y curso aunque nadie
+    # los diga en voz alta.
+    student_ids: Mapped[list | None] = mapped_column(JSONB)
 
     participants: Mapped[list["MeetingParticipant"]] = relationship(
         back_populates="meeting", cascade="all, delete-orphan"

@@ -147,7 +147,13 @@ async def update_memory_from_meeting(
 
         # tareas → relación "assigned" a la persona responsable
         tasks = (
-            (await db.execute(select(ActionItem).where(ActionItem.meeting_id == meeting_id)))
+            (
+                await db.execute(
+                    select(ActionItem).where(
+                        ActionItem.meeting_id == meeting_id, ActionItem.status.not_in(("suggested", "dismissed"))
+                    )
+                )
+            )
             .scalars()
             .all()
         )

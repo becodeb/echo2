@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { FamilyMemberOut, FamilyOut, ProfessionalOut } from "../api/types";
 import { FamilyMeetingsPanel } from "../components/FamilyMeetingsPanel";
+import { FamilyImportButton } from "../components/FamilyImport";
 import { PeoplePicker } from "../components/PeoplePicker";
 import { useMyAccess } from "../state/access";
 import { Select } from "../components/Select";
@@ -66,6 +67,7 @@ function FamilyDetail({ family }: { family: FamilyOut }) {
   const [relationship, setRelationship] =
     useState<FamilyMemberOut["relationship_type"]>("madre");
   const [drive, setDrive] = useState(family.drive_url ?? "");
+  const [curso, setCurso] = useState("");
   const [linking, setLinking] = useState("");
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["families"] });
@@ -85,10 +87,12 @@ function FamilyDetail({ family }: { family: FamilyOut }) {
           // El estudiante no es responsable: su ausencia no cuenta como
           // "faltó un tutor".
           is_guardian: relationship !== "estudiante",
+          curso: relationship === "estudiante" ? curso.trim() || null : null,
         }),
       }),
     onSuccess: () => {
       setName("");
+      setCurso("");
       setRelationship("madre");
       invalidate();
     },
@@ -182,6 +186,7 @@ function FamilyDetail({ family }: { family: FamilyOut }) {
                 <Badge tone={member.is_guardian ? "indigo" : "gray"}>
                   {member.relationship_type}
                 </Badge>
+                {member.curso && <Badge tone="sky">{member.curso}</Badge>}
                 <button
                   onClick={() => removeMember.mutate(member.id)}
                   className="ml-auto text-xs text-ink-400 hover:text-red-600"
@@ -217,6 +222,11 @@ function FamilyDetail({ family }: { family: FamilyOut }) {
             }))}
             className="w-36"
           />
+          {relationship === "estudiante" && (
+            <div className="w-28">
+              <Input placeholder="Curso" aria-label="Curso" value={curso} onChange={(event) => setCurso(event.target.value)} />
+            </div>
+          )}
           <Button type="submit" variant="soft" disabled={addMember.isPending}>
             {addMember.isPending ? <Spinner /> : "Agregar"}
           </Button>
@@ -460,7 +470,12 @@ export default function Families() {
     <div className="mx-auto max-w-4xl space-y-5 px-6 py-10">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight text-ink-900">Familias</h1>
-        {tab === "familias" && <Button onClick={() => setCreating(true)}>Nueva familia</Button>}
+        {tab === "familias" && (
+          <div className="flex flex-wrap gap-2">
+            <FamilyImportButton />
+            <Button onClick={() => setCreating(true)}>Nueva familia</Button>
+          </div>
+        )}
       </div>
 
       <div className="inline-flex">

@@ -12,6 +12,7 @@ import type {
 } from "../api/types";
 import { useAuth } from "../state/auth";
 import { FamilySelect } from "./FamilySelect";
+import { StudentPicker, onlyStudent } from "./StudentPicker";
 import { Select } from "./Select";
 import { Badge, Button, Input, Modal, Spinner } from "./ui";
 
@@ -54,6 +55,7 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
   const [attended, setAttended] = useState<Set<string>>(new Set());
   const [audience, setAudience] = useState<Audience | "">("");
   const [attendedPros, setAttendedPros] = useState<Set<string>>(new Set());
+  const [students, setStudents] = useState<string[]>([]);
 
   const { data: classification, isLoading } = useQuery({
     queryKey: ["classification", meetingId],
@@ -82,6 +84,7 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
     setReasonId(classification.reason_id ?? "");
     setSeverity(classification.severity ?? "");
     setAudience(classification.audience ?? "");
+    setStudents(classification.student_ids ?? []);
     setAttended(
       new Set(classification.attendance.filter((row) => row.attended).map((row) => row.member_id)),
     );
@@ -105,6 +108,7 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
           audience: audience || null,
           attended_member_ids: [...attended],
           attended_professional_ids: [...attendedPros],
+          student_ids: familyId === classification?.family_id || students.length ? students : onlyStudent(selectedFamily),
         }),
       }),
     onSuccess: () => {
@@ -164,6 +168,17 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
             {classification?.family_name && (
               <Badge tone="indigo">{classification.family_name}</Badge>
             )}
+            {(classification?.student_ids ?? []).map((studentId) => {
+              const kid = families
+                ?.find((family) => family.id === classification?.family_id)
+                ?.members.find((member) => member.id === studentId);
+              return kid ? (
+                <Badge key={studentId} tone="gray">
+                  {kid.name}
+                  {kid.curso && ` · ${kid.curso}`}
+                </Badge>
+              ) : null;
+            })}
             {classification?.audience && (
               <Badge tone="sky">
                 {AUDIENCES.find((a) => a.value === classification.audience)?.label}
@@ -282,6 +297,8 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
           ))}
         </div>
       </div>
+
+      <StudentPicker family={selectedFamily} value={students} onChange={setStudents} />
 
       {familyId && (
         <div>

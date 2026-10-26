@@ -72,7 +72,7 @@ def test_meeting_recorded_in_wrong_org_moves_and_gets_the_campus_acta(client, fa
         id=meeting_id, org=campus.org_id,
     )
     assert leftovers[0][0] == 0
-    tasks = client.get("/api/tasks", headers=campus.headers).json()
+    tasks = client.get("/api/tasks", params={"status": "suggested"}, headers=campus.headers).json()
     assert any(task["meeting_id"] == meeting_id for task in tasks)
     minutes = client.get(f"/api/meetings/{meeting_id}/minutes", headers=campus.headers).json()
     assert minutes["number"] is None  # el número era de la otra numeración

@@ -75,6 +75,7 @@ from .stt.channels import (
     is_noise_transcript,
     is_unreliable,
     strip_hallucinations,
+    stt_language,
 )
 from .stt.elevenlabs import group_words
 
@@ -350,7 +351,7 @@ async def _run_final_pass(
         meeting = await db.get(Meeting, meeting_id)
         config = await resolve_stt(db, organization_id)
         vocabulary = await _vocabulary(db, meeting)
-        language = meeting.language if meeting.language and meeting.language != "auto" else "es"
+        language = stt_language(meeting.language)
 
     live = await _live_rows(meeting_id)
     # Lo dicho después del audio de trabajo (se grabó solo una parte con el
@@ -488,7 +489,7 @@ async def retry_pending_text() -> int:
             vocabulary = await _vocabulary(db, meeting) if meeting else []
             config = await resolve_stt(db, organization_id)
         engine = _text_engine(config)
-        language = language if language and language != "auto" else "es"
+        language = stt_language(language)
         pcm = audio.with_name(f"{meeting_id}.text.pcm")
         try:
             if engine is None:
@@ -679,7 +680,7 @@ async def retry_pending_people() -> int:
             await _release_hold(retry.get("hold_id"))
             await _update_meta(meeting_id, people_status="skipped", people_retry=None)
             continue
-        language = language if language and language != "auto" else "es"
+        language = stt_language(language)
         try:
             result = await _scribe(audio, language, vocabulary)
         except Exception as exc:  # noqa: BLE001 - se vuelve a intentar en la próxima vuelta

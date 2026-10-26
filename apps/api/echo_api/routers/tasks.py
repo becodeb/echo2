@@ -23,6 +23,9 @@ from ..services.audit import audit
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
 TASK_STATUS = ("pending", "in_progress", "done", "cancelled")
+# Las que detectó Echo y nadie confirmó, y las descartadas: no cuentan en
+# ningún listado salvo que se pidan explícitamente (status=suggested).
+NOT_REAL = ("suggested", "dismissed")
 
 
 class TaskOut(BaseModel):
@@ -109,6 +112,8 @@ async def list_tasks(
     )
     if status_filter:
         query = query.where(ActionItem.status == status_filter)
+    else:
+        query = query.where(ActionItem.status.not_in(NOT_REAL))
     if assignee:
         query = query.where(ActionItem.assignee_name.ilike(f"%{assignee}%"))
     if mine:
@@ -121,7 +126,8 @@ async def list_tasks(
 
 
 class TaskUpdateIn(BaseModel):
-    status: str | None = Field(default=None, pattern="^(pending|in_progress|done|cancelled)$")
+    # suggested → pending es confirmarla; dismissed es descartarla.
+    status: str | None = Field(default=None, pattern="^(pending|in_progress|done|cancelled|dismissed)$")
     text: str | None = Field(default=None, max_length=2000)
     assignee_user_id: uuid.UUID | None = None
     assignee_name: str | None = Field(default=None, max_length=200)
@@ -138,6 +144,9 @@ async def update_task(
     task = await _task_or_404(db, ctx, task_id)
 
     if data.status and data.status != task.status:
+        if task.status == "suggested" and data.status != "dismissed":
+            # Confirmada: ya es de una persona, la pasada final no la toca.
+            task.source = "manual"
         task.status = data.status
     if data.text:
         task.text = data.text.strip()
@@ -166,6 +175,8 @@ async def update_task(
             )
         task.assignee_user_id = data.assignee_user_id
         task.assignee_email = None
+        if task.status == "suggested":
+            task.status = "pending"  # repartirla es confirmarla
         task.source = "manual" if task.source == "ai" else task.source
         assignee_user = await db.get(User, data.assignee_user_id)
         if assignee_user:

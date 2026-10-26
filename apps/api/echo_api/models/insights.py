@@ -74,7 +74,9 @@ class ActionItem(PKMixin, TimestampMixin, Base):
     suggested_assignee: Mapped[str | None] = mapped_column(String(200))
     due_text: Mapped[str | None] = mapped_column(String(120))  # "viernes"
     due_date: Mapped[date | None] = mapped_column(Date)  # 2026-08-28 (resuelta)
-    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending|in_progress|done|cancelled
+    # suggested: la detectó Echo y nadie la confirmó todavía (no cuenta en
+    # ningún lado hasta que una persona la confirma). dismissed: la descartaron.
+    status: Mapped[str] = mapped_column(String(20), default="pending")  # suggested|pending|in_progress|done|cancelled|dismissed
     evidence_start_ms: Mapped[int | None] = mapped_column(Integer)
     evidence_end_ms: Mapped[int | None] = mapped_column(Integer)
     source: Mapped[str] = mapped_column(String(20), default="ai")

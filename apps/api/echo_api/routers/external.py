@@ -153,6 +153,8 @@ async def assign_external(
     db.add(access)
     task.assignee_user_id = None
     task.assignee_email = email
+    if task.status == "suggested":
+        task.status = "pending"  # mandarla por mail es confirmarla
     task.assignee_name = name or email
     task.source = "manual" if task.source == "ai" else task.source
 

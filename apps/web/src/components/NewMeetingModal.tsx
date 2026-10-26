@@ -8,6 +8,8 @@ import { FamilySelect } from "./FamilySelect";
 import { usePaid } from "./billing";
 import { MeetingAiPlan } from "./MeetingAiPlan";
 import { PeoplePicker } from "./PeoplePicker";
+import { SedePicker } from "./SedePicker";
+import { StudentPicker, onlyStudent } from "./StudentPicker";
 import { RecordToggle } from "./RecordToggle";
 import { SettingsGroup } from "./SettingRows";
 import { Select } from "./Select";
@@ -64,6 +66,8 @@ export function NewMeetingModal({
   const [minors, setMinors] = useState(false);
   // Familia
   const [familyId, setFamilyId] = useState("");
+  const [students, setStudents] = useState<string[]>([]);
+  const [intersede, setIntersede] = useState(false);
   const [audience, setAudience] = useState<Audience | "">("");
   const [visibility, setVisibility] = useState<"org" | "private">("org");
   const creatable = myAccess?.creatable_levels ?? [];
@@ -96,11 +100,19 @@ export function NewMeetingModal({
         ? `${family.name} · ${today}`
         : `Reunión ${today}`;
 
+  // "Laura Gómez - psicopedagoga" o "Ana (maestra integradora)": con el rol,
+  // Echo reconoce quién es cada voz y arma "Qué dijo cada uno".
   const participantList = participants
     .split(",")
-    .map((name) => name.trim())
+    .map((entry) => entry.trim())
     .filter(Boolean)
-    .map((name) => ({ name }));
+    .map((entry) => {
+      // El guion necesita espacio antes: "Ana-Laura" es un nombre, no "Ana" con rol "Laura".
+      const match = entry.match(/^(.+?)\s*\((.+)\)$/) ?? entry.match(/^(.+?)\s+[-–—:]\s*(.+)$/);
+      const name = (match ? match[1] : entry).trim();
+      const role = match ? match[2].trim() : "";
+      return role ? { name, role_label: role } : { name };
+    });
 
   // Importar la grabación de una reunión que ya pasó (Zoom, Meet, el celular):
   // es de los planes pagos.
@@ -124,7 +136,7 @@ export function NewMeetingModal({
         body: JSON.stringify(
           kind === "equipo"
             ? { ...common, kind: "interna", group_id: groupId, minutes: wantsMinutes, project_id: projectId || null }
-            : { ...common, visibility, level: level || null },
+            : { ...common, visibility, level: level || null, intersede },
         ),
       });
       // La familia se guarda antes de grabar: así la seudonimización ya
@@ -133,7 +145,11 @@ export function NewMeetingModal({
       if (kind === "familia" && (familyId || audience)) {
         await api(`/api/meetings/${meeting.id}/classification`, {
           method: "PUT",
-          body: JSON.stringify({ family_id: familyId || null, audience: audience || null }),
+          body: JSON.stringify({
+            family_id: familyId || null,
+            audience: audience || null,
+            student_ids: familyId ? (students.length ? students : onlyStudent(family)) : [],
+          }),
         }).catch(() => undefined);
       }
       if (file) {
@@ -153,6 +169,8 @@ export function NewMeetingModal({
       setParticipants("");
       setStaff([]);
       setFamilyId("");
+      setStudents([]);
+      setIntersede(false);
       setAudience("");
       setRecordAudio(false);
       setPeople(false);
@@ -186,15 +204,25 @@ export function NewMeetingModal({
           />
         )}
 
+        {kind === "familia" && <SedePicker intersede={intersede} onIntersede={setIntersede} />}
+
         {kind === "familia" ? (
           <div className="grid gap-4 rounded-2xl bg-ink-50 p-4 sm:grid-cols-2">
-            <FamilySelect value={familyId} onChange={setFamilyId} enabled={open} />
+            <FamilySelect
+              value={familyId}
+              onChange={(next) => {
+                setFamilyId(next);
+                setStudents([]);
+              }}
+              enabled={open}
+            />
             <Select
               label="¿Con quién es?"
               value={audience}
               onChange={(next) => setAudience(next as Audience | "")}
               options={[{ value: "", label: "Sin definir" }, ...AUDIENCES]}
             />
+            <StudentPicker family={family} value={students} onChange={setStudents} />
           </div>
         ) : (
           <div className="space-y-3 rounded-2xl bg-ink-50 p-4">
@@ -253,8 +281,8 @@ export function NewMeetingModal({
           />
         )}
         <Input
-          label={kind === "familia" ? "Otros participantes (separados por coma)" : "Participantes (separados por coma)"}
-          placeholder="Ana, Marcos, Juan"
+          label={kind === "familia" ? "Otros participantes, con su rol" : "Participantes, con su rol"}
+          placeholder="Laura Gómez - psicopedagoga, Ana (maestra integradora)"
           value={participants}
           onChange={(event) => setParticipants(event.target.value)}
         />
@@ -274,9 +302,13 @@ export function NewMeetingModal({
                 { value: "es", label: "Español" },
                 { value: "en", label: "English" },
                 { value: "pt", label: "Português" },
-                { value: "auto", label: "Detectar automáticamente" },
+                { value: "multi", label: "Varios idiomas (español, inglés, otro)" },
               ]}
             />
+            <p className="-mt-2 text-xs text-ink-400">
+              Con varios idiomas (una familia que habla inglés, un traductor) Echo transcribe cada uno como se habló.
+              El acta, el resumen y las tareas salen igual en castellano.
+            </p>
         {kind === "familia" && (
               <label className="flex items-center gap-2 text-sm text-ink-600">
                 <input

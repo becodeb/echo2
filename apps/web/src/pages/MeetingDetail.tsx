@@ -100,7 +100,10 @@ export default function MeetingDetail() {
             {meeting.group_name && <Badge tone="gray">{meeting.group_name}</Badge>}
           </div>
         ) : (
-          <LevelControl meeting={meeting} />
+          <div className="flex flex-wrap items-center gap-1.5">
+            <LevelControl meeting={meeting} />
+            {meeting.meta?.intersede && <Badge tone="sky">Intersede</Badge>}
+          </div>
         )}
         <p className="mt-1 text-sm text-ink-500">
           {formatDate(meeting.started_at)} · {formatDuration(meeting.duration_seconds)}
@@ -357,7 +360,7 @@ function SummaryTab({ meeting, onJump }: { meeting: MeetingOut; onJump: (ms: num
   const timeline = meeting.meta?.timeline ?? [];
   const nextSteps = meeting.meta?.next_steps ?? [];
 
-  const empty = !summaries?.executive && !insights?.decisions.length && !timeline.length;
+  const empty = !summaries?.executive && !summaries?.by_person && !insights?.decisions.length && !timeline.length;
 
   return (
     <div className="space-y-6">
@@ -383,6 +386,27 @@ function SummaryTab({ meeting, onJump }: { meeting: MeetingOut; onJump: (ms: num
               </li>
             ))}
           </ul>
+        </Card>
+      )}
+
+      {summaries?.by_person?.content.people && summaries.by_person.content.people.length > 0 && (
+        <Card>
+          <h2 className="mb-3 font-semibold text-ink-900">Qué dijo cada uno</h2>
+          <div className="space-y-4">
+            {summaries.by_person.content.people.map((person, index) => (
+              <div key={index}>
+                <h3 className="text-sm font-semibold text-ink-800">{person.name}</h3>
+                <ul className="mt-1 space-y-1">
+                  {person.points.map((point, pointIndex) => (
+                    <li key={pointIndex} className="flex gap-2.5 text-[15px] leading-relaxed text-ink-700">
+                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-ink-300" />
+                      {point}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         </Card>
       )}
 
@@ -1065,8 +1089,11 @@ function TasksTab({ meetingId }: { meetingId: string }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["insights", meetingId] }),
   });
 
-  const tasks = insights?.action_items ?? [];
-  if (tasks.length === 0) {
+  const all = insights?.action_items ?? [];
+  // Las que detectó Echo no cuentan hasta que una persona las confirma.
+  const suggested = all.filter((task) => task.status === "suggested");
+  const tasks = all.filter((task) => task.status !== "suggested" && task.status !== "dismissed");
+  if (tasks.length === 0 && suggested.length === 0) {
     return (
       <Card>
         <EmptyState title="Sin tareas detectadas" mood="idle" />
@@ -1075,6 +1102,58 @@ function TasksTab({ meetingId }: { meetingId: string }) {
   }
 
   return (
+    <div className="space-y-4">
+      {suggested.length > 0 && (
+        <Card className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-[15px] font-semibold text-ink-900">Echo sugiere estas tareas</h3>
+              <p className="text-sm text-ink-500">
+                Confirmá las que se acordaron de verdad. Hasta entonces no se asignan ni aparecen en Mi trabajo.
+              </p>
+            </div>
+            {suggested.length > 1 && (
+              <Button
+                variant="soft"
+                disabled={update.isPending}
+                onClick={() => suggested.forEach((task) => update.mutate({ taskId: task.id, status: "pending" }))}
+              >
+                Confirmar todas
+              </Button>
+            )}
+          </div>
+          <ul className="divide-y divide-ink-100">
+            {suggested.map((task) => (
+              <li key={task.id} className="flex flex-wrap items-center gap-2 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-ink-800">{task.text}</p>
+                  <p className="text-xs text-ink-400">
+                    {task.suggested_assignee && <>En la reunión: {task.suggested_assignee} · </>}
+                    {task.due_date ?? task.due_text ?? "Sin fecha"}
+                  </p>
+                </div>
+                <Button
+                  variant="soft"
+                  className="min-h-9 px-3"
+                  disabled={update.isPending}
+                  onClick={() => update.mutate({ taskId: task.id, status: "pending" })}
+                >
+                  Confirmar
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="min-h-9 px-3"
+                  disabled={update.isPending}
+                  onClick={() => update.mutate({ taskId: task.id, status: "dismissed" })}
+                >
+                  Descartar
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+      {tasks.length > 0 && (
     <Card className="overflow-x-auto p-0">
       <table className="w-full text-sm">
         <thead>
@@ -1115,6 +1194,8 @@ function TasksTab({ meetingId }: { meetingId: string }) {
         </tbody>
       </table>
     </Card>
+      )}
+    </div>
   );
 }
 
