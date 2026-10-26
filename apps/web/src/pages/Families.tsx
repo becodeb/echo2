@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { FamilyMemberOut, FamilyOut, ProfessionalOut } from "../api/types";
 import { FamilyMeetingsPanel } from "../components/FamilyMeetingsPanel";
+import { PeoplePicker } from "../components/PeoplePicker";
+import { useMyAccess } from "../state/access";
 import { Select } from "../components/Select";
 import { Badge, Button, Card, EmptyState, Input, Modal, Spinner } from "../components/ui";
 
@@ -16,6 +18,47 @@ const RELATIONSHIPS: FamilyMemberOut["relationship_type"][] = [
 ];
 
 // ── Detalle de una familia ───────────────────────────────────────
+
+/**
+ * Personas de la sede asignadas a la familia: ven todas sus reuniones (menos
+ * las privadas). Las asignan los directivos; el resto solo ve quiénes son.
+ */
+function FamilyAssignees({ family }: { family: FamilyOut }) {
+  const queryClient = useQueryClient();
+  const { data: access } = useMyAccess();
+  const canAssign = (access?.rank ?? 1) >= 2;
+  const save = useMutation({
+    mutationFn: (ids: string[]) =>
+      api(`/api/families/${family.id}/assignees`, { method: "PUT", body: JSON.stringify({ user_ids: ids }) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["families"] }),
+  });
+  const ids = family.assignees.map((assignee) => assignee.user_id);
+
+  if (!canAssign) {
+    return (
+      <div className="space-y-1">
+        <span className="block text-sm font-medium text-ink-700">Asignadas a la familia</span>
+        <p className="text-sm text-ink-500">
+          {family.assignees.length
+            ? family.assignees.map((assignee) => assignee.name).join(", ")
+            : "Nadie todavía. Las asigna un directivo."}
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <PeoplePicker
+        label="Asignadas a la familia"
+        hint="Ven todas las reuniones de la familia, aunque no hayan estado (menos las privadas)."
+        value={ids}
+        onChange={(next) => save.mutate(next)}
+      />
+      {save.isPending && <p className="mt-1 text-xs text-ink-400">Guardando…</p>}
+      {save.isError && <p className="mt-1 text-xs text-red-600">{(save.error as Error).message}</p>}
+    </div>
+  );
+}
 
 function FamilyDetail({ family }: { family: FamilyOut }) {
   const queryClient = useQueryClient();
@@ -121,6 +164,8 @@ function FamilyDetail({ family }: { family: FamilyOut }) {
           Drive. El enlace aparece en cada reunión de esta familia.
         </p>
       </div>
+
+      <FamilyAssignees family={family} />
 
       {/* Integrantes */}
       <div className="space-y-2">
@@ -479,6 +524,8 @@ export default function Families() {
                         </span>
                         {family.professionals.length > 0 &&
                           ` · ${family.professionals.length} prof.`}
+                        {family.assignees.length > 0 &&
+                          ` · La siguen: ${family.assignees.map((assignee) => assignee.name).join(", ")}`}
                       </p>
                     </button>
                     <div className="flex items-center gap-2">

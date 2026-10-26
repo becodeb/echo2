@@ -79,6 +79,9 @@ class Meeting(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
     # "size_bytes", "duration_seconds", "error"}. Columna aparte de `meta`
     # porque la escribe una tarea de fondo mientras el pipeline escribe meta.
     recording: Mapped[dict | None] = mapped_column(JSONB)
+    # Carpeta "fecha — motivo" de la reunión en el Drive de la sede, dentro de
+    # la de su familia: ahí van el acta y la grabación (services/drive.py).
+    drive_folder_id: Mapped[str | None] = mapped_column(String(120))
 
     participants: Mapped[list["MeetingParticipant"]] = relationship(
         back_populates="meeting", cascade="all, delete-orphan"

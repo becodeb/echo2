@@ -35,11 +35,20 @@ router = APIRouter(prefix="/api/org/drive", tags=["drive"])
 AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 STATE_COOKIE = "echo_drive_state"
-STATE_PATH = "/api/org/drive"
+# "/api" y no "/api/org/drive": Google vuelve al callback del login
+# (routers/auth_google.py), que es la única URL registrada en la consola, y
+# la cookie tiene que viajar también ahí.
+STATE_PATH = "/api"
 
 
 def _callback_url() -> str:
-    return get_settings().api_public_url.rstrip("/") + "/api/org/drive/callback"
+    """La misma URL de retorno que el login con Google.
+
+    Google rechaza (redirect_uri_mismatch) toda URL que no esté registrada en
+    la consola, y registrar una por cada flujo es un paso manual que se olvida.
+    El callback del login reconoce la cookie de estado de Drive y deriva acá.
+    """
+    return get_settings().google_callback_url
 
 
 def _web(path: str) -> str:

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MeetingStatus, StatusIcons, StatusPill } from "../components/MeetingStatus";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { AdminOrgOut, ChatOut, InsightsOut, MeetingOut, MinutesOut, SegmentOut } from "../api/types";
@@ -17,6 +17,7 @@ import { MarkdownView } from "../components/MarkdownView";
 import { InterviewReview } from "../components/InterviewReview";
 import { Select } from "../components/Select";
 import { TaskAssignee } from "../components/TaskAssignee";
+import { MeetingStaff } from "../components/PeoplePicker";
 import { ActaNumberCard, GenerateActaModal } from "../components/ActaNumber";
 import { LEVELS, LEVEL_LABEL, useMyAccess, type Level } from "../state/access";
 import { insightsQuery, meetingQuery, summaryQuery, transcriptQuery, type TranscriptPage } from "../lib/prefetch";
@@ -90,6 +91,7 @@ export default function MeetingDetail() {
           <div className="ml-auto flex gap-2">
             {user?.is_superadmin && <MoveMeetingButton meeting={meeting} />}
             <ShareButton meetingId={meeting.id} />
+            <DeleteMeetingButton meeting={meeting} />
           </div>
         </div>
         {internal ? (
@@ -102,9 +104,13 @@ export default function MeetingDetail() {
         )}
         <p className="mt-1 text-sm text-ink-500">
           {formatDate(meeting.started_at)} · {formatDuration(meeting.duration_seconds)}
-          {meeting.participants.length > 0 &&
-            ` · ${meeting.participants.map((participant) => participant.name).join(", ")}`}
+          {meeting.participants.some((participant) => !participant.user_id) &&
+            ` · ${meeting.participants
+              .filter((participant) => !participant.user_id)
+              .map((participant) => participant.name)
+              .join(", ")}`}
         </p>
+        {!internal && <MeetingStaff meeting={meeting} />}
         {!internal && <ClassificationPanel meetingId={meeting.id} />}
         {meeting.meta?.people_status === "pending" && (
           <p className="animate-fade-up mt-3 flex items-center gap-2 rounded-3xl bg-ink-50 px-3.5 py-2.5 text-sm text-ink-600">
@@ -168,6 +174,59 @@ export default function MeetingDetail() {
  * la reunión; el acta se regenera después en la sede nueva para que salga
  * con su formato (services/meeting_move.py).
  */
+/**
+ * Borrar una reunión ya grabada. La borra quien la creó o un admin de la sede
+ * (el mismo permiso que DELETE /api/meetings/{id}); es baja lógica y queda en
+ * auditoría. Pregunta antes, con el título a la vista.
+ */
+function DeleteMeetingButton({ meeting }: { meeting: MeetingOut }) {
+  const { user, activeOrg } = useAuth();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const remove = useMutation({
+    mutationFn: () => api(`/api/meetings/${meeting.id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["meetings"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      navigate("/meetings", { replace: true });
+    },
+  });
+  const canDelete =
+    meeting.created_by === user?.id ||
+    user?.is_superadmin ||
+    activeOrg?.role === "admin" ||
+    activeOrg?.role === "owner";
+  if (!canDelete) return null;
+
+  return (
+    <>
+      <Button variant="ghost" onClick={() => setOpen(true)} className="text-red-600 hover:bg-red-50 hover:text-red-700">
+        Borrar
+      </Button>
+      <Modal open={open} onClose={() => setOpen(false)} title="Borrar la reunión">
+        <div className="space-y-4">
+          <p className="text-sm text-ink-600">
+            Se borra «{meeting.title}» con su transcripción, acta y tareas, y deja de verse para todos. Lo que ya se
+            guardó en Drive no se toca.
+          </p>
+          {remove.isError && (
+            <p className="text-sm text-red-600">
+              {remove.error instanceof Error ? remove.error.message : "No se pudo borrar"}
+            </p>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button variant="danger" onClick={() => remove.mutate()} disabled={remove.isPending}>
+              {remove.isPending ? <Spinner /> : "Borrar"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </>
+  );
+}
+
 function MoveMeetingButton({ meeting }: { meeting: MeetingOut }) {
   const { activeOrg, switchOrg } = useAuth();
   const [open, setOpen] = useState(false);
@@ -1034,6 +1093,7 @@ function TasksTab({ meetingId }: { meetingId: string }) {
                 <TaskAssignee
                   task={task}
                   onAssigned={() => queryClient.invalidateQueries({ queryKey: ["insights", meetingId] })}
+                  inMeeting
                   className="w-44"
                 />
               </td>

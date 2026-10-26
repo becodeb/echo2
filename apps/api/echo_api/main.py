@@ -95,6 +95,7 @@ def _include_optional_routers() -> None:
         "my_voice",
         "contact",
         "password_reset",
+        "external",
     ):
         try:
             module = import_module(f".routers.{name}", package="echo_api")

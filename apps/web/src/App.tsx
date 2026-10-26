@@ -36,6 +36,8 @@ const loadSettings = () => import("./pages/Settings");
 const Settings = lazy(loadSettings);
 const loadSharedView = () => import("./pages/SharedView");
 const SharedView = lazy(loadSharedView);
+const loadExternalTask = () => import("./pages/ExternalTask");
+const ExternalTask = lazy(loadExternalTask);
 const loadAdmin = () => import("./pages/Admin");
 const Admin = lazy(loadAdmin);
 const loadFamilies = () => import("./pages/Families");
@@ -104,11 +106,13 @@ export default function App() {
     else window.setTimeout(prefetch, 1500);
   }, [user]);
 
-  if (location.pathname.startsWith("/s/")) {
+  if (location.pathname.startsWith("/s/") || location.pathname.startsWith("/t/")) {
     return (
       <Suspense fallback={<FullLoader />}>
         <Routes>
           <Route path="/s/:token" element={<SharedView />} />
+          {/* Tarea asignada por mail a alguien de afuera (routers/external.py). */}
+          <Route path="/t/:token" element={<ExternalTask />} />
         </Routes>
       </Suspense>
     );

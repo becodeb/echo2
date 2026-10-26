@@ -57,6 +57,8 @@ class Minutes(PKMixin, TimestampMixin, Base):
     # Enlace al acta subida a Drive, si la organización tiene Drive conectado.
     drive_file_url: Mapped[str | None] = mapped_column(String(600))
     drive_synced_version: Mapped[int | None] = mapped_column(Integer)
+    # El archivo en Drive: cada versión nueva lo reemplaza en vez de sumar otro.
+    drive_file_id: Mapped[str | None] = mapped_column(String(120))
     template_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("minutes_templates.id", ondelete="SET NULL")
     )

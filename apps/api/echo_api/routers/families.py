@@ -7,7 +7,7 @@ práctica se completa de una sola sentada, al terminar la reunión.
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -20,9 +20,13 @@ from ..models import (
     RELATIONSHIPS,
     SEVERITIES,
     Family,
+    FamilyAssignment,
     FamilyMember,
     FamilyProfessional,
     Meeting,
+    Notification,
+    OrganizationMember,
+    User,
     MeetingAttendance,
     MeetingProfessionalAttendance,
     MeetingReason,
@@ -30,7 +34,7 @@ from ..models import (
     Minutes,
     Professional,
 )
-from ..services.access import meeting_filter
+from ..services.access import RANK_DIRECTIVO, meeting_filter, scope_rank
 from ..services.audit import audit
 
 router = APIRouter(tags=["families"])
@@ -64,6 +68,11 @@ class ProfessionalOut(BaseModel):
         from_attributes = True
 
 
+class FamilyAssigneeOut(BaseModel):
+    user_id: uuid.UUID
+    name: str
+
+
 class FamilyOut(BaseModel):
     id: uuid.UUID
     name: str
@@ -73,6 +82,12 @@ class FamilyOut(BaseModel):
     members: list[FamilyMemberOut] = []
     professionals: list[ProfessionalOut] = []
     meetings: int = 0
+    # Personas de la sede asignadas: ven todas las reuniones de la familia.
+    assignees: list[FamilyAssigneeOut] = []
+
+
+class FamilyAssigneesIn(BaseModel):
+    user_ids: list[uuid.UUID] = Field(default_factory=list, max_length=100)
 
 
 class ReasonOut(BaseModel):
@@ -205,6 +220,17 @@ async def list_families(
         ).all()
     )
 
+    assignees_by_family: dict[uuid.UUID, list[FamilyAssigneeOut]] = {}
+    for family_id, user_id, name in (
+        await db.execute(
+            select(FamilyAssignment.family_id, User.id, User.name)
+            .join(User, User.id == FamilyAssignment.user_id)
+            .where(FamilyAssignment.family_id.in_(ids))
+            .order_by(User.name)
+        )
+    ).all():
+        assignees_by_family.setdefault(family_id, []).append(FamilyAssigneeOut(user_id=user_id, name=name))
+
     pros_by_family: dict[uuid.UUID, list[Professional]] = {}
     for family_id, professional in (
         await db.execute(
@@ -228,9 +254,63 @@ async def list_families(
                 ProfessionalOut.model_validate(pro) for pro in pros_by_family.get(f.id, [])
             ],
             meetings=counts.get(f.id, 0),
+            assignees=assignees_by_family.get(f.id, []),
         )
         for f in families
     ]
+
+
+@router.put("/api/families/{family_id}/assignees", response_model=list[FamilyAssigneeOut])
+async def set_family_assignees(
+    family_id: uuid.UUID,
+    data: FamilyAssigneesIn,
+    ctx: OrgContext = Depends(get_org_context),
+    db: AsyncSession = Depends(get_db),
+):
+    """Quiénes siguen a la familia. Asignar da acceso a todas sus reuniones: lo
+    deciden los directivos (o quien administra la sede), y queda en auditoría."""
+    if scope_rank(await ctx.scope(db)) < RANK_DIRECTIVO:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Asignan familias los directivos de la sede")
+    family = await _get_family(family_id, ctx, db)
+    wanted = set(data.user_ids)
+    members = {
+        user.id: user
+        for user in (
+            await db.execute(
+                select(User)
+                .join(OrganizationMember, OrganizationMember.user_id == User.id)
+                .where(OrganizationMember.organization_id == ctx.org_id, User.id.in_(wanted))
+            )
+        ).scalars()
+    }
+    if set(members) != wanted:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Hay personas que no son de la sede")
+    current = {
+        row.user_id: row
+        for row in (await db.execute(select(FamilyAssignment).where(FamilyAssignment.family_id == family.id))).scalars()
+    }
+    for user_id, row in current.items():
+        if user_id not in wanted:
+            await db.delete(row)
+    for user_id in wanted - set(current):
+        db.add(FamilyAssignment(family_id=family.id, organization_id=ctx.org_id, user_id=user_id))
+        if user_id != ctx.user.id:
+            db.add(
+                Notification(
+                    user_id=user_id,
+                    organization_id=ctx.org_id,
+                    kind="family_assigned",
+                    title=f"{ctx.user.name} te asignó la familia {family.name}",
+                    body="Desde ahora ves todas sus reuniones.",
+                    link="/families",
+                )
+            )
+    await audit(db, ctx.org_id, ctx.user.id, "family.assignees", "family", str(family.id),
+                detail={"user_ids": sorted(str(user_id) for user_id in wanted)})
+    await db.commit()
+    return sorted(
+        (FamilyAssigneeOut(user_id=user.id, name=user.name) for user in members.values()), key=lambda item: item.name
+    )
 
 
 @router.post("/api/families", response_model=FamilyOut, status_code=201)
@@ -840,6 +920,7 @@ async def get_classification(
 async def set_classification(
     meeting_id: uuid.UUID,
     data: ClassificationIn,
+    background: BackgroundTasks,
     ctx: OrgContext = Depends(get_org_context),
     db: AsyncSession = Depends(get_db),
 ):
@@ -860,6 +941,7 @@ async def set_classification(
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Motivo no encontrado")
 
     family_changed = data.family_id != meeting.family_id
+    folder_changed = family_changed or data.reason_id != meeting.reason_id
     meeting.family_id = data.family_id
     meeting.reason_id = data.reason_id
     meeting.severity = data.severity or None
@@ -944,4 +1026,9 @@ async def set_classification(
     await audit(db, ctx.org_id, ctx.user.id, "meeting.classify", "meeting", str(meeting.id))
     await db.commit()
     await db.refresh(meeting)
+    if folder_changed and meeting.drive_folder_id:
+        # La carpeta de Drive sigue a la reunión: a la familia nueva, con el motivo nuevo.
+        from ..services.drive import sync_meeting_folder
+
+        background.add_task(sync_meeting_folder, meeting.id)
     return await _classification_out(meeting, db)

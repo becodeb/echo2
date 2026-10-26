@@ -166,24 +166,39 @@ async def finalize_recording(meeting_id: uuid.UUID) -> None:
 
 
 async def upload_to_drive(meeting_id: uuid.UUID, user_id: uuid.UUID | None = None) -> dict | None:
-    """Sube el mp3 al Drive de quien grabó (o de `user_id`) y lo borra de acá.
+    """Sube el mp3 a Drive y lo borra de acá.
 
-    Sin conexión a Drive no hace nada: el archivo sigue disponible para
+    Las reuniones con familias van a la carpeta de la reunión en el Drive de
+    la sede, junto al acta. Las internas, o si la sede no conectó Drive, al
+    Drive personal de quien grabó (o de `user_id`, que lo pide a mano).
+    Sin ninguna conexión no hace nada: el archivo sigue disponible para
     descargar hasta que venza. Una falla de Drive tampoco lo borra.
     """
-    from .drive import DriveError, get_user_connection, upload_recording
+    from .drive import (
+        DriveError,
+        get_connection,
+        get_user_connection,
+        upload_recording,
+        upload_recording_to_org,
+    )
 
     target = mp3_path(meeting_id)
     async with SessionLocal() as db:
         meeting = await db.get(Meeting, meeting_id)
         if meeting is None or not target.exists():
             return None
-        owner = user_id or uuid.UUID((meeting.recording or {}).get("user_id") or str(meeting.created_by))
-        connection = await get_user_connection(db, owner)
+        connection = None
+        if user_id is None and meeting.kind != "interna":
+            connection = await get_connection(db, meeting.organization_id)
+        upload = upload_recording_to_org
+        if connection is None:
+            owner = user_id or uuid.UUID((meeting.recording or {}).get("user_id") or str(meeting.created_by))
+            connection = await get_user_connection(db, owner)
+            upload = upload_recording
         if connection is None:
             return meeting.recording
         try:
-            url = await upload_recording(db, connection, meeting, target)
+            url = await upload(db, connection, meeting, target)
         except DriveError as exc:
             connection.last_error = str(exc)
             await db.commit()

@@ -7,6 +7,7 @@ import { AUDIENCES } from "./ClassificationPanel";
 import { FamilySelect } from "./FamilySelect";
 import { usePaid } from "./billing";
 import { MeetingAiPlan } from "./MeetingAiPlan";
+import { PeoplePicker } from "./PeoplePicker";
 import { RecordToggle } from "./RecordToggle";
 import { SettingsGroup } from "./SettingRows";
 import { Select } from "./Select";
@@ -43,7 +44,7 @@ export function NewMeetingModal({
 }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { activeOrg } = useAuth();
+  const { activeOrg, user } = useAuth();
   const { data: myAccess } = useMyAccess();
   const { data: groupsData } = useInternalGroups();
   const myGroups = (groupsData?.groups ?? []).filter((group) => group.is_member);
@@ -55,6 +56,8 @@ export function NewMeetingModal({
   const [title, setTitle] = useState("");
   const [language, setLanguage] = useState(() => localStorage.getItem("echo_pref_lang") ?? "es");
   const [participants, setParticipants] = useState("");
+  // Quiénes del colegio están: con eso la ven (además de quien la crea).
+  const [staff, setStaff] = useState<string[]>([]);
   const [recordAudio, setRecordAudio] = useState(false);
   // Quién habló (gasta un crédito en el plan Gratis) y si hablan menores.
   const [people, setPeople] = useState(false);
@@ -112,6 +115,7 @@ export function NewMeetingModal({
         language,
         record_audio: recordAudio,
         participants: participantList,
+        staff_ids: staff,
         people: people && !minors,
         minors,
       };
@@ -147,6 +151,7 @@ export function NewMeetingModal({
       // El modal no se desmonta: que la próxima reunión arranque en blanco.
       setTitle("");
       setParticipants("");
+      setStaff([]);
       setFamilyId("");
       setAudience("");
       setRecordAudio(false);
@@ -237,8 +242,18 @@ export function NewMeetingModal({
             />
           )}
         </div>
+        {kind === "familia" && (
+          <PeoplePicker
+            label="¿Quiénes del colegio están?"
+            hint="La ven vos, quienes sumes acá, quienes tienen asignada la familia y los directivos."
+            value={staff}
+            onChange={setStaff}
+            exclude={user ? [user.id] : []}
+            enabled={open}
+          />
+        )}
         <Input
-          label="Participantes (separados por coma)"
+          label={kind === "familia" ? "Otros participantes (separados por coma)" : "Participantes (separados por coma)"}
           placeholder="Ana, Marcos, Juan"
           value={participants}
           onChange={(event) => setParticipants(event.target.value)}
@@ -274,7 +289,7 @@ export function NewMeetingModal({
               </label>
             )}
             <SettingsGroup>
-              <RecordToggle checked={recordAudio} onChange={setRecordAudio} />
+              <RecordToggle checked={recordAudio} onChange={setRecordAudio} internal={kind === "equipo"} />
             </SettingsGroup>
           </div>
         </details>

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import type { MyDriveOut } from "../api/types";
+import type { DriveStatusOut, MyDriveOut } from "../api/types";
 import { PillSwitch, SettingRow } from "./SettingRows";
 
 /** Estado del Drive personal (adonde van las grabaciones de cada uno). */
@@ -9,6 +9,16 @@ export function useMyDrive(enabled = true) {
   return useQuery({
     queryKey: ["my-drive"],
     queryFn: () => api<MyDriveOut>("/api/me/drive", { skipOrg: true }),
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+/** Drive de la sede: adonde van las actas y las grabaciones de reuniones con familias. */
+export function useOrgDrive(enabled = true) {
+  return useQuery({
+    queryKey: ["drive-status"],
+    queryFn: () => api<DriveStatusOut>("/api/org/drive/status"),
     enabled,
     staleTime: 60_000,
   });
@@ -22,12 +32,16 @@ export function RecordToggle({
   checked,
   onChange,
   disabled = false,
+  internal = false,
 }: {
   checked: boolean;
   onChange: (value: boolean) => void;
   disabled?: boolean;
+  /** Las internas no van a la carpeta compartida de la sede. */
+  internal?: boolean;
 }) {
   const { data: drive } = useMyDrive();
+  const { data: orgDrive } = useOrgDrive(!internal);
   return (
     <SettingRow
       disabled={disabled}
@@ -35,7 +49,9 @@ export function RecordToggle({
       control={<PillSwitch checked={checked} onChange={onChange} label="Grabar el audio completo" disabled={disabled} />}
       hint={
         <>
-          {drive?.connected ? (
+          {!internal && orgDrive?.connected ? (
+            <>Al terminar se guarda en el Drive de la sede, en la carpeta de la reunión, y se borra de Echo.</>
+          ) : drive?.connected ? (
             <>Al terminar se guarda en tu Google Drive ({drive.connected_email}) y se borra de Echo.</>
           ) : (
             <>

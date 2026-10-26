@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
 from ..deps import OrgContext, get_org_context
-from ..services.access import meeting_filter, meeting_id_filter
+from ..services.access import RANK_LABEL, can_assign_to, meeting_filter, meeting_id_filter, member_ranks, scope_rank
 from ..models import (
     ActionItem,
     Meeting,
@@ -61,6 +61,8 @@ async def list_people(ctx: OrgContext = Depends(get_org_context), db: AsyncSessi
     # Los conteos cuentan solo lo que quien mira puede ver: si no, el número
     # delata reuniones de otros niveles.
     scope = await ctx.scope(db)
+    ranks = await member_ranks(db, ctx.org_id)
+    my_rank = scope_rank(scope)
     members = (
         await db.execute(
             select(User, OrganizationMember.role)
@@ -88,6 +90,10 @@ async def list_people(ctx: OrgContext = Depends(get_org_context), db: AsyncSessi
                 "avatar_url": user.avatar_url,
                 "job_title": user.job_title,
                 "role": role,
+                "rank": ranks.get(user.id, 1),
+                "rank_label": RANK_LABEL.get(ranks.get(user.id, 1)),
+                # Tareas: a igual o menor rango (services/access.py).
+                "assignable": can_assign_to(my_rank, ctx.user.id, user.id, ranks.get(user.id, 1)),
                 "meeting_count": meeting_count or 0,
                 "open_task_count": open_tasks or 0,
             }

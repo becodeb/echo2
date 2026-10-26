@@ -91,6 +91,46 @@ class SharedLink(PKMixin, TimestampMixin, Base):
     access_count: Mapped[int] = mapped_column(Integer, default=0)
 
 
+# Qué ve alguien de afuera con su link: solo la tarea, la tarea y el acta, o
+# la reunión entera (resumen, acta y transcripción; nunca el audio).
+EXTERNAL_SCOPES = ("task", "acta", "meeting")
+
+
+class ExternalAccess(PKMixin, TimestampMixin, Base):
+    """Acceso por mail para alguien que no tiene cuenta en Echo.
+
+    Nace al asignarle una tarea a una persona de afuera: le llega un mail con
+    un link personal y ve lo que eligió quien se la asignó. Del token se guarda
+    solo el hash, como los de "Olvidé mi contraseña".
+    """
+
+    __tablename__ = "external_access"
+    __table_args__ = (
+        Index("ix_external_access_task", "task_id"),
+        Index("ix_external_access_meeting", "meeting_id"),
+    )
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    meeting_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("meetings.id", ondelete="CASCADE")
+    )
+    task_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("action_items.id", ondelete="CASCADE")
+    )
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    name: Mapped[str | None] = mapped_column(String(200))
+    scope: Mapped[str] = mapped_column(String(20), default="task", nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Si el mail salió: sin Resend configurado queda el link para copiarlo a mano.
+    mail_sent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+
 class MeetingShare(PKMixin, TimestampMixin, Base):
     """ACL por usuario sobre una reunión (además de la visibilidad org)."""
 

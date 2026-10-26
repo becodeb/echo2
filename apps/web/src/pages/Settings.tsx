@@ -1073,8 +1073,9 @@ function DriveSection() {
       <div>
         <h2 className="text-[15px] font-semibold text-ink-900">Google Drive</h2>
         <p className="mt-1 text-sm text-ink-500">
-          Al aprobar un acta, Echo la guarda sola en Drive: crea la carpeta de la familia si no
-          existe y completa su enlace. Nadie tiene que subir nada a mano.
+          Echo guarda solo en Drive las actas (apenas se generan, y las reemplaza en cada versión)
+          y las grabaciones de las reuniones con familias: una carpeta por familia y, adentro, una
+          por reunión con la fecha y el motivo. Nadie tiene que subir nada a mano.
         </p>
       </div>
 
@@ -1113,8 +1114,9 @@ function DriveSection() {
               >
                 abrir en Drive ↗
               </a>
-              . Podés moverla a donde quieras dentro de tu Drive, incluso a una unidad compartida:
-              el acceso no depende de dónde esté.
+              . Movela adentro de la carpeta que compartís con el equipo (o compartila directamente)
+              y todos ven lo que Echo va guardando; el acceso de Echo no depende de dónde esté.
+              Las reuniones internas no van acá.
             </p>
           )}
           <div className="flex items-center gap-2">

@@ -976,7 +976,7 @@ export default function MeetingLive() {
                       ]}
                     />
                   </div>
-                  <RecordToggle checked={recordingOn} onChange={setRecordAudio} disabled={recordingBusy} />
+                  <RecordToggle checked={recordingOn} onChange={setRecordAudio} disabled={recordingBusy} internal={meeting?.kind === "interna"} />
                   {canCaptureSystemAudio() ? (
                     <SettingRow
                       label="Incluir el audio de la llamada"

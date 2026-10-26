@@ -142,6 +142,14 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
     if not settings.google_enabled:
         return _back_to_login(settings, "google_no_configurado")
 
+    # Conectar Drive vuelve por esta misma URL (routers/drive.py): se
+    # reconoce por su propia cookie de estado.
+    from .drive import STATE_COOKIE as DRIVE_STATE_COOKIE, drive_callback
+
+    drive_state = request.cookies.get(DRIVE_STATE_COOKIE)
+    if drive_state and request.query_params.get("state") in (drive_state, None):
+        return await drive_callback(request, db)
+
     if request.query_params.get("error"):
         # El usuario cerró la pantalla de Google o rechazó los permisos.
         return _back_to_login(settings, "google_cancelado")

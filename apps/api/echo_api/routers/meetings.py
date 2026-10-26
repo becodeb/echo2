@@ -14,6 +14,9 @@ from ..models import (
     MEETING_KINDS,
     ActionItem,
     InternalGroup,
+    Notification,
+    OrganizationMember,
+    User,
     Bookmark,
     Decision,
     Meeting,
@@ -41,6 +44,12 @@ class ParticipantIn(BaseModel):
     role_label: str | None = None
 
 
+class StaffIn(BaseModel):
+    """Quiénes de la sede estuvieron: con eso la ven (services/access.py)."""
+
+    user_ids: list[uuid.UUID] = Field(default_factory=list, max_length=100)
+
+
 class MeetingCreateIn(BaseModel):
     title: str = Field(min_length=1, max_length=300)
     language: str = Field(default="es", max_length=10)
@@ -48,6 +57,8 @@ class MeetingCreateIn(BaseModel):
     stt_engine: str | None = None
     project_id: uuid.UUID | None = None
     participants: list[ParticipantIn] = []
+    # Personas de la sede que están en la reunión (además de quien la crea).
+    staff_ids: list[uuid.UUID] = Field(default_factory=list, max_length=100)
     visibility: str = Field(default="org")  # org|private
     # inicial|primaria|secundaria. Sin él se usa el primer nivel en el que
     # puede crear quien la crea (services/access.py).
@@ -72,6 +83,7 @@ class ParticipantOut(BaseModel):
     name: str
     email: str | None
     role_label: str | None
+    user_id: uuid.UUID | None = None
 
     class Config:
         from_attributes = True
@@ -165,6 +177,68 @@ def _meeting_out(m: Meeting, participants: list, speakers: list, group_name: str
     )
 
 
+async def _set_staff(
+    db: AsyncSession,
+    ctx: OrgContext,
+    meeting: Meeting,
+    user_ids: list[uuid.UUID],
+    participants: list[MeetingParticipant],
+) -> list[MeetingParticipant]:
+    """Deja como presentes de la sede exactamente a `user_ids` (quien la creó no hace falta).
+
+    Un participante escrito a mano con el mismo nombre se vincula en vez de
+    duplicarse. A quien se suma le llega un aviso: desde ahora la ve.
+    """
+    wanted = {user_id for user_id in user_ids if user_id != meeting.created_by}
+    members = {
+        user.id: user
+        for user in (
+            await db.execute(
+                select(User)
+                .join(OrganizationMember, OrganizationMember.user_id == User.id)
+                .where(OrganizationMember.organization_id == ctx.org_id, User.id.in_(wanted))
+            )
+        ).scalars()
+    }
+    if set(members) != wanted:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Hay personas que no son de la sede")
+    linked = {p.user_id for p in participants if p.user_id}
+    kept = []
+    for participant in participants:
+        if participant.user_id and participant.user_id not in wanted:
+            await db.delete(participant)
+            continue
+        if participant.user_id is None:
+            match = next(
+                (user for user in members.values()
+                 if user.id not in linked and user.name.strip().lower() == participant.name.strip().lower()),
+                None,
+            )
+            if match:
+                participant.user_id = match.id
+                linked.add(match.id)
+        kept.append(participant)
+    await db.flush()
+    for user_id in wanted - linked:
+        user = members[user_id]
+        participant = MeetingParticipant(meeting_id=meeting.id, user_id=user.id, name=user.name, email=user.email)
+        db.add(participant)
+        kept.append(participant)
+        if user.id != ctx.user.id:
+            db.add(
+                Notification(
+                    user_id=user.id,
+                    organization_id=ctx.org_id,
+                    kind="meeting_added",
+                    title=f"{ctx.user.name} te sumó a «{meeting.title}»",
+                    body="Figurás entre quienes estuvieron, así que ahora la ves.",
+                    link=f"/meetings/{meeting.id}",
+                )
+            )
+    await db.flush()
+    return kept
+
+
 async def _within_limits(check) -> None:
     try:
         await check
@@ -243,6 +317,8 @@ async def create_meeting(
         )
         db.add(mp)
         participants.append(mp)
+    if data.staff_ids:
+        participants = await _set_staff(db, ctx, meeting, data.staff_ids, participants)
 
     if data.project_id:
         project = (
@@ -406,6 +482,29 @@ async def update_meeting(
         await audit(db, ctx.org_id, ctx.user.id, "meeting.level", "meeting", str(meeting.id),
                     detail={"from": meeting.level, "to": data.level})
         meeting.level = data.level
+    await db.commit()
+    return await get_meeting(meeting_id, ctx, db)
+
+
+@router.put("/{meeting_id}/staff", response_model=MeetingOut)
+async def set_meeting_staff(
+    meeting_id: uuid.UUID,
+    data: StaffIn,
+    ctx: OrgContext = Depends(get_org_context),
+    db: AsyncSession = Depends(get_db),
+):
+    """Quiénes de la sede estuvieron. Sumar a alguien es darle acceso: queda en auditoría."""
+    meeting = await get_meeting_or_404(meeting_id, ctx, db, minimum_role="editor")
+    if not can_edit_meeting(ctx, meeting):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Sin permiso de edición")
+    participants = list(
+        (await db.execute(select(MeetingParticipant).where(MeetingParticipant.meeting_id == meeting.id)))
+        .scalars()
+        .all()
+    )
+    await _set_staff(db, ctx, meeting, data.user_ids, participants)
+    await audit(db, ctx.org_id, ctx.user.id, "meeting.staff", "meeting", str(meeting.id),
+                detail={"user_ids": [str(user_id) for user_id in data.user_ids]})
     await db.commit()
     return await get_meeting(meeting_id, ctx, db)
 
@@ -602,6 +701,7 @@ async def get_insights(
                 "text": a.text,
                 "assignee_name": a.assignee_name,
                 "assignee_user_id": str(a.assignee_user_id) if a.assignee_user_id else None,
+                "assignee_email": a.assignee_email,
                 "suggested_assignee": a.suggested_assignee,
                 "due_text": a.due_text,
                 "due_date": a.due_date.isoformat() if a.due_date else None,

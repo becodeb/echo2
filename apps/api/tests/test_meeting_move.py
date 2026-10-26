@@ -93,3 +93,29 @@ def test_meeting_recorded_in_wrong_org_moves_and_gets_the_campus_acta(client, fa
     # El link compartido sigue andando y muestra el acta nueva.
     shared = client.get(f"/api/shared/{share['token']}").json()
     assert "PEREZ, Tomás" in shared["minutes_markdown"]
+
+
+def test_moving_an_acta_whose_number_already_exists_in_the_campus(client):
+    """Las dos sedes tenían su acta N.º 1: mover una no puede chocar con la otra
+    (pasó al pasar reuniones de Nordelta a Puertos el 26/10)."""
+    stray = EchoTestUser(client, name="Sonia", org_name="Nordelta")
+    campus = EchoTestUser(client, name="Dirección", org_name="Puertos")
+    moved_id = None
+    for who in (stray, campus):
+        meeting_id = client.post("/api/meetings", json={"title": "Con acta"}, headers=who.headers).json()["id"]
+        saved = client.post(
+            f"/api/meetings/{meeting_id}/minutes/versions", json={"body_markdown": "# Acta"}, headers=who.headers
+        )
+        assert saved.status_code == 200, saved.text
+        _sql("update minutes set number = 1, number_series = 'general' where meeting_id = :id", id=meeting_id)
+        moved_id = moved_id or meeting_id
+
+    admin = EchoTestUser(client, name="Superadmin", org_name="Becode")
+    _sql("update users set is_superadmin = true where id = :id", id=admin.user_id)
+    moved = client.post(
+        f"/api/admin/meetings/{moved_id}/move",
+        json={"organization_id": campus.org_id, "level": "primaria"},
+        headers={"Authorization": f"Bearer {admin.token}"},
+    )
+    assert moved.status_code == 200, moved.text
+    assert client.get(f"/api/meetings/{moved_id}/minutes", headers=campus.headers).json()["number"] is None

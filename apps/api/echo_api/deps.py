@@ -23,7 +23,7 @@ from .models import (
     User,
 )
 from .security import decode_token
-from .services.access import Scope, can_see_by_rule, load_scope
+from .services.access import Scope, can_see_by_rule, is_present, load_scope
 
 ROLE_ORDER = {"viewer": 0, "commenter": 0, "member": 1, "editor": 1, "admin": 2, "owner": 3}
 
@@ -167,7 +167,7 @@ async def check_meeting_access(
     ya tenía.
     """
     scope = await load_scope(db, meeting.organization_id, user.id, role)
-    if can_see_by_rule(scope, meeting):
+    if can_see_by_rule(scope, meeting) or await is_present(db, meeting.id, user.id):
         return MEETING_ACCESS_OK
 
     share = (

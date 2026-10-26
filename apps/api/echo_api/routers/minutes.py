@@ -211,6 +211,7 @@ class MinutesEditIn(BaseModel):
 async def save_minutes_edit(
     meeting_id: uuid.UUID,
     data: MinutesEditIn,
+    background: BackgroundTasks,
     ctx: OrgContext = Depends(get_org_context),
     db: AsyncSession = Depends(get_db),
 ):
@@ -257,6 +258,8 @@ async def save_minutes_edit(
     minutes.generation_error = None
     await audit(db, ctx.org_id, ctx.user.id, "minutes.edit", "minutes", str(minutes.id))
     await db.commit()
+    # Drive se queda siempre con la última versión (reemplaza el archivo).
+    background.add_task(upload_minutes, meeting.id)
     return await get_minutes(meeting_id, None, ctx, db)
 
 
@@ -285,8 +288,7 @@ async def change_minutes_status(
             )
         minutes.approved_by = ctx.user.id
         minutes.approved_at = datetime.now(UTC)
-        # Solo se sube la versión aprobada: Drive queda con el acta definitiva
-        # y no con los borradores intermedios.
+        # Por si la versión aprobada todavía no llegó a Drive.
         background.add_task(upload_minutes, meeting.id)
         # Avisar la aprobación solo a quienes ven la reunión.
         for user_id in await users_who_can_see(db, meeting):

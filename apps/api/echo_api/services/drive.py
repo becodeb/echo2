@@ -1,15 +1,21 @@
-"""Subida de actas a Google Drive.
+"""Actas y grabaciones a Google Drive.
 
 Alcance pedido: `drive.file`. Echo solo ve y toca lo que él mismo creó, así
 que no puede leer el Drive de la institución aunque quisiera. El permiso
 amplio (`drive`) daría acceso a todo y exige revisión de Google; no vale la
 pena para lo único que hace falta acá, que es escribir actas.
 
-Estructura: una carpeta madre por organización, y adentro una subcarpeta por
-familia que se crea sola la primera vez que hace falta. La carpeta madre se
-puede mover a cualquier lado del Drive — el acceso lo da haberla creado, no
-dónde esté.
+Estructura: una carpeta madre por organización; adentro, una por familia, y
+adentro de cada familia una por reunión ("2026-10-21 — Motivo") con el acta y
+la grabación. Todo se crea solo la primera vez que hace falta. La carpeta
+madre se puede mover a cualquier lado del Drive (por ejemplo, adentro de una
+carpeta compartida con todo el equipo): el acceso lo da haberla creado, no
+dónde esté, y lo de adentro hereda con quién está compartida.
+
+El acta sube apenas Echo la genera y se reemplaza en cada versión nueva
+(editada, aprobada): un solo archivo por reunión, siempre el último.
 """
+import asyncio
 import json
 import logging
 import uuid
@@ -23,6 +29,7 @@ from ..config import get_settings
 from ..models import (
     Family,
     Meeting,
+    MeetingReason,
     Minutes,
     MinutesVersion,
     OrgGoogleDrive,
@@ -128,18 +135,34 @@ async def get_connection(db: AsyncSession, org_id: uuid.UUID) -> OrgGoogleDrive 
     ).scalar_one_or_none()
 
 
+_locks: dict[str, asyncio.Lock] = {}
+
+
+def _lock(key: str) -> asyncio.Lock:
+    """Un lock por carpeta: el acta y la grabación llegan casi juntas y sin
+    esto cada una crearía su propia carpeta de la reunión (o de la familia).
+    Alcanza en memoria porque la API corre en un solo proceso."""
+    return _locks.setdefault(key, asyncio.Lock())
+
+
 async def ensure_root_folder(db: AsyncSession, connection: OrgGoogleDrive) -> str:
     """Devuelve el id de la carpeta madre, creándola si hace falta."""
-    if connection.root_folder_id:
+    async with _lock(f"root:{connection.organization_id}"):
+        await db.refresh(connection, ["root_folder_id", "root_folder_url"])
+        if connection.root_folder_id:
+            return connection.root_folder_id
+
+        org = await db.get(Organization, connection.organization_id)
+        token = await _access_token(decrypt_secret(connection.refresh_token_enc) or "")
+        created = await _create_folder(token, f"Echo — {org.name if org else 'Actas'}")
+        connection.root_folder_id = created["id"]
+        connection.root_folder_url = created.get("webViewLink")
+        await db.commit()
         return connection.root_folder_id
 
-    org = await db.get(Organization, connection.organization_id)
-    token = await _access_token(decrypt_secret(connection.refresh_token_enc) or "")
-    created = await _create_folder(token, f"Echo — {org.name if org else 'Actas'}")
-    connection.root_folder_id = created["id"]
-    connection.root_folder_url = created.get("webViewLink")
-    await db.commit()
-    return connection.root_folder_id
+
+def _safe(name: str, limit: int = 80) -> str:
+    return " ".join(name.replace("/", "-").split())[:limit]
 
 
 async def _ensure_family_folder(
@@ -149,35 +172,92 @@ async def _ensure_family_folder(
     root = await ensure_root_folder(db, connection)
     if family is None:
         return root
+    async with _lock(f"family:{family.id}"):
+        await db.refresh(family, ["drive_folder_id", "drive_url"])
+        if family.drive_folder_id:
+            return family.drive_folder_id
+        created = await _create_folder(token, _safe(family.name, 120), parent=root)
+        family.drive_folder_id = created["id"]
+        # El enlace de la familia, si nadie puso otro a mano.
+        if not family.drive_url:
+            family.drive_url = created.get("webViewLink") or f"https://drive.google.com/drive/folders/{created['id']}"
+        await db.commit()
+        return created["id"]
 
-    # Si la familia ya tiene carpeta creada por Echo, se reutiliza. El
-    # drive_url puede haberlo puesto una persona a mano apuntando a otra
-    # carpeta: en ese caso no se toca y el acta va a la madre, porque sobre
-    # una carpeta ajena `drive.file` no da permiso de escritura.
-    if family.drive_url and "/folders/" in family.drive_url:
-        folder_id = family.drive_url.rsplit("/folders/", 1)[1].split("?")[0]
-        if folder_id:
-            return folder_id
 
-    created = await _create_folder(token, family.name, parent=root)
-    family.drive_url = created.get("webViewLink") or f"https://drive.google.com/drive/folders/{created['id']}"
-    await db.commit()
-    return created["id"]
+async def _meeting_folder_name(db: AsyncSession, meeting: Meeting) -> str:
+    fecha = (meeting.started_at or meeting.created_at).strftime("%Y-%m-%d")
+    reason = await db.get(MeetingReason, meeting.reason_id) if meeting.reason_id else None
+    return f"{fecha} — {_safe(reason.name if reason else meeting.title)}"
+
+
+async def _ensure_meeting_folder(
+    db: AsyncSession, connection: OrgGoogleDrive, token: str, meeting: Meeting
+) -> str:
+    """Carpeta "fecha — motivo" de la reunión, dentro de la de su familia."""
+    async with _lock(f"meeting:{meeting.id}"):
+        await db.refresh(meeting, ["drive_folder_id"])
+        if meeting.drive_folder_id:
+            return meeting.drive_folder_id
+        family = await db.get(Family, meeting.family_id) if meeting.family_id else None
+        parent = await _ensure_family_folder(db, connection, token, family)
+        created = await _create_folder(token, await _meeting_folder_name(db, meeting), parent=parent)
+        meeting.drive_folder_id = created["id"]
+        await db.commit()
+        return created["id"]
+
+
+async def _get_file(token: str, file_id: str) -> dict | None:
+    async with httpx.AsyncClient(timeout=30) as client:
+        response = await client.get(
+            f"{FILES_URL}/{file_id}",
+            params={"supportsAllDrives": "true", "fields": "id,parents,trashed"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    if response.status_code == 404:
+        return None
+    if response.status_code != 200:
+        raise DriveError(_friendly(response.status_code, response.text))
+    return response.json()
+
+
+async def _update_file(token: str, file_id: str, name: str, blob: bytes, mime: str) -> dict | None:
+    """Reemplaza el contenido (y el nombre) de un archivo. None si ya no existe."""
+    files = {
+        "metadata": ("metadata", json.dumps({"name": name}), "application/json; charset=UTF-8"),
+        "file": (name, blob, mime),
+    }
+    async with httpx.AsyncClient(timeout=120) as client:
+        response = await client.patch(
+            f"{UPLOAD_URL}/{file_id}",
+            params={"uploadType": "multipart", "supportsAllDrives": "true", "fields": "id,webViewLink,trashed"},
+            headers={"Authorization": f"Bearer {token}"},
+            files=files,
+        )
+    if response.status_code == 404:
+        return None
+    if response.status_code not in (200, 201):
+        raise DriveError(_friendly(response.status_code, response.text))
+    data = response.json()
+    return None if data.get("trashed") else data
 
 
 async def upload_minutes(meeting_id: uuid.UUID) -> None:
-    """Sube el acta aprobada de una reunión a Drive.
+    """Sube (o reemplaza) el acta de una reunión en el Drive de la sede.
 
     Corre como tarea de fondo: cualquier falla se guarda en last_error, porque
     si no una integración rota es invisible hasta que alguien va a buscar un
     acta a Drive y no está.
     """
     from ..db import SessionLocal
-    from ..routers.exports import _markdown_to_docx
+    from ..routers.exports import _font_of, _markdown_to_docx
 
     async with SessionLocal() as db:
         meeting = await db.get(Meeting, meeting_id)
-        if not meeting:
+        if not meeting or meeting.deleted_at is not None:
+            return
+        # Las internas (directivos, DOE...) no van a la carpeta compartida.
+        if meeting.kind == "interna":
             return
         connection = await get_connection(db, meeting.organization_id)
         if not connection:
@@ -186,10 +266,10 @@ async def upload_minutes(meeting_id: uuid.UUID) -> None:
         minutes = (
             await db.execute(select(Minutes).where(Minutes.meeting_id == meeting_id))
         ).scalar_one_or_none()
-        if not minutes or minutes.status != "approved":
+        if not minutes or not minutes.current_version:
             return
         # Ya está subida esta misma versión: no duplicar el archivo.
-        if minutes.drive_synced_version == minutes.current_version:
+        if minutes.drive_synced_version == minutes.current_version and minutes.drive_file_id:
             return
 
         version = (
@@ -205,20 +285,23 @@ async def upload_minutes(meeting_id: uuid.UUID) -> None:
 
         try:
             token = await _access_token(decrypt_secret(connection.refresh_token_enc) or "")
-            family = await db.get(Family, meeting.family_id) if meeting.family_id else None
-            parent = await _ensure_family_folder(db, connection, token, family)
+            parent = await _ensure_meeting_folder(db, connection, token, meeting)
 
-            fecha = (meeting.started_at or meeting.created_at).strftime("%Y-%m-%d")
-            safe_title = meeting.title[:60].replace("/", "-")
-            name = f"{fecha} — {safe_title} (v{version.version}).docx"
-            blob = _markdown_to_docx(version.body_markdown, meeting.title)
-            created = await _upload(token, name, parent, blob, DOCX_MIME)
+            name = f"Acta {await _meeting_folder_name(db, meeting)}.docx"
+            org = await db.get(Organization, meeting.organization_id)
+            blob = _markdown_to_docx(version.body_markdown, meeting.title, _font_of(org)[0])
+            created = None
+            if minutes.drive_file_id:
+                created = await _update_file(token, minutes.drive_file_id, name, blob, DOCX_MIME)
+            if created is None:
+                created = await _upload(token, name, parent, blob, DOCX_MIME)
 
+            minutes.drive_file_id = created["id"]
             minutes.drive_file_url = created.get("webViewLink")
-            minutes.drive_synced_version = minutes.current_version
+            minutes.drive_synced_version = version.version
             connection.last_error = None
             await db.commit()
-            log.info("drive: acta de %s subida", meeting_id)
+            log.info("drive: acta de %s subida (v%s)", meeting_id, version.version)
         except DriveError as exc:
             connection.last_error = str(exc)
             await db.commit()
@@ -227,6 +310,56 @@ async def upload_minutes(meeting_id: uuid.UUID) -> None:
             connection.last_error = "No se pudo guardar el acta en Drive."
             await db.commit()
             del exc
+
+
+async def upload_recording_to_org(db: AsyncSession, connection: OrgGoogleDrive, meeting: Meeting, path) -> str:
+    """Sube el mp3 a la carpeta de la reunión en el Drive de la sede."""
+    token = await _access_token(decrypt_secret(connection.refresh_token_enc) or "")
+    parent = await _ensure_meeting_folder(db, connection, token, meeting)
+    name = f"Grabación {await _meeting_folder_name(db, meeting)}.mp3"
+    created = await _upload_resumable(token, name, parent, path, "audio/mpeg")
+    return created.get("webViewLink") or f"https://drive.google.com/file/d/{created['id']}/view"
+
+
+async def sync_meeting_folder(meeting_id: uuid.UUID) -> None:
+    """Si a la reunión le cambiaron la familia o el motivo, mueve y renombra su carpeta."""
+    from ..db import SessionLocal
+
+    async with SessionLocal() as db:
+        meeting = await db.get(Meeting, meeting_id)
+        if not meeting or not meeting.drive_folder_id:
+            return
+        connection = await get_connection(db, meeting.organization_id)
+        if not connection:
+            return
+        try:
+            token = await _access_token(decrypt_secret(connection.refresh_token_enc) or "")
+            current = await _get_file(token, meeting.drive_folder_id)
+            if current is None or current.get("trashed"):
+                meeting.drive_folder_id = None
+                await db.commit()
+                return
+            family = await db.get(Family, meeting.family_id) if meeting.family_id else None
+            parent = await _ensure_family_folder(db, connection, token, family)
+            old_parents = ",".join(p for p in current.get("parents", []) if p != parent)
+            params = {"supportsAllDrives": "true", "fields": "id"}
+            if old_parents:
+                params["addParents"] = parent
+                params["removeParents"] = old_parents
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await client.patch(
+                    f"{FILES_URL}/{meeting.drive_folder_id}",
+                    params=params,
+                    headers={"Authorization": f"Bearer {token}"},
+                    json={"name": await _meeting_folder_name(db, meeting)},
+                )
+            if response.status_code not in (200, 201):
+                raise DriveError(_friendly(response.status_code, response.text))
+        except DriveError as exc:
+            connection.last_error = str(exc)
+            await db.commit()
+        except Exception:  # noqa: BLE001 - mover la carpeta nunca rompe la clasificación
+            log.exception("drive: no se pudo mover la carpeta de %s", meeting_id)
 
 
 async def save_connection(

@@ -49,6 +49,8 @@ export interface ParticipantOut {
   name: string;
   email: string | null;
   role_label: string | null;
+  /** Persona de la sede que estuvo: con eso ve la reunión. */
+  user_id: string | null;
 }
 
 export interface SpeakerOut {
@@ -195,6 +197,8 @@ export interface TaskOut {
   text: string;
   assignee_name: string | null;
   assignee_user_id: string | null;
+  /** Responsable de afuera de Echo: le llegó por mail con un link. */
+  assignee_email?: string | null;
   /** Quién dijo en la reunión que se encargaba (las que detecta Echo). */
   suggested_assignee?: string | null;
   due_text: string | null;
@@ -326,6 +330,8 @@ export interface FamilyOut {
   members: FamilyMemberOut[];
   professionals: ProfessionalOut[];
   meetings: number;
+  /** Personas de la sede asignadas: ven todas las reuniones de la familia. */
+  assignees: { user_id: string; name: string }[];
 }
 
 export interface AttachmentOut {

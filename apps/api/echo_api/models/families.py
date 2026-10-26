@@ -46,9 +46,38 @@ class Family(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
     # la lee ni la sincroniza, solo guarda el enlace para tenerlo a mano
     # desde la familia y desde cada reunión suya.
     drive_url: Mapped[str | None] = mapped_column(String(600))
+    # Carpeta que creó Echo en el Drive de la sede (services/drive.py). Aparte
+    # de drive_url porque ese lo puede pisar una persona con una carpeta
+    # ajena, donde `drive.file` no deja escribir.
+    drive_folder_id: Mapped[str | None] = mapped_column(String(120))
 
     members: Mapped[list["FamilyMember"]] = relationship(
         back_populates="family", cascade="all, delete-orphan"
+    )
+
+
+class FamilyAssignment(PKMixin, TimestampMixin, Base):
+    """Personas de la sede asignadas a una familia (la tutora, el DOE que la sigue).
+
+    Quien está asignado ve todas las reuniones de la familia aunque no haya
+    estado en ellas, salvo las privadas. La regla vive en services/access.py.
+    """
+
+    __tablename__ = "family_assignments"
+    __table_args__ = (
+        UniqueConstraint("family_id", "user_id", name="uq_family_assignment"),
+        Index("ix_family_assignments_org_user", "organization_id", "user_id"),
+    )
+
+    family_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("families.id", ondelete="CASCADE"), nullable=False
+    )
+    # Repetido de la familia para cargar "qué familias tengo" sin join.
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
 
 

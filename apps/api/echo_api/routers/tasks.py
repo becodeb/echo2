@@ -17,7 +17,7 @@ from ..models import (
     OrganizationMember,
     User,
 )
-from ..services.access import Scope, meeting_filter, meeting_id_filter
+from ..services.access import Scope, can_assign_to, meeting_filter, meeting_id_filter, member_ranks, scope_rank
 from ..services.audit import audit
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
@@ -30,6 +30,8 @@ class TaskOut(BaseModel):
     text: str
     assignee_name: str | None
     assignee_user_id: uuid.UUID | None
+    # Responsable de afuera de Echo (routers/external.py).
+    assignee_email: str | None = None
     # Quién dijo en la reunión que se encargaba: la pista para repartirla.
     suggested_assignee: str | None = None
     due_text: str | None
@@ -75,6 +77,7 @@ def _task_out(task: ActionItem, meeting_title: str | None) -> TaskOut:
         text=task.text,
         assignee_name=task.assignee_name,
         assignee_user_id=task.assignee_user_id,
+        assignee_email=task.assignee_email,
         suggested_assignee=task.suggested_assignee,
         due_text=task.due_text,
         due_date=task.due_date,
@@ -156,7 +159,13 @@ async def update_task(
         ).scalar_one_or_none()
         if not member:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "El usuario no pertenece a la organización")
+        ranks = await member_ranks(db, ctx.org_id)
+        if not can_assign_to(scope_rank(await ctx.scope(db)), ctx.user.id, member.user_id, ranks.get(member.user_id, 1)):
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN, "Solo podés asignar tareas a personas de tu mismo rol o de uno menor"
+            )
         task.assignee_user_id = data.assignee_user_id
+        task.assignee_email = None
         task.source = "manual" if task.source == "ai" else task.source
         assignee_user = await db.get(User, data.assignee_user_id)
         if assignee_user:

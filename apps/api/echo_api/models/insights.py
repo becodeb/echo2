@@ -66,6 +66,9 @@ class ActionItem(PKMixin, TimestampMixin, Base):
     assignee_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id")
     )
+    # Responsable de afuera de Echo (una terapeuta, un docente de otra sede):
+    # le llega por mail con un link de acceso (models/workspace.py, ExternalAccess).
+    assignee_email: Mapped[str | None] = mapped_column(String(320))
     # Quién dijo en la reunión que se encargaba ("la Directora"): ayuda a
     # repartirla y es el responsable que figura en el acta.
     suggested_assignee: Mapped[str | None] = mapped_column(String(200))

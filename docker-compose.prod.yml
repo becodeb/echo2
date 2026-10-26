@@ -58,6 +58,9 @@ services:
       SMTP_USER: '${SMTP_USER:-}'
       SMTP_PASSWORD: '${SMTP_PASSWORD:-}'
       SMTP_FROM: '${SMTP_FROM:-}'
+      # Resend: si está, los mails salen por su API (services/mailer.py).
+      RESEND_API_KEY: '${RESEND_API_KEY:-}'
+      MAIL_FROM: '${MAIL_FROM:-}'
       SALES_EMAIL: '${SALES_EMAIL:-becodestudio@gmail.com}'
       # Grabaciones de paso (services/recording.py): se suben al Drive de quien
       # grabó y se borran. En un volumen para que un deploy no se lleve un

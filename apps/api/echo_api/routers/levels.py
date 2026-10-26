@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..db import get_db
 from ..deps import OrgContext, get_org_context
 from ..models import LEVELS, MemberLevelAccess, OrganizationMember, User
+from ..services.access import scope_rank
 from ..services.audit import audit
 
 router = APIRouter(prefix="/api/org/access", tags=["levels"])
@@ -33,6 +34,8 @@ class MyAccessOut(BaseModel):
     creatable_levels: list[str]
     managed_levels: list[str]
     needs_level: bool
+    # 3 dirección de la sede, 2 directivo, 1 equipo (services/access.py).
+    rank: int = 1
 
 
 async def _my_access(ctx: OrgContext, db: AsyncSession) -> MyAccessOut:
@@ -44,6 +47,7 @@ async def _my_access(ctx: OrgContext, db: AsyncSession) -> MyAccessOut:
         creatable_levels=scope.creatable_levels,
         managed_levels=[level for level in LEVELS if level in scope.managed_levels],
         needs_level=scope.needs_level,
+        rank=scope_rank(scope),
     )
 
 

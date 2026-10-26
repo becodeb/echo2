@@ -1,8 +1,9 @@
 """Mails que manda el servidor: por Resend (RESEND_API_KEY) o por SMTP.
 
-Hoy: avisos a Becode (pedidos de plan, contacto) y el link de "Olvidé mi
-contraseña". Sin ninguno configurado no manda nada y lo deja en el log: lo
-importante igual queda en la base y en la campanita de los superadmins.
+Hoy: avisos a Becode (pedidos de plan, contacto), el link de "Olvidé mi
+contraseña" y las tareas asignadas a gente de afuera (routers/external.py).
+Sin ninguno configurado no manda nada y lo deja en el log: lo importante
+igual queda en la base y en la campanita de los superadmins.
 """
 import asyncio
 import logging
@@ -15,12 +16,14 @@ from ..config import get_settings
 log = logging.getLogger("echo.mailer")
 
 
-def _send(to: str, subject: str, body: str) -> None:
+def _send(to: str, subject: str, body: str, reply_to: str | None = None) -> None:
     settings = get_settings()
     message = EmailMessage()
     message["From"] = settings.mail_from or settings.smtp_from or settings.smtp_user
     message["To"] = to
     message["Subject"] = subject
+    if reply_to:
+        message["Reply-To"] = reply_to
     message.set_content(body)
     if settings.smtp_port == 465:
         with smtplib.SMTP_SSL(settings.smtp_host, 465, context=ssl.create_default_context(), timeout=20) as smtp:
@@ -40,30 +43,36 @@ def mail_enabled() -> bool:
     return bool(settings.resend_api_key or settings.smtp_host)
 
 
-async def _send_resend(to: str, subject: str, body: str) -> None:
+async def _send_resend(to: str, subject: str, body: str, reply_to: str | None = None) -> None:
     import httpx
 
     settings = get_settings()
     sender = settings.mail_from or settings.smtp_from or "Echo <no-responder@becode.com.ar>"
+    payload = {"from": sender, "to": [to], "subject": subject, "text": body}
+    if reply_to:
+        payload["reply_to"] = reply_to
     async with httpx.AsyncClient(timeout=20) as client:
         response = await client.post(
             "https://api.resend.com/emails",
             headers={"Authorization": f"Bearer {settings.resend_api_key}"},
-            json={"from": sender, "to": [to], "subject": subject, "text": body},
+            json=payload,
         )
         response.raise_for_status()
 
 
-async def send_mail(to: str, subject: str, body: str) -> bool:
-    """True si salió. Nunca levanta: un mail que no sale no corta nada."""
+async def send_mail(to: str, subject: str, body: str, reply_to: str | None = None) -> bool:
+    """True si salió. Nunca levanta: un mail que no sale no corta nada.
+
+    `reply_to`: a quién le llega la respuesta (quien asignó la tarea, por ejemplo).
+    """
     if not mail_enabled() or not to:
         log.info("mail sin Resend ni SMTP configurado (no se manda): %s", subject)
         return False
     try:
         if get_settings().resend_api_key:
-            await _send_resend(to, subject, body)
+            await _send_resend(to, subject, body, reply_to)
         else:
-            await asyncio.to_thread(_send, to, subject, body)
+            await asyncio.to_thread(_send, to, subject, body, reply_to)
         return True
     except Exception as exc:  # noqa: BLE001
         log.warning("no se pudo mandar el mail %r: %s", subject, exc)

@@ -24,6 +24,8 @@ export interface MyAccess {
   creatable_levels: Level[];
   managed_levels: Level[];
   needs_level: boolean;
+  /** 3 dirección de la sede, 2 directivo, 1 equipo (DOE, docentes). */
+  rank: number;
 }
 
 /** Qué ve y qué puede hacer la persona en la sede activa (services/access.py). */

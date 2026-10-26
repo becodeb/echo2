@@ -184,6 +184,14 @@ async def generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instruc
     except Exception as exc:  # noqa: BLE001 - cualquier falla tiene que quedar registrada
         log.exception("falló la generación del acta de %s", meeting_id)
         await _set_generation_state(meeting_id, "failed", friendly_generation_error(exc))
+        return
+    # Al Drive de la sede apenas está, sin esperar a que la aprueben.
+    from .drive import upload_minutes
+
+    try:
+        await upload_minutes(meeting_id)
+    except Exception:  # noqa: BLE001 - Drive nunca tira abajo el acta
+        log.exception("drive: no se pudo subir el acta de %s", meeting_id)
 
 
 async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instructions: str | None = None) -> None:

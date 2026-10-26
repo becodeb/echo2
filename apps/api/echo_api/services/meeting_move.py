@@ -55,15 +55,17 @@ async def move_meeting(db: AsyncSession, meeting: Meeting, target_org_id: uuid.U
             or_(MeetingLink.meeting_id == meeting.id, MeetingLink.related_meeting_id == meeting.id)
         )
     )
-    for table in _tables_to_move():
-        await db.execute(
-            update(table).where(table.c.meeting_id == meeting.id).values(organization_id=target_org_id)
-        )
+    # El número se suelta antes de mover: si no, el acta llega a la sede nueva
+    # con un número que allá ya existe y choca con uq_minutes_number.
     await db.execute(
         update(Minutes)
         .where(Minutes.meeting_id == meeting.id)
         .values(number=None, number_series=None, template_id=None)
     )
+    for table in _tables_to_move():
+        await db.execute(
+            update(table).where(table.c.meeting_id == meeting.id).values(organization_id=target_org_id)
+        )
     meeting.organization_id = target_org_id
     meeting.family_id = None
     meeting.reason_id = None
