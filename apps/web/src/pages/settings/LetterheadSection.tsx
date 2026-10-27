@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api/client";
 import type { LetterheadOut } from "../../api/types";
 import { Select } from "../../components/Select";
-import { Button, Card, Input, Spinner } from "../../components/ui";
+import { Button, Input, Spinner } from "../../components/ui";
+import { Block, Loading } from "./parts";
 
 const LOGO_MAX_BYTES = 400 * 1024;
 
@@ -45,7 +46,7 @@ export function LetterheadSection() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["letterhead"] }),
   });
 
-  if (!form) return <div className="flex justify-center py-10 text-ink-300"><Spinner /></div>;
+  if (!form) return <Loading />;
 
   const set = (field: keyof LetterheadOut) => (event: ChangeEvent<HTMLInputElement>) =>
     setForm({ ...form, [field]: event.target.value });
@@ -69,14 +70,8 @@ export function LetterheadSection() {
   };
 
   return (
-    <Card>
-      <h2 className="mb-1 font-semibold text-ink-900">Membrete</h2>
-      <p className="mb-5 text-sm text-ink-400">
-        Lo que va arriba del acta impresa: encabezado institucional, logo, dirección y firmas. Se
-        usa tal cual, sin pasar por la IA.
-      </p>
-
-      <div className="space-y-4">
+    <div>
+      <Block id="letterhead-logo" title="Logo" hint="Se usa tal cual en el acta impresa, sin pasar por la IA.">
         <div className="flex items-start gap-4">
           <div className="flex h-20 w-32 shrink-0 items-center justify-center rounded-xl border border-dashed border-ink-200 bg-ink-50">
             {form.logo_data_url ? (
@@ -99,70 +94,76 @@ export function LetterheadSection() {
             {logoError && <p className="text-xs text-red-600">{logoError}</p>}
           </div>
         </div>
+      </Block>
 
-        <label className="block">
-          <span className="mb-1.5 block text-sm font-medium text-ink-700">Encabezado (una línea por renglón)</span>
-          <textarea
-            value={linesText}
-            onChange={(event) => setLinesText(event.target.value)}
-            rows={4}
-            placeholder={"Dirección General de Cultura y Educación\nRegión 11\nDistrito Escobar"}
-            className="w-full rounded-xl border border-ink-200 px-3 py-2 text-sm leading-relaxed focus:border-accent-500 focus:outline-none"
+      <Block id="letterhead-header" title="Encabezado y datos">
+        <div className="space-y-4">
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium text-ink-700">Encabezado (una línea por renglón)</span>
+            <textarea
+              value={linesText}
+              onChange={(event) => setLinesText(event.target.value)}
+              rows={4}
+              placeholder={"Dirección General de Cultura y Educación\nRegión 11\nDistrito Escobar"}
+              className="w-full rounded-xl border border-ink-200 px-3 py-2 text-sm leading-relaxed focus:border-accent-500 focus:outline-none"
+            />
+          </label>
+  
+          <Input label="Institución" value={form.institution} onChange={set("institution")} />
+          <Input label="Dirección" value={form.address} onChange={set("address")} placeholder="Calle 123, Ciudad" />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input label="Teléfono" value={form.phone} onChange={set("phone")} />
+            <Input label="Email" value={form.email} onChange={set("email")} />
+          </div>
+          <Input label="Título del acta" value={form.title} onChange={set("title")} placeholder="Acta de entrevista" />
+          <Select
+            label="Fuente del acta"
+            value={form.font ?? "arial"}
+            onChange={(font) => setForm({ ...form, font: font as LetterheadOut["font"] })}
+            options={[
+              { value: "arial", label: "Arial (sans serif)" },
+              { value: "calibri", label: "Calibri (sans serif)" },
+              { value: "times", label: "Times New Roman (con serif)" },
+              { value: "trebuchet", label: "Trebuchet MS (sans serif)" },
+            ]}
           />
-        </label>
-
-        <Input label="Institución" value={form.institution} onChange={set("institution")} />
-        <Input label="Dirección" value={form.address} onChange={set("address")} placeholder="Calle 123, Ciudad" />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Input label="Teléfono" value={form.phone} onChange={set("phone")} />
-          <Input label="Email" value={form.email} onChange={set("email")} />
-        </div>
-        <Input label="Título del acta" value={form.title} onChange={set("title")} placeholder="Acta de entrevista" />
-        <Select
-          label="Fuente del acta"
-          value={form.font ?? "arial"}
-          onChange={(font) => setForm({ ...form, font: font as LetterheadOut["font"] })}
-          options={[
-            { value: "arial", label: "Arial (sans serif)" },
-            { value: "calibri", label: "Calibri (sans serif)" },
-            { value: "times", label: "Times New Roman (con serif)" },
-            { value: "trebuchet", label: "Trebuchet MS (sans serif)" },
-          ]}
-        />
-        <p className="-mt-2 text-xs text-ink-400">Se usa en el acta impresa, en Word y en PDF.</p>
-        <Input
-          label="Lugar en el acta de entrevista"
-          value={form.interview_place}
-          onChange={set("interview_place")}
-          placeholder="la institución educativa de nivel primario denominada …, registro de DIEGEP Nº …"
-        />
-        <p className="-mt-2 text-xs text-ink-400">
-          Completa el párrafo del formulario: «A los … días del mes de … en las instalaciones de <em>esto</em>, se reúnen…».
-        </p>
-
-        <label className="block">
-          <span className="mb-1.5 block text-sm font-medium text-ink-700">Firmas al pie (una por renglón)</span>
-          <textarea
-            value={signaturesText}
-            onChange={(event) => setSignaturesText(event.target.value)}
-            rows={3}
-            placeholder={"Firma docente\nFirma familia"}
-            className="w-full rounded-xl border border-ink-200 px-3 py-2 text-sm leading-relaxed focus:border-accent-500 focus:outline-none"
+          <p className="-mt-2 text-xs text-ink-400">Se usa en el acta impresa, en Word y en PDF.</p>
+          <Input
+            label="Lugar en el acta de entrevista"
+            value={form.interview_place}
+            onChange={set("interview_place")}
+            placeholder="la institución educativa de nivel primario denominada …, registro de DIEGEP Nº …"
           />
-        </label>
-
-        <div className="flex items-center gap-3">
-          <Button onClick={() => save.mutate()} disabled={save.isPending}>
-            {save.isPending ? <Spinner /> : "Guardar membrete"}
-          </Button>
-          {save.isSuccess && <span className="text-sm text-emerald-600">Guardado ✓</span>}
-          {save.isError && (
-            <span className="text-sm text-red-600">
-              {save.error instanceof Error ? save.error.message : "No se pudo guardar"}
-            </span>
-          )}
+          <p className="-mt-2 text-xs text-ink-400">
+            Completa el párrafo del formulario: «A los … días del mes de … en las instalaciones de <em>esto</em>, se reúnen…».
+          </p>
         </div>
+      </Block>
+
+      <Block id="letterhead-signatures" title="Firmas al pie" hint="Una por renglón.">
+        <textarea
+          value={signaturesText}
+          onChange={(event) => setSignaturesText(event.target.value)}
+          rows={3}
+          aria-label="Firmas al pie"
+          placeholder={"Firma docente\nFirma familia"}
+          className="w-full rounded-xl border border-ink-200 px-3 py-2 text-sm leading-relaxed focus:border-accent-500 focus:outline-none"
+        />
+      </Block>
+
+      {/* Un solo Guardar para todo el membrete, siempre a la vista. -bottom-10 y
+          pb-14: se pega al borde de la ventana, tapando el margen de abajo. */}
+      <div className="sticky -bottom-10 -mb-10 flex items-center gap-3 border-t border-ink-100 bg-white pb-14 pt-3">
+        <Button onClick={() => save.mutate()} disabled={save.isPending}>
+          {save.isPending ? <Spinner /> : "Guardar membrete"}
+        </Button>
+        {save.isSuccess && <span className="text-sm text-emerald-600">Guardado ✓</span>}
+        {save.isError && (
+          <span className="text-sm text-red-600">
+            {save.error instanceof Error ? save.error.message : "No se pudo guardar"}
+          </span>
+        )}
       </div>
-    </Card>
+    </div>
   );
 }

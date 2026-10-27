@@ -51,8 +51,14 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     { id: "ask", label: "Preguntale a Echo", hint: "Chat global", run: () => go("/ask") },
     { id: "tasks", label: "Mi trabajo", run: () => go("/tasks") },
     { id: "projects", label: "Proyectos", run: () => go("/projects") },
-    { id: "settings", label: "Configuración", run: () => go("/settings") },
-  ].filter((action) => !query || action.label.toLowerCase().includes(query.toLowerCase()));
+    { id: "settings", label: "Ajustes", hint: "Ctrl ,", run: () => go("/settings") },
+  ].filter(
+    (action) =>
+      !query ||
+      action.label.toLowerCase().includes(query.toLowerCase()) ||
+      // Quien busca "configuración" o "preferencias" también quiere Ajustes.
+      (action.id === "settings" && /^(conf|pref|ajus)/i.test(query.trim())),
+  );
 
   const results: Action[] = [
     ...staticActions,

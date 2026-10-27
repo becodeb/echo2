@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { MeetingOut } from "../api/types";
@@ -14,6 +14,7 @@ import { Icon, type IconName } from "./icons";
 import { NotificationsPanel } from "./NotificationsPanel";
 import { VoicePrompt } from "./VoicePrompt";
 import { useTitle } from "../lib/useTitle";
+import { closeSettings, usePageLocation } from "../pages/settings/pageLocation";
 // El panel de preguntas trae react-markdown: se baja recién al abrirlo, no al entrar.
 const AskPanel = lazy(() => import("./AskPanel").then((module) => ({ default: module.AskPanel })));
 import { CreditDots, effectivePlan, PLAN_NAME, useBilling } from "./billing";
@@ -61,7 +62,6 @@ function pageTitle(pathname: string): string {
     "/admin": "Panel de Becode",
   };
   if (exact[pathname]) return exact[pathname];
-  if (pathname.startsWith("/settings")) return "Ajustes";
   if (pathname.startsWith("/meetings/")) return "Reunión";
   if (pathname.startsWith("/projects/")) return "Proyecto";
   if (pathname.startsWith("/people/")) return "Persona";
@@ -69,8 +69,13 @@ function pageTitle(pathname: string): string {
 }
 
 export function Layout({ children }: { children: ReactNode }) {
-  const routeTitle = pageTitle(useLocation().pathname);
-  useTitle(routeTitle);
+  // Con Ajustes abierto la URL es /settings/..., pero atrás sigue la página de antes.
+  const { page: location, settingsOpen } = usePageLocation();
+  useTitle(settingsOpen ? "Ajustes" : pageTitle(location.pathname));
+  const navigate = useNavigate();
+  const settingsOpenRef = useRef(settingsOpen);
+  settingsOpenRef.current = settingsOpen;
+  const openSettings = () => navigate("/settings");
   const { user, activeOrg } = useAuth();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
@@ -78,7 +83,6 @@ export function Layout({ children }: { children: ReactNode }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const { data: myAccess } = useMyAccess();
   const seesInternal = useSeesInternal();
-  const location = useLocation();
   // Dentro de una reunión interna se marca su sección y no "Reuniones". Lee la
   // reunión que la página ya cargó: no la vuelve a pedir.
   const openMeetingId = /^\/meetings\/([^/]+)/.exec(location.pathname)?.[1];
@@ -104,6 +108,13 @@ export function Layout({ children }: { children: ReactNode }) {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setPaletteOpen((open) => !open);
+      }
+      // Ctrl/Cmd + , abre (o cierra) Ajustes, como en la mayoría de las apps.
+      if ((event.ctrlKey || event.metaKey) && event.key === ",") {
+        event.preventDefault();
+        setPaletteOpen(false);
+        if (settingsOpenRef.current) closeSettings(navigate);
+        else navigate("/settings");
       }
     };
     window.addEventListener("keydown", onKey);
@@ -214,6 +225,7 @@ export function Layout({ children }: { children: ReactNode }) {
           <RoundButton label="Notificaciones" onClick={() => setNotificationsOpen((open) => !open)} badge={unread} toggle="notifications" active={notificationsOpen}>
             <Icon name="bell" />
           </RoundButton>
+          <SettingsButton open={settingsOpen} onClick={openSettings} />
           <ProfileMenu />
         </header>
         {!live && (
@@ -226,6 +238,8 @@ export function Layout({ children }: { children: ReactNode }) {
             onNotifications={() => setNotificationsOpen((open) => !open)}
             notificationsOpen={notificationsOpen}
             unread={unread}
+            settingsOpen={settingsOpen}
+            onSettings={openSettings}
           />
         )}
 
@@ -315,6 +329,8 @@ function TopBar({
   onNotifications,
   notificationsOpen,
   unread,
+  settingsOpen,
+  onSettings,
 }: {
   title: string;
   // Nombre de la sede que un superadmin está viendo sin ser miembro.
@@ -325,6 +341,8 @@ function TopBar({
   onNotifications: () => void;
   notificationsOpen: boolean;
   unread: number;
+  settingsOpen: boolean;
+  onSettings: () => void;
 }) {
   return (
     <div className="hidden h-14 shrink-0 items-center gap-3 border-b border-ink-100 bg-white px-5 md:flex">
@@ -364,8 +382,24 @@ function TopBar({
       <RoundButton label="Notificaciones" onClick={onNotifications} badge={unread} toggle="notifications" active={notificationsOpen}>
         <Icon name="bell" />
       </RoundButton>
+      <SettingsButton open={settingsOpen} onClick={onSettings} />
       <ProfileMenu />
     </div>
+  );
+}
+
+/** La ruedita de Ajustes: gira media vuelta al abrir la ventana y vuelve al cerrarla. */
+function SettingsButton({ open, onClick }: { open: boolean; onClick: () => void }) {
+  return (
+    <RoundButton label="Ajustes" onClick={onClick} active={open}>
+      <span
+        className={`flex transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none ${
+          open ? "rotate-180" : ""
+        }`}
+      >
+        <Icon name="gear" />
+      </span>
+    </RoundButton>
   );
 }
 
@@ -460,7 +494,7 @@ function ProfileMenu() {
               <Icon name="usage" size={17} /> Consumo
             </button>
             <button type="button" role="menuitem" onClick={() => go("/settings")} className={item}>
-              <Icon name="settings" size={17} /> Ajustes
+              <Icon name="gear" size={17} /> Ajustes
             </button>
             {user.is_superadmin && (
               <button type="button" role="menuitem" onClick={() => go("/admin")} className={item}>

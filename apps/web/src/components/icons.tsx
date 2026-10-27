@@ -37,6 +37,18 @@ export type IconName =
   | "admin"
   | "usage"
   | "settings"
+  | "gear"
+  | "mic"
+  | "cloud"
+  | "shield"
+  | "building"
+  | "layers"
+  | "hash"
+  | "letterhead"
+  | "book"
+  | "device"
+  | "chevron-left"
+  | "close"
   | "search"
   | "bell"
   | "plans"
@@ -140,6 +152,90 @@ export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
         <Svg size={size}>
           <circle cx="12" cy="12" r="3" />
           <path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6 18 18M6 18l1.4-1.4M16.6 7.4 18 6" />
+        </Svg>
+      );
+    case "gear":
+      // Ruedita con dientes redondeados: abre los ajustes y gira al tocarla.
+      return (
+        <Svg size={size}>
+          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+          <circle cx="12" cy="12" r="3" />
+        </Svg>
+      );
+    case "mic":
+      return (
+        <Svg size={size}>
+          <rect x="9" y="3.5" width="6" height="11" rx="3" />
+          <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v2.5" />
+        </Svg>
+      );
+    case "cloud":
+      return (
+        <Svg size={size}>
+          <path d="M7.5 18.5a4 4 0 0 1-.6-7.95 5.5 5.5 0 0 1 10.6 1.45 3.25 3.25 0 0 1-.5 6.5h-9.5z" />
+        </Svg>
+      );
+    case "shield":
+      return (
+        <Svg size={size}>
+          <path d="M12 3.5 5.5 6v5.5c0 4 2.8 7.3 6.5 9 3.7-1.7 6.5-5 6.5-9V6L12 3.5z" />
+          <path d="m9.3 12.2 1.9 1.9 3.6-3.8" />
+        </Svg>
+      );
+    case "building":
+      return (
+        <Svg size={size}>
+          <path d="M4.5 20.5h15M6 20.5V9.5l6-4.5 6 4.5v11" />
+          <path d="M10 20.5v-4a2 2 0 0 1 4 0v4M10 11.5h.01M14 11.5h.01" />
+        </Svg>
+      );
+    case "layers":
+      return (
+        <Svg size={size}>
+          <path d="m12 4 8 4-8 4-8-4 8-4z" />
+          <path d="m4 12 8 4 8-4M4 16l8 4 8-4" />
+        </Svg>
+      );
+    case "hash":
+      return (
+        <Svg size={size}>
+          <path d="M9.5 4.5 8 19.5M16 4.5l-1.5 15M5 9h14.5M4.5 15H19" />
+        </Svg>
+      );
+    case "letterhead":
+      // Una hoja con la franja del encabezado y el logo arriba.
+      return (
+        <Svg size={size}>
+          <rect x="5" y="3.5" width="14" height="17" rx="2" />
+          <circle cx="9" cy="8" r="1.4" />
+          <path d="M12.5 7.3h3.5M12.5 9h2.5M8 13h8M8 16.5h5" />
+        </Svg>
+      );
+    case "book":
+      return (
+        <Svg size={size}>
+          <path d="M5 5.5A2 2 0 0 1 7 3.5h11.5v14H7a2 2 0 0 0-2 2v-14z" />
+          <path d="M5 19.5a2 2 0 0 0 2 1h11.5v-3M9 8h5.5" />
+        </Svg>
+      );
+    case "device":
+      return (
+        <Svg size={size}>
+          <rect x="4.5" y="6" width="15" height="12" rx="3" />
+          <circle cx="12" cy="12" r="2.2" />
+          <path d="M8 3.5h8" />
+        </Svg>
+      );
+    case "chevron-left":
+      return (
+        <Svg size={size}>
+          <path d="m14.5 6-6 6 6 6" />
+        </Svg>
+      );
+    case "close":
+      return (
+        <Svg size={size}>
+          <path d="m6.5 6.5 11 11M17.5 6.5l-11 11" />
         </Svg>
       );
     case "search":

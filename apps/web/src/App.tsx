@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import OnboardingOrg from "./pages/OnboardingOrg";
 import Dashboard from "./pages/Dashboard";
+import { usePageLocation } from "./pages/settings/pageLocation";
 
 const loadMeetingLive = () => import("./pages/MeetingLive");
 const MeetingLive = lazy(loadMeetingLive);
@@ -194,10 +195,23 @@ export default function App() {
 
   return (
     <Layout>
+      <AppRoutes superadmin={user.is_superadmin} />
+    </Layout>
+  );
+}
+
+/**
+ * Las páginas de la app. Ajustes (/settings/...) no es una página: es una
+ * ventana encima de la última página abierta (o del Inicio, si se entró directo).
+ */
+function AppRoutes({ superadmin }: { superadmin: boolean }) {
+  const { page, settingsOpen } = usePageLocation();
+  return (
+    <>
       {/* Sin la carita a pantalla completa: dentro del marco, un instante en blanco
           se ve como parte de la transición. */}
       <Suspense fallback={<div className="h-full" />}>
-        <Routes>
+        <Routes location={page}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/meetings" element={<Meetings />} />
           <Route path="/internal" element={<InternalMeetings />} />
@@ -212,15 +226,19 @@ export default function App() {
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/ask" element={<AskEcho />} />
           <Route path="/search" element={<SearchPage />} />
-          <Route path="/settings/*" element={<Settings />} />
           <Route path="/plans" element={<Plans />} />
           <Route path="/usage" element={<Usage />} />
           {/* El panel de superadmin no existe para el resto: sin la ruta, /admin
               cae en el catch-all y vuelve al inicio. */}
-          {user.is_superadmin && <Route path="/admin" element={<Admin />} />}
+          {superadmin && <Route path="/admin" element={<Admin />} />}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
-    </Layout>
+      {settingsOpen && (
+        <Suspense fallback={null}>
+          <Settings />
+        </Suspense>
+      )}
+    </>
   );
 }
