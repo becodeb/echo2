@@ -515,6 +515,83 @@ async def set_meeting_staff(
     return await get_meeting(meeting_id, ctx, db)
 
 
+class MoveSedeIn(BaseModel):
+    organization_id: uuid.UUID
+    # Nivel en la sede nueva. Sin él, el mismo de ahora si allá puede crear en
+    # ese nivel; si no, el primero en el que puede.
+    level: str | None = None
+
+
+@router.post("/{meeting_id}/sede")
+async def move_to_other_sede(
+    meeting_id: uuid.UUID,
+    data: MoveSedeIn,
+    ctx: OrgContext = Depends(get_org_context),
+    db: AsyncSession = Depends(get_db),
+):
+    """Pasar la reunión a otra sede de quien la grabó (pedido de Bauti, 27/10).
+
+    Para quien trabaja en las dos sedes y grabó en la que no era. La pasa
+    quien la grabó o quien administra la sede donde está, y solo a una sede de
+    la que esa persona también es parte, en un nivel donde puede crear
+    reuniones. Se mueve todo lo de la reunión y se suelta lo que es de la sede
+    vieja (familia, motivo, proyectos, número de acta y carpeta de Drive):
+    services/meeting_move.py. Queda en la auditoría de las dos sedes.
+    """
+    from ..models import Minutes, Organization
+    from ..services import meeting_move
+    from ..services.access import load_scope
+
+    meeting = await get_meeting_or_404(meeting_id, ctx, db)
+    if meeting.created_by != ctx.user.id and ctx.role not in ("admin", "owner"):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "La cambia de sede quien la grabó o quien administra la sede"
+        )
+    if meeting.status in ("live", "paused", "processing"):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Se puede cambiar de sede cuando termina de grabarse y procesarse"
+        )
+    if meeting.kind == "interna":
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "Las reuniones internas son de un grupo de la sede: no se cambian"
+        )
+    if data.organization_id == meeting.organization_id:
+        raise HTTPException(status.HTTP_409_CONFLICT, "La reunión ya está en esa sede")
+    target = await db.get(Organization, data.organization_id)
+    membership = (
+        await db.execute(
+            select(OrganizationMember).where(
+                OrganizationMember.organization_id == data.organization_id,
+                OrganizationMember.user_id == ctx.user.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if target is None or target.deleted_at is not None or target.is_personal or membership is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No sos parte de esa sede")
+    creatable = (await load_scope(db, target.id, ctx.user.id, membership.role)).creatable_levels
+    if data.level is not None and data.level not in creatable:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "En esa sede no podés crear reuniones en ese nivel")
+    level = data.level or (meeting.level if meeting.level in creatable else (creatable[0] if creatable else None))
+    if level is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "En esa sede todavía no tenés un nivel asignado")
+
+    source_id = meeting.organization_id
+    await meeting_move.move_meeting(db, meeting, target.id, level)
+    # La carpeta de Drive y el archivo del acta eran del Drive de la sede vieja.
+    meeting.drive_folder_id = None
+    meeting.student_ids = None
+    minutes = (await db.execute(select(Minutes).where(Minutes.meeting_id == meeting.id))).scalar_one_or_none()
+    if minutes is not None:
+        minutes.drive_file_id = None
+        minutes.drive_file_url = None
+        minutes.drive_synced_version = None
+    detail = {"by": ctx.user.email, "from": str(source_id), "to": str(target.id), "title": meeting.title}
+    await audit(db, source_id, ctx.user.id, "meeting.moved_out", "meeting", str(meeting.id), detail=detail)
+    await audit(db, target.id, ctx.user.id, "meeting.moved_in", "meeting", str(meeting.id), detail=detail)
+    await db.commit()
+    return {"meeting_id": str(meeting.id), "organization_id": str(target.id), "level": meeting.level}
+
+
 @router.delete("/{meeting_id}", status_code=204)
 async def delete_meeting(
     meeting_id: uuid.UUID,

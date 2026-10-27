@@ -119,3 +119,50 @@ def test_moving_an_acta_whose_number_already_exists_in_the_campus(client):
     )
     assert moved.status_code == 200, moved.text
     assert client.get(f"/api/meetings/{moved_id}/minutes", headers=campus.headers).json()["number"] is None
+
+
+def test_quien_esta_en_las_dos_sedes_cambia_su_reunion_de_sede(client):
+    """Karina graba en Nordelta una reunión que era de Puertos y la pasa ella misma (27/10)."""
+    from test_levels import Member, _grant
+
+    nordelta = EchoTestUser(client, name="Dirección Nordelta", org_name="Nordelta")
+    puertos = EchoTestUser(client, name="Dirección Puertos", org_name="Puertos")
+    karina = Member(client, nordelta, "Karina")
+    _grant(client, nordelta, karina, "primaria", "limitado")
+    # La suman también a Puertos.
+    invite = client.post("/api/org/invites", json={"email": _sql(
+        "select email from users where id = :id", id=karina.user_id)[0][0], "role": "member"}, headers=puertos.headers).json()
+    accepted = client.post("/api/auth/invites/accept", json={"token": invite["token"]}, headers={"Authorization": f"Bearer {karina.token}"})
+    assert accepted.status_code == 200, accepted.text
+    _grant(client, puertos, type("M", (), {"user_id": karina.user_id})(), "inicial", "limitado")
+    in_puertos = {"Authorization": f"Bearer {karina.token}", "X-Organization-Id": puertos.org_id}
+
+    meeting_id = client.post("/api/meetings", json={"title": "Era de Puertos", "level": "primaria"}, headers=karina.headers).json()["id"]
+    otra = Member(client, nordelta, "Otra")
+    _grant(client, nordelta, otra, "primaria", "limitado")
+
+    def move(headers, org_id, **extra):
+        return client.post(f"/api/meetings/{meeting_id}/sede", json={"organization_id": org_id, **extra}, headers=headers)
+
+    # Grabándose no se mueve.
+    client.post(f"/api/meetings/{meeting_id}/start", headers=karina.headers)
+    assert move(karina.headers, puertos.org_id).status_code == 409
+    _sql("update meetings set status = 'completed' where id = :id", id=meeting_id)
+
+    # A una sede de la que no es parte, no.
+    ajena = EchoTestUser(client, name="Otra escuela", org_name="Ajena")
+    assert move(karina.headers, ajena.org_id).status_code == 404
+    # En Puertos no tiene primaria: con ese nivel, no.
+    assert move(karina.headers, puertos.org_id, level="primaria").status_code == 403
+
+    moved = move(karina.headers, puertos.org_id)
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["level"] == "inicial"  # el único en el que puede crear allá
+    assert client.get(f"/api/meetings/{meeting_id}", headers=karina.headers).status_code == 404
+    assert client.get(f"/api/meetings/{meeting_id}", headers=in_puertos).json()["level"] == "inicial"
+    rows = _sql("select action from audit_logs where target_id = :id and action like 'meeting.moved%'", id=meeting_id)
+    assert sorted(r[0] for r in rows) == ["meeting.moved_in", "meeting.moved_out"]
+    # Quien no la grabó (y no administra) no la puede mover.
+    assert client.post(
+        f"/api/meetings/{meeting_id}/sede", json={"organization_id": nordelta.org_id}, headers=otra.headers
+    ).status_code == 404

@@ -90,6 +90,7 @@ export default function MeetingDetail() {
           <h1 className="min-w-0 break-words text-2xl font-semibold tracking-tight text-ink-900">{meeting.title}</h1>
           {(meeting.status === "processing" || meeting.status === "failed") && <MeetingStatus status={meeting.status} />}
           <div className="ml-auto flex gap-2">
+            <ChangeSedeButton meeting={meeting} />
             {user?.is_superadmin && <MoveMeetingButton meeting={meeting} />}
             <ShareButton meetingId={meeting.id} />
             <DeleteMeetingButton meeting={meeting} />
@@ -223,6 +224,88 @@ function DeleteMeetingButton({ meeting }: { meeting: MeetingOut }) {
             <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button variant="danger" onClick={() => remove.mutate()} disabled={remove.isPending}>
               {remove.isPending ? <Spinner /> : "Borrar"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </>
+  );
+}
+
+/**
+ * Cambiar la reunión de sede, para quien trabaja en las dos (Nordelta y
+ * Puertos) y grabó en la que no era. La ve quien la grabó o quien administra
+ * la sede; el servidor revisa que también sea parte de la otra
+ * (routers/meetings.py, move_to_other_sede). Después rehace el acta con el
+ * formato de la sede nueva.
+ */
+function ChangeSedeButton({ meeting }: { meeting: MeetingOut }) {
+  const { user, activeOrg, organizations, switchOrg } = useAuth();
+  const others = organizations.filter((org) => !org.is_personal && org.id !== activeOrg?.id);
+  const [open, setOpen] = useState(false);
+  // Con una sola otra sede (Nordelta ↔ Puertos) ya viene elegida.
+  const [target, setTarget] = useState(others.length === 1 ? others[0].id : "");
+  const [redo, setRedo] = useState(true);
+  const canMove =
+    others.length > 0 &&
+    meeting.kind !== "interna" &&
+    !["live", "paused", "processing"].includes(meeting.status) &&
+    (meeting.created_by === user?.id || activeOrg?.role === "admin" || activeOrg?.role === "owner");
+
+  const move = useMutation({
+    mutationFn: async () => {
+      await api(`/api/meetings/${meeting.id}/sede`, {
+        method: "POST",
+        body: JSON.stringify({ organization_id: target }),
+      });
+      // La reunión ahora vive en la otra sede: se sigue ahí.
+      switchOrg(target);
+      if (redo) {
+        await api(`/api/meetings/${meeting.id}/minutes/generate`, { method: "POST", body: "{}" }).catch(() => undefined);
+      }
+    },
+    onSuccess: () => {
+      window.location.href = `/meetings/${meeting.id}?tab=minutes`;
+    },
+  });
+
+  if (!canMove) return null;
+
+  return (
+    <>
+      <Button variant="ghost" onClick={() => setOpen(true)}>Cambiar de sede</Button>
+      <Modal open={open} onClose={() => setOpen(false)} title="Cambiar de sede">
+        <div className="space-y-4">
+          <p className="text-sm text-ink-600">
+            Pasa «{meeting.title}» con su transcripción, acta y tareas a otra sede tuya. La familia, el motivo y los
+            proyectos son de esta sede: se sueltan y los cargás de nuevo allá. Queda en el mismo nivel si allá podés
+            crear reuniones en él; si no, en el tuyo.
+          </p>
+          <Select
+            label="Sede"
+            value={target}
+            onChange={setTarget}
+            options={others.map((org) => ({ value: org.id, label: org.name }))}
+            placeholder="Elegir sede…"
+          />
+          <label className="flex items-center gap-2 text-sm text-ink-700">
+            <input
+              type="checkbox"
+              checked={redo}
+              onChange={(event) => setRedo(event.target.checked)}
+              className="h-4 w-4 rounded border-ink-300"
+            />
+            Rehacer el acta con el formato de la sede nueva
+          </label>
+          {move.isError && (
+            <p className="text-sm text-red-600">
+              {move.error instanceof Error ? move.error.message : "No se pudo cambiar de sede"}
+            </p>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button onClick={() => move.mutate()} disabled={!target || move.isPending}>
+              {move.isPending ? <Spinner /> : "Cambiar de sede"}
             </Button>
           </div>
         </div>
