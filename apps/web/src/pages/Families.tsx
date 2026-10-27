@@ -1,287 +1,18 @@
-import { useCallback, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Tabs } from "../components/Tabs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
-import type { FamilyMemberOut, FamilyOut, ProfessionalOut } from "../api/types";
-import { FamilyMeetingsPanel } from "../components/FamilyMeetingsPanel";
+import type { FamilyOut, ProfessionalOut } from "../api/types";
+import { LevelBadge } from "../components/FamilyLevel";
 import { FamilyImportButton } from "../components/FamilyImport";
-import { PeoplePicker } from "../components/PeoplePicker";
-import { useMyAccess } from "../state/access";
-import { Select } from "../components/Select";
-import { Badge, Button, Card, EmptyState, Input, Modal, Spinner } from "../components/ui";
-
-const RELATIONSHIPS: FamilyMemberOut["relationship_type"][] = [
-  "madre",
-  "padre",
-  "tutor",
-  "estudiante",
-  "otro",
-];
-
-// ── Detalle de una familia ───────────────────────────────────────
+import { LEVELS, LEVEL_LABEL, type Level } from "../state/access";
+import { Button, Card, EmptyState, Input, Modal, Spinner } from "../components/ui";
 
 /**
- * Personas de la sede asignadas a la familia: ven todas sus reuniones (menos
- * las privadas). Las asignan los directivos; el resto solo ve quiénes son.
+ * Familias de la sede. Cada una abre su página (pages/FamilyDetail.tsx); acá
+ * se buscan y se filtran por el nivel de sus hijos.
  */
-function FamilyAssignees({ family }: { family: FamilyOut }) {
-  const queryClient = useQueryClient();
-  const { data: access } = useMyAccess();
-  const canAssign = (access?.rank ?? 1) >= 2;
-  const save = useMutation({
-    mutationFn: (ids: string[]) =>
-      api(`/api/families/${family.id}/assignees`, { method: "PUT", body: JSON.stringify({ user_ids: ids }) }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["families"] }),
-  });
-  const ids = family.assignees.map((assignee) => assignee.user_id);
-
-  if (!canAssign) {
-    return (
-      <div className="space-y-1">
-        <span className="block text-sm font-medium text-ink-700">Asignadas a la familia</span>
-        <p className="text-sm text-ink-500">
-          {family.assignees.length
-            ? family.assignees.map((assignee) => assignee.name).join(", ")
-            : "Nadie todavía. Las asigna un directivo."}
-        </p>
-      </div>
-    );
-  }
-  return (
-    <div>
-      <PeoplePicker
-        label="Asignadas a la familia"
-        hint="Ven todas las reuniones de la familia, aunque no hayan estado (menos las privadas)."
-        value={ids}
-        onChange={(next) => save.mutate(next)}
-      />
-      {save.isPending && <p className="mt-1 text-xs text-ink-400">Guardando…</p>}
-      {save.isError && <p className="mt-1 text-xs text-red-600">{(save.error as Error).message}</p>}
-    </div>
-  );
-}
-
-function FamilyDetail({ family }: { family: FamilyOut }) {
-  const queryClient = useQueryClient();
-  const [name, setName] = useState("");
-  const [relationship, setRelationship] =
-    useState<FamilyMemberOut["relationship_type"]>("madre");
-  const [drive, setDrive] = useState(family.drive_url ?? "");
-  const [curso, setCurso] = useState("");
-  const [linking, setLinking] = useState("");
-
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["families"] });
-
-  const { data: professionals } = useQuery({
-    queryKey: ["professionals"],
-    queryFn: () => api<ProfessionalOut[]>("/api/professionals"),
-  });
-
-  const addMember = useMutation({
-    mutationFn: () =>
-      api<FamilyMemberOut>(`/api/families/${family.id}/members`, {
-        method: "POST",
-        body: JSON.stringify({
-          name,
-          relationship_type: relationship,
-          // El estudiante no es responsable: su ausencia no cuenta como
-          // "faltó un tutor".
-          is_guardian: relationship !== "estudiante",
-          curso: relationship === "estudiante" ? curso.trim() || null : null,
-        }),
-      }),
-    onSuccess: () => {
-      setName("");
-      setCurso("");
-      setRelationship("madre");
-      invalidate();
-    },
-  });
-
-  const removeMember = useMutation({
-    mutationFn: (memberId: string) =>
-      api(`/api/families/members/${memberId}`, { method: "DELETE" }),
-    onSuccess: invalidate,
-  });
-
-  const saveDrive = useMutation({
-    mutationFn: () =>
-      api<FamilyOut>(`/api/families/${family.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          name: family.name,
-          reference: family.reference,
-          notes: family.notes,
-          drive_url: drive || null,
-        }),
-      }),
-    onSuccess: invalidate,
-  });
-
-  const linkPro = useMutation({
-    mutationFn: (professionalId: string) =>
-      api(`/api/families/${family.id}/professionals/${professionalId}`, { method: "PUT" }),
-    onSuccess: () => {
-      setLinking("");
-      invalidate();
-    },
-  });
-
-  const unlinkPro = useMutation({
-    mutationFn: (professionalId: string) =>
-      api(`/api/families/${family.id}/professionals/${professionalId}`, { method: "DELETE" }),
-    onSuccess: invalidate,
-  });
-
-  const linkedIds = new Set(family.professionals.map((pro) => pro.id));
-  const available = (professionals ?? []).filter((pro) => !linkedIds.has(pro.id));
-
-  return (
-    <div className="space-y-5 border-t border-ink-100 pt-4">
-      {/* Carpeta de Drive */}
-      <div>
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="min-w-[220px] flex-1">
-            <Input
-              label="Carpeta de Drive"
-              placeholder="https://drive.google.com/drive/folders/…"
-              value={drive}
-              onChange={(event) => setDrive(event.target.value)}
-            />
-          </div>
-          <Button variant="soft" onClick={() => saveDrive.mutate()} disabled={saveDrive.isPending}>
-            {saveDrive.isPending ? <Spinner /> : "Guardar"}
-          </Button>
-          {family.drive_url && (
-            <a
-              href={family.drive_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="pb-2 text-sm font-medium text-accent-600 hover:underline"
-            >
-              Abrir ↗
-            </a>
-          )}
-        </div>
-        <p className="mt-1 text-xs text-ink-400">
-          Echo guarda el enlace, no el contenido: los informes y el contexto siguen viviendo en tu
-          Drive. El enlace aparece en cada reunión de esta familia.
-        </p>
-      </div>
-
-      <FamilyAssignees family={family} />
-
-      {/* Integrantes */}
-      <div className="space-y-2">
-        <span className="block text-sm font-medium text-ink-700">Integrantes</span>
-        {family.members.length === 0 ? (
-          <p className="text-sm text-ink-500">
-            Cargá al menos a los responsables: son contra quienes se mide si vinieron todos.
-          </p>
-        ) : (
-          <ul className="space-y-1.5">
-            {family.members.map((member) => (
-              <li key={member.id} className="flex items-center gap-2 text-sm">
-                <span className="text-ink-800">{member.name}</span>
-                <Badge tone={member.is_guardian ? "indigo" : "gray"}>
-                  {member.relationship_type}
-                </Badge>
-                {member.curso && <Badge tone="sky">{member.curso}</Badge>}
-                <button
-                  onClick={() => removeMember.mutate(member.id)}
-                  className="ml-auto text-xs text-ink-400 hover:text-red-600"
-                >
-                  Quitar
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <form
-          onSubmit={(event: FormEvent) => {
-            event.preventDefault();
-            if (name.trim()) addMember.mutate();
-          }}
-          className="flex flex-wrap items-end gap-2"
-        >
-          <div className="min-w-[160px] flex-1">
-            <Input
-              placeholder="Nombre y apellido"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-            />
-          </div>
-          <Select
-            ariaLabel="Parentesco"
-            value={relationship}
-            onChange={(next) => setRelationship(next as FamilyMemberOut["relationship_type"])}
-            options={RELATIONSHIPS.map((value) => ({
-              value,
-              label: value[0].toUpperCase() + value.slice(1),
-            }))}
-            className="w-36"
-          />
-          {relationship === "estudiante" && (
-            <div className="w-28">
-              <Input placeholder="Curso" aria-label="Curso" value={curso} onChange={(event) => setCurso(event.target.value)} />
-            </div>
-          )}
-          <Button type="submit" variant="soft" disabled={addMember.isPending}>
-            {addMember.isPending ? <Spinner /> : "Agregar"}
-          </Button>
-        </form>
-      </div>
-
-      {/* Profesionales que la acompañan */}
-      <div className="space-y-2">
-        <span className="block text-sm font-medium text-ink-700">Profesionales que acompañan</span>
-        {family.professionals.length === 0 ? (
-          <p className="text-sm text-ink-500">Ninguno asociado todavía.</p>
-        ) : (
-          <ul className="space-y-1.5">
-            {family.professionals.map((pro) => (
-              <li key={pro.id} className="flex items-center gap-2 text-sm">
-                <span className="text-ink-800">{pro.name}</span>
-                {pro.role_label && <Badge tone="gray">{pro.role_label}</Badge>}
-                <button
-                  onClick={() => unlinkPro.mutate(pro.id)}
-                  className="ml-auto text-xs text-ink-400 hover:text-red-600"
-                >
-                  Desasociar
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        {available.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2">
-            <Select
-              ariaLabel="Profesional"
-              value={linking}
-              onChange={setLinking}
-              options={available.map((pro) => ({
-                value: pro.id,
-                label: pro.name,
-                hint: pro.role_label ?? undefined,
-              }))}
-              placeholder="Elegir profesional…"
-              searchPlaceholder="Buscar profesional…"
-              className="min-w-[200px] flex-1 sm:max-w-xs"
-            />
-            <Button
-              variant="soft"
-              onClick={() => linking && linkPro.mutate(linking)}
-              disabled={!linking || linkPro.isPending}
-            >
-              Asociar
-            </Button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 // ── Directorio de profesionales ──────────────────────────────────
 
@@ -423,15 +154,106 @@ function ProfessionalsTab() {
 
 // ── Página ───────────────────────────────────────────────────────
 
+type LevelFilter = "" | Level | "sin";
+
+const LEVEL_FILTERS: { value: LevelFilter; label: string }[] = [
+  { value: "", label: "Todos" },
+  ...LEVELS,
+  { value: "sin", label: "Sin nivel" },
+];
+
+const normalize = (text: string) =>
+  text
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+
+const childrenOf = (family: FamilyOut) =>
+  family.members.filter((member) => member.relationship_type === "estudiante");
+
+/** Con un nivel elegido: las familias con algún hijo de ese nivel ("sin": algún hijo sin nivel). */
+function matchesLevel(family: FamilyOut, level: LevelFilter): boolean {
+  if (!level) return true;
+  return childrenOf(family).some((child) => (level === "sin" ? !child.level : child.level === level));
+}
+
+function FamilyCard({ family, level, from }: { family: FamilyOut; level: LevelFilter; from: string }) {
+  const kids = childrenOf(family);
+  const guardians = family.members.filter((member) => member.is_guardian);
+  return (
+    <Card className="relative p-4 transition-colors hover:border-ink-200 sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+        <div className="min-w-0 flex-1">
+          {/* Toda la tarjeta abre la familia; el link a Drive queda por encima. */}
+          <Link
+            to={`/families/${family.id}`}
+            state={{ search: from }}
+            className="text-[15px] font-semibold text-ink-900 after:absolute after:inset-0 after:rounded-3xl hover:text-accent-600"
+          >
+            {family.name}
+          </Link>
+          <p className="mt-0.5 text-sm text-ink-500">
+            {family.reference && <>Legajo {family.reference} · </>}
+            {guardians.length} {guardians.length === 1 ? "responsable" : "responsables"} ·{" "}
+            {family.meetings} {family.meetings === 1 ? "reunión" : "reuniones"}
+            {family.assignees.length > 0 &&
+              ` · La siguen: ${family.assignees.map((assignee) => assignee.name).join(", ")}`}
+          </p>
+        </div>
+        {family.drive_url && (
+          <a
+            href={family.drive_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="relative z-10 text-sm font-medium text-accent-600 hover:underline"
+          >
+            Drive ↗
+          </a>
+        )}
+      </div>
+      {kids.length > 0 ? (
+        <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
+          {kids.map((child) => {
+            const other = level !== "" && !(level === "sin" ? !child.level : child.level === level);
+            return (
+              <li key={child.id} className={`flex items-center gap-1.5 text-sm ${other ? "opacity-50" : ""}`}>
+                <span className="text-ink-800">{child.name}</span>
+                {child.curso && <span className="text-xs text-ink-500">{child.curso}</span>}
+                <LevelBadge level={child.level} />
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="mt-2 text-xs text-ink-400">Sin hijos cargados</p>
+      )}
+    </Card>
+  );
+}
+
 export default function Families() {
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<"familias" | "profesionales">("familias");
+  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") === "profesionales" ? "profesionales" : "familias";
+  const rawLevel = params.get("nivel") ?? "";
+  const level = (LEVEL_FILTERS.some((item) => item.value === rawLevel) ? rawLevel : "") as LevelFilter;
+  const search = params.get("q") ?? "";
   const [creating, setCreating] = useState(false);
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [panelId, setPanelId] = useState<string | null>(null);
-  const closePanel = useCallback(() => setPanelId(null), []);
   const [form, setForm] = useState({ name: "", reference: "", drive_url: "" });
-  const [search, setSearch] = useState("");
+
+  // Nivel, búsqueda y pestaña van en la dirección: al volver de una familia siguen igual.
+  const setParam = (key: string, value: string) =>
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (value) next.set(key, value);
+        else next.delete(key);
+        return next;
+      },
+      { replace: true },
+    );
+  const from = params.toString() ? `?${params}` : "";
 
   const { data: families, isLoading } = useQuery({
     queryKey: ["families"],
@@ -451,23 +273,27 @@ export default function Families() {
     onSuccess: (family) => {
       setCreating(false);
       setForm({ name: "", reference: "", drive_url: "" });
-      setOpenId(family.id);
       queryClient.invalidateQueries({ queryKey: ["families"] });
+      navigate(`/families/${family.id}`, { state: { search: from } });
     },
   });
 
-  const panelFamily = (families ?? []).find((family) => family.id === panelId);
-
-  const term = search.trim().toLowerCase();
-  const visible = (families ?? []).filter(
+  const all = families ?? [];
+  const term = normalize(search.trim());
+  const searched = all.filter(
     (family) =>
       !term ||
-      family.name.toLowerCase().includes(term) ||
-      (family.reference ?? "").toLowerCase().includes(term),
+      normalize(family.name).includes(term) ||
+      normalize(family.reference ?? "").includes(term) ||
+      family.members.some((member) => normalize(member.name).includes(term)),
   );
+  const visible = searched.filter((family) => matchesLevel(family, level));
+  const counts = Object.fromEntries(
+    LEVEL_FILTERS.map((item) => [item.value, searched.filter((family) => matchesLevel(family, item.value)).length]),
+  ) as Record<LevelFilter, number>;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5 px-6 py-10">
+    <div className="mx-auto max-w-4xl space-y-5 px-4 py-6 sm:px-6 sm:py-10">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight text-ink-900">Familias</h1>
         {tab === "familias" && (
@@ -485,98 +311,77 @@ export default function Families() {
             { id: "profesionales", label: "Profesionales" },
           ]}
           value={tab}
-          onChange={setTab}
+          onChange={(next) => setParam("tab", next === "profesionales" ? next : "")}
           label="Familias o profesionales"
           idPrefix="familias"
         />
       </div>
 
       <div role="tabpanel" id={`familias-panel-${tab}`} aria-labelledby={`familias-tab-${tab}`}>
-      {tab === "profesionales" ? (
-        <ProfessionalsTab />
-      ) : isLoading ? (
-        <div className="flex justify-center py-16 text-ink-300">
-          <Spinner className="h-6 w-6" />
-        </div>
-      ) : (families ?? []).length === 0 ? (
-        <Card>
-          <EmptyState title="Todavía no hay familias" mood="idle">
-            <p className="mb-4">
-              Creá la primera y cargale sus integrantes. Después vas a poder asociarle reuniones y
-              ver todo junto en Reportes.
-            </p>
-            <Button onClick={() => setCreating(true)}>Nueva familia</Button>
-          </EmptyState>
-        </Card>
-      ) : (
-        <>
-          <Input
-            placeholder="Buscar por apellido o legajo…"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-          <div className="space-y-3">
-            {visible.map((family) => {
-              const guardians = family.members.filter((member) => member.is_guardian).length;
-              const open = openId === family.id;
-              return (
-                <Card key={family.id} className="space-y-3">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    {/* Tocar la familia abre sus reuniones; "Detalle" edita integrantes y demás. */}
-                    <button
-                      type="button"
-                      onClick={() => setPanelId(family.id)}
-                      className="group min-w-0 flex-1 text-left"
-                    >
-                      <h3 className="text-[15px] font-semibold text-ink-900 group-hover:text-accent-600">
-                        {family.name}
-                      </h3>
-                      <p className="mt-0.5 text-sm text-ink-500">
-                        {family.reference && <>Legajo {family.reference} · </>}
-                        {guardians} {guardians === 1 ? "responsable" : "responsables"} ·{" "}
-                        <span className="font-medium text-accent-600 group-hover:underline">
-                          {family.meetings} {family.meetings === 1 ? "reunión" : "reuniones"}
-                        </span>
-                        {family.professionals.length > 0 &&
-                          ` · ${family.professionals.length} prof.`}
-                        {family.assignees.length > 0 &&
-                          ` · La siguen: ${family.assignees.map((assignee) => assignee.name).join(", ")}`}
-                      </p>
-                    </button>
-                    <div className="flex items-center gap-2">
-                      {family.drive_url && (
-                        <a
-                          href={family.drive_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm font-medium text-accent-600 hover:underline"
-                        >
-                          Drive ↗
-                        </a>
-                      )}
-                      <Button variant="soft" onClick={() => setPanelId(family.id)}>
-                        Reuniones
-                      </Button>
-                      <Button variant="ghost" onClick={() => setOpenId(open ? null : family.id)}>
-                        {open ? "Cerrar" : "Detalle"}
-                      </Button>
-                    </div>
-                  </div>
-                  {open && <FamilyDetail family={family} />}
-                </Card>
-              );
-            })}
-            {visible.length === 0 && (
-              <p className="py-8 text-center text-sm text-ink-500">
-                Ninguna familia coincide con «{search}».
-              </p>
-            )}
+        {tab === "profesionales" ? (
+          <ProfessionalsTab />
+        ) : isLoading ? (
+          <div className="flex justify-center py-16 text-ink-300">
+            <Spinner className="h-6 w-6" />
           </div>
-        </>
-      )}
+        ) : all.length === 0 ? (
+          <Card>
+            <EmptyState title="Todavía no hay familias" mood="idle">
+              <p className="mb-4">
+                Creá la primera o importá la planilla del colegio. Después vas a poder asociarle reuniones y ver
+                todo junto en su página.
+              </p>
+              <Button onClick={() => setCreating(true)}>Nueva familia</Button>
+            </EmptyState>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            <Input
+              type="search"
+              placeholder="Buscar por apellido, legajo o nombre de un hijo…"
+              value={search}
+              onChange={(event) => setParam("q", event.target.value)}
+            />
+            <div role="group" aria-label="Nivel de los hijos" className="flex flex-wrap gap-1.5">
+              {LEVEL_FILTERS.filter((item) => item.value !== "sin" || counts.sin > 0 || level === "sin").map(
+                (item) => {
+                  const active = level === item.value;
+                  return (
+                    <button
+                      key={item.value || "todos"}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => setParam("nivel", item.value)}
+                      className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium transition-colors ${
+                        active
+                          ? "border-ink-900 bg-ink-900 text-white"
+                          : "border-ink-200 bg-white text-ink-600 hover:border-ink-300 hover:text-ink-900"
+                      }`}
+                    >
+                      {item.label}
+                      <span className={active ? "text-white/70" : "text-ink-400"}>{counts[item.value]}</span>
+                    </button>
+                  );
+                },
+              )}
+            </div>
+            <div className="space-y-3">
+              {visible.map((family) => (
+                <FamilyCard key={family.id} family={family} level={level} from={from} />
+              ))}
+              {visible.length === 0 && (
+                <p className="py-8 text-center text-sm text-ink-500">
+                  {term
+                    ? `Ninguna familia coincide con «${search}»${level ? " en este nivel" : ""}.`
+                    : level === "sin"
+                      ? "Todos los hijos tienen su nivel."
+                      : `Ninguna familia tiene hijos en ${LEVEL_LABEL[level] ?? "este nivel"}.`}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
-
-      {panelFamily && <FamilyMeetingsPanel family={panelFamily} onClose={closePanel} />}
 
       <Modal open={creating} onClose={() => setCreating(false)} title="Nueva familia">
         <form
@@ -604,6 +409,7 @@ export default function Families() {
             value={form.drive_url}
             onChange={(event) => setForm({ ...form, drive_url: event.target.value })}
           />
+          <p className="text-xs text-ink-400">Los hijos y los responsables se cargan después, en la página de la familia.</p>
           {create.isError && (
             <p className="text-sm text-red-600">
               {create.error instanceof Error ? create.error.message : "No se pudo crear"}

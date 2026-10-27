@@ -165,8 +165,10 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
           <span className="text-sm text-ink-500">Esta reunión no está clasificada.</span>
         ) : (
           <>
-            {classification?.family_name && (
-              <Badge tone="indigo">{classification.family_name}</Badge>
+            {classification?.family_name && classification.family_id && (
+              <Link to={`/families/${classification.family_id}`} title="Ver la familia" className="hover:opacity-80">
+                <Badge tone="indigo">{classification.family_name}</Badge>
+              </Link>
             )}
             {(classification?.student_ids ?? []).map((studentId) => {
               const kid = families
@@ -306,7 +308,7 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
           {membersToShow.length === 0 ? (
             <p className="text-sm text-ink-500">
               Esta familia no tiene integrantes cargados.{" "}
-              <Link to="/families" className="text-accent-600 hover:underline">
+              <Link to={`/families/${familyId}`} className="text-accent-600 hover:underline">
                 Cargarlos
               </Link>
             </p>

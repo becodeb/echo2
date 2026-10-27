@@ -313,7 +313,7 @@ export interface FamilyMemberOut {
   phone: string | null;
   /** Estudiantes: curso ("3N EP") y nivel. */
   curso?: string | null;
-  level?: string | null;
+  level?: "inicial" | "primaria" | "secundaria" | null;
 }
 
 export interface ProfessionalOut {
@@ -387,6 +387,51 @@ export interface FamilyMeetingOut {
   professionals: string[];
   /** Primeros puntos del resumen ejecutivo. */
   summary: string[];
+  /** De qué hijo(s) de la familia es. */
+  student_ids: string[];
+}
+
+/** Tarea sin cerrar de una reunión de la familia. */
+export interface FamilyTaskOut {
+  id: string;
+  text: string;
+  /** suggested = la detectó Echo y falta confirmarla. */
+  status: "suggested" | "pending" | "in_progress";
+  assignee: string | null;
+  due_date: string | null;
+  due_text: string | null;
+  overdue: boolean;
+  meeting_id: string;
+  meeting_title: string;
+  meeting_date: string;
+}
+
+/** La ficha de una familia (GET /api/families/{id}). */
+export interface FamilyDetailOut extends FamilyOut {
+  created_at: string;
+  open_tasks: FamilyTaskOut[];
+  /** Cambios en la ficha, del más nuevo al más viejo. */
+  history: { at: string; action: string; actor: string | null; detail: Record<string, unknown> | null }[];
+}
+
+export interface FamilySummaryContent {
+  overview: string;
+  working_on: string[];
+  agreements: string[];
+  pending: string[];
+  alerts: string[];
+}
+
+/** Resumen de IA de la familia, armado con las reuniones que ve quien mira. */
+export interface FamilySummaryOut {
+  /** empty: nada para resumir · none: no se generó · stale: reuniones nuevas · outdated: cambió un acta o una tarea. */
+  status: "empty" | "none" | "stale" | "outdated" | "fresh";
+  summary: FamilySummaryContent | null;
+  generated_at: string | null;
+  meetings_used: number;
+  meetings_available: number;
+  new_meetings: number;
+  ai_configured: boolean;
 }
 
 export interface AttendanceRow {

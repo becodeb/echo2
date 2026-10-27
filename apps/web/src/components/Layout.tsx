@@ -65,6 +65,7 @@ function pageTitle(pathname: string): string {
   if (pathname.startsWith("/meetings/")) return "Reunión";
   if (pathname.startsWith("/projects/")) return "Proyecto";
   if (pathname.startsWith("/people/")) return "Persona";
+  if (pathname.startsWith("/families/")) return "Familia";
   return "Echo";
 }
 

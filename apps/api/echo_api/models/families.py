@@ -10,9 +10,10 @@ real no es "¿vinieron todos?" sino "¿quién faltó, y falta seguido?". Con un
 booleano esa segunda pregunta no se puede contestar nunca más.
 """
 import uuid
+from datetime import datetime
 
-from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, Text, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, PKMixin, SoftDeleteMixin, TimestampMixin
@@ -102,6 +103,41 @@ class FamilyMember(PKMixin, TimestampMixin, Base):
     level: Mapped[str | None] = mapped_column(String(20))
 
     family: Mapped["Family"] = relationship(back_populates="members")
+
+
+class FamilySummary(PKMixin, TimestampMixin, Base):
+    """Resumen de IA de una familia: qué se viene trabajando, acuerdos y pendientes.
+
+    Se arma con las reuniones que ve quien lo pide, así que no hay uno solo por
+    familia: hay uno por conjunto de reuniones (`meetings_key`). A cada persona
+    se le muestra el más completo de los que no usan reuniones que no ve
+    (services/family_summary.py).
+    """
+
+    __tablename__ = "family_summaries"
+    __table_args__ = (
+        UniqueConstraint("family_id", "meetings_key", name="uq_family_summary_meetings"),
+        Index("ix_family_summaries_family", "family_id"),
+    )
+
+    family_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("families.id", ondelete="CASCADE"), nullable=False
+    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    # sha256 de los ids ordenados: la clave para no repetir el mismo resumen.
+    meetings_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    meeting_ids: Mapped[list] = mapped_column(JSONB, nullable=False)
+    # {overview, working_on[], agreements[], pending[], alerts[]}
+    content: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    # Último cambio de los resúmenes y actas usados: si después hay uno más
+    # nuevo, el resumen quedó viejo aunque las reuniones sean las mismas.
+    source_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    model_used: Mapped[str | None] = mapped_column(String(120))
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
 
 
 class MeetingReason(PKMixin, TimestampMixin, Base):

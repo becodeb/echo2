@@ -8,6 +8,7 @@ from .families import (
     FamilyAssignment,
     FamilyMember,
     FamilyProfessional,
+    FamilySummary,
     MeetingAttendance,
     MeetingProfessionalAttendance,
     MeetingReason,
@@ -69,7 +70,7 @@ from .workspace import (
 __all__ = [
     "Base", "BillingPlan", "PlanRequest", "UsageEvent", "ORG_PLANS", "USER_PLANS", "User", "Organization", "OrganizationMember", "OrganizationInvite",
     "MemberLevelAccess", "LEVELS", "LEVEL_ACCESS",
-    "Family", "FamilyAssignment", "FamilyMember", "MeetingReason", "MeetingAttendance",
+    "Family", "FamilyAssignment", "FamilyMember", "FamilySummary", "MeetingReason", "MeetingAttendance",
     "Professional", "FamilyProfessional", "MeetingProfessionalAttendance",
     "MeetingAttachment", "OrgGoogleDrive", "ServerAISettings", "UserGoogleDrive",
     "InternalGroup", "InternalGroupMember", "DEFAULT_GROUPS", "MEETING_KINDS", "UserVoiceSample", "VoiceSession",

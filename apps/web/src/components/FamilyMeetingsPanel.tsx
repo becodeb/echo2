@@ -1,18 +1,18 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import type { FamilyMeetingOut, FamilyOut, Severity } from "../api/types";
+import type { FamilyMeetingOut, FamilyMemberOut, Severity } from "../api/types";
 import { LEVEL_LABEL } from "../state/access";
 import { AUDIENCES } from "./ClassificationPanel";
 import { Select } from "./Select";
 import { Badge, EmptyState, Spinner, formatDuration } from "./ui";
 
 /**
- * Panel lateral con todas las reuniones de una familia.
+ * Todas las reuniones de una familia, en su página (pages/FamilyDetail.tsx).
  *
  * Trae todo de una vez (una familia tiene decenas de reuniones, no miles) y
- * filtra acá: fecha, gravedad, motivo, estado del acta, nivel y texto. La
+ * filtra acá: fecha, gravedad, motivo, estado del acta, nivel, hijo y texto. La
  * visibilidad ya la resolvió el servidor: cada uno ve solo lo que puede ver.
  */
 
@@ -107,9 +107,10 @@ function Stat({ value, label, children }: { value: ReactNode; label: string; chi
   );
 }
 
-function MeetingRow({ meeting }: { meeting: FamilyMeetingOut }) {
+function MeetingRow({ meeting, students }: { meeting: FamilyMeetingOut; students: Map<string, FamilyMemberOut> }) {
   const date = meetingDate(meeting);
   const acta = meeting.minutes_status ? ACTA_LABEL[meeting.minutes_status] : null;
+  const children = meeting.student_ids.map((id) => students.get(id)).filter(Boolean) as FamilyMemberOut[];
   return (
     <li>
       <Link
@@ -132,6 +133,12 @@ function MeetingRow({ meeting }: { meeting: FamilyMeetingOut }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5">
+            {children.map((child) => (
+              <Badge key={child.id} tone="sky">
+                {child.name.split(" ")[0]}
+                {child.curso && ` · ${child.curso}`}
+              </Badge>
+            ))}
             {meeting.reason_name && <Badge tone="indigo">{meeting.reason_name}</Badge>}
             {acta && (
               <Badge tone={acta.tone}>
@@ -176,7 +183,7 @@ function MeetingRow({ meeting }: { meeting: FamilyMeetingOut }) {
   );
 }
 
-export function FamilyMeetingsPanel({ family, onClose }: { family: FamilyOut; onClose: () => void }) {
+export function FamilyMeetings({ familyId, students }: { familyId: string; students: FamilyMemberOut[] }) {
   const [search, setSearch] = useState("");
   const [period, setPeriod] = useState<Period>("todo");
   const [from, setFrom] = useState("");
@@ -186,25 +193,13 @@ export function FamilyMeetingsPanel({ family, onClose }: { family: FamilyOut; on
   const [acta, setActa] = useState<ActaFilter>("");
   const [level, setLevel] = useState("");
   const [order, setOrder] = useState<"desc" | "asc">("desc");
+  const [studentId, setStudentId] = useState("");
 
   const { data: meetings, isLoading, isError } = useQuery({
-    queryKey: ["family-meetings", family.id],
-    queryFn: () => api<FamilyMeetingOut[]>(`/api/families/${family.id}/meetings`),
+    queryKey: ["family-meetings", familyId],
+    queryFn: () => api<FamilyMeetingOut[]>(`/api/families/${familyId}/meetings`),
   });
-
-  // Escape cierra y la página de atrás no scrollea mientras el panel está abierto.
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = previous;
-    };
-  }, [onClose]);
+  const studentsById = useMemo(() => new Map(students.map((student) => [student.id, student])), [students]);
 
   const all = meetings ?? [];
 
@@ -255,6 +250,7 @@ export function FamilyMeetingsPanel({ family, onClose }: { family: FamilyOut; on
         return false;
       }
       if (level && meeting.level !== level) return false;
+      if (studentId && !meeting.student_ids.includes(studentId)) return false;
       if (term) {
         const haystack = normalize(
           [
@@ -270,7 +266,7 @@ export function FamilyMeetingsPanel({ family, onClose }: { family: FamilyOut; on
       return true;
     });
     return order === "asc" ? [...rows].reverse() : rows;
-  }, [all, period, from, to, severities, reasonId, acta, level, search, order]);
+  }, [all, period, from, to, severities, reasonId, acta, level, studentId, search, order]);
 
   const groups = useMemo(() => {
     const out: { key: string; label: string; items: FamilyMeetingOut[] }[] = [];
@@ -312,7 +308,8 @@ export function FamilyMeetingsPanel({ family, onClose }: { family: FamilyOut; on
     severities.size > 0 ||
     reasonId !== "" ||
     acta !== "" ||
-    level !== "";
+    level !== "" ||
+    studentId !== "";
 
   const clear = () => {
     setSearch("");
@@ -323,6 +320,7 @@ export function FamilyMeetingsPanel({ family, onClose }: { family: FamilyOut; on
     setReasonId("");
     setActa("");
     setLevel("");
+    setStudentId("");
   };
 
   const toggleSeverity = (value: SeverityFilter) =>
@@ -334,58 +332,9 @@ export function FamilyMeetingsPanel({ family, onClose }: { family: FamilyOut; on
     });
 
   const severityTotal = stats.bySeverity.verde + stats.bySeverity.amarillo + stats.bySeverity.rojo;
-  const guardians = family.members.filter((member) => member.is_guardian);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex justify-end bg-ink-950/40 backdrop-blur-[2px]"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Reuniones de ${family.name}`}
-    >
-      <aside className="animate-slide-in flex h-full w-full max-w-2xl flex-col bg-white shadow-2xl">
-        {/* Encabezado */}
-        <header className="border-b border-ink-100 px-4 py-4 sm:px-6">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wide text-ink-400">Reuniones de la familia</p>
-              <h2 className="break-words text-xl font-semibold text-ink-900">{family.name}</h2>
-              <p className="mt-0.5 text-sm text-ink-500">
-                {family.reference && <>Legajo {family.reference} · </>}
-                {guardians.length > 0
-                  ? guardians.map((member) => member.name).join(", ")
-                  : "Sin responsables cargados"}
-                {family.drive_url && (
-                  <>
-                    {" · "}
-                    <a
-                      href={family.drive_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-medium text-accent-600 hover:underline"
-                    >
-                      Drive ↗
-                    </a>
-                  </>
-                )}
-              </p>
-            </div>
-            <button
-              onClick={onClose}
-              className="shrink-0 rounded-xl p-2 text-ink-400 hover:bg-ink-100 hover:text-ink-700"
-              aria-label="Cerrar"
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
-            </button>
-          </div>
-        </header>
-
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 sm:px-6">
+    <div>
           {isLoading ? (
             <div className="flex justify-center py-16 text-ink-300">
               <Spinner className="h-6 w-6" />
@@ -395,8 +344,8 @@ export function FamilyMeetingsPanel({ family, onClose }: { family: FamilyOut; on
           ) : all.length === 0 ? (
             <EmptyState title="Todavía no hay reuniones con esta familia" mood="idle">
               <p>
-                Cuando una reunión se clasifica con esta familia (en el detalle de la reunión, o al
-                crearla), aparece acá.
+                Cuando una reunión se clasifica con esta familia (al crearla, o después en el detalle
+                de la reunión), aparece acá.
               </p>
             </EmptyState>
           ) : (
@@ -500,6 +449,22 @@ export function FamilyMeetingsPanel({ family, onClose }: { family: FamilyOut; on
                       { value: "sin", label: "Sin acta" },
                     ]}
                   />
+                  {students.length > 1 && (
+                    <Select
+                      ariaLabel="Hijo"
+                      size="sm"
+                      value={studentId}
+                      onChange={setStudentId}
+                      options={[
+                        { value: "", label: "Todos los hijos" },
+                        ...students.map((student) => ({
+                          value: student.id,
+                          label: student.name,
+                          hint: student.curso ?? undefined,
+                        })),
+                      ]}
+                    />
+                  )}
                   {levels.length > 1 && (
                     <Select
                       ariaLabel="Nivel"
@@ -555,7 +520,7 @@ export function FamilyMeetingsPanel({ family, onClose }: { family: FamilyOut; on
                       </h3>
                       <ul className="space-y-2">
                         {group.items.map((meeting) => (
-                          <MeetingRow key={meeting.id} meeting={meeting} />
+                          <MeetingRow key={meeting.id} meeting={meeting} students={studentsById} />
                         ))}
                       </ul>
                     </section>
@@ -564,8 +529,6 @@ export function FamilyMeetingsPanel({ family, onClose }: { family: FamilyOut; on
               )}
             </div>
           )}
-        </div>
-      </aside>
     </div>
   );
 }

@@ -5,7 +5,7 @@ gravedad y quién de la familia vino. Va todo junto en un solo PUT porque en la
 práctica se completa de una sola sentada, al terminar la reunión.
 """
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
@@ -17,6 +17,8 @@ from ..db import get_db
 from ..deps import OrgContext, can_edit_meeting, get_meeting_or_404, get_org_context
 from ..models import (
     AUDIENCES,
+    ActionItem,
+    AuditLog,
     LEVELS,
     RELATIONSHIPS,
     SEVERITIES,
@@ -181,21 +183,8 @@ async def _get_family(family_id: uuid.UUID, ctx: OrgContext, db: AsyncSession) -
     return family
 
 
-@router.get("/api/families", response_model=list[FamilyOut])
-async def list_families(
-    ctx: OrgContext = Depends(get_org_context), db: AsyncSession = Depends(get_db)
-):
-    families = (
-        (
-            await db.execute(
-                select(Family)
-                .where(Family.organization_id == ctx.org_id, Family.deleted_at.is_(None))
-                .order_by(Family.name)
-            )
-        )
-        .scalars()
-        .all()
-    )
+async def _families_out(families: list[Family], ctx: OrgContext, db: AsyncSession) -> list[FamilyOut]:
+    """Las familias con sus integrantes, profesionales, asignadas y cuántas reuniones ve quien mira."""
     if not families:
         return []
 
@@ -270,6 +259,28 @@ async def list_families(
     ]
 
 
+@router.get("/api/families", response_model=list[FamilyOut])
+async def list_families(
+    level: str | None = Query(default=None, description="inicial|primaria|secundaria|sin"),
+    ctx: OrgContext = Depends(get_org_context),
+    db: AsyncSession = Depends(get_db),
+):
+    """Todas las familias de la sede. Con `level`, las que tienen algún hijo de ese
+    nivel ("sin": algún hijo sin nivel cargado)."""
+    query = select(Family).where(Family.organization_id == ctx.org_id, Family.deleted_at.is_(None))
+    if level:
+        if level != "sin" and level not in LEVELS:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Nivel desconocido")
+        child = select(FamilyMember.id).where(
+            FamilyMember.family_id == Family.id,
+            FamilyMember.relationship_type == "estudiante",
+            FamilyMember.level.is_(None) if level == "sin" else FamilyMember.level == level,
+        )
+        query = query.where(child.exists())
+    families = (await db.execute(query.order_by(Family.name))).scalars().all()
+    return await _families_out(list(families), ctx, db)
+
+
 @router.put("/api/families/{family_id}/assignees", response_model=list[FamilyAssigneeOut])
 async def set_family_assignees(
     family_id: uuid.UUID,
@@ -312,7 +323,7 @@ async def set_family_assignees(
                     kind="family_assigned",
                     title=f"{ctx.user.name} te asignó la familia {family.name}",
                     body="Desde ahora ves todas sus reuniones.",
-                    link="/families",
+                    link=f"/families/{family.id}",
                 )
             )
     await audit(db, ctx.org_id, ctx.user.id, "family.assignees", "family", str(family.id),
@@ -408,25 +419,22 @@ async def update_family(
     db: AsyncSession = Depends(get_db),
 ):
     ctx.require_role("member")
+    from ..services.privacy import forget_org_cache
+
     family = await _get_family(family_id, ctx, db)
+    before = {"name": family.name, "reference": family.reference, "notes": family.notes, "drive_url": family.drive_url}
     family.name = data.name.strip()
     family.reference = (data.reference or "").strip() or None
-    family.notes = data.notes
+    family.notes = (data.notes or "").strip() or None
     family.drive_url = (data.drive_url or "").strip() or None
+    after = {"name": family.name, "reference": family.reference, "notes": family.notes, "drive_url": family.drive_url}
+    changed = sorted(key for key in after if after[key] != before[key])
+    if changed:
+        await audit(db, ctx.org_id, ctx.user.id, "family.update", "family", str(family.id), detail={"fields": changed})
     await db.commit()
-    members = (
-        (await db.execute(select(FamilyMember).where(FamilyMember.family_id == family.id)))
-        .scalars()
-        .all()
-    )
-    return FamilyOut(
-        id=family.id,
-        name=family.name,
-        reference=family.reference,
-        notes=family.notes,
-        drive_url=family.drive_url,
-        members=[FamilyMemberOut.model_validate(m) for m in members],
-    )
+    if "name" in changed:
+        forget_org_cache(ctx.org_id)  # el apellido nuevo se protege desde ya
+    return (await _families_out([family], ctx, db))[0]
 
 
 @router.delete("/api/families/{family_id}", status_code=204)
@@ -453,24 +461,36 @@ async def add_member(
     ctx: OrgContext = Depends(get_org_context),
     db: AsyncSession = Depends(get_db),
 ):
+    from ..services.privacy import forget_org_cache
+
     ctx.require_role("member")
     family = await _get_family(family_id, ctx, db)
-    if data.relationship_type not in RELATIONSHIPS:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Vínculo desconocido")
-    member = FamilyMember(
-        family_id=family.id,
-        name=data.name.strip(),
-        relationship_type=data.relationship_type,
-        is_guardian=data.is_guardian,
-        email=(data.email or "").strip() or None,
-        phone=(data.phone or "").strip() or None,
-        curso=(data.curso or "").strip() or None,
-        level=data.level if data.level in LEVELS else None,
-    )
+    member = FamilyMember(family_id=family.id)
+    _fill_member(member, data)
     db.add(member)
     await db.flush()
+    await audit(db, ctx.org_id, ctx.user.id, "family.member_add", "family", str(family.id),
+                detail={"name": member.name, "relationship_type": member.relationship_type})
     await db.commit()
+    forget_org_cache(ctx.org_id)  # el nombre nuevo se protege desde ya
     return FamilyMemberOut.model_validate(member)
+
+
+def _fill_member(member: FamilyMember, data: FamilyMemberIn) -> None:
+    """Carga los datos validados. Un hijo nunca es responsable, y el curso y el
+    nivel son solo de los hijos."""
+    if data.relationship_type not in RELATIONSHIPS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Vínculo desconocido")
+    if data.level and data.level not in LEVELS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Nivel desconocido")
+    student = data.relationship_type == "estudiante"
+    member.name = data.name.strip()
+    member.relationship_type = data.relationship_type
+    member.is_guardian = data.is_guardian and not student
+    member.email = (data.email or "").strip() or None
+    member.phone = (data.phone or "").strip() or None
+    member.curso = ((data.curso or "").strip() or None) if student else None
+    member.level = (data.level or None) if student else None
 
 
 @router.patch("/api/families/members/{member_id}", response_model=FamilyMemberOut)
@@ -484,17 +504,19 @@ async def update_member(
     member = await db.get(FamilyMember, member_id)
     if not member:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Integrante no encontrado")
+    from ..services.privacy import forget_org_cache
+
     await _get_family(member.family_id, ctx, db)  # valida que sea de esta organización
-    if data.relationship_type not in RELATIONSHIPS:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Vínculo desconocido")
-    member.name = data.name.strip()
-    member.relationship_type = data.relationship_type
-    member.is_guardian = data.is_guardian
-    member.email = (data.email or "").strip() or None
-    member.phone = (data.phone or "").strip() or None
-    member.curso = (data.curso or "").strip() or None
-    member.level = data.level if data.level in LEVELS else None
+    before = FamilyMemberOut.model_validate(member).model_dump()
+    _fill_member(member, data)
+    after = FamilyMemberOut.model_validate(member).model_dump()
+    changed = sorted(key for key in after if after[key] != before[key])
+    if changed:
+        await audit(db, ctx.org_id, ctx.user.id, "family.member_update", "family", str(member.family_id),
+                    detail={"name": member.name, "fields": changed, **({"level": member.level} if "level" in changed else {})})
     await db.commit()
+    if "name" in changed:
+        forget_org_cache(ctx.org_id)
     return FamilyMemberOut.model_validate(member)
 
 
@@ -509,6 +531,8 @@ async def delete_member(
     if not member:
         return
     await _get_family(member.family_id, ctx, db)
+    await audit(db, ctx.org_id, ctx.user.id, "family.member_remove", "family", str(member.family_id),
+                detail={"name": member.name, "relationship_type": member.relationship_type})
     await db.delete(member)
     await db.commit()
 
@@ -619,7 +643,10 @@ async def link_professional(
         )
     ).scalar_one_or_none()
     if existing is None:
+        pro = await db.get(Professional, professional_id)
         db.add(FamilyProfessional(family_id=family_id, professional_id=professional_id))
+        await audit(db, ctx.org_id, ctx.user.id, "family.professional_link", "family", str(family_id),
+                    detail={"name": pro.name if pro else None})
         await db.commit()
 
 
@@ -641,6 +668,9 @@ async def unlink_professional(
         )
     ).scalar_one_or_none()
     if row is not None:
+        pro = await db.get(Professional, professional_id)
+        await audit(db, ctx.org_id, ctx.user.id, "family.professional_unlink", "family", str(family_id),
+                    detail={"name": pro.name if pro else None})
         await db.delete(row)
         await db.commit()
 
@@ -733,6 +763,8 @@ class FamilyMeetingOut(BaseModel):
     professionals: list[str]
     # Los primeros puntos del resumen ejecutivo, para reconocer la reunión.
     summary: list[str]
+    # De qué hijo(s) de la familia es.
+    student_ids: list[uuid.UUID] = []
 
 
 @router.get("/api/families/{family_id}/meetings", response_model=list[FamilyMeetingOut])
@@ -842,9 +874,164 @@ async def list_family_meetings(
                 attended=[mem.name for mem in members if rows.get(mem.id)],
                 professionals=pros.get(m.id, []),
                 summary=[str(p) for p in points[:3]],
+                student_ids=[uuid.UUID(student_id) for student_id in m.student_ids or []],
             )
         )
     return out
+
+
+# ── Página de la familia ─────────────────────────────────────────
+
+
+class FamilyTaskOut(BaseModel):
+    id: uuid.UUID
+    text: str
+    status: str
+    assignee: str | None
+    due_date: date | None
+    due_text: str | None
+    overdue: bool
+    meeting_id: uuid.UUID
+    meeting_title: str
+    meeting_date: datetime
+
+
+class FamilyHistoryOut(BaseModel):
+    at: datetime
+    action: str
+    actor: str | None
+    detail: dict | None
+
+
+class FamilyDetailOut(FamilyOut):
+    created_at: datetime
+    # Tareas sin cerrar de las reuniones de la familia que quien mira ve.
+    open_tasks: list[FamilyTaskOut] = []
+    # Cambios en la ficha: integrantes, datos, asignadas, profesionales.
+    history: list[FamilyHistoryOut] = []
+
+
+@router.get("/api/families/{family_id}", response_model=FamilyDetailOut)
+async def family_detail(
+    family_id: uuid.UUID,
+    ctx: OrgContext = Depends(get_org_context),
+    db: AsyncSession = Depends(get_db),
+):
+    """La ficha de la familia. Las reuniones van aparte (/meetings), con sus filtros."""
+    family = await _get_family(family_id, ctx, db)
+    base = (await _families_out([family], ctx, db))[0]
+    scope = await ctx.scope(db)
+
+    tasks = []
+    for task, title, started_at, created_at, owner in (
+        await db.execute(
+            select(ActionItem, Meeting.title, Meeting.started_at, Meeting.created_at, User.name)
+            .join(Meeting, Meeting.id == ActionItem.meeting_id)
+            .outerjoin(User, User.id == ActionItem.assignee_user_id)
+            .where(
+                Meeting.organization_id == ctx.org_id,
+                Meeting.family_id == family.id,
+                Meeting.deleted_at.is_(None),
+                meeting_filter(scope),
+                # "suggested" es la que detectó Echo y falta confirmar: también es un pendiente.
+                ActionItem.status.in_(("suggested", "pending", "in_progress")),
+            )
+            .order_by(ActionItem.due_date.asc().nulls_last(), ActionItem.created_at.desc())
+            .limit(100)
+        )
+    ).all():
+        tasks.append(
+            FamilyTaskOut(
+                id=task.id,
+                text=task.text,
+                status=task.status,
+                assignee=owner or task.assignee_name or task.assignee_email or task.suggested_assignee,
+                due_date=task.due_date,
+                due_text=task.due_text,
+                overdue=bool(task.due_date and task.due_date < date.today()),
+                meeting_id=task.meeting_id,
+                meeting_title=title,
+                meeting_date=started_at or created_at,
+            )
+        )
+
+    history = [
+        FamilyHistoryOut(at=row.created_at, action=row.action, actor=name, detail=row.detail)
+        for row, name in (
+            await db.execute(
+                select(AuditLog, User.name)
+                .outerjoin(User, User.id == AuditLog.actor_id)
+                .where(
+                    AuditLog.organization_id == ctx.org_id,
+                    AuditLog.target_type == "family",
+                    AuditLog.target_id == str(family.id),
+                )
+                .order_by(AuditLog.created_at.desc())
+                .limit(40)
+            )
+        ).all()
+    ]
+    return FamilyDetailOut(**base.model_dump(), created_at=family.created_at, open_tasks=tasks, history=history)
+
+
+class FamilySummaryOut(BaseModel):
+    # empty: no hay reuniones con resumen o acta · none: todavía no se generó ·
+    # stale: hay reuniones nuevas · outdated: cambió un acta o una tarea · fresh
+    status: str
+    summary: dict | None
+    generated_at: datetime | None
+    meetings_used: int
+    meetings_available: int
+    new_meetings: int
+    ai_configured: bool
+
+
+@router.get("/api/families/{family_id}/summary", response_model=FamilySummaryOut)
+async def get_family_summary(
+    family_id: uuid.UUID,
+    ctx: OrgContext = Depends(get_org_context),
+    db: AsyncSession = Depends(get_db),
+):
+    from ..services.ai_settings import resolve_llm
+    from ..services.family_summary import summary_state
+
+    family = await _get_family(family_id, ctx, db)
+    state = await summary_state(db, await ctx.scope(db), family)
+    return FamilySummaryOut(**state, ai_configured=await resolve_llm(db, ctx.org_id) is not None)
+
+
+@router.post("/api/families/{family_id}/summary", response_model=FamilySummaryOut)
+async def generate_family_summary(
+    family_id: uuid.UUID,
+    ctx: OrgContext = Depends(get_org_context),
+    db: AsyncSession = Depends(get_db),
+):
+    """Arma el resumen con las reuniones que ve quien lo pide (con el modelo de la
+    sede y sin mandar nombres afuera, como el resto)."""
+    from ..services import family_summary
+    from ..services.ai_settings import resolve_llm
+    from ..services.llm import LLMError, get_llm_provider
+    from ..services.privacy import protect
+
+    ctx.require_role("member")
+    family = await _get_family(family_id, ctx, db)
+    llm_config = await resolve_llm(db, ctx.org_id)
+    if llm_config is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "No hay un modelo de IA configurado (Ajustes → IA)")
+    provider = await protect(
+        db,
+        ctx.org_id,
+        get_llm_provider(llm_config.provider, llm_config.api_key, llm_config.model, llm_config.base_url),
+        None,
+        ctx.user.id,
+    )
+    scope = await ctx.scope(db)
+    try:
+        await family_summary.generate(db, scope, family, provider, llm_config.model)
+    except LLMError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"El modelo falló: {exc}") from exc
+    state = await family_summary.summary_state(db, scope, family)
+    return FamilySummaryOut(**state, ai_configured=True)
 
 
 # ── Clasificación de una reunión ─────────────────────────────────

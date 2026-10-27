@@ -38,11 +38,14 @@ export function NewMeetingModal({
   onClose,
   initialKind = "familia",
   initialGroup = "",
+  initialFamily = "",
 }: {
   open: boolean;
   onClose: () => void;
   initialKind?: Kind;
   initialGroup?: string;
+  /** Desde la página de una familia: la reunión ya viene con ella. */
+  initialFamily?: string;
 }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -65,15 +68,13 @@ export function NewMeetingModal({
   const [people, setPeople] = useState(false);
   const [minors, setMinors] = useState(false);
   // Familia
-  const [familyId, setFamilyId] = useState("");
+  const [familyId, setFamilyId] = useState(initialFamily);
   const [students, setStudents] = useState<string[]>([]);
   const [intersede, setIntersede] = useState(false);
   const [audience, setAudience] = useState<Audience | "">("");
   const [visibility, setVisibility] = useState<"org" | "private">("org");
   const creatable = myAccess?.creatable_levels ?? [];
   const [levelChoice, setLevelChoice] = useState<Level | "">("");
-  // Por defecto primaria si puede crear ahí (es donde está casi todo), si no el primero.
-  const level = levelChoice || (creatable.includes("primaria") ? "primaria" : creatable[0] ?? "");
   // Equipo
   const [groupChoice, setGroupChoice] = useState("");
   const [wantsMinutes, setWantsMinutes] = useState(false);
@@ -92,6 +93,17 @@ export function NewMeetingModal({
     enabled: open && kind === "familia",
   });
   const family = families?.find((item) => item.id === familyId);
+  // Por defecto el nivel del hijo de la reunión, si puede crear ahí; si no,
+  // primaria (es donde está casi todo) o el primero.
+  const kids = students.length ? students : onlyStudent(family);
+  const childLevel = family?.members.find((member) => kids.includes(member.id) && member.level)?.level;
+  const level =
+    levelChoice ||
+    (childLevel && creatable.includes(childLevel)
+      ? childLevel
+      : creatable.includes("primaria")
+        ? "primaria"
+        : (creatable[0] ?? ""));
   const today = new Date().toLocaleDateString("es");
   const defaultTitle =
     kind === "equipo"
@@ -168,7 +180,7 @@ export function NewMeetingModal({
       setTitle("");
       setParticipants("");
       setStaff([]);
-      setFamilyId("");
+      setFamilyId(initialFamily);
       setStudents([]);
       setIntersede(false);
       setAudience("");
