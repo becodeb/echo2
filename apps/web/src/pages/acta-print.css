@@ -45,7 +45,7 @@
 .acta-print-numero {
   margin: 0 0 8px;
   text-align: right;
-  font-size: 12px;
+  font-size: calc(12px * var(--acta-scale, 1));
   font-weight: 700;
   color: #141824;
 }
@@ -53,12 +53,12 @@
 .acta-hoja-print {
   max-width: 800px;
   margin: 0 auto;
-  padding: 56px 64px 48px;
+  padding: calc(56px * var(--acta-margin, 1)) calc(64px * var(--acta-margin, 1)) calc(48px * var(--acta-margin, 1));
   background: #ffffff;
   color: #141824;
   font-family: var(--acta-font, Arial, Helvetica, "Liberation Sans", sans-serif);
-  font-size: 13.5px;
-  line-height: 1.6;
+  font-size: calc(13.5px * var(--acta-scale, 1));
+  line-height: calc(1.6 * var(--acta-lh, 1));
   box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 12px 40px rgba(16, 24, 40, 0.08);
 }
 .acta-print-membrete {
@@ -70,7 +70,7 @@
 }
 .acta-print-lineas p {
   margin: 0;
-  font-size: 12px;
+  font-size: 12px; /* el membrete no cambia con el tamaño de letra */
   line-height: 1.5;
   color: #646e84;
 }
@@ -81,13 +81,13 @@
 }
 .acta-print-institucion {
   margin: 18px 0 0;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--acta-scale, 1));
   color: #363d4f;
 }
 .acta-print-titulo {
   margin: 28px 0 8px;
   text-align: center;
-  font-size: 16px;
+  font-size: calc(16px * var(--acta-scale, 1));
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -96,15 +96,22 @@
  * los formularios institucionales. */
 .acta-hoja-print h1 {
   text-align: center;
-  font-size: 16px;
+  font-size: calc(16px * var(--acta-scale, 1));
   letter-spacing: 0.1em;
   text-transform: uppercase;
   margin: 28px 0 16px;
 }
+/* El cuerpo del acta (MarkdownView trae 15px fijos): crece con el tamaño de
+ * letra elegido y toma el interlineado. Normal = 15px y 1.625, como siempre. */
+.acta-hoja-print .prose-echo {
+  font-size: calc(15px * var(--acta-scale, 1));
+  line-height: calc(1.625 * var(--acta-lh, 1));
+}
+.acta-hoja-print .prose-echo h2 { font-size: 1.2em; line-height: 1.555; }
 .acta-print-meta {
   margin: 0 0 24px;
   text-align: center;
-  font-size: 12px;
+  font-size: calc(12px * var(--acta-scale, 1));
   color: #646e84;
 }
 .acta-print-firmas {
@@ -118,12 +125,12 @@
   padding-top: 8px;
   border-top: 1px solid #141824;
   text-align: center;
-  font-size: 12px;
+  font-size: calc(12px * var(--acta-scale, 1));
   color: #363d4f;
 }
 .acta-print-pie {
   margin: 40px 0 0;
-  font-size: 11px;
+  font-size: calc(11px * var(--acta-scale, 1));
   color: #8b94a7;
   text-align: right;
 }
@@ -147,7 +154,7 @@
   .acta-hoja-print {
     max-width: none;
     margin: 0;
-    padding: 18mm 16mm;
+    padding: calc(18mm * var(--acta-margin, 1)) calc(16mm * var(--acta-margin, 1));
     box-shadow: none;
     -webkit-box-decoration-break: clone;
     box-decoration-break: clone;

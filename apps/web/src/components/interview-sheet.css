@@ -1,6 +1,9 @@
 /* Formulario "Acta de entrevista": medidas tomadas del PDF del colegio (A4,
  * Arial 12pt, renglones cada 20pt, membrete gris arriba a la izquierda).
- * Se mide en pt/mm y no en px para que lo impreso coincida con el papel. */
+ * Se mide en pt/mm y no en px para que lo impreso coincida con el papel.
+ * Letra, interlineado y márgenes se multiplican por las variables de
+ * actaFormatVars (Ajustes → Formato de acta); en "normal" valen 1. El
+ * membrete no cambia: es el encabezado del papel del colegio. */
 
 .entrevista-hoja {
   page: entrevista;
@@ -8,12 +11,12 @@
   width: 210mm;
   min-height: 297mm;
   margin: 0 auto;
-  padding: 5mm 18mm 12mm 21mm;
+  padding: 5mm calc(18mm * var(--acta-margin, 1)) calc(12mm * var(--acta-margin, 1)) calc(21mm * var(--acta-margin, 1));
   background: #ffffff;
   color: #000000;
   font-family: var(--acta-font, Arial, Helvetica, "Liberation Sans", sans-serif);
-  font-size: 12pt;
-  line-height: 1.45;
+  font-size: calc(12pt * var(--acta-scale, 1));
+  line-height: calc(1.45 * var(--acta-lh, 1));
   box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 12px 40px rgba(16, 24, 40, 0.08);
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
@@ -32,7 +35,7 @@
 .entrevista-hoja .ent-numero {
   margin: 0 0 2pt;
   text-align: right;
-  font-size: 10pt;
+  font-size: calc(10pt * var(--acta-scale, 1));
   font-weight: 700;
 }
 
@@ -50,7 +53,7 @@
 .ent-titulo {
   margin: 12pt 0 0;
   text-align: center;
-  font-size: 12pt;
+  font-size: calc(12pt * var(--acta-scale, 1));
   font-weight: 700;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -61,6 +64,10 @@
   align-items: baseline;
   gap: 2pt;
 }
+/* Con letra grande no se parte el rótulo ("Nombre del alumno:"): se achica el
+ * espacio para completar, que puede ocupar dos renglones. */
+.ent-fila > b { flex: none; }
+.ent-fila > .ent-grow { min-width: 0; }
 .ent-fila:first-of-type { margin-top: 34pt; }
 .ent-solicitada { margin-top: 10pt; }
 .ent-motivo { margin-top: 15pt; }
@@ -88,25 +95,25 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 13pt;
-  height: 11pt;
+  width: calc(13pt * var(--acta-scale, 1));
+  height: calc(11pt * var(--acta-scale, 1));
   border: 1pt solid #555555;
-  font-size: 10pt;
+  font-size: calc(10pt * var(--acta-scale, 1));
   font-weight: 700;
   line-height: 1;
 }
 
 .ent-parrafo {
   margin-top: 22pt;
-  line-height: 20pt;
+  line-height: var(--ent-renglon, 20pt);
 }
 
 /* El desarrollo va sobre renglones, como el "con____" del papel. La raya es
  * el borde inferior de cada línea de 20pt, así el texto queda apoyado. */
 .ent-renglones {
-  line-height: 20pt;
-  background-image: linear-gradient(to bottom, transparent calc(20pt - 0.75pt), #000000 calc(20pt - 0.75pt));
-  background-size: 100% 20pt;
+  line-height: var(--ent-renglon, 20pt);
+  background-image: linear-gradient(to bottom, transparent calc(var(--ent-renglon, 20pt) - 0.75pt), #000000 calc(var(--ent-renglon, 20pt) - 0.75pt));
+  background-size: 100% var(--ent-renglon, 20pt);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -123,7 +130,7 @@
   padding-top: 5pt;
   border-top: 1pt solid #000000;
   text-align: center;
-  font-size: 10pt;
+  font-size: calc(10pt * var(--acta-scale, 1));
 }
 
 /* En una pantalla más angosta que la hoja (el celular), la hoja se adapta al
@@ -150,7 +157,7 @@
 
 /* "Acta de reunión" (Nordelta): copia del Word del colegio. Trebuchet 12pt,
  * membrete negro a la izquierda, logo arriba a la derecha y prosa justificada. */
-.reunion-hoja { padding-top: 14mm; }
+.reunion-hoja { padding-top: calc(14mm * var(--acta-margin, 1)); }
 .reu-encabezado {
   display: flex;
   justify-content: space-between;
@@ -163,7 +170,7 @@
 .reu-cuerpo {
   margin-top: 16pt;
   text-align: justify;
-  line-height: 1.5;
+  line-height: calc(1.5 * var(--acta-lh, 1));
 }
 .reunion-hoja .reu-cuerpo p { margin-top: 10pt; }
 .reu-cuerpo .ent-fill { border-bottom: none; padding: 0; }

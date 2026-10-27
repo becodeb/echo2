@@ -20,6 +20,7 @@ export type SectionId =
   | "my-drive"
   | "privacy"
   | "org"
+  | "users"
   | "access"
   | "drive"
   | "template"
@@ -86,6 +87,14 @@ export const SECTIONS: SectionMeta[] = [
     description: "Quiénes están en la sede y cómo invitar a alguien más.",
     icon: "building",
     group: "org",
+  },
+  {
+    id: "users",
+    label: "Usuarios y roles",
+    description: "Todas las personas de la sede: su puesto (DOE, docente, directivo...) y sus niveles.",
+    icon: "people",
+    group: "org",
+    visible: (viewer) => viewer.admin,
   },
   {
     id: "access",
@@ -197,6 +206,11 @@ export const SETTINGS_INDEX: SettingEntry[] = [
     target: "org-invite",
   },
   {
+    section: "users",
+    label: "Usuarios y roles",
+    keywords: ["usuarios", "personas", "roles", "rol", "puesto", "doe", "docente", "directivo", "secretaria", "nivel", "permisos", "quien ve que"],
+  },
+  {
     section: "access",
     label: "Niveles y accesos",
     keywords: ["nivel", "niveles", "acceso", "permisos", "inicial", "primaria", "secundaria", "direccion", "limitado", "quien ve que", "rol"],
@@ -212,6 +226,12 @@ export const SETTINGS_INDEX: SettingEntry[] = [
     label: "Idioma del acta",
     keywords: ["idioma", "ingles", "english", "portugues", "espanol", "lenguaje", "traducir"],
     target: "minutes-language",
+  },
+  {
+    section: "template",
+    label: "Cómo se ve el acta",
+    keywords: ["letra", "tamano de letra", "letra grande", "mas grande", "interlineado", "margenes", "leer mejor"],
+    target: "acta-look",
   },
   {
     section: "letterhead",

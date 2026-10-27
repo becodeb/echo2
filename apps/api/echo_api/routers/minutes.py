@@ -493,6 +493,26 @@ ACTA_FONTS = {
     "trebuchet": ("Trebuchet MS", "Helvetica"),
 }
 
+# Cómo se ve el acta (Ajustes → Actas → Cómo se ve el acta). Va guardado en el
+# membrete pero se cambia aparte; "normal" es como salió siempre.
+# Tamaño de letra: (puntos del texto en Word, en PDF).
+ACTA_SIZES = {"normal": (11, 10), "grande": (13, 12), "muy_grande": (15, 14)}
+# Interlineado, como en Word: sencillo o 1,5.
+ACTA_LINE_SPACINGS = {"simple": 1.0, "1.5": 1.5}
+# Márgenes en mm (arriba y abajo, costados); None = los de siempre.
+ACTA_MARGINS = {"normal": None, "angosto": (13, 13)}
+ACTA_FORMAT_DEFAULTS = {"font_size": "normal", "line_spacing": "1.5", "margins": "normal"}
+_ACTA_FORMAT_CHOICES = {"font_size": ACTA_SIZES, "line_spacing": ACTA_LINE_SPACINGS, "margins": ACTA_MARGINS}
+
+
+def acta_format_of(letterhead: dict | None) -> dict[str, str]:
+    """El formato guardado del acta; lo que falte o no exista, en su valor de siempre."""
+    data = letterhead or {}
+    return {
+        key: data[key] if data.get(key) in _ACTA_FORMAT_CHOICES[key] else default
+        for key, default in ACTA_FORMAT_DEFAULTS.items()
+    }
+
 
 class LetterheadIn(BaseModel):
     institution: str = Field(default="", max_length=200)
@@ -538,6 +558,7 @@ def _letterhead_out(org: Organization) -> dict:
         "logo_data_url": data.get("logo_data_url") or None,
         "interview_place": data.get("interview_place") or "",
         "font": data.get("font") if data.get("font") in ACTA_FONTS else "arial",
+        **acta_format_of(data),
     }
 
 
@@ -561,7 +582,32 @@ async def update_letterhead(
     org = await db.get(Organization, ctx.org_id)
     if org is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Organización no encontrada")
-    org.letterhead = data.model_dump()
+    # El formato se guarda desde su propio bloque: guardar el membrete no lo toca.
+    kept = {key: value for key, value in (org.letterhead or {}).items() if key in ACTA_FORMAT_DEFAULTS}
+    org.letterhead = {**data.model_dump(), **kept}
     await audit(db, ctx.org_id, ctx.user.id, "letterhead.update", "organization", str(org.id))
+    await db.commit()
+    return _letterhead_out(org)
+
+
+class ActaFormatIn(BaseModel):
+    font_size: Literal["normal", "grande", "muy_grande"] = "normal"
+    line_spacing: Literal["simple", "1.5"] = "1.5"
+    margins: Literal["normal", "angosto"] = "normal"
+
+
+@router.put("/api/org/letterhead/format")
+async def update_acta_format(
+    data: ActaFormatIn,
+    ctx: OrgContext = Depends(get_org_context),
+    db: AsyncSession = Depends(get_db),
+):
+    """Tamaño de letra, interlineado y márgenes del acta: impresa, en Word y en PDF."""
+    ctx.require_role("admin")
+    org = await db.get(Organization, ctx.org_id)
+    if org is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Organización no encontrada")
+    org.letterhead = {**(org.letterhead or {}), **data.model_dump()}
+    await audit(db, ctx.org_id, ctx.user.id, "letterhead.format", "organization", str(org.id))
     await db.commit()
     return _letterhead_out(org)

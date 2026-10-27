@@ -63,8 +63,20 @@ def _font_of(org: Organization | None) -> tuple[str, str]:
     return ACTA_FONTS.get(key, ACTA_FONTS["arial"])
 
 
-def _markdown_to_docx(markdown: str, title: str, font: str = "Arial") -> bytes:
+def _format_of(org: Organization | None) -> dict[str, str]:
+    """Tamaño de letra, interlineado y márgenes del acta de esta organización."""
+    from .minutes import acta_format_of
+
+    return acta_format_of(org.letterhead if org else None)
+
+
+def _markdown_to_docx(
+    markdown: str, title: str, font: str = "Arial", acta_format: dict[str, str] | None = None
+) -> bytes:
     from docx import Document
+    from docx.shared import Mm, Pt
+
+    from .minutes import ACTA_LINE_SPACINGS, ACTA_MARGINS, ACTA_SIZES, acta_format_of
 
     document = Document()
     document.core_properties.title = title
@@ -73,6 +85,21 @@ def _markdown_to_docx(markdown: str, title: str, font: str = "Arial") -> bytes:
             document.styles[style].font.name = font
         except KeyError:
             pass
+    if acta_format is not None:
+        acta_format = acta_format_of(acta_format)
+        size = ACTA_SIZES[acta_format["font_size"]][0]
+        normal = document.styles["Normal"]
+        normal.font.size = Pt(size)
+        normal.paragraph_format.line_spacing = ACTA_LINE_SPACINGS[acta_format["line_spacing"]]
+        # Los títulos crecen en la misma proporción que el texto (11 pt es el de siempre).
+        for style in ("Title", "Heading 1", "Heading 2"):
+            if document.styles[style].font.size is not None:
+                document.styles[style].font.size = Pt(round(document.styles[style].font.size.pt * size / 11))
+        margins = ACTA_MARGINS[acta_format["margins"]]
+        if margins:
+            for section in document.sections:
+                section.top_margin = section.bottom_margin = Mm(margins[0])
+                section.left_margin = section.right_margin = Mm(margins[1])
     table = None
     for raw_line in markdown.splitlines():
         line = raw_line.rstrip()
@@ -118,7 +145,9 @@ def _add_runs_with_bold(paragraph, text: str) -> None:
         run.bold = index % 2 == 1
 
 
-def _markdown_to_pdf(markdown: str, title: str, font: str = "Helvetica") -> bytes:
+def _markdown_to_pdf(
+    markdown: str, title: str, font: str = "Helvetica", acta_format: dict[str, str] | None = None
+) -> bytes:
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import mm
@@ -126,16 +155,29 @@ def _markdown_to_pdf(markdown: str, title: str, font: str = "Helvetica") -> byte
     from reportlab.lib import colors
     from xml.sax.saxutils import escape
 
+    from .minutes import ACTA_MARGINS, ACTA_SIZES, acta_format_of
+
+    # Sin formato (el transcript) sale como siempre: 10 pt, interlineado 14.
+    acta_format = acta_format_of(acta_format) if acta_format is not None else None
+    size = ACTA_SIZES[acta_format["font_size"]][1] if acta_format else 10
+    # Interlineado en PDF: sencillo = 1,2 veces la letra (como Word), 1,5 = 1,5 veces.
+    leading = size * (1.5 if acta_format["line_spacing"] == "1.5" else 1.2) if acta_format else 14
+    margins = (ACTA_MARGINS[acta_format["margins"]] if acta_format else None) or (20, 22)
+
     output = io.BytesIO()
     document = SimpleDocTemplate(
         output, pagesize=A4, title=title,
-        leftMargin=22 * mm, rightMargin=22 * mm, topMargin=20 * mm, bottomMargin=20 * mm,
+        leftMargin=margins[1] * mm, rightMargin=margins[1] * mm,
+        topMargin=margins[0] * mm, bottomMargin=margins[0] * mm,
     )
     styles = getSampleStyleSheet()
     bold = {"Helvetica": "Helvetica-Bold", "Times-Roman": "Times-Bold"}.get(font, font)
     for name in ("Title", "Heading2", "Heading3"):
         styles[name].fontName = bold
-    body_style = ParagraphStyle("EchoBody", parent=styles["BodyText"], fontName=font, fontSize=10, leading=14)
+        # Los títulos crecen en la misma proporción que el texto.
+        styles[name].fontSize = styles[name].fontSize * size / 10
+        styles[name].leading = styles[name].leading * size / 10
+    body_style = ParagraphStyle("EchoBody", parent=styles["BodyText"], fontName=font, fontSize=size, leading=leading)
     elements = []
     table_rows: list[list[str]] = []
 
@@ -209,15 +251,16 @@ async def export_minutes(
             plain, media_type="text/plain; charset=utf-8",
             headers=_attachment(f"{filename}.txt"),
         )
+    org = await db.get(Organization, meeting.organization_id)
     if fmt == "docx":
-        blob = _markdown_to_docx(markdown, meeting.title, _font_of(await db.get(Organization, meeting.organization_id))[0])
+        blob = _markdown_to_docx(markdown, meeting.title, _font_of(org)[0], _format_of(org))
         return Response(
             blob,
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             headers=_attachment(f"{filename}.docx"),
         )
     if fmt == "pdf":
-        blob = _markdown_to_pdf(markdown, meeting.title, _font_of(await db.get(Organization, meeting.organization_id))[1])
+        blob = _markdown_to_pdf(markdown, meeting.title, _font_of(org)[1], _format_of(org))
         return Response(
             blob, media_type="application/pdf",
             headers=_attachment(f"{filename}.pdf"),
@@ -297,11 +340,14 @@ async def export_google_doc(
     if kind == "minutes":
         markdown = await _get_minutes_markdown(db, meeting.id)
         name = f"Acta — {meeting.title[:80]}"
+        org = await db.get(Organization, meeting.organization_id)
+        blob = _markdown_to_docx(markdown, meeting.title, _font_of(org)[0], _format_of(org))
     else:
         markdown = await _transcript_markdown(db, meeting)
         name = f"Transcript — {meeting.title[:80]}"
+        blob = _markdown_to_docx(markdown, meeting.title)
     try:
-        url = await upload_google_doc(db, connection, name, _markdown_to_docx(markdown, meeting.title))
+        url = await upload_google_doc(db, connection, name, blob)
     except DriveError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc)) from exc
     return GoogleDocOut(url=url)

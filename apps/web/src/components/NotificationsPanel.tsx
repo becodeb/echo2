@@ -41,6 +41,7 @@ const KIND_ART: { match: (kind: string) => boolean; icon: IconName; tone: string
   { match: (k) => k.startsWith("minutes"), icon: "doc", tone: "from-sky-300 to-sky-600 text-white" },
   { match: (k) => k.startsWith("task"), icon: "check", tone: "from-emerald-300 to-emerald-600 text-white" },
   { match: (k) => k.startsWith("comment"), icon: "comment", tone: "from-fuchsia-300 to-fuchsia-600 text-white" },
+  { match: (k) => k === "voice_missing", icon: "mic", tone: "from-rose-300 to-rose-500 text-white" },
 ];
 
 function art(kind: string) {

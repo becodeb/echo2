@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -7,21 +7,16 @@ import type { LetterheadOut, MeetingOut, MinutesOut } from "../api/types";
 import { InterviewSheet } from "../components/InterviewSheet";
 import { MarkdownView } from "../components/MarkdownView";
 import { parseActaNumber, useNextActaNumber } from "../components/ActaNumber";
+import { actaFormatVars } from "../components/actaFormat";
 import { Spinner, formatDate, formatDuration } from "../components/ui";
 import "./acta-print.css";
 
 /**
  * La hoja del acta tal como se imprime: membrete de la organización (líneas,
  * logo, dirección), título, datos de la reunión, el acta y las firmas. Con
- * ?print=1 abre el diálogo de impresión apenas carga.
+ * ?print=1 abre el diálogo de impresión apenas carga. La letra, el
+ * interlineado y los márgenes son los de Ajustes → Formato de acta.
  */
-/** La fuente que el colegio eligió para sus actas (Ajustes → Membrete). */
-export const ACTA_FONT_CSS: Record<string, string> = {
-  arial: 'Arial, Helvetica, "Liberation Sans", sans-serif',
-  calibri: 'Calibri, Carlito, "Segoe UI", Arial, sans-serif',
-  times: '"Times New Roman", Times, "Liberation Serif", serif',
-  trebuchet: '"Trebuchet MS", "Segoe UI", Arial, sans-serif',
-};
 
 export default function ActaPrint() {
   const { id } = useParams<{ id: string }>();
@@ -112,7 +107,7 @@ export default function ActaPrint() {
   const contact = [letterhead.address, letterhead.phone, letterhead.email].filter(Boolean).join(" · ");
 
   return (
-    <div className="acta-print" style={{ "--acta-font": ACTA_FONT_CSS[letterhead.font] ?? ACTA_FONT_CSS.arial } as CSSProperties}>
+    <div className="acta-print" style={actaFormatVars(letterhead)}>
       <div className="acta-print-toolbar no-print">
         <Link to={`/meetings/${id}?tab=minutes`} className="acta-print-link">
           Volver a la reunión

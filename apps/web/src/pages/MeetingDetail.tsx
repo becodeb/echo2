@@ -15,6 +15,7 @@ import { ExportMenu } from "../components/ExportMenu";
 import { AnswerText } from "../components/AnswerText";
 import { MarkdownView } from "../components/MarkdownView";
 import { InterviewReview } from "../components/InterviewReview";
+import { ActaFormatted } from "../components/actaFormat";
 import { Select } from "../components/Select";
 import { TaskAssignee } from "../components/TaskAssignee";
 import { MeetingStaff } from "../components/PeoplePicker";
@@ -1067,7 +1068,10 @@ function MinutesTab({ meetingId, minutesTitle }: { meetingId: string; minutesTit
         </Card>
       ) : (
         <Card>
-          <MarkdownView markdown={minutes.version.body_markdown} />
+          {/* Con la letra e interlineado que la sede eligió para sus actas. */}
+          <ActaFormatted>
+            <MarkdownView markdown={minutes.version.body_markdown} />
+          </ActaFormatted>
         </Card>
       )}
 

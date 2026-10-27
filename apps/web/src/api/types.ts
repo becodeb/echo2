@@ -301,7 +301,15 @@ export interface LetterheadOut {
   interview_place: string;
   /** Fuente del acta impresa, en Word y en PDF. */
   font: "arial" | "calibri" | "times" | "trebuchet";
+  /** Cómo se ve el acta (Ajustes → Formato de acta): impresa, en la reunión, Word y PDF. */
+  font_size: ActaFontSize;
+  line_spacing: ActaLineSpacing;
+  margins: ActaMargins;
 }
+
+export type ActaFontSize = "normal" | "grande" | "muy_grande";
+export type ActaLineSpacing = "simple" | "1.5";
+export type ActaMargins = "normal" | "angosto";
 
 export interface FamilyMemberOut {
   id: string;

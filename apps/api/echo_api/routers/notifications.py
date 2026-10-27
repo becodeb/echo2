@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..db import get_db
 from ..deps import OrgContext, get_org_context
 from ..models import Notification
+from ..services.voice_reminder import VOICE_REMINDER_KIND
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
 
@@ -84,8 +85,8 @@ async def mark_read(
         return
     condition = Notification.id == notification.id
     # Un anuncio se ve una vez por persona, no una por sede: cerrarlo en una
-    # lo cierra en todas.
-    if notification.kind.startswith(ANNOUNCEMENT_PREFIX):
+    # lo cierra en todas. Lo mismo el recordatorio de grabar la voz.
+    if notification.kind.startswith(ANNOUNCEMENT_PREFIX) or notification.kind == VOICE_REMINDER_KIND:
         condition = Notification.kind == notification.kind
     await db.execute(
         update(Notification)

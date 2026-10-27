@@ -154,6 +154,17 @@ async def _start_final_prepass() -> None:
 
 
 @app.on_event("startup")
+async def _start_voice_reminder() -> None:
+    """Recuerda en la campanita, cada 3 días, grabar "Mi voz" a quien no la
+    tiene (services/voice_reminder.py)."""
+    from .services.background import spawn
+    from .services.voice_reminder import reminder_loop
+
+    if settings.echo_env != "test":
+        spawn(reminder_loop(), name="voice-reminder")
+
+
+@app.on_event("startup")
 async def _sync_superadmins() -> None:
     """Aplica SUPERADMIN_EMAILS sobre los usuarios existentes.
 

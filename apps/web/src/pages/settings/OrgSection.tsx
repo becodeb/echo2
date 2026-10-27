@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 import { Select } from "../../components/Select";
 import { Badge, Button, Input, Spinner } from "../../components/ui";
@@ -30,6 +31,8 @@ function JoinOrCreate() {
 
 export function OrgSection() {
   const { activeOrg } = useAuth();
+  const navigate = useNavigate();
+  const manages = activeOrg?.role === "owner" || activeOrg?.role === "admin";
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("member");
   const [lastInviteToken, setLastInviteToken] = useState<string | null>(null);
@@ -65,7 +68,21 @@ export function OrgSection() {
 
       {activeOrg?.is_personal && <JoinOrCreate />}
 
-      <Block id="org-members" title="Miembros">
+      <Block
+        id="org-members"
+        title="Miembros"
+        action={
+          manages && (
+            <button
+              type="button"
+              onClick={() => navigate("/settings/users", { replace: true })}
+              className="text-sm font-medium text-ink-600 underline-offset-2 hover:text-ink-900 hover:underline"
+            >
+              Puestos y niveles
+            </button>
+          )
+        }
+      >
         <ul className="divide-y divide-ink-100">
           {members?.map((member) => (
             <li key={member.id} className="flex items-center justify-between gap-3 py-2.5">

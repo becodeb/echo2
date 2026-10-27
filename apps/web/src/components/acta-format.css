@@ -1,0 +1,10 @@
+/* El acta en la reunión con el tamaño de letra e interlineado de la sede (las
+ * variables las pone actaFormatVars). La fuente sigue siendo la de la app: la
+ * del membrete es para el papel, Word y PDF. Los 15px y 1.625 son los de
+ * MarkdownView, que es como se vio siempre. */
+.acta-formato .prose-echo {
+  font-size: calc(15px * var(--acta-scale, 1));
+  line-height: calc(1.625 * var(--acta-lh, 1));
+}
+.acta-formato .prose-echo h1 { font-size: 1.333em; line-height: 1.4; }
+.acta-formato .prose-echo h2 { font-size: 1.2em; line-height: 1.555; }

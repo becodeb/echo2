@@ -1,4 +1,6 @@
+import type { CSSProperties } from "react";
 import type { InterviewFields, LetterheadOut } from "../api/types";
+import { actaFormatVars, actaScale } from "./actaFormat";
 import "./interview-sheet.css";
 
 const MESES = [
@@ -8,6 +10,24 @@ const MESES = [
 
 /** Renglones vacíos mínimos: la hoja llega al pie aunque el acta sea corta. */
 const MIN_RULED_LINES = 16;
+/** Alto del renglón del formulario con la letra de siempre. */
+const RULED_LINE_PT = 20;
+
+/**
+ * Letra, interlineado y márgenes de la sede, y el alto de los renglones. Con
+ * letra más grande los renglones crecen con ella y el espacio rayado mínimo se
+ * achica (por la escala al cuadrado: lo de arriba también crece). Medido con
+ * membrete y logo: un acta corta en "muy grande" ocupa 268 de los 297 mm.
+ */
+function sheetFormat(letterhead: LetterheadOut) {
+  const { scale, line } = actaScale(letterhead);
+  const ruled = Math.round(RULED_LINE_PT * scale * line * 100) / 100;
+  const lines = Math.max(6, Math.floor((MIN_RULED_LINES * RULED_LINE_PT) / scale ** 2 / ruled));
+  return {
+    style: { ...actaFormatVars(letterhead), "--ent-renglon": `${ruled}pt` } as CSSProperties,
+    minRuledHeight: `${lines * ruled}pt`,
+  };
+}
 
 /**
  * El formulario "Acta de entrevista" del colegio, completo. Replica el papel:
@@ -28,9 +48,10 @@ export function InterviewSheet({
   const [year, month, day] = fields.fecha.split("-").map(Number);
   const place = letterhead.interview_place || `la institución ${letterhead.institution}`;
   const paragraphs = fields.desarrollo.split(/\n\s*\n|\n/).map((text) => text.trim()).filter(Boolean);
+  const format = sheetFormat(letterhead);
 
   return (
-    <article className="entrevista-hoja">
+    <article className="entrevista-hoja" style={format.style}>
       {number != null && <p className="ent-numero">Acta N.º {number}</p>}
       <header className="ent-membrete">
         {letterhead.lines.map((line, index) => (
@@ -67,7 +88,7 @@ export function InterviewSheet({
         {year || "……"} en las instalaciones de {place}, se reúnen <Fill>{fields.reunen}</Fill>
       </p>
 
-      <div className="ent-renglones" style={{ minHeight: `${MIN_RULED_LINES * 20}pt` }}>
+      <div className="ent-renglones" style={{ minHeight: format.minRuledHeight }}>
         <p>con {fields.con}{fields.con && !/[.:]$/.test(fields.con) ? "." : ""}</p>
         {paragraphs.map((text, index) => (
           <p key={index}>{text}</p>
@@ -106,7 +127,7 @@ function ReunionSheet({
   const signatures = letterhead.signatures.length > 0 ? letterhead.signatures : ["", ""];
 
   return (
-    <article className="entrevista-hoja reunion-hoja">
+    <article className="entrevista-hoja reunion-hoja" style={sheetFormat(letterhead).style}>
       {number != null && <p className="ent-numero">Acta N.º {number}</p>}
       <header className="reu-encabezado">
         <div className="reu-membrete">

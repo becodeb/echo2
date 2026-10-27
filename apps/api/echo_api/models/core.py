@@ -84,6 +84,10 @@ class OrganizationMember(PKMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     role: Mapped[str] = mapped_column(String(20), default=ROLE_MEMBER, nullable=False)
+    # Puesto que eligió quien administra la sede (DOE, docente, directivo...;
+    # services/positions.py). Se guarda porque DOE y docente dan los mismos
+    # permisos y no se pueden deducir. Nulo = nadie lo eligió todavía.
+    position: Mapped[str | None] = mapped_column(String(30))
 
     organization: Mapped["Organization"] = relationship(back_populates="members")
     user: Mapped["User"] = relationship(back_populates="memberships")

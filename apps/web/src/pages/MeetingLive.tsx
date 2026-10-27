@@ -10,6 +10,7 @@ import { ChoiceCards, PillSwitch, SettingRow, SettingsGroup } from "../component
 import { Select } from "../components/Select";
 import { Button, Modal, Spinner, formatMs } from "../components/ui";
 import { EchoFace, type EchoMood } from "../components/EchoFace";
+import { VoiceBeforeMeeting, needsVoice, useMyVoice } from "../components/VoicePrompt";
 import { micErrorMessage } from "../lib/micError";
 
 interface LiveLine {
@@ -555,6 +556,20 @@ export default function MeetingLive() {
     setPaused(true);
   }, [id, sendOrQueue]);
 
+  // A quien le falta "Mi voz" se la pide una vez antes de iniciar, sin frenar
+  // la reunión: "Ahora no, empezar igual" arranca enseguida.
+  const { data: myVoice } = useMyVoice();
+  const [voiceAsk, setVoiceAsk] = useState(false);
+  const voiceAsked = useRef(false);
+  const startOrAskVoice = () => {
+    if (!voiceAsked.current && needsVoice(myVoice)) {
+      voiceAsked.current = true;
+      setVoiceAsk(true);
+      return;
+    }
+    void start();
+  };
+
   const resume = useCallback(async () => {
     await start();
   }, [start]);
@@ -1063,7 +1078,7 @@ export default function MeetingLive() {
                 )}
                 <button
                   type="button"
-                  onClick={start}
+                  onClick={startOrAskVoice}
                   disabled={starting}
                   className="flex w-full items-center justify-center gap-2 rounded-full bg-ink-900 py-3.5 text-[15px] font-semibold text-white transition-all duration-200 hover:bg-ink-700 active:scale-[0.99] disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 sm:mx-auto sm:max-w-xs"
                 >
@@ -1246,6 +1261,14 @@ export default function MeetingLive() {
           </div>
         </form>
       </Modal>
+      <VoiceBeforeMeeting
+        open={voiceAsk}
+        onClose={() => setVoiceAsk(false)}
+        onStart={() => {
+          setVoiceAsk(false);
+          void start();
+        }}
+      />
     </div>
   );
 }

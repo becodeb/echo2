@@ -8,23 +8,28 @@ cuando quiera. Se guarda como WAV 16 kHz mono de hasta 12 s, con su huella
 grabar (decisión de Bauti, 1/10) y se puede apagar: al apagarlo, el perfil
 vuelve a ser solo la muestra. Desde el 27/10 Echo no suma reuniones al perfil
 (aprendía de lo que adivinaba); la opción queda para olvidar lo aprendido.
+
+Desde el 27/10 grabarla es "medio obligatorio" (pedido de Bauti): la
+invitación ya no se apaga para siempre, "Más tarde" la frena un día
+(PROMPT_SNOOZE), y la campanita lo recuerda (services/voice_reminder.py).
 """
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import numpy as np
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
 from ..deps import get_current_user
-from ..models import User, UserVoiceSample
+from ..models import Notification, User, UserVoiceSample
 from ..services import voiceprint
 from ..services.speaker_names import fingerprint_sample
 from ..services.stt.base import pcm16_to_wav
 from ..services.stt.windowing import silence_threshold
+from ..services.voice_reminder import VOICE_REMINDER_KIND
 
 router = APIRouter(prefix="/api/me/voice", tags=["voice"])
 
@@ -35,13 +40,15 @@ MAX_MS = 12000
 # menos de esta diferencia entre voz y fondo (dB), con ruido.
 LOW_LEVEL_DBFS = -38.0
 MIN_SNR_DB = 15.0
+# "Más tarde" en la invitación a grabarla: vuelve a aparecer pasado esto.
+PROMPT_SNOOZE = timedelta(days=1)
 
 
 class VoiceOut(BaseModel):
     has_sample: bool
     duration_ms: int | None = None
     recorded_at: datetime | None = None
-    # Ya vio (y cerró) la invitación a grabarla: no se le vuelve a mostrar.
+    # Eligió "Más tarde" en la invitación a grabarla hace menos de un día.
     prompt_seen: bool = False
     learn_from_meetings: bool = True
     # Cuántas reuniones sumaron a su perfil.
@@ -112,12 +119,18 @@ def _trim_to_speech(pcm: bytes) -> bytes:
     return pcm[first * frame * 2 : last * frame * 2]
 
 
+def _snoozed(user: User) -> bool:
+    """Antes era "No volver a mostrar" para siempre; ahora dura un día, así
+    que a quienes lo habían apagado se les vuelve a pedir."""
+    return user.voice_prompt_seen_at is not None and user.voice_prompt_seen_at > datetime.now(UTC) - PROMPT_SNOOZE
+
+
 @router.get("", response_model=VoiceOut)
 async def my_voice(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     sample = (
         await db.execute(select(UserVoiceSample).where(UserVoiceSample.user_id == user.id))
     ).scalar_one_or_none()
-    seen = user.voice_prompt_seen_at is not None
+    seen = _snoozed(user)
     if sample is None:
         return VoiceOut(has_sample=False, prompt_seen=seen)
     return _out(sample, seen)
@@ -125,11 +138,11 @@ async def my_voice(user: User = Depends(get_current_user), db: AsyncSession = De
 
 @router.post("/prompt-seen", status_code=204)
 async def voice_prompt_seen(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """"No volver a mostrar" en la invitación a grabar la voz. Sin esto, a
-    quien no tiene muestra la invitación le aparece cada vez que entra."""
-    if user.voice_prompt_seen_at is None:
-        user.voice_prompt_seen_at = datetime.now(UTC)
-        await db.commit()
+    """"Más tarde" en la invitación a grabar la voz: no aparece por un día
+    (PROMPT_SNOOZE). Sin esto, a quien no tiene muestra le aparece cada vez
+    que entra."""
+    user.voice_prompt_seen_at = datetime.now(UTC)
+    await db.commit()
 
 
 @router.post("", response_model=VoiceOut)
@@ -167,9 +180,14 @@ async def save_my_voice(
     sample.embedding_model = voiceprint.MODEL_NAME if fingerprint is not None else None
     sample.learned_count = 0
     sample.learn_from_meetings = True
+    # Ya la grabó: el recordatorio de la campanita sobra, en todas sus sedes.
+    if sample.duration_ms >= voiceprint.MIN_SAMPLE_MS:
+        await db.execute(
+            delete(Notification).where(Notification.user_id == user.id, Notification.kind == VOICE_REMINDER_KIND)
+        )
     await db.commit()
     await db.refresh(sample)
-    return _out(sample, user.voice_prompt_seen_at is not None, _quality(recorded))
+    return _out(sample, _snoozed(user), _quality(recorded))
 
 
 class LearnIn(BaseModel):
@@ -191,7 +209,7 @@ async def set_learning(data: LearnIn, user: User = Depends(get_current_user), db
         sample.learned_count = 0
     await db.commit()
     await db.refresh(sample)
-    return _out(sample, user.voice_prompt_seen_at is not None)
+    return _out(sample, _snoozed(user))
 
 
 @router.delete("", status_code=204)

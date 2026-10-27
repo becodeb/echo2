@@ -12,7 +12,7 @@ import { AnnouncementPopup } from "./AnnouncementPopup";
 import { CommandPalette } from "./CommandPalette";
 import { Icon, type IconName } from "./icons";
 import { NotificationsPanel } from "./NotificationsPanel";
-import { VoicePrompt } from "./VoicePrompt";
+import { VoiceNudge, VoicePrompt } from "./VoicePrompt";
 import { useTitle } from "../lib/useTitle";
 import { closeSettings, usePageLocation } from "../pages/settings/pageLocation";
 // El panel de preguntas trae react-markdown: se baja recién al abrirlo, no al entrar.
@@ -186,6 +186,8 @@ export function Layout({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="space-y-1 p-3">
+          {/* Mientras falte "Mi voz", fijo acá: no se puede cerrar (VoicePrompt.tsx). */}
+          <VoiceNudge variant={collapsed ? "icon" : "sidebar"} />
           {!collapsed && <PlanCard onNavigate={() => setMobileNav(false)} />}
           {user?.is_superadmin &&
             navLink({ to: "/admin", label: "Panel de Becode", icon: "admin" })}
@@ -229,6 +231,7 @@ export function Layout({ children }: { children: ReactNode }) {
           <SettingsButton open={settingsOpen} onClick={openSettings} />
           <ProfileMenu />
         </header>
+        <VoiceNudge variant="mobile" />
         {!live && (
           <TopBar
             title={pageTitle(location.pathname)}

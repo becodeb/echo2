@@ -24,12 +24,14 @@ import { LetterheadSection } from "./settings/LetterheadSection";
 import { MyVoiceSection } from "./settings/MyVoiceSection";
 import { OrgSection } from "./settings/OrgSection";
 import { PrivacySection } from "./settings/PrivacySection";
+import { UsersSection } from "./settings/UsersSection";
 
 const SECTION_COMPONENTS: Record<SectionId, ComponentType> = {
   "my-voice": MyVoiceSection,
   "my-drive": MyDriveSection,
   privacy: PrivacySection,
   org: OrgSection,
+  users: UsersSection,
   access: AccessSection,
   drive: DriveSection,
   template: TemplateSection,

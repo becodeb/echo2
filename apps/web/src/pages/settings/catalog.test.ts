@@ -45,6 +45,12 @@ describe("searchSettings", () => {
     expect(searchSettings("invitar", member)[0].section).toBe("org");
   });
 
+  it("usuarios y roles es solo de quien administra la sede", () => {
+    expect(searchSettings("doe", admin)[0].section).toBe("users");
+    expect(searchSettings("puesto", directive)).toEqual([]);
+    expect(searchSettings("usuarios", member).map((hit) => hit.section)).not.toContain("users");
+  });
+
   it("dice dónde está cada resultado", () => {
     expect(searchSettings("logo", admin)[0].where).toBe("Actas · Membrete");
   });
@@ -54,7 +60,7 @@ describe("visibleSections", () => {
   it("cada uno ve sus grupos", () => {
     expect(visibleSections(member).map((section) => section.id)).toEqual(["my-voice", "my-drive", "privacy", "org", "drive"]);
     expect(visibleSections(directive).map((section) => section.group)).not.toContain("advanced");
-    expect(visibleSections(admin)).toHaveLength(12);
+    expect(visibleSections(admin)).toHaveLength(13);
   });
 });
 

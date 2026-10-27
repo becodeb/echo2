@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api/client";
-import type { ReasonOut } from "../../api/types";
+import type { LetterheadOut, ReasonOut } from "../../api/types";
+import { ACTA_FONT_CSS, actaScale } from "../../components/actaFormat";
 import { Select } from "../../components/Select";
 import { Badge, Button, Input, Spinner } from "../../components/ui";
 import { useAuth } from "../../state/auth";
@@ -53,6 +54,178 @@ function MinutesLanguage() {
   );
 }
 
+type ActaLookValue = Pick<LetterheadOut, "font_size" | "line_spacing" | "margins">;
+
+const SAMPLE_PARAGRAPHS = [
+  "A los 27 días del mes de octubre, se reúnen la docente y la familia del alumno para conversar sobre su adaptación al grupo.",
+  "La docente comenta que participa en clase y que le cuesta organizar las tareas. La familia cuenta que en casa repasan juntos.",
+  "Se acuerda una agenda semanal y una nueva reunión en noviembre.",
+];
+
+/**
+ * Tamaño de letra, interlineado y márgenes del acta, con una muestra que
+ * cambia al instante. Se guarda por sede junto al membrete y vale para la
+ * hoja impresa, el acta en la reunión, Word y PDF.
+ */
+function ActaLook() {
+  const queryClient = useQueryClient();
+  const { activeOrg } = useAuth();
+  const isAdmin = activeOrg?.role === "owner" || activeOrg?.role === "admin";
+  const { data: letterhead } = useQuery({
+    queryKey: ["letterhead"],
+    queryFn: () => api<LetterheadOut>("/api/org/letterhead"),
+  });
+  const save = useMutation({
+    mutationFn: (value: ActaLookValue) =>
+      api<LetterheadOut>("/api/org/letterhead/format", { method: "PUT", body: JSON.stringify(value) }),
+    // La respuesta ya trae el membrete completo: la muestra no espera otra vuelta.
+    onSuccess: (saved) => queryClient.setQueryData(["letterhead"], saved),
+  });
+
+  if (!letterhead) {
+    return (
+      <Block id="acta-look" title="Cómo se ve el acta">
+        <Loading />
+      </Block>
+    );
+  }
+
+  // Mientras se guarda, la muestra ya muestra lo elegido.
+  const current: ActaLookValue = save.isPending && save.variables ? save.variables : letterhead;
+  const change = (patch: Partial<ActaLookValue>) =>
+    save.mutate({
+      font_size: current.font_size,
+      line_spacing: current.line_spacing,
+      margins: current.margins,
+      ...patch,
+    });
+  const { scale, line, margin } = actaScale(current);
+
+  return (
+    <Block
+      id="acta-look"
+      title="Cómo se ve el acta"
+      hint="Para que se lea mejor en papel. Vale para el acta impresa, la que se ve en la reunión, Word y PDF. La fuente se elige en Membrete."
+    >
+      <div className="grid gap-5 sm:grid-cols-[17.5rem_minmax(0,1fr)]">
+        <div className="space-y-4">
+          <LookChoice
+            label="Tamaño de letra"
+            value={current.font_size}
+            disabled={!isAdmin}
+            onChange={(font_size) => change({ font_size })}
+            options={[
+              { value: "normal", label: "Normal" },
+              { value: "grande", label: "Grande" },
+              { value: "muy_grande", label: "Muy grande" },
+            ]}
+          />
+          <LookChoice
+            label="Interlineado"
+            value={current.line_spacing}
+            disabled={!isAdmin}
+            onChange={(line_spacing) => change({ line_spacing })}
+            options={[
+              { value: "simple", label: "Sencillo" },
+              { value: "1.5", label: "1,5" },
+            ]}
+          />
+          <LookChoice
+            label="Márgenes"
+            value={current.margins}
+            disabled={!isAdmin}
+            onChange={(margins) => change({ margins })}
+            options={[
+              { value: "normal", label: "Normales" },
+              { value: "angosto", label: "Angostos" },
+            ]}
+          />
+          <p className="text-xs leading-relaxed text-ink-400">
+            Con letra grande el acta ocupa más: si una larga pasa a otra hoja, probá márgenes angostos o interlineado sencillo.
+          </p>
+          <div className="h-5 text-sm">
+            {!isAdmin && <span className="text-ink-400">Lo cambia dirección o quien administra la sede.</span>}
+            {save.isPending && <Spinner />}
+            {save.isSuccess && !save.isPending && <span className="text-emerald-600">Guardado ✓</span>}
+            {save.isError && (
+              <span className="text-red-600">
+                {save.error instanceof Error ? save.error.message : "No se pudo guardar"}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Muestra: el principio de una hoja, con la letra, los renglones y el
+            margen elegidos (a escala de pantalla, no de papel). */}
+        <figure aria-label="Vista previa del acta" className="rounded-2xl bg-ink-100 p-3">
+          <div
+            className="relative h-64 overflow-hidden rounded-md bg-white text-[#141824] shadow-sm"
+            style={{
+              fontFamily: ACTA_FONT_CSS[letterhead.font] ?? ACTA_FONT_CSS.arial,
+              padding: `${Math.round(20 * margin)}px ${Math.round(22 * margin)}px`,
+              fontSize: `${(11 * scale).toFixed(1)}px`,
+              lineHeight: 1.6 * line,
+            }}
+          >
+            <p className="text-center font-bold uppercase tracking-wide" style={{ fontSize: "1.1em" }}>
+              {letterhead.title || "Acta de reunión"}
+            </p>
+            {SAMPLE_PARAGRAPHS.map((text) => (
+              <p key={text} className="mt-[0.6em] text-justify">
+                {text}
+              </p>
+            ))}
+            <span aria-hidden className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white to-transparent" />
+          </div>
+          <figcaption className="mt-2 text-center text-xs text-ink-500">Vista previa</figcaption>
+        </figure>
+      </div>
+    </Block>
+  );
+}
+
+function LookChoice<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (value: T) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div>
+      <p className="mb-1.5 text-sm font-medium text-ink-700">{label}</p>
+      <div role="radiogroup" aria-label={label} className="inline-flex gap-1 rounded-full bg-ink-100 p-1">
+        {options.map((option) => {
+          const selected = option.value === value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              disabled={disabled}
+              onClick={() => !selected && onChange(option.value)}
+              className={`min-h-9 whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed ${
+                selected
+                  ? "bg-white text-ink-900 shadow-[0_1px_3px_rgba(0,0,0,0.18)]"
+                  : "text-ink-500 hover:text-ink-700 disabled:hover:text-ink-500"
+              }`}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function TemplateSection() {
   const queryClient = useQueryClient();
   const { data: template } = useQuery({
@@ -82,6 +255,7 @@ export function TemplateSection() {
   return (
     <div>
       <MinutesLanguage />
+      <ActaLook />
       <Block
         id="minutes-template"
         title={
