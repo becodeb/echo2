@@ -103,7 +103,7 @@ def main() -> None:
         print(f"  {a}: " + "  ".join(row))
     print(f"\nmisma persona: min {min(same):.2f} · prom {np.mean(same):.2f}")
     print(f"otra persona:  max {max(other):.2f} · prom {np.mean(other):.2f}")
-    print(f"umbrales: nombra desde {voiceprint.ACCEPT} con margen {voiceprint.MARGIN}; sugiere desde {voiceprint.SUGGEST}")
+    print(f"umbrales: sugiere desde {voiceprint.SUGGEST} con margen {voiceprint.MARGIN} (la voz sola no nombra)")
 
 
 if __name__ == "__main__":

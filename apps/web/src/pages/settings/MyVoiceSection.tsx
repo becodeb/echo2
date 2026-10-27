@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api/client";
 import { Switch } from "../../components/Toggles";
-import { VoiceRecorder, type MyVoice } from "../../components/VoiceRecorder";
+import { VOICE_WARNINGS, VoiceRecorder, type MyVoice } from "../../components/VoiceRecorder";
 import { Block, Loading } from "./parts";
 
 /**
@@ -46,6 +46,11 @@ export function MyVoiceSection() {
             {voice.recorded_at && ` desde el ${new Date(voice.recorded_at).toLocaleDateString("es-AR")}`}.
             {(voice.learned_count ?? 0) > 0 &&
               ` Echo ya la mejoró con ${voice.learned_count} reunión${voice.learned_count === 1 ? "" : "es"}.`}
+          </div>
+        )}
+        {voice?.has_sample && !rerecord && voice.warning && VOICE_WARNINGS[voice.warning] && (
+          <div className="mb-4 rounded-3xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            {VOICE_WARNINGS[voice.warning]}
           </div>
         )}
 
@@ -93,7 +98,7 @@ export function MyVoiceSection() {
             label="Mejorar el reconocimiento con mis reuniones"
             hint={
               voice.learn_from_meetings ?? true
-                ? "Cuando Echo te reconoce con seguridad, suma lo aprendido a tu huella de voz."
+                ? "Por ahora Echo no suma reuniones a tu huella: compara solo con tu grabación."
                 : "Apagado: Echo usa solo tu grabación. Lo aprendido se olvidó."
             }
           />

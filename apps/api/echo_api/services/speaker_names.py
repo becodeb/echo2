@@ -6,16 +6,21 @@ Después de separar a las personas (Scribe), en este orden:
    X", "me llamo X", "habla X". X se busca entre participantes, miembros de la
    organización e integrantes de la familia de la reunión; si coincide uno
    solo, se pone ese nombre.
-2. **Su voz** (§7.2): la huella de cada persona contra la de "Mi voz" de los
-   miembros que la grabaron (services/voiceprint.py). Se nombra solo con
-   coincidencia alta y margen; si no, queda como sugerencia.
+2. **Su voz** (§7.2): la huella de cada persona contra la de "Mi voz" de
+   quienes pueden haber estado (`could_have_been`): quien la grabó, la gente
+   del colegio que figura como que estuvo y los participantes cuyo nombre es
+   el de un solo miembro. Nunca contra toda la sede. La voz sola no pone el
+   nombre: con coincidencia alta y margen queda "¿Puede ser X?" (sin
+   porcentaje); si no, nada. Quien ya dijo "no es X" no se vuelve a sugerir
+   en esa reunión.
    Si lo que dijo y la voz no coinciden, gana lo que dijo y la voz queda como
    sugerencia para revisar.
 3. Lo que quede sin nombre lo intenta después la IA (diarization.name_speakers),
    con una lista cerrada de roles.
 
-Si la persona lo permite (§7.4), una coincidencia de voz muy alta suma esa
-huella a su perfil. Nunca se guardan huellas de quien no grabó su voz.
+Echo ya no suma huellas de las reuniones al perfil (§7.4): aprendía de lo
+que adivinaba y el perfil terminaba pareciéndose a cualquiera (27/10). Nunca
+se guardan huellas de quien no grabó su voz.
 """
 from __future__ import annotations
 
@@ -43,9 +48,8 @@ from .privacy import fold
 log = logging.getLogger("echo.speaker_names")
 
 SAID_WITHIN_MS = 3 * 60 * 1000
-# Coincidencia de voz desde la que se aprende (más exigente que nombrar).
-LEARN_FROM = 0.82
-MAX_LEARNED = 20
+# meeting.meta: usuarios que alguien descartó ("no es X") en esa reunión.
+VOICE_REJECTED = "voice_rejected"
 
 _SAID = re.compile(
     r"\b(?:soy|me llamo|habla|les habla|te habla|mi nombre es)\s+(?:el |la )?"
@@ -60,8 +64,6 @@ class Candidate:
     name: str
     user_id: uuid.UUID | None = None
     voice: np.ndarray | None = None
-    sample_id: uuid.UUID | None = None
-    learn: bool = False
 
 
 @dataclass
@@ -76,16 +78,16 @@ class Naming:
     extra: dict = field(default_factory=dict)
 
     def suggestion(self) -> dict:
-        # Por la voz, qué tan seguro (0-1, lo que la pantalla muestra en %),
-        # no el coseno crudo.
-        confidence = voiceprint.certainty(self.score) if self.source == "voz" else self.score
-        return {
+        out = {
             "person_name": self.name,
             "user_id": str(self.user_id) if self.user_id else None,
-            "confidence": round(confidence, 2),
             "source": self.source,
             **self.extra,
         }
+        # Por la voz no hay porcentaje: el parecido no dice qué tan seguro es.
+        if self.source != "voz":
+            out["confidence"] = round(self.score, 2)
+        return out
 
 
 def said_names(rows: list[Row], candidates: list[Candidate]) -> dict[str, Candidate]:
@@ -135,7 +137,7 @@ def decide(
         scores = np.array([[float(np.dot(prints[p], c.voice)) for c in with_voice] for p in people])
         for match in voiceprint.assign(scores, people=people):
             candidate = with_voice[match.candidate]
-            heard = Naming(candidate.name, candidate.user_id, "voz", match.accepted, match.score)
+            heard = Naming(candidate.name, candidate.user_id, "voz", False, match.score)
             current = out.get(match.person)
             if current is None:
                 out[match.person] = heard
@@ -157,6 +159,29 @@ def decide(
     return out
 
 
+def could_have_been(
+    created_by: uuid.UUID | None,
+    members: list[tuple[uuid.UUID, str | None]],
+    participants: list[tuple[str | None, uuid.UUID | None]],
+) -> set[uuid.UUID]:
+    """Quiénes del colegio pueden haber estado en la reunión.
+
+    Quien la grabó, los que figuran como que estuvieron y los participantes
+    cargados a mano cuyo nombre es el de un solo miembro ("Natalia" sirve si
+    hay una sola Natalia). Contra toda la sede, la voz se equivocaba 10 de
+    cada 14 veces (27/10).
+    """
+    present = {created_by} | {user_id for _, user_id in participants if user_id}
+    for name, user_id in participants:
+        if user_id or not name:
+            continue
+        words = fold(name).split()
+        hits = {member_id for member_id, member_name in members if _names(member_name or "", words)}
+        if len(hits) == 1:
+            present |= hits
+    return present & {member_id for member_id, _ in members}
+
+
 async def _candidates(db, meeting: Meeting) -> list[Candidate]:
     members = (
         await db.execute(
@@ -165,13 +190,23 @@ async def _candidates(db, meeting: Meeting) -> list[Candidate]:
             .where(OrganizationMember.organization_id == meeting.organization_id)
         )
     ).all()
+    participants = (
+        await db.execute(
+            select(MeetingParticipant.name, MeetingParticipant.user_id).where(MeetingParticipant.meeting_id == meeting.id)
+        )
+    ).all()
+    rejected = {str(user_id) for user_id in (meeting.meta or {}).get(VOICE_REJECTED, [])}
+    present = {
+        user_id for user_id in could_have_been(meeting.created_by, members, participants) if str(user_id) not in rejected
+    }
     samples = {
         sample.user_id: sample
         for sample in (
             await db.execute(
                 select(UserVoiceSample).where(
-                    UserVoiceSample.user_id.in_([user_id for user_id, _ in members] or [uuid.uuid4()]),
+                    UserVoiceSample.user_id.in_(present or [uuid.uuid4()]),
                     UserVoiceSample.embedding_model == voiceprint.MODEL_NAME,
+                    UserVoiceSample.duration_ms >= voiceprint.MIN_SAMPLE_MS,
                 )
             )
         ).scalars()
@@ -180,14 +215,9 @@ async def _candidates(db, meeting: Meeting) -> list[Candidate]:
     for user_id, name in members:
         sample = samples.get(user_id)
         voice = np.asarray(sample.embedding, dtype=np.float32) if sample is not None and sample.embedding is not None else None
-        out.append(Candidate(name or "", user_id, voice, sample.id if sample else None,
-                             bool(sample and sample.learn_from_meetings)))
+        out.append(Candidate(name or "", user_id, voice))
     member_names = {fold(c.name) for c in out}
-    for name, user_id in (
-        await db.execute(
-            select(MeetingParticipant.name, MeetingParticipant.user_id).where(MeetingParticipant.meeting_id == meeting.id)
-        )
-    ).all():
+    for name, user_id in participants:
         if name and fold(name) not in member_names:
             out.append(Candidate(name, user_id))
     if meeting.family_id:
@@ -212,7 +242,6 @@ async def resolve(meeting_id: uuid.UUID, rows: list[Row], pcm: np.ndarray | None
             turns = [(label, start, end) for label, _, start, end in rows]
             prints = await asyncio.to_thread(voiceprint.people_prints, pcm, turns)
         names = decide(rows, candidates, prints)
-        await _learn(names, prints, candidates)
         if names:
             log.info("nombres de %s: %s", meeting_id,
                      {label: (n.source, n.accepted, n.score) for label, n in names.items()})
@@ -220,29 +249,6 @@ async def resolve(meeting_id: uuid.UUID, rows: list[Row], pcm: np.ndarray | None
     except Exception:  # noqa: BLE001 - sin nombres queda "Persona 1"
         log.exception("no se pudieron poner los nombres de %s", meeting_id)
         return {}
-
-
-async def _learn(names: dict[str, Naming], prints: dict[str, np.ndarray], candidates: list[Candidate]) -> None:
-    """§7.4: suma la huella de la reunión al perfil de quien lo permitió."""
-    by_user = {c.user_id: c for c in candidates if c.user_id and c.sample_id and c.learn}
-    learned = [
-        (by_user[naming.user_id], prints[label])
-        for label, naming in names.items()
-        if naming.source == "voz" and naming.accepted and naming.score >= LEARN_FROM
-        and naming.user_id in by_user and label in prints
-    ]
-    if not learned:
-        return
-    async with SessionLocal() as db:
-        for candidate, vector in learned:
-            sample = await db.get(UserVoiceSample, candidate.sample_id)
-            if sample is None or sample.embedding is None or not sample.learn_from_meetings:
-                continue
-            weight = min(sample.learned_count + 1, MAX_LEARNED)
-            profile = np.asarray(sample.embedding, dtype=np.float32) * weight + vector
-            sample.embedding = voiceprint.to_list(profile / float(np.linalg.norm(profile)))
-            sample.learned_count += 1
-        await db.commit()
 
 
 async def fingerprint_sample(wav_pcm: bytes) -> list[float] | None:

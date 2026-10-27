@@ -1,12 +1,12 @@
-"""Huella de voz: poner el nombre de quien habló a partir de "Mi voz".
+"""Huella de voz: sugerir el nombre de quien habló a partir de "Mi voz".
 
 Después de que la pasada final separa a las personas (ElevenLabs Scribe), se
 saca la huella (embedding) de cada persona de la reunión con hasta 30 s de
-sus turnos limpios, y se compara con las huellas de "Mi voz" de los
-candidatos: miembros de la organización que grabaron su voz. Una persona
-queda nombrada solo si la coincidencia supera un umbral Y le saca margen a
-la segunda mejor opción; si no, queda como sugerencia para confirmar con un
-toque. Un nombre equivocado es peor que "Persona 1".
+sus turnos limpios, y se compara con las huellas de "Mi voz" de quienes
+pueden haber estado (services/speaker_names.py). La voz sola nunca pone el
+nombre: con coincidencia alta Y margen sobre la segunda opción queda como
+"¿Puede ser X?" para confirmar con un toque; si no, nada. Un nombre
+equivocado es peor que "Persona 1".
 
 El modelo (WeSpeaker ResNet34, ONNX, vía sherpa-onnx) corre en la CPU del
 servidor de Echo: ni la muestra ni el audio salen a terceros. Si el modelo
@@ -36,31 +36,17 @@ MIN_TURN_MS = 1000
 MAX_PERSON_MS = 30000
 # Menos que esto de una persona y la huella no es confiable: no se nombra.
 MIN_PERSON_MS = 3000
-# Coseno entre la huella de "Mi voz" y la de la persona en la reunión. En el
-# banco (1/10): misma persona 0,81-0,97 (también entre reuniones de días
-# distintos); dos personas distintas en la misma sala 0,67-0,73, porque la
-# sala y el micrófono pesan.
-#
-# Se lleva a "qué tan seguro" (0-100 %): 0 % donde llegan dos personas
-# distintas, 100 % bien adentro de la misma persona. Decisión de Bauti (6/10):
-# con 80 % o más se pone el nombre; entre 50 y 80 %, "¿Es X?"; menos, nada. Con
-# 0,65 de piso, cualquiera con Mi voz grabada aparecía como "¿Es…?" en todas
-# las reuniones.
-CERTAIN_FROM = 0.70  # 0 %
-CERTAIN_AT = 0.85  # 100 %
-ACCEPT_CERTAINTY = 0.80
-SUGGEST_CERTAINTY = 0.50
-
-
-def certainty(score: float) -> float:
-    """Coseno → qué tan seguro (0 a 1)."""
-    return round(float(min(1.0, max(0.0, (score - CERTAIN_FROM) / (CERTAIN_AT - CERTAIN_FROM)))), 4)
-
-
-ACCEPT = round(CERTAIN_FROM + ACCEPT_CERTAINTY * (CERTAIN_AT - CERTAIN_FROM), 4)  # 0,82
-SUGGEST = round(CERTAIN_FROM + SUGGEST_CERTAINTY * (CERTAIN_AT - CERTAIN_FROM), 4)  # 0,775
-# Además del umbral, la persona tiene que ganarle por esto a la segunda opción
-# (dos voces parecidas no se nombran solas).
+# Una muestra de Mi voz más corta que esto no se compara: la de 4,7 s de
+# producción se parecía a cualquier voz de las reuniones (27/10).
+MIN_SAMPLE_MS = 8000
+# Coseno entre la huella de "Mi voz" y la de la persona en la reunión. En
+# producción (27/10, 14 personas nombradas a mano en la capacitación): contra
+# su propia muestra, mediana 0,80 (0,68-0,89); contra la ajena que más se le
+# parece, mediana 0,85 y hasta 0,91. La sala y el micrófono pesan tanto como
+# la persona: por eso no se muestra un porcentaje ni se nombra solo.
+SUGGEST = 0.775
+# Además, tiene que ganarle por esto a la segunda opción, y a la otra persona
+# de la reunión que más se parece a la misma muestra; si no, no se sugiere.
 MARGIN = 0.08
 
 _lock = threading.Lock()
@@ -203,16 +189,17 @@ class Match:
     person: str  # la persona de la reunión ("speaker_1")
     candidate: int  # índice del candidato
     score: float
-    accepted: bool  # True: se nombra; False: queda como sugerencia
 
 
-def assign(scores: np.ndarray, accept: float = ACCEPT, margin: float = MARGIN, suggest: float = SUGGEST,
+def assign(scores: np.ndarray, margin: float = MARGIN, suggest: float = SUGGEST,
            people: list[str] | None = None) -> list[Match]:
-    """Uno a uno (nadie se nombra dos veces), con umbral y margen.
+    """Uno a uno (nadie se sugiere dos veces), con umbral y margen.
 
     `scores[i][j]`: coseno entre la persona i de la reunión y el candidato j.
     El margen se mide contra la segunda mejor opción de la persona y contra la
-    otra persona que más se parece al mismo candidato.
+    otra persona que más se parece al mismo candidato: con más personas que
+    candidatos, el uno a uno le "da" a cada candidato alguien, y sin margen
+    eso no dice nada (7/10: tres sugerencias de gente que no estuvo).
     """
     scores = np.asarray(scores, dtype=np.float32)
     if scores.size == 0:
@@ -231,8 +218,8 @@ def assign(scores: np.ndarray, accept: float = ACCEPT, margin: float = MARGIN, s
             continue
         rival_candidate = max((float(x) for k, x in enumerate(scores[i]) if k != j), default=-1.0)
         rival_person = max((float(x) for k, x in enumerate(scores[:, j]) if k != i), default=-1.0)
-        accepted = score >= accept and score - max(rival_candidate, rival_person) >= margin
-        out.append(Match(people[i], j, round(score, 3), accepted))
+        if score - max(rival_candidate, rival_person) >= margin:
+            out.append(Match(people[i], j, round(score, 3)))
     return out
 
 

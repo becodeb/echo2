@@ -6,7 +6,8 @@ cuando quiera. Se guarda como WAV 16 kHz mono de hasta 12 s, con su huella
 
 "Mejorar el reconocimiento con mis reuniones" (§7.4) viene prendido al
 grabar (decisión de Bauti, 1/10) y se puede apagar: al apagarlo, el perfil
-vuelve a ser solo la muestra.
+vuelve a ser solo la muestra. Desde el 27/10 Echo no suma reuniones al perfil
+(aprendía de lo que adivinaba); la opción queda para olvidar lo aprendido.
 """
 import asyncio
 from datetime import UTC, datetime
@@ -46,10 +47,13 @@ class VoiceOut(BaseModel):
     # Cuántas reuniones sumaron a su perfil.
     learned_count: int = 0
     # "baja" | "ruido": se guardó igual, pero conviene grabar de nuevo.
+    # "corta": de antes del mínimo de 8 s; Echo no la usa hasta grabarla de nuevo.
     warning: str | None = None
 
 
 def _out(sample: UserVoiceSample, seen: bool, warning: str | None = None) -> VoiceOut:
+    if sample.duration_ms < voiceprint.MIN_SAMPLE_MS:
+        warning = "corta"
     return VoiceOut(
         has_sample=True, duration_ms=sample.duration_ms, recorded_at=sample.updated_at, prompt_seen=seen,
         learn_from_meetings=sample.learn_from_meetings, learned_count=sample.learned_count, warning=warning,
@@ -87,7 +91,10 @@ async def _to_pcm16(data: bytes) -> bytes:
 
 
 def _trim_to_speech(pcm: bytes) -> bytes:
-    """Saca el silencio del principio y del final y deja hasta 12 s."""
+    """Saca el silencio del principio y del final y deja hasta 12 s.
+
+    Vacío si casi no hay voz o si lo que queda dura menos de 8 s
+    (voiceprint.MIN_SAMPLE_MS): una muestra corta se parece a cualquiera."""
     samples = np.frombuffer(pcm[: len(pcm) // 2 * 2], dtype=np.int16).astype(np.float32)
     frame = 1600  # 100 ms
     count = len(samples) // frame
@@ -100,6 +107,8 @@ def _trim_to_speech(pcm: bytes) -> bytes:
         return b""
     first, last = int(voiced[0]), int(voiced[-1]) + 1
     last = min(last, first + MAX_MS // 100)
+    if (last - first) * 100 < voiceprint.MIN_SAMPLE_MS:
+        return b""
     return pcm[first * frame * 2 : last * frame * 2]
 
 
@@ -140,7 +149,7 @@ async def save_my_voice(
     if not speech:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            "Casi no se escuchó tu voz. Grabá de nuevo hablando cerca del micrófono unos segundos.",
+            "Casi no se escuchó tu voz o quedó corta. Grabá de nuevo leyendo el texto completo, cerca del micrófono.",
         )
     sample = (
         await db.execute(select(UserVoiceSample).where(UserVoiceSample.user_id == user.id))

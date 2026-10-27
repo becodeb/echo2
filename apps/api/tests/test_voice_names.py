@@ -14,8 +14,7 @@ from test_final_pass import _cleanup, _meeting, _setup, _transcript
 from test_levels import _sql, _sql_rows
 
 from echo_api.services import diarization, speaker_names, voiceprint
-from echo_api.services.speaker_names import Candidate, decide, said_names
-
+from echo_api.services.speaker_names import Candidate, could_have_been, decide, said_names
 
 
 def _unit(*values: float) -> np.ndarray:
@@ -41,35 +40,47 @@ def test_hungarian_finds_the_best_one_to_one():
         assert sum(scores[i, c] for i, c in enumerate(got)) == sum(scores[i, c] for i, c in enumerate(best))
 
 
-def test_each_voice_gets_its_name_and_nobody_twice():
+def test_the_voice_only_suggests_and_nobody_twice():
     bauti = Candidate("Bautista Goñi", uuid.uuid4(), BAUTI)
     laura = Candidate("Laura Belzunce", uuid.uuid4(), LAURA)
     prints = {"speaker_1": _near(BAUTI, 0.2), "speaker_2": _near(LAURA, 0.2)}
     names = decide([], [bauti, laura], prints)
+    # Aun con coincidencia altísima, la voz sola no pone el nombre (27/10).
     assert {k: (n.name, n.accepted, n.source) for k, n in names.items()} == {
-        "speaker_1": ("Bautista Goñi", True, "voz"), "speaker_2": ("Laura Belzunce", True, "voz"),
+        "speaker_1": ("Bautista Goñi", False, "voz"), "speaker_2": ("Laura Belzunce", False, "voz"),
     }
-    # Dos personas que se parecen a la misma muestra: ninguna se nombra seguro.
+    # Sin porcentaje: el parecido no dice qué tan seguro es.
+    assert "confidence" not in names["speaker_1"].suggestion()
+    # Dos personas que se parecen a la misma muestra: no se sugiere ninguna.
     twins = {"speaker_1": _near(BAUTI, 0.3), "speaker_2": _near(BAUTI, 0.35)}
-    names = decide([], [bauti], twins)
-    assert not any(n.accepted for n in names.values())
+    assert decide([], [bauti], twins) == {}
 
 
-def test_the_name_goes_by_how_sure_echo_is():
-    # Bauti (6/10): con 80 % o más, el nombre; entre 50 y 80 %, "¿Es X?";
-    # menos, nada. Antes cualquiera con Mi voz salía "¿Es…?" en todas las reuniones.
+def test_without_margin_over_the_second_nothing_is_suggested():
     bauti = Candidate("Bautista Goñi", uuid.uuid4(), BAUTI)
-    # Coseno ~0,71: como dos personas distintas en la misma sala (banco del 1/10). Nada.
+    # Coseno ~0,71: como dos personas distintas en la misma sala. Nada.
     assert decide([], [bauti], {"speaker_1": _near(BAUTI, 1.0)}) == {}
     assert decide([], [bauti], {"speaker_1": OTHER}) == {}
-    # Coseno 0,80 (~67 %): se pregunta, con cuánta seguridad.
-    doubtful = decide([], [bauti], {"speaker_1": _near(BAUTI, 0.75)})["speaker_1"]
-    assert doubtful.accepted is False
-    assert doubtful.suggestion()["person_name"] == "Bautista Goñi"
-    assert 0.6 <= doubtful.suggestion()["confidence"] <= 0.7
-    # Coseno ~0,89 (100 %): se nombra solo.
-    assert decide([], [bauti], {"speaker_1": _near(BAUTI, 0.5)})["speaker_1"].accepted is True
-    assert voiceprint.certainty(0.82) >= 0.8 > voiceprint.certainty(0.81)
+    # Coseno ~0,80 y nadie más parecido: "¿Puede ser Bautista?".
+    assert decide([], [bauti], {"speaker_1": _near(BAUTI, 0.75)})["speaker_1"].name == "Bautista Goñi"
+    # 7/10: cuatro personas, tres muestras de gente que no estuvo, todas
+    # parecidas entre 0,80 y 0,83. El uno a uno le "daba" a cada muestra
+    # alguien; sin margen no se sugiere nadie.
+    scores = [[0.83, 0.82, 0.80], [0.82, 0.83, 0.81], [0.81, 0.80, 0.82], [0.80, 0.81, 0.80]]
+    assert voiceprint.assign(np.array(scores)) == []
+
+
+def test_only_who_could_have_been_there_is_compared():
+    creator, natalia, natalia_b, vanina, laura = (uuid.uuid4() for _ in range(5))
+    members = [(creator, "Analía Musso"), (natalia, "Natalia Miranda"), (vanina, "Vanina Gerstner"),
+               (laura, "Laura Belzunce")]
+    # La creadora, quien figura como que estuvo y "Natalia" (una sola en el colegio).
+    assert could_have_been(creator, members, [("Natalia", None), ("Vanina Gerstner", vanina)]) == {
+        creator, natalia, vanina}
+    # Dos Natalias: no se sabe cuál. Y alguien de afuera del colegio no cuenta.
+    members.append((natalia_b, "Natalia Pérez"))
+    assert could_have_been(creator, members, [("Natalia", None), ("Otra", uuid.uuid4())]) == {creator}
+    assert could_have_been(creator, members, [("Natalia Pérez", None)]) == {creator, natalia_b}
 
 
 def test_what_someone_says_names_them():
@@ -92,59 +103,87 @@ def test_what_someone_says_names_them():
     assert names["speaker_0"].name == "Bautista Goñi" and names["speaker_0"].accepted
 
 
-def test_the_final_pass_names_people_by_their_voice(client, monkeypatch):
-    _setup(monkeypatch, "2026-09-27")
-    user, meeting_id = _meeting(client, 20.4, [(0, 20400, "hola", None)], people=True)
-    laura = EchoTestUser(client, name="Laura Belzunce", org_name="x")
+def _voice_sample(user_id: str, vector: np.ndarray, duration_ms: int = 9000) -> None:
+    _sql("INSERT INTO user_voice_samples (id, user_id, audio_wav, duration_ms, consent_at, sample_embedding,"
+         " embedding, embedding_model, created_at, updated_at) VALUES (gen_random_uuid(), :u, '\\x00', :d,"
+         " now(), CAST(:v AS vector), CAST(:v AS vector), :m, now(), now())",
+         u=user_id, d=duration_ms, v=str(voiceprint.to_list(vector)), m=voiceprint.MODEL_NAME)
+
+
+def _member(client, meeting_id, name: str) -> EchoTestUser:
+    member = EchoTestUser(client, name=name, org_name="x")
     _sql("INSERT INTO organization_members (id, organization_id, user_id, role, created_at, updated_at)"
          " VALUES (gen_random_uuid(), :o, :u, 'member', now(), now())",
-         o=_sql_rows("SELECT organization_id::text FROM meetings WHERE id = :m", m=str(meeting_id))[0][0], u=laura.user_id)
-    for who, vector in ((user.user_id, BAUTI), (laura.user_id, LAURA)):
-        _sql("INSERT INTO user_voice_samples (id, user_id, audio_wav, duration_ms, consent_at, sample_embedding,"
-             " embedding, embedding_model, created_at, updated_at) VALUES (gen_random_uuid(), :u, '\\x00', 9000,"
-             " now(), CAST(:v AS vector), CAST(:v AS vector), :m, now(), now())",
-             u=who, w=b"RIFF", v=str(voiceprint.to_list(vector)), m=voiceprint.MODEL_NAME)
+         o=_sql_rows("SELECT organization_id::text FROM meetings WHERE id = :m", m=str(meeting_id))[0][0],
+         u=member.user_id)
+    return member
+
+
+def _diarize_with(monkeypatch, meeting_id) -> None:
     # En el fixture del 27/9, speaker_1 es Vanina (no grabó su voz) y speaker_2 "el Choto".
+    _setup(monkeypatch, "2026-09-27")
     monkeypatch.setattr(voiceprint, "available", lambda: True)
     monkeypatch.setattr(voiceprint, "people_prints", lambda pcm, turns: {
         "speaker_1": _near(LAURA, 0.9), "speaker_2": _near(LAURA, 0.2)})
     assert asyncio.run(diarization.diarize_meeting(meeting_id)) is True
     monkeypatch.undo()
+
+
+def test_the_final_pass_suggests_people_by_their_voice(client, monkeypatch):
+    _setup(monkeypatch, "2026-09-27")
+    user, meeting_id = _meeting(client, 20.4, [(0, 20400, "hola", None)], people=True)
+    monkeypatch.undo()
+    laura = _member(client, meeting_id, "Laura Belzunce")
+    # Emma grabó su voz pero no figura en la reunión: no se compara con ella.
+    emma = _member(client, meeting_id, "Emma Esposito")
+    _voice_sample(user.user_id, BAUTI)
+    _voice_sample(laura.user_id, LAURA)
+    _voice_sample(emma.user_id, _near(LAURA, 0.05))
+    _sql("INSERT INTO meeting_participants (id, meeting_id, name, created_at, updated_at)"
+         " VALUES (gen_random_uuid(), :m, 'Laura', now(), now())", m=str(meeting_id))
+    _diarize_with(monkeypatch, meeting_id)
     rows, meeting = _transcript(client, user, meeting_id)
-    by_label = {s["label"]: s for s in meeting["speakers"]}
-    named = {s["display_name"]: s for s in meeting["speakers"] if s["display_name"]}
-    # Bautista se nombra porque lo dijo ("yo soy Bautista Goñi"); "Laura" por su voz.
-    assert set(named) == {"Bautista Goñi", "Laura Belzunce"}
-    assert len(by_label) == 3
+    # Bautista se nombra porque lo dijo ("yo soy Bautista Goñi"); a Laura se
+    # la sugiere por su voz, sin porcentaje.
+    assert [s["display_name"] for s in meeting["speakers"] if s["display_name"]] == ["Bautista Goñi"]
+    [suggested] = [s for s in meeting["speakers"] if s["identity_suggestion"]]
+    assert suggested["identity_suggestion"] == {
+        "person_name": "Laura Belzunce", "user_id": laura.user_id, "source": "voz"}
     stored = dict(_sql_rows("SELECT display_name, name_source FROM speakers WHERE meeting_id = :m AND display_name"
                             " IS NOT NULL", m=str(meeting_id)))
-    assert stored == {"Bautista Goñi": "dijo", "Laura Belzunce": "voz"}
+    assert stored == {"Bautista Goñi": "dijo"}
+
+    # "No es Laura": no se le vuelve a sugerir aunque se procese de nuevo.
+    url = f"/api/meetings/{meeting_id}/speakers/{suggested['id']}/reject-suggestion"
+    assert client.post(url, headers=user.headers).status_code == 200
+    assert _sql_rows("SELECT meta->'voice_rejected' FROM meetings WHERE id = :m", m=str(meeting_id)) == [
+        ([laura.user_id],)]
+    _diarize_with(monkeypatch, meeting_id)
+    _, again = _transcript(client, user, meeting_id)
+    assert {s["id"] for s in again["speakers"]}.isdisjoint(s["id"] for s in meeting["speakers"])
+    assert not [s for s in again["speakers"] if (s["identity_suggestion"] or {}).get("source") == "voz"]
     _cleanup(meeting_id)
 
 
-def test_a_sure_match_teaches_the_profile_only_with_permission(client):
+def test_a_short_sample_is_not_compared(client):
     from echo_api.db import SessionLocal
-    from echo_api.models import UserVoiceSample
+    from echo_api.models import Meeting
 
-    def sample(learn: bool) -> tuple[uuid.UUID, uuid.UUID]:
-        user = EchoTestUser(client, org_name=f"Colegio {uuid.uuid4().hex[:4]}")
-        sample_id = uuid.uuid4()
-        _sql("INSERT INTO user_voice_samples (id, user_id, audio_wav, duration_ms, consent_at, sample_embedding,"
-             " embedding, embedding_model, learn_from_meetings, created_at, updated_at) VALUES (:s, :u, :w,"
-             " 9000, now(), CAST(:v AS vector), CAST(:v AS vector), :m, :l, now(), now())",
-             s=str(sample_id), u=user.user_id, w=b"RIFF", v=str(voiceprint.to_list(BAUTI)), m=voiceprint.MODEL_NAME,
-             l=learn)
-        return uuid.UUID(user.user_id), sample_id
+    user = EchoTestUser(client, name="Analía Musso", org_name=f"Colegio {uuid.uuid4().hex[:4]}")
+    meeting_id = client.post("/api/meetings", json={"title": "x", "level": "primaria"}, headers=user.headers).json()["id"]
+    _voice_sample(user.user_id, BAUTI, duration_ms=4700)
 
-    async def learned(user_id, sample_id, learn: bool) -> int:
-        candidate = Candidate("Ana", user_id, BAUTI, sample_id, learn)
-        prints = {"speaker_1": _near(BAUTI, 0.1)}
-        await speaker_names._learn(decide([], [candidate], prints), prints, [candidate])
+    async def voices():
         async with SessionLocal() as db:
-            return (await db.get(UserVoiceSample, sample_id)).learned_count
+            meeting = await db.get(Meeting, uuid.UUID(meeting_id))
+            return [c.voice for c in await speaker_names._candidates(db, meeting)]
 
-    assert asyncio.run(learned(*sample(True), True)) == 1
-    assert asyncio.run(learned(*sample(False), False)) == 0
+    assert asyncio.run(voices()) == [None]
+    assert client.get("/api/me/voice", headers=user.headers).json()["warning"] == "corta"
+    _sql("UPDATE user_voice_samples SET duration_ms = 9000 WHERE user_id = :u", u=user.user_id)
+    [voice] = asyncio.run(voices())
+    assert voice is not None
+    assert client.get("/api/me/voice", headers=user.headers).json()["warning"] is None
 
 
 def test_saving_my_voice_keeps_its_print_and_learning_can_be_turned_off(client, monkeypatch):
@@ -160,7 +199,7 @@ def test_saving_my_voice_keeps_its_print_and_learning_can_be_turned_off(client, 
         out.setnchannels(1)
         out.setsampwidth(2)
         out.setframerate(16000)
-        out.writeframes(_tone(5.0))
+        out.writeframes(_tone(10.0))
     auth = {"Authorization": f"Bearer {user.token}"}
     saved = client.post("/api/me/voice", files={"audio": ("voz.wav", buffer.getvalue(), "audio/wav")},
                         data={"consent": "true"}, headers=auth).json()
@@ -189,3 +228,25 @@ def test_confirming_a_suggestion_links_the_person_to_the_member(client):
     # Alguien de otra organización no queda vinculado.
     client.patch(url, json={"display_name": "X", "user_id": outsider.user_id}, headers=owner.headers)
     assert _sql_rows("SELECT user_id FROM speakers WHERE id = :id", id=speaker_id) == [(None,)]
+
+
+def test_naming_someone_else_counts_as_not_this_person(client):
+    owner = EchoTestUser(client, name="Mariana Gibson", org_name=f"Colegio {uuid.uuid4().hex[:4]}")
+    meeting_id = client.post("/api/meetings", json={"title": "x", "level": "primaria"}, headers=owner.headers).json()["id"]
+    laura = str(uuid.uuid4())
+
+    def speaker() -> str:
+        speaker_id = str(uuid.uuid4())
+        _sql("INSERT INTO speakers (id, meeting_id, label, color, identity_suggestion, created_at, updated_at) VALUES"
+             " (:id, :m, 'Persona 1', '#000', CAST(:s AS jsonb), now(), now())", id=speaker_id, m=meeting_id,
+             s=f'{{"person_name": "Laura Belzunce", "user_id": "{laura}", "source": "voz"}}')
+        return f"/api/meetings/{meeting_id}/speakers/{speaker_id}"
+
+    def rejected():
+        return _sql_rows("SELECT meta->'voice_rejected' FROM meetings WHERE id = :m", m=meeting_id)[0][0]
+
+    # Escribir a mano el mismo nombre no es un "no".
+    client.patch(speaker(), json={"display_name": "laura belzunce"}, headers=owner.headers)
+    assert rejected() is None
+    client.patch(speaker(), json={"display_name": "Vanina"}, headers=owner.headers)
+    assert rejected() == [laura]

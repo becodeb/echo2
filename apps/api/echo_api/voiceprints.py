@@ -6,7 +6,7 @@ tienen con otro modelo). Se corre una vez después de desplegar §7.2:
 
 `--comparar` sirve para calibrar con voces reales sin sacarlas del servidor:
 dos muestras de la misma persona tienen que dar bastante más que las de dos
-personas distintas (services/voiceprint.py, ACCEPT y MARGIN).
+personas distintas (services/voiceprint.py, SUGGEST y MARGIN).
 """
 import asyncio
 import sys

@@ -12,15 +12,16 @@ export interface MyVoice {
   prompt_seen?: boolean;
   learn_from_meetings?: boolean;
   learned_count?: number;
-  /** "baja" | "ruido": se guardó, pero conviene grabarla de nuevo. */
+  /** "baja" | "ruido": se guardó, pero conviene grabarla de nuevo. "corta": Echo no la usa. */
   warning?: string | null;
 }
 
 const SECONDS = 12;
 
-const WARNINGS: Record<string, string> = {
+export const VOICE_WARNINGS: Record<string, string> = {
   baja: "Quedó muy baja. Si podés, grabala de nuevo más cerca del micrófono.",
   ruido: "Se escucha mucho ruido de fondo. Si podés, grabala de nuevo en un lugar más tranquilo.",
+  corta: "Tu grabación quedó corta y Echo no la usa. Grabala de nuevo leyendo el texto completo.",
 };
 
 type Stage = "idle" | "recording" | "review" | "saving" | "saved";
@@ -116,7 +117,7 @@ export function VoiceRecorder({ onSaved, compact = false }: { onSaved?: (voice: 
       form.append("audio", blob, `voz.${extension}`);
       form.append("consent", "true");
       const voice = await api<MyVoice>("/api/me/voice", { method: "POST", body: form, skipOrg: true });
-      setWarning(voice.warning ? WARNINGS[voice.warning] ?? null : null);
+      setWarning(voice.warning ? VOICE_WARNINGS[voice.warning] ?? null : null);
       setStage("saved");
       await queryClient.invalidateQueries({ queryKey: ["my-voice"] });
       await queryClient.invalidateQueries({ queryKey: ["my-voice-prompt"] });
@@ -221,7 +222,7 @@ export function VoiceRecorder({ onSaved, compact = false }: { onSaved?: (voice: 
       {stage === "saved" && (
         <div className="space-y-3">
           <p className="rounded-3xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-            ¡Listo! Desde la próxima reunión, Echo te reconoce por tu voz.
+            ¡Listo! Desde la próxima reunión, Echo puede sugerir tu nombre cuando hables.
           </p>
           {warning && (
             <div className="flex flex-wrap items-center gap-3 rounded-3xl bg-amber-50 px-4 py-3 text-sm text-amber-800">

@@ -144,7 +144,8 @@ def test_voice_sample_needs_consent_and_voice(client):
 
     assert upload(_tone(5), "false").status_code == 400
     assert upload(_silence(5), "true").status_code == 400
-    assert upload(_tone(5), "true").status_code == 200
+    assert upload(_tone(5), "true").status_code == 400  # menos de 8 s: se parece a cualquiera
+    assert upload(_tone(10), "true").status_code == 200
     assert client.get("/api/me/voice", headers=auth).json()["has_sample"] is True
     assert client.delete("/api/me/voice", headers=auth).status_code == 204
     assert client.get("/api/me/voice", headers=auth).json()["has_sample"] is False

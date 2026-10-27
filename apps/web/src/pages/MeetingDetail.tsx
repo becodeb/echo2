@@ -679,6 +679,10 @@ function SpeakerEditor({ meeting, onChanged }: { meeting: MeetingOut; onChanged:
     setRenaming(null);
     onChanged();
   };
+  const reject = async (speakerId: string) => {
+    await api(`/api/meetings/${meeting.id}/speakers/${speakerId}/reject-suggestion`, { method: "POST" });
+    onChanged();
+  };
   const byVoice = meeting.speakers.some((speaker) => speaker.name_source === "voz");
 
   return (
@@ -719,25 +723,35 @@ function SpeakerEditor({ meeting, onChanged }: { meeting: MeetingOut; onChanged:
             </button>
           )}
           {renaming !== speaker.id && !speaker.display_name && speaker.identity_suggestion?.person_name && (
-            <button
-              onClick={() =>
-                rename(
-                  speaker.id,
-                  speaker.identity_suggestion?.person_name ?? "",
-                  speaker.identity_suggestion?.user_id ?? null,
-                )
-              }
-              className="ml-1 inline-flex min-h-8 items-center gap-1 rounded-full bg-accent-50 px-2.5 py-1 text-xs font-medium text-accent-700 hover:bg-accent-100"
-              title="Confirmar"
-            >
-              ¿Es {speaker.identity_suggestion.person_name}?
-              {speaker.identity_suggestion.confidence != null && (
+            <span className="ml-1 inline-flex min-h-8 items-center gap-1 rounded-full bg-accent-50 py-1 pl-2.5 pr-1 text-xs font-medium text-accent-700">
+              {/* Por la voz, sin porcentaje: el parecido no dice qué tan seguro es (27/10). */}
+              {speaker.identity_suggestion.source === "voz" ? "¿Puede ser" : "¿Es"} {speaker.identity_suggestion.person_name}?
+              {speaker.identity_suggestion.source !== "voz" && speaker.identity_suggestion.confidence != null && (
                 <span className="font-normal text-accent-600/80">
                   {Math.round(speaker.identity_suggestion.confidence * 100)} %
                 </span>
-              )}{" "}
-              Sí
-            </button>
+              )}
+              <button
+                onClick={() =>
+                  rename(
+                    speaker.id,
+                    speaker.identity_suggestion?.person_name ?? "",
+                    speaker.identity_suggestion?.user_id ?? null,
+                  )
+                }
+                className="rounded-full px-2 py-0.5 hover:bg-accent-100"
+                title="Confirmar"
+              >
+                Sí
+              </button>
+              <button
+                onClick={() => reject(speaker.id)}
+                className="rounded-full px-2 py-0.5 text-ink-500 hover:bg-accent-100"
+                title="No es esta persona"
+              >
+                No
+              </button>
+            </span>
           )}
           {speaker.identity_suggestion?.voice_says && (
             <span className="ml-1 text-xs text-amber-700">(la voz parece de {speaker.identity_suggestion.voice_says})</span>

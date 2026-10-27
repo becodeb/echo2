@@ -10,6 +10,8 @@ from ..db import get_db
 from ..deps import OrgContext, can_edit_meeting, get_meeting_or_404, get_org_context
 from ..models import OrganizationMember, SegmentRevision, Speaker, TranscriptSegment
 from ..services.audit import audit
+from ..services.privacy import fold
+from ..services.speaker_names import VOICE_REJECTED
 
 router = APIRouter(prefix="/api/meetings/{meeting_id}", tags=["transcript"])
 
@@ -191,6 +193,8 @@ async def rename_speaker(
     ).scalar_one_or_none()
     if not speaker:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Hablante no encontrado")
+    suggested = _suggested_by_voice(speaker)
+    suggested_name = (speaker.identity_suggestion or {}).get("person_name") or ""
     speaker.display_name = data.display_name.strip()
     speaker.name_source = "manual"
     speaker.identity_suggestion = None
@@ -204,9 +208,52 @@ async def rename_speaker(
             )
         ).scalar_one_or_none()
         speaker.user_id = member
+    if suggested and suggested != str(speaker.user_id) and fold(speaker.display_name) != fold(suggested_name):
+        # La voz decía X y le pusieron otro nombre: es un "no es X".
+        _reject_voice(meeting, suggested)
     await audit(db, ctx.org_id, ctx.user.id, "speaker.rename", "speaker", str(speaker.id))
     await db.commit()
     return {"id": str(speaker.id), "label": speaker.label, "display_name": speaker.display_name}
+
+
+def _suggested_by_voice(speaker: Speaker) -> str | None:
+    suggestion = speaker.identity_suggestion or {}
+    return suggestion.get("user_id") if suggestion.get("source") == "voz" else None
+
+
+def _reject_voice(meeting, user_id: str) -> None:
+    """Esa persona no se vuelve a sugerir por la voz en esta reunión, aunque
+    se procese de nuevo (services/speaker_names.py)."""
+    rejected = (meeting.meta or {}).get(VOICE_REJECTED, [])
+    if user_id not in rejected:
+        meeting.meta = {**(meeting.meta or {}), VOICE_REJECTED: [*rejected, user_id]}
+
+
+@router.post("/speakers/{speaker_id}/reject-suggestion")
+async def reject_suggestion(
+    meeting_id: uuid.UUID,
+    speaker_id: uuid.UUID,
+    ctx: OrgContext = Depends(get_org_context),
+    db: AsyncSession = Depends(get_db),
+):
+    """"No": la sugerencia ("¿Puede ser Laura?") se saca y no vuelve."""
+    meeting = await get_meeting_or_404(meeting_id, ctx, db, minimum_role="editor")
+    if not can_edit_meeting(ctx, meeting):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Sin permiso de edición")
+    speaker = (
+        await db.execute(
+            select(Speaker).where(Speaker.id == speaker_id, Speaker.meeting_id == meeting.id)
+        )
+    ).scalar_one_or_none()
+    if not speaker:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Hablante no encontrado")
+    suggested = _suggested_by_voice(speaker)
+    if suggested:
+        _reject_voice(meeting, suggested)
+    speaker.identity_suggestion = None
+    await audit(db, ctx.org_id, ctx.user.id, "speaker.reject_suggestion", "speaker", str(speaker.id))
+    await db.commit()
+    return {"id": str(speaker.id)}
 
 
 class SpeakerMergeIn(BaseModel):
