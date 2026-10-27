@@ -155,6 +155,30 @@ class TestModelosRazonadores:
         assert sent["thinking"] == {"type": "disabled"}
         assert sent["max_tokens"] == 400
 
+    def test_el_acta_va_sin_razonar_y_si_el_modelo_no_acepta_repite_con_low(self, monkeypatch):
+        import asyncio
+
+        import httpx
+
+        from echo_api.services.llm.base import reasoning
+
+        sent: list[str] = []
+
+        async def fake_post(self, url, json=None, headers=None):
+            sent.append(json["reasoning_effort"])
+            if json["reasoning_effort"] == "none":
+                return httpx.Response(400, text='{"error": {"param": "reasoning_effort"}}')
+            return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
+
+        monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
+        provider = get_llm_provider("openai", "k", "gpt-6-luna")
+        with reasoning("none"):
+            assert asyncio.run(provider.chat("sys", [{"role": "user", "content": "hola"}], 0.2, 1000)) == "ok"
+        assert sent == ["none", "low"]
+        # Fuera del bloque, lo de siempre.
+        asyncio.run(provider.chat("sys", [{"role": "user", "content": "hola"}], 0.2, 1000))
+        assert sent[-1] == "low"
+
     def test_modelo_clasico_conserva_temperatura(self, monkeypatch):
         payload = self._payload(monkeypatch, "gpt-4.1")
         assert payload["temperature"] == 0.2 and payload["max_tokens"] == 1000

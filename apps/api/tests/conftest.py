@@ -198,17 +198,21 @@ class SmartFakeLLM:
                         "desarrollo": "Se acuerda mover el lanzamiento al viernes.",
                         "fecha": "1999-01-01",
                     },
-                    "claims": [{"text": "El lanzamiento se mueve al viernes", "approx_ms": 7000}],
                 }
             )
         if "generador de actas" in system:
             return json.dumps(
                 {
                     "markdown": "# ACTA DE REUNIÓN\n\n## Decisiones adoptadas\n- El lanzamiento se mueve al viernes\n\n## Compromisos y tareas\n| Tarea | Responsable | Fecha límite |\n|---|---|---|\n| Pedir tres presupuestos | Marcos | viernes |\n",
+                }
+            )
+        if "afirmaciones verificables del acta" in system:
+            return json.dumps(
+                {
                     "claims": [
                         {"text": "El lanzamiento se mueve al viernes", "approx_ms": 4000},
                         {"text": "Marcos pedirá tres presupuestos", "approx_ms": 2000},
-                    ],
+                    ]
                 }
             )
         if "verificador" in system:

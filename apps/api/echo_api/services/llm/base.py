@@ -47,6 +47,24 @@ def collect_usage():
         _usage.reset(token)
 
 
+# Cuánto razona un modelo razonador (GPT-5.x/6.x) en las llamadas de adentro
+# del bloque. Redactar el acta o el resumen a partir del transcript no gana
+# nada pensando y sí tarda: medido el 27/10 con actas reales, sin razonar sale
+# en ~8 s en vez de ~16 s, y con el mismo contenido. Lo que decide (tareas,
+# verificación) sigue en "low".
+_effort: ContextVar[str] = ContextVar("echo_llm_effort", default="low")
+
+
+@contextmanager
+def reasoning(effort: str):
+    """Las llamadas de adentro del bloque razonan `effort` ("none", "low"...)."""
+    token = _effort.set(effort)
+    try:
+        yield
+    finally:
+        _effort.reset(token)
+
+
 class LLMProvider:
     name = "base"
 
@@ -143,7 +161,7 @@ class OpenAICompatibleProvider(LLMProvider):
             # GPT-5.x / o-series rechazan `max_tokens` y cualquier temperatura
             # distinta de 1. El razonamiento consume del mismo techo, así que
             # se le suma margen: sin eso vuelve 200 con el contenido vacío.
-            payload["reasoning_effort"] = "low"
+            payload["reasoning_effort"] = _effort.get()
             if not self.omit_max_tokens and max_tokens is not None:
                 payload["max_completion_tokens"] = max_tokens + REASONING_TOKEN_MARGIN
         else:
@@ -164,6 +182,17 @@ class OpenAICompatibleProvider(LLMProvider):
                 response = await post_with_rate_limit(
                     client, f"{self.base_url}/chat/completions", json=payload, headers=headers
                 )
+                if (
+                    response.status_code == 400
+                    and payload.get("reasoning_effort", "low") != "low"
+                    and "reasoning_effort" in response.text
+                ):
+                    # Un modelo (o un gateway) que no acepta ese nivel: se
+                    # repite con el de siempre en vez de perder el acta.
+                    payload["reasoning_effort"] = "low"
+                    response = await post_with_rate_limit(
+                        client, f"{self.base_url}/chat/completions", json=payload, headers=headers
+                    )
         except httpx.HTTPError as exc:
             raise LLMError(f"Error de red con {self.name}: {exc}") from exc
         latency_ms = int((time.monotonic() - started) * 1000)

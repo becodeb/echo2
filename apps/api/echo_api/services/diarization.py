@@ -59,6 +59,7 @@ from ..models import (
     User,
 )
 from . import final_chunks, plans, speaker_names
+from .llm.base import reasoning
 from .ai_settings import get_vocabulary, resolve_stt
 from .recording import pcm_path, recordings_dir
 from .speaker_names import Naming
@@ -1007,7 +1008,10 @@ async def name_speakers(meeting_id: uuid.UUID, provider) -> int:
         + '\n\nRespondé con {"speakers": [{"label": "Persona 1", "name": string|null, '
         '"role": string|null, "confidence": número entre 0 y 1}]} con una entrada por cada persona de arriba.'
     )
-    result = await provider.chat_json(NAMING_SYSTEM, [{"role": "user", "content": prompt}])
+    # El acta espera este paso: sin razonar sale en un par de segundos (27/10,
+    # una reunión de dos horas con 21 personas tardaba 13 s).
+    with reasoning("none"):
+        result = await provider.chat_json(NAMING_SYSTEM, [{"role": "user", "content": prompt}])
     entries = result.get("speakers", []) if isinstance(result, dict) else []
 
     count = 0

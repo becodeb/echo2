@@ -1,9 +1,12 @@
 """Generación y verificación de actas.
 
 Flujo: template (source of truth) + transcript + insights → LLM genera el acta
-→ se publica enseguida → ActaVerifier contrasta cada afirmación contra el
-transcript y anota el resultado. La regla crítica es NO INVENTAR: los campos
-sin información llevan "No especificado durante la reunión".
+→ se publica enseguida → se sacan del acta las afirmaciones verificables y
+ActaVerifier contrasta cada una contra el transcript y anota el resultado.
+Lo único que espera quien terminó la reunión es la redacción: va sin razonar
+y sin pedir las afirmaciones junto al acta (27/10: de ~16 s a ~8 s). La regla
+crítica es NO INVENTAR: los campos sin información llevan "No especificado
+durante la reunión".
 
 El template default es PROVISIONAL y está marcado como tal: cuando el usuario
 cargue su modelo real de acta (Ajustes → Formato de acta), ese pasa a mandar.
@@ -34,11 +37,16 @@ from ..models import (
 from . import acta_entrevista
 from .insights_prompts import language_name
 from .llm import LLMError, LLMProvider
+from .llm.base import reasoning
 from .transcript_util import format_ms, load_transcript_lines, transcript_to_text
 
 log = logging.getLogger("echo.minutes")
 
 DEFAULT_TEMPLATE_NAME = "Acta estándar (provisional)"
+
+# Hasta dónde se le pasa el transcript al acta: ~100.000 tokens, una reunión
+# de varias horas.
+TRANSCRIPT_CHAR_LIMIT = 400_000
 
 DEFAULT_TEMPLATE = """# ACTA DE REUNIÓN
 
@@ -85,9 +93,15 @@ REGLAS CRÍTICAS:
    exactamente: "No especificado durante la reunión".
 3. Respetá la estructura, títulos, orden y estilo del modelo AL PIE DE LA LETRA.
 4. Todo lo que afirmes debe poder rastrearse al transcript.
-5. Junto al acta, devolvé la lista de afirmaciones verificables (claims) con el
-   timestamp aproximado de donde salen.
-6. Escribí el acta en {language}."""
+5. Escribí el acta en {language}."""
+
+
+CLAIMS_SYSTEM = """Recibís un acta de reunión y el transcript del que salió. Listá
+las afirmaciones verificables del acta (hechos, acuerdos, compromisos, fechas,
+cifras), una frase cada una, con el timestamp aproximado del transcript donde
+se dijo. Como mucho 20, las más importantes primero.
+
+Respondé JSON: {"claims": [{"text": "afirmación", "approx_ms": <int o null>}]}"""
 
 
 VERIFIER_SYSTEM = """Sos el verificador de actas de Echo. Recibís una afirmación de un
@@ -313,8 +327,15 @@ async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instru
     await _mark_generating(meeting_id, org_id, template.id)
 
     transcript_text = transcript_to_text(lines)
-    if len(transcript_text) > 28000:
-        transcript_text = transcript_text[:28000] + "\n[transcript truncado para el prompt; los datos estructurados cubren el resto]"
+    # Antes se cortaba en 28.000 caracteres (~35 minutos) y el acta de una
+    # reunión de dos horas salía solo con el principio. Leer más no tarda: lo
+    # que tarda es lo que se escribe (medido: 6.000 o 22.000 tokens de entrada,
+    # el mismo tiempo).
+    if len(transcript_text) > TRANSCRIPT_CHAR_LIMIT:
+        transcript_text = (
+            transcript_text[:TRANSCRIPT_CHAR_LIMIT]
+            + "\n[transcript truncado para el prompt; los datos estructurados cubren el resto]"
+        )
 
     duration_min = meeting.duration_seconds // 60
     structured = {
@@ -353,12 +374,13 @@ async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instru
         formato = acta_entrevista.template_format(template.body_markdown)
         hints = {**structured, "motivo_cargado": reason_name, "familia_cargada": family_hint}
         hidden = [(m.name, acta_entrevista.initials(m.name)) for m in students]
-        result = await provider.chat_json(
-            acta_entrevista.GENERATOR_SYSTEM.format(language=language),
-            [
-                {
-                    "role": "user",
-                    "content": f"""{acta_entrevista.fields_spec(formato)}
+        with reasoning("none"):
+            result = await provider.chat_json(
+                acta_entrevista.GENERATOR_SYSTEM.format(language=language),
+                [
+                    {
+                        "role": "user",
+                        "content": f"""{acta_entrevista.fields_spec(formato)}
 
 DATOS DE LA REUNIÓN (lo "cargado" lo ingresó una persona: tiene prioridad):
 {json.dumps(hints, ensure_ascii=False, indent=1)}
@@ -369,14 +391,13 @@ TRANSCRIPT (con timestamps [MM:SS] y hablantes):
 
 Devolvé JSON:
 {{
-  "fields": {{"alumno": "", "curso": "", "solicitada_por": "", "motivo": "", "reunen": "", "con": "", "desarrollo": ""}},
-  "claims": [{{"text": "afirmación verificable del acta", "approx_ms": <int|null>}}]
+  "fields": {{"alumno": "", "curso": "", "solicitada_por": "", "motivo": "", "reunen": "", "con": "", "desarrollo": ""}}
 }}""",
-                }
-            ],
-            temperature=0.1,
-            max_tokens=8000,
-        )
+                    }
+                ],
+                temperature=0.1,
+                max_tokens=8000,
+            )
         if not isinstance(result, dict) or not isinstance(result.get("fields"), dict):
             raise LLMError("El generador de actas no devolvió contenido")
         fields = acta_entrevista.normalize_fields(
@@ -424,16 +445,16 @@ TRANSCRIPT (con timestamps [MM:SS] y hablantes):
 
 Devolvé JSON:
 {{
-  "markdown": "el acta completa en markdown siguiendo el modelo",
-  "claims": [{{"text": "afirmación verificable del acta", "approx_ms": <int|null>}}]
+  "markdown": "el acta completa en markdown siguiendo el modelo"
 }}"""
 
-    result = await provider.chat_json(
-        GENERATOR_SYSTEM.format(language=language),
-        [{"role": "user", "content": prompt}],
-        temperature=0.1,
-        max_tokens=8000,
-    )
+    with reasoning("none"):
+        result = await provider.chat_json(
+            GENERATOR_SYSTEM.format(language=language),
+            [{"role": "user", "content": prompt}],
+            temperature=0.1,
+            max_tokens=8000,
+        )
     if not isinstance(result, dict) or not result.get("markdown"):
         raise LLMError("El generador de actas no devolvió contenido")
 
@@ -457,15 +478,17 @@ async def _publish_and_verify(
     provider: LLMProvider,
     instructions: str | None = None,
 ) -> None:
-    claims = [c for c in (result.get("claims") or []) if isinstance(c, dict) and c.get("text")]
-
     # ── Guardar primero: el acta se ve apenas existe ─────────────
-    # La verificación tarda (una consulta por afirmación) y no cambia el
-    # texto, así que corre después, con el acta ya publicada en "verifying".
+    # La verificación tarda (sacar las afirmaciones y una consulta por cada
+    # una) y no cambia el texto, así que corre después, con el acta ya
+    # publicada en "verifying".
     version_id = await _store_version(meeting_id, org_id, template_id, markdown, provider, blocks, instructions)
 
     # ── Verificación contra el transcript ────────────────────────
     try:
+        claims = [c for c in (result.get("claims") or []) if isinstance(c, dict) and c.get("text")]
+        if not claims:
+            claims = await _extract_claims(provider, markdown, lines)
         verification = await _verify_claims(provider, claims, lines)
     except Exception:  # noqa: BLE001 - el acta ya está; la verificación no la tira abajo
         log.exception("falló la verificación del acta de %s", meeting_id)
@@ -556,14 +579,30 @@ async def _store_version(
         return version_id
 
 
+async def _extract_claims(provider: LLMProvider, markdown: str, lines: list[dict]) -> list[dict]:
+    """Las afirmaciones verificables del acta ya publicada, con dónde se dijeron."""
+    transcript_text = transcript_to_text(lines)[:TRANSCRIPT_CHAR_LIMIT]
+    content = f"ACTA:\n{markdown}\n\nTRANSCRIPT (con timestamps [MM:SS]):\n{transcript_text}"
+    with reasoning("none"):
+        result = await provider.chat_json(
+            CLAIMS_SYSTEM,
+            [{"role": "user", "content": content}],
+            temperature=0.0,
+            max_tokens=3000,
+        )
+    claims = result.get("claims") if isinstance(result, dict) else None
+    return [c for c in claims or [] if isinstance(c, dict) and c.get("text")]
+
+
 async def _verify_claims(provider: LLMProvider, claims: list[dict], lines: list[dict]) -> list[dict]:
     """Verifica cada claim buscando primero por keyword y consultando al LLM.
 
-    Las consultas van en paralelo (de a cuatro) y el resultado conserva el
+    Las consultas van en paralelo (de a diez) y el resultado conserva el
     orden de las afirmaciones: treinta verificaciones en serie tardaban lo
-    mismo que treinta actas.
+    mismo que treinta actas, y de a cuatro la reunión seguía "procesando"
+    medio minuto después de tener el acta (27/10).
     """
-    limite = asyncio.Semaphore(4)
+    limite = asyncio.Semaphore(10)
 
     async def verificar(claim: dict) -> dict | None:
         text = str(claim.get("text", "")).strip()

@@ -7,11 +7,11 @@ Al tocar "Finalizar" corre en background:
   4. generación del acta: arranca acá y corre en paralelo con embeddings y
      resúmenes, porque es lo primero que se quiere ver al terminar
   5. embeddings del transcript (RAG)
-  6. resúmenes (jerárquicos si la reunión es larga)
+  6. resúmenes (el ejecutivo aparte, para que salga en segundos)
   7. espera y verificación del acta
-  8. actualización de la memoria organizacional
-  9. sugerencia de reuniones relacionadas (dentro del paso 8)
- 10. notificaciones «tu acta está lista» (en _finish)
+  8. notificaciones «tu acta está lista» (en _finish)
+  9. actualización de la memoria organizacional, ya con la reunión lista
+ 10. sugerencia de reuniones relacionadas (dentro del paso 9)
 
 Las reuniones internas (kind="interna": directivos, coordinadores) no tienen
 acta ni alimentan la memoria organizacional: son de un grupo, y la memoria la
@@ -58,6 +58,7 @@ from .insights_prompts import (
     FINAL_EXTRACT_SYSTEM,
     SECTION_SUMMARY_SYSTEM,
     SUMMARY_SYSTEM,
+    build_executive_prompt,
     build_final_extract_prompt,
     build_section_summary_prompt,
     build_summary_prompt,
@@ -65,6 +66,7 @@ from .insights_prompts import (
 )
 from .live_bus import live_bus
 from .llm import LLMError, get_llm_provider
+from .llm.base import reasoning
 from .privacy import protect
 from .diarization import diarize_meeting, name_speakers
 from .memory_svc import update_memory_from_meeting
@@ -79,8 +81,11 @@ log = logging.getLogger("echo.pipeline")
 
 SPEAKER_COLORS = ["#6366f1", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6"]
 
-# Si el transcript supera este tamaño se procesa jerárquicamente
-SINGLE_PASS_CHAR_LIMIT = 24000
+# Si el transcript supera este tamaño se procesa jerárquicamente. Era 24.000
+# (una reunión de media hora): una de dos horas iba de a secciones, una detrás
+# de la otra, y las tareas salían a los 3 minutos. Leer el transcript entero
+# no tarda más (27/10: 6.000 o 22.000 tokens de entrada, el mismo tiempo).
+SINGLE_PASS_CHAR_LIMIT = 300_000
 
 
 async def _set_stage(meeting_id: uuid.UUID, stage: str, progress: int, extra: dict | None = None) -> None:
@@ -236,6 +241,22 @@ async def _run(meeting_id: uuid.UUID) -> None:
 
     embeddings_task = asyncio.create_task(_embeddings())
 
+    # Resúmenes, a la par del acta y de las tareas. Antes esperaban a la
+    # extracción para "no contradecirla", y en la reunión de dos horas del
+    # 27/10 el resumen ejecutivo salió a los 4 minutos.
+    summary_task: asyncio.Task | None = None
+    if provider:
+
+        async def _summaries() -> None:
+            try:
+                await _generate_summaries(provider, meeting_id, org_id, language, lines)
+            except Exception as exc:  # noqa: BLE001 - sin resumen, el acta y las tareas siguen
+                log.warning("resumen fallo: %s", exc)
+                skipped.append(f"summary:{exc}")
+            mark("resumen")
+
+        summary_task = asyncio.create_task(_summaries())
+
     # Extracción estructurada final (+ resolución de fechas al persistir)
     insights: dict = {}
     if provider:
@@ -251,15 +272,10 @@ async def _run(meeting_id: uuid.UUID) -> None:
     else:
         skipped.append("insights:llm_no_configurado")
 
-    # Resúmenes (usan lo extraído para no contradecirlo), mientras el acta sigue.
-    if provider:
-        await _set_stage(meeting_id, "summary", 60)
-        try:
-            await _generate_summaries(provider, meeting_id, org_id, language, lines, insights)
-        except LLMError as exc:
-            log.warning("resumen fallo: %s", exc)
-            skipped.append(f"summary:{exc}")
-        mark("resumen")
+    if summary_task is not None:
+        if not summary_task.done():
+            await _set_stage(meeting_id, "summary", 60)
+        await summary_task
 
     await embeddings_task
     # Esperar el acta si todavía no terminó (generación + verificación)
@@ -272,19 +288,19 @@ async def _run(meeting_id: uuid.UUID) -> None:
             log.warning("acta fallo: %s", exc)
             skipped.append(f"minutes:{exc}")
 
-    # 8. Memoria organizacional (+ sugerencia de reuniones relacionadas). Las
-    #    internas no: la memoria la ve toda la sede y la reunión es de un grupo.
-    if provider and not internal:
-        await _set_stage(meeting_id, "memory", 88)
-        try:
-            await update_memory_from_meeting(meeting_id, insights, embeddings_config)
-        except Exception as exc:
-            log.warning("memoria fallo: %s", exc)
-            skipped.append(f"memory:{exc}")
-
     mark("total")
     log.info("pipeline %s: %s", meeting_id, timings)
     await _finish(meeting_id, skipped, timings)
+
+    # 8. Memoria organizacional (+ sugerencia de reuniones relacionadas). Las
+    #    internas no: la memoria la ve toda la sede y la reunión es de un grupo.
+    #    Va después de avisar que está lista: nadie la espera, y tenía la
+    #    reunión "procesando" medio minuto más con el acta ya hecha (27/10).
+    if provider and not internal:
+        try:
+            await update_memory_from_meeting(meeting_id, insights, embeddings_config)
+        except Exception as exc:  # noqa: BLE001 - la reunión ya está lista
+            log.warning("memoria fallo: %s", exc)
 
 
 async def _finish(meeting_id: uuid.UUID, skipped: list[str], timings: dict | None = None) -> None:
@@ -407,17 +423,19 @@ async def _extract_final(provider, lines: list[dict], bookmarks_text: str, langu
         "mentions": {"people": [], "projects": [], "dates": [], "numbers": [], "links": []},
         "timeline": [], "next_steps": [],
     }
-    for section_lines in sections:
-        section_text = transcript_to_text(section_lines)
+    async def extract(section_lines: list[dict]) -> dict | None:
         try:
-            partial = await provider.chat_json(
+            return await provider.chat_json(
                 FINAL_EXTRACT_SYSTEM.format(language=language),
-                [{"role": "user", "content": build_final_extract_prompt(section_text, bookmarks_text)}],
+                [{"role": "user", "content": build_final_extract_prompt(transcript_to_text(section_lines), bookmarks_text)}],
                 temperature=0.1,
                 max_tokens=8000,
             )
         except LLMError:
-            continue
+            return None
+
+    # Las secciones a la vez: en orden, una tras otra, sumaban minutos.
+    for partial in await asyncio.gather(*(extract(section) for section in sections)):
         if not isinstance(partial, dict):
             continue
         for key in ("topics", "decisions", "tasks", "questions", "risks", "timeline", "next_steps"):
@@ -586,78 +604,94 @@ async def _persist_insights(meeting_id: uuid.UUID, insights: dict, reference_dat
 
 
 async def _generate_summaries(
-    provider, meeting_id: uuid.UUID, org_id: uuid.UUID, language: str, lines: list[dict], insights: dict
+    provider, meeting_id: uuid.UUID, org_id: uuid.UUID, language: str, lines: list[dict]
 ) -> None:
+    """Resumen ejecutivo por un lado y detallado + "qué dijo cada uno" por otro, a la vez.
+
+    El ejecutivo son unas pocas frases: pedido solo y sin razonar aparece en
+    segundos, sin esperar al detallado, que es largo de escribir.
+    """
     full_text = transcript_to_text(lines)
 
     if len(full_text) > SINGLE_PASS_CHAR_LIMIT:
         # jerárquico: resumen por sección → resumen global sobre los resúmenes
-        section_summaries = []
-        for section_lines in _split_sections(lines, SINGLE_PASS_CHAR_LIMIT):
+        sections = _split_sections(lines, SINGLE_PASS_CHAR_LIMIT)
+
+        async def summarize(section_lines: list[dict]) -> str | None:
             try:
                 partial = await provider.chat_json(
                     SECTION_SUMMARY_SYSTEM,
                     [{"role": "user", "content": build_section_summary_prompt(transcript_to_text(section_lines))}],
                 )
-                if isinstance(partial, dict) and partial.get("summary"):
-                    start = format_ms(section_lines[0]["start_ms"])
-                    section_summaries.append(f"[Sección desde {start}] {partial['summary']}")
             except LLMError:
-                continue
+                return None
+            if isinstance(partial, dict) and partial.get("summary"):
+                return f"[Sección desde {format_ms(section_lines[0]['start_ms'])}] {partial['summary']}"
+            return None
+
+        with reasoning("none"):
+            section_summaries = [s for s in await asyncio.gather(*(summarize(x) for x in sections)) if s]
         source_text = "\n\n".join(section_summaries) or full_text[:SINGLE_PASS_CHAR_LIMIT]
     else:
         source_text = full_text
 
-    insights_compact = json.dumps(
-        {
-            "decisions": [d.get("text") for d in insights.get("decisions", [])[:20]],
-            "tasks": [t.get("text") for t in insights.get("tasks", [])[:20]],
-        },
-        ensure_ascii=False,
-    )
-    result = await provider.chat_json(
-        SUMMARY_SYSTEM.format(language=language),
-        [{"role": "user", "content": build_summary_prompt(source_text, insights_compact)}],
-        max_tokens=6000,
-    )
-    if not isinstance(result, dict):
-        return
+    model_name = getattr(provider, "model", provider.name)
+    system = SUMMARY_SYSTEM.format(language=language)
 
-    async with SessionLocal() as db:
-        await db.execute(
-            delete(MeetingSummary).where(
-                MeetingSummary.meeting_id == meeting_id,
-                MeetingSummary.kind.in_(["executive", "detailed", "by_person"]),
+    async def executive() -> None:
+        with reasoning("none"):
+            result = await provider.chat_json(
+                system, [{"role": "user", "content": build_executive_prompt(source_text)}], max_tokens=1500
             )
-        )
-        model_name = getattr(provider, "model", provider.name)
-        if result.get("executive"):
-            db.add(
-                MeetingSummary(
-                    meeting_id=meeting_id, organization_id=org_id, kind="executive",
-                    content={"points": result["executive"]}, model_used=model_name,
-                )
+        points = result.get("executive") if isinstance(result, dict) else None
+        await _store_summaries(meeting_id, org_id, model_name, {"executive": {"points": points} if points else None})
+
+    async def detailed() -> None:
+        with reasoning("none"):
+            result = await provider.chat_json(
+                system, [{"role": "user", "content": build_summary_prompt(source_text)}], max_tokens=6000
             )
-        if result.get("detailed"):
-            db.add(
-                MeetingSummary(
-                    meeting_id=meeting_id, organization_id=org_id, kind="detailed",
-                    content={"markdown": result["detailed"]}, model_used=model_name,
-                )
-            )
+        if not isinstance(result, dict):
+            return
         # "Qué dijo cada uno": lo pidió Karina para las reuniones de equipo (26/10).
         people = [
             {"name": str(entry.get("persona") or "").strip()[:200], "points": [str(p) for p in entry.get("puntos") or []][:8]}
             for entry in result.get("by_person") or []
             if isinstance(entry, dict) and entry.get("persona") and entry.get("puntos")
         ]
-        if people:
-            db.add(
-                MeetingSummary(
-                    meeting_id=meeting_id, organization_id=org_id, kind="by_person",
-                    content={"people": people}, model_used=model_name,
-                )
+        await _store_summaries(
+            meeting_id,
+            org_id,
+            model_name,
+            {
+                "detailed": {"markdown": result["detailed"]} if result.get("detailed") else None,
+                "by_person": {"people": people} if people else None,
+            },
+        )
+
+    failures = [r for r in await asyncio.gather(executive(), detailed(), return_exceptions=True) if r is not None]
+    if failures:
+        raise failures[0]
+
+
+async def _store_summaries(
+    meeting_id: uuid.UUID, org_id: uuid.UUID, model_name: str, contents: dict[str, dict | None]
+) -> None:
+    """Reemplaza los resúmenes de esos tipos; uno en None queda borrado."""
+    async with SessionLocal() as db:
+        await db.execute(
+            delete(MeetingSummary).where(
+                MeetingSummary.meeting_id == meeting_id, MeetingSummary.kind.in_(list(contents))
             )
+        )
+        for kind, content in contents.items():
+            if content:
+                db.add(
+                    MeetingSummary(
+                        meeting_id=meeting_id, organization_id=org_id, kind=kind,
+                        content=content, model_used=model_name,
+                    )
+                )
         await db.commit()
 
 

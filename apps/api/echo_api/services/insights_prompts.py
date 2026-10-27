@@ -110,17 +110,23 @@ de reuniones basados EXCLUSIVAMENTE en el transcript. No agregues conocimiento
 externo ni supongas nada que no se haya dicho. Respondé en {language}."""
 
 
-def build_summary_prompt(transcript_text: str, insights_json: str) -> str:
+def build_executive_prompt(transcript_text: str) -> str:
     return f"""Transcript de la reunión:
 
 {transcript_text}
 
-Información estructurada ya extraída (para consistencia):
-{insights_json}
+Devolvé JSON:
+{{"executive": ["5 a 10 puntos clave, una frase cada uno"]}}"""
+
+
+def build_summary_prompt(transcript_text: str) -> str:
+    """El resumen detallado y "qué dijo cada uno"; el ejecutivo va aparte (build_executive_prompt)."""
+    return f"""Transcript de la reunión:
+
+{transcript_text}
 
 Devolvé JSON:
 {{
-  "executive": ["5 a 10 puntos clave, una frase cada uno"],
   "detailed": "resumen extenso en markdown, organizado por temas, fiel al transcript",
   "by_person": [{{"persona": "nombre y rol como figura en el transcript", "puntos": ["lo que planteó, 1 a 5 frases"]}}]
 }}

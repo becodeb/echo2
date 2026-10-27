@@ -55,7 +55,7 @@ export default function MeetingDetail() {
   const [tab, setTab] = useState<TabId>((params.get("tab") as TabId) || "summary");
   const jumpMs = params.get("t");
 
-  const { data: meeting, refetch } = useQuery({
+  const { data: meeting, refetch, dataUpdatedAt } = useQuery({
     ...meetingQuery(id ?? ""),
     enabled: !!id,
     refetchInterval: (query) =>
@@ -63,6 +63,20 @@ export default function MeetingDetail() {
         ? 3000
         : false,
   });
+
+  // Mientras se procesa, el acta, el resumen y las tareas se muestran apenas
+  // salen, sin recargar: el acta está mucho antes de que termine todo, y antes
+  // la pestaña abierta seguía diciendo "procesando" hasta recargar.
+  const queryClient = useQueryClient();
+  const wasProcessing = useRef(false);
+  useEffect(() => {
+    const processing = meeting?.status === "processing";
+    if (!id || (!processing && !wasProcessing.current)) return;
+    wasProcessing.current = processing;
+    for (const key of ["summary", "insights", "minutes"]) {
+      queryClient.invalidateQueries({ queryKey: [key, id] });
+    }
+  }, [queryClient, id, meeting?.status, dataUpdatedAt]);
 
   useEffect(() => {
     if (jumpMs != null) setTab("transcript");
