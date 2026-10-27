@@ -133,6 +133,17 @@ async def _start_people_retry() -> None:
 
 
 @app.on_event("startup")
+async def _start_final_prepass() -> None:
+    """Transcribe de a 5 minutos las reuniones que se están grabando, para que
+    al finalizar falte poco (services/final_chunks.py)."""
+    from .services.background import spawn
+    from .services.final_chunks import prepass_loop
+
+    if settings.echo_env != "test":
+        spawn(prepass_loop(), name="final-prepass")
+
+
+@app.on_event("startup")
 async def _sync_superadmins() -> None:
     """Aplica SUPERADMIN_EMAILS sobre los usuarios existentes.
 

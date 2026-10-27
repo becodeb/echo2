@@ -18,6 +18,7 @@ download, expired, discarded, empty, failed.
 """
 import asyncio
 import logging
+import shutil
 import time
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -227,6 +228,13 @@ async def cleanup_recordings() -> int:
     folder = recordings_dir()
     mp3s: dict[uuid.UUID, Path] = {}
     for path in folder.iterdir():
+        if path.is_dir() and path.name.endswith(".chunks"):
+            # Tramos de la pasada final (services/final_chunks.py) de una
+            # reunión que nunca se finalizó.
+            if time.time() - path.stat().st_mtime > ORPHAN_PCM_HOURS * 3600:
+                shutil.rmtree(path, ignore_errors=True)
+                removed += 1
+            continue
         if path.name.endswith((".people.mp3", ".text.mp3", ".text.pcm")):
             # Copias para reintentar la separación de personas o el texto
             # (services/diarization.py): los reintentos las borran; si

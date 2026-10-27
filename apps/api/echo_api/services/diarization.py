@@ -58,7 +58,7 @@ from ..models import (
     UsageEvent,
     User,
 )
-from . import plans, speaker_names
+from . import final_chunks, plans, speaker_names
 from .ai_settings import get_vocabulary, resolve_stt
 from .recording import pcm_path, recordings_dir
 from .speaker_names import Naming
@@ -215,6 +215,18 @@ async def _text_rows(path: Path, provider, language: str | None, vocabulary: lis
     return rows
 
 
+async def _chunked_text_rows(
+    meeting_id: uuid.UUID, path: Path, total_ms: int, engine, language: str | None, vocabulary: list[str]
+) -> list[Row]:
+    """Texto sin personas por tramos (los del en vivo + el resto en paralelo); si falla, como siempre."""
+    try:
+        chunks = await final_chunks.all_chunks(meeting_id, path, total_ms, "groq", engine, language, vocabulary)
+        return _clean_rows(final_chunks.stitch_segments(chunks), language)
+    except Exception as exc:  # noqa: BLE001 - respaldo: partes de 10 minutos, una detrás de otra
+        log.warning("texto por tramos falló en %s, va como siempre: %s", meeting_id, exc)
+        return await _text_rows(path, engine, language, vocabulary)
+
+
 def _groq_key(config) -> str:
     if config is not None and config.provider == "groq":
         return config.api_key
@@ -325,6 +337,8 @@ async def diarize_meeting(meeting_id: uuid.UUID) -> bool:
         # Lo que falle después de reservar no se lleva los créditos ni las horas.
         await _release_unless_pending(meeting_id, hold_id)
         raise
+    finally:
+        final_chunks.discard(meeting_id)
 
 
 async def _release_unless_pending(meeting_id: uuid.UUID, hold_id: uuid.UUID | None) -> None:
@@ -376,7 +390,7 @@ async def _run_final_pass(
     if engine is None:
         return False
     try:
-        rows = await _text_rows(path, engine, language, vocabulary)
+        rows = await _chunked_text_rows(meeting_id, path, total_ms, engine, language, vocabulary)
     except Exception as exc:  # noqa: BLE001 - queda el transcript en vivo
         log.warning("pasada final sin personas falló en %s: %s", meeting_id, exc)
         await _keep_for_text_retry(meeting_id, path, total_ms, decision.reason)
@@ -563,15 +577,6 @@ async def _people_pass(
     None = no hay personas: falló y quedó pendiente de reintento (con los
     créditos reservados), o no se pudo / no devolvió nada (créditos devueltos).
     """
-    audio = people_path(meeting_id)
-    try:
-        await _encode_mp3([path], audio)
-    except Exception as exc:  # noqa: BLE001 - sin mp3 no hay pasada con personas
-        log.warning("no se pudo preparar el audio de %s para ElevenLabs: %s", meeting_id, exc)
-        audio.unlink(missing_ok=True)
-        await _release_hold(hold_id)
-        return None
-
     retry = {
         "keyterms": bool(vocabulary),
         "credits": decision.credits,
@@ -580,13 +585,33 @@ async def _people_pass(
         "attempts": 1,
         "hold_id": str(hold_id) if hold_id else None,
     }
+    # Por tramos de 5 minutos (services/final_chunks.py): casi todos ya se
+    # transcribieron mientras se grababa, así que al finalizar falta poco.
+    result = None
     try:
-        result = await _scribe(audio, language, vocabulary)
-    except Exception as exc:  # noqa: BLE001 - respaldo: Groq ahora, personas después
-        log.warning("ElevenLabs falló en %s, queda pendiente: %s", meeting_id, exc)
-        await _update_meta(meeting_id, people_status="pending", people_retry=retry)
-        return None
-    audio.unlink(missing_ok=True)
+        engine = get_stt_provider("elevenlabs", get_settings().elevenlabs_api_key)
+        chunks = await final_chunks.all_chunks(meeting_id, path, total_ms, "elevenlabs", engine, language, vocabulary)
+        stitched = final_chunks.stitch_words(chunks)
+        if stitched:
+            result = SttResult(words=stitched, entities=final_chunks.entities(chunks))
+    except Exception as exc:  # noqa: BLE001 - respaldo: la reunión entera de una vez
+        log.warning("pasada por tramos falló en %s, va entera: %s", meeting_id, exc)
+    if result is None:
+        audio = people_path(meeting_id)
+        try:
+            await _encode_mp3([path], audio)
+        except Exception as exc:  # noqa: BLE001 - sin mp3 no hay pasada con personas
+            log.warning("no se pudo preparar el audio de %s para ElevenLabs: %s", meeting_id, exc)
+            audio.unlink(missing_ok=True)
+            await _release_hold(hold_id)
+            return None
+        try:
+            result = await _scribe(audio, language, vocabulary)
+        except Exception as exc:  # noqa: BLE001 - respaldo: Groq ahora, personas después
+            log.warning("ElevenLabs falló en %s, queda pendiente: %s", meeting_id, exc)
+            await _update_meta(meeting_id, people_status="pending", people_retry=retry)
+            return None
+        audio.unlink(missing_ok=True)
     rows = rows_from_scribe(result, language)
     if not rows:
         # Scribe no oyó nada: no se borra el texto en vivo ni se cobra.
