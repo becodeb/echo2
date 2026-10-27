@@ -260,6 +260,15 @@ export default function MeetingLive() {
         case "processing":
           setProcessing({ stage: event.stage, progress: event.progress });
           break;
+        case "ready":
+          // El acta (o, en las internas, el resumen) ya se puede leer: se pasa
+          // a la reunión sin esperar la verificación ni lo demás, que siguen
+          // apareciendo solos ahí.
+          if (event.what === (kindRef.current === "interna" ? "summary" : "minutes")) {
+            queryClient.invalidateQueries({ queryKey: ["meeting", id] });
+            navigate(`/meetings/${id}?tab=${kindRef.current === "interna" ? "summary" : "minutes"}`);
+          }
+          break;
         case "status":
           if (event.status === "completed") {
             queryClient.invalidateQueries({ queryKey: ["meeting", id] });
@@ -706,12 +715,21 @@ export default function MeetingLive() {
 
   // Mientras procesa, además del aviso en vivo se pregunta al servidor: si la
   // conexión se cortó justo, la pantalla se quedaba esperando para siempre.
+  // También si se abrió (o recargó) la pantalla con la reunión ya procesando.
+  const waiting = Boolean(processing) || meeting?.status === "processing";
   useEffect(() => {
-    if (!id || !processing) return;
+    if (!id || !waiting) return;
     const interval = window.setInterval(async () => {
       try {
         const current = await api<MeetingOut>(`/api/meetings/${id}`);
-        if (current.status === "completed") {
+        const wanted = current.kind === "interna" ? "summary_ready" : "minutes_ready";
+        const stage = current.processing_state?.stage;
+        if (typeof stage === "string" && stage !== "done") {
+          setProcessing((previous) =>
+            previous?.stage === stage ? previous : { stage, progress: Number(current.processing_state?.progress ?? 0) },
+          );
+        }
+        if (current.status === "completed" || current.processing_state?.[wanted]) {
           queryClient.setQueryData(["meeting", id], current);
           navigate(`/meetings/${id}?tab=${current.kind === "interna" ? "summary" : "minutes"}`);
         } else if (current.status === "failed") {
@@ -721,9 +739,9 @@ export default function MeetingLive() {
       } catch {
         /* se reintenta en la próxima vuelta */
       }
-    }, 4000);
+    }, 2000);
     return () => window.clearInterval(interval);
-  }, [id, processing, navigate, queryClient]);
+  }, [id, waiting, navigate, queryClient]);
 
   // cleanup al desmontar
   useEffect(() => {
@@ -795,32 +813,13 @@ export default function MeetingLive() {
 
   // ── pantalla de procesamiento post-Finalizar ───────────────────
   if (processing || meeting.status === "processing") {
-    const stageLabels: Record<string, string> = {
-      queued: "Preparando la reunión…",
-      speakers: "Identificando quién habló…",
-      insights: "Extrayendo decisiones y tareas…",
-      embeddings: "Preparando la búsqueda…",
-      summary: "Escribiendo el resumen…",
-      minutes: "Generando el acta…",
-      memory: "Actualizando la memoria…",
-      transcribed: "Transcripción completa…",
-      done: "Listo",
-    };
-    const stage = processing?.stage ?? "queued";
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-6 px-6">
-        <span className="text-ink-700"><EchoFace mood="thinking" size={72} /></span>
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-ink-900">{stageLabels[stage] ?? "Procesando…"}</h2>
-          <p className="mt-1 text-sm text-ink-500">{meeting.title}</p>
-        </div>
-        <div className="h-1.5 w-64 overflow-hidden rounded-full bg-ink-100">
-          <div
-            className="h-full rounded-full bg-accent-500 transition-all duration-700"
-            style={{ width: `${processing?.progress ?? 5}%` }}
-          />
-        </div>
-      </div>
+      <ProcessingScreen
+        stage={processing?.stage ?? "queued"}
+        title={meeting.title}
+        durationMs={elapsedMs || (meeting.duration_seconds ?? 0) * 1000}
+        internal={meeting.kind === "interna"}
+      />
     );
   }
 
@@ -1269,6 +1268,90 @@ export default function MeetingLive() {
           void start();
         }}
       />
+    </div>
+  );
+}
+
+
+// Cuánto se espera que tarde, según lo medido en producción el 27/10. Primero
+// la cola de la transcripción: lo que quedó sin transcribir mientras se
+// grababa (hasta 5 minutos de audio, que tardan ~3 % de lo que duran) y los
+// nombres. Después, escribir el acta: unos segundos, algo más si es larga.
+function estimateSeconds(durationMs: number) {
+  const chunkMs = 5 * 60 * 1000;
+  const tailMs = durationMs <= chunkMs ? durationMs : (durationMs % chunkMs) + 40_000;
+  const transcription = 2.5 + (tailMs / 1000) * 0.027;
+  const names = durationMs > 30 * 60 * 1000 ? 4 : 2;
+  const writing = Math.min(4 + (durationMs / 60_000) * 0.15, 9);
+  return { first: transcription + names, second: writing };
+}
+
+// Avanza parejo hasta el 80 % de lo esperado y después cada vez más despacio,
+// sin llegar nunca al final: si tarda más, no se queda clavado ni se pasa.
+function eased(fraction: number) {
+  if (fraction < 0.8) return fraction;
+  return 0.8 + 0.19 * (1 - Math.exp(-(fraction - 0.8) / 0.25));
+}
+
+const TRANSCRIBING_STAGES = ["queued", "speakers", "transcribed"];
+
+// Antes la barra iba por etapas (5 %, 20 %, 60 %…) y se quedaba quieta en
+// cada una: "se siente que falta un montón y no falta tanto" (27/10). Ahora
+// avanza con el tiempo que se espera para cada parte y salta adelante cuando
+// una termina antes.
+function ProcessingScreen({
+  stage,
+  title,
+  durationMs,
+  internal,
+}: {
+  stage: string;
+  title: string;
+  durationMs: number;
+  internal: boolean;
+}) {
+  const [estimate] = useState(() => estimateSeconds(durationMs));
+  const startedAt = useRef(Date.now());
+  const writing = useRef<{ at: number; base: number } | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 200);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const share = estimate.first / (estimate.first + estimate.second);
+  const firstPart = share * eased((now - startedAt.current) / 1000 / estimate.first);
+  if (!TRANSCRIBING_STAGES.includes(stage) && writing.current === null) {
+    writing.current = { at: now, base: firstPart };
+  }
+  const progress = writing.current
+    ? writing.current.base +
+      (1 - writing.current.base) * eased((now - writing.current.at) / 1000 / estimate.second)
+    : firstPart;
+  const percent = Math.max(1, Math.min(99, Math.round(progress * 100)));
+
+  const label = TRANSCRIBING_STAGES.includes(stage)
+    ? "Terminando la transcripción…"
+    : internal
+      ? "Escribiendo el resumen…"
+      : "Escribiendo el acta…";
+
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-6 px-6">
+      <span className="text-ink-700"><EchoFace mood="thinking" size={72} /></span>
+      <div className="text-center">
+        <h2 className="text-xl font-semibold text-ink-900">{label}</h2>
+        <p className="mt-1 text-sm text-ink-500">{title}</p>
+      </div>
+      <div className="flex items-center gap-3">
+        <div className="h-1.5 w-64 overflow-hidden rounded-full bg-ink-100">
+          <div
+            className="h-full rounded-full bg-accent-500 transition-[width] duration-200 ease-linear"
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+        <span className="w-10 text-right font-mono text-sm tabular-nums text-ink-500">{percent}%</span>
+      </div>
     </div>
   );
 }

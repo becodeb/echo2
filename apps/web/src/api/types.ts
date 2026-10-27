@@ -530,6 +530,7 @@ export type LiveEvent =
   | { type: "partial"; text: string; start_ms: number; speaker_hint?: string | null }
   | { type: "status"; status: string }
   | { type: "processing"; stage: string; progress: number }
+  | { type: "ready"; what: "minutes" | "summary" }
   | { type: "insights"; totals: { decisions: number; tasks: number; questions: number }; new: Record<string, number> }
   | { type: "warning"; code: string; message: string }
   | { type: "limit"; code: string; message: string }

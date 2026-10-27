@@ -34,7 +34,7 @@ import time
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, text
 
 from ..db import SessionLocal
 from ..models import (
@@ -88,20 +88,37 @@ SPEAKER_COLORS = ["#6366f1", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#8b5cf
 SINGLE_PASS_CHAR_LIMIT = 300_000
 
 
-async def _set_stage(meeting_id: uuid.UUID, stage: str, progress: int, extra: dict | None = None) -> None:
+async def _merge_state(meeting_id: uuid.UUID, patch: dict) -> None:
+    # Se mezcla en la base y no leyendo y escribiendo: el acta y el resumen
+    # avisan que están listos mientras las etapas siguen avanzando, y una
+    # escritura pisaba a la otra.
     async with SessionLocal() as db:
-        meeting = await db.get(Meeting, meeting_id)
-        if not meeting:
-            return
-        state = dict(meeting.processing_state or {})
-        state.update({"stage": stage, "progress": progress})
-        if extra:
-            state.update(extra)
-        meeting.processing_state = state
+        await db.execute(
+            text(
+                "update meetings set processing_state = "
+                "coalesce(processing_state, '{}'::jsonb) || cast(:patch as jsonb) where id = :id"
+            ),
+            {"patch": json.dumps(patch), "id": meeting_id},
+        )
         await db.commit()
+
+
+async def _set_stage(meeting_id: uuid.UUID, stage: str, progress: int, extra: dict | None = None) -> None:
+    await _merge_state(meeting_id, {"stage": stage, "progress": progress, **(extra or {})})
     await live_bus.publish(
         str(meeting_id), {"type": "processing", "stage": stage, "progress": progress}
     )
+
+
+async def announce_ready(meeting_id: uuid.UUID, what: str) -> None:
+    """El acta ("minutes") o el resumen ejecutivo ("summary") ya se pueden leer.
+
+    La pantalla de "Finalizar" pasa a la reunión con esto, sin esperar la
+    verificación ni lo demás: el 27/10 el acta de una reunión de 4 minutos
+    estaba a los 13 s y se veía a los 22.
+    """
+    await _merge_state(meeting_id, {f"{what}_ready": True})
+    await live_bus.publish(str(meeting_id), {"type": "ready", "what": what})
 
 
 async def run_finalize_pipeline(meeting_id_str: str) -> None:
@@ -216,7 +233,9 @@ async def _run(meeting_id: uuid.UUID) -> None:
     # haya (lo detectado en vivo) le sirve de pista.
     minutes_task: asyncio.Task | None = None
     if not wants_minutes:
-        pass  # interna sin acta: lo que se quiere es el resumen y poder preguntarle
+        # Interna sin acta: lo que se quiere es el resumen y poder preguntarle.
+        if provider:
+            await _set_stage(meeting_id, "summary", 20)
     elif provider:
         await _set_stage(meeting_id, "minutes", 20)
 
@@ -645,6 +664,8 @@ async def _generate_summaries(
             )
         points = result.get("executive") if isinstance(result, dict) else None
         await _store_summaries(meeting_id, org_id, model_name, {"executive": {"points": points} if points else None})
+        if points:
+            await announce_ready(meeting_id, "summary")
 
     async def detailed() -> None:
         with reasoning("none"):

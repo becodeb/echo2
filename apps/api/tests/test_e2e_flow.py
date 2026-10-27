@@ -48,7 +48,18 @@ def _record_meeting(client, user, meeting_id):
             assert event["seq"] >= 1
 
 
-def test_full_meeting_lifecycle(client, fake_ai):
+def test_full_meeting_lifecycle(client, fake_ai, monkeypatch):
+    from echo_api.services.live_bus import live_bus
+
+    published: list[dict] = []
+    original_publish = live_bus.publish
+
+    async def recording_publish(channel: str, message: dict) -> None:
+        published.append(message)
+        await original_publish(channel, message)
+
+    monkeypatch.setattr(live_bus, "publish", recording_publish)
+
     user = EchoTestUser(client, name="Ana Flujo", org_name="Org Flujo")
 
     # 1. crear reunión
@@ -92,6 +103,12 @@ def test_full_meeting_lifecycle(client, fake_ai):
             break
         time.sleep(0.4)
     assert status == "completed", f"pipeline no completó: {meeting['processing_state']}"
+
+    # El acta y el resumen avisan apenas se pueden leer, antes de que la
+    # reunión quede lista: con eso la pantalla de "Finalizar" pasa al acta.
+    kinds = [event.get("what") or event.get("status") for event in published if event["type"] in ("ready", "status")]
+    assert "minutes" in kinds and "summary" in kinds
+    assert kinds.index("minutes") < kinds.index("completed")
 
     # 5. hablantes consolidados desde los hints
     assert len(meeting["speakers"]) == 2

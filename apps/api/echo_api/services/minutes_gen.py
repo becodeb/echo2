@@ -483,6 +483,9 @@ async def _publish_and_verify(
     # una) y no cambia el texto, así que corre después, con el acta ya
     # publicada en "verifying".
     version_id = await _store_version(meeting_id, org_id, template_id, markdown, provider, blocks, instructions)
+    from .pipeline import announce_ready  # pipeline importa este módulo
+
+    await announce_ready(meeting_id, "minutes")
 
     # ── Verificación contra el transcript ────────────────────────
     try:
