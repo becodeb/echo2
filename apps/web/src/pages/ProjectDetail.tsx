@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
-import { Badge, Card, EmptyState, Spinner, formatDate, formatDuration, formatMs } from "../components/ui";
+import { Badge, Button, Card, EmptyState, Modal, Spinner, formatDate, formatDuration, formatMs } from "../components/ui";
+import { useMyAccess } from "../state/access";
 
 interface ProjectDetailData {
   id: string;
@@ -52,6 +53,52 @@ interface Prep {
   suggested_agenda: string[];
 }
 
+/**
+ * Borrar el proyecto (lo hacen los directivos). Las reuniones no se borran:
+ * quedan donde estaban, sin proyecto.
+ */
+function DeleteProjectButton({ id, name, meetings }: { id: string; name: string; meetings: number }) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { data: access } = useMyAccess();
+  const [open, setOpen] = useState(false);
+  const remove = useMutation({
+    mutationFn: () => api(`/api/projects/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["projects-options"] });
+      navigate("/projects", { replace: true });
+    },
+  });
+  if ((access?.rank ?? 1) < 2) return null;
+  return (
+    <>
+      <Button variant="ghost" onClick={() => setOpen(true)} className="text-red-600 hover:bg-red-50 hover:text-red-700">
+        Borrar
+      </Button>
+      <Modal open={open} onClose={() => setOpen(false)} title="Borrar el proyecto">
+        <div className="space-y-4">
+          <p className="text-sm text-ink-600">
+            Se borra «{name}».{" "}
+            {meetings > 0
+              ? `Sus ${meetings === 1 ? "reunión no se borra" : `${meetings} reuniones no se borran`}: quedan donde estaban, sin proyecto.`
+              : "No tiene reuniones."}
+          </p>
+          {remove.isError && (
+            <p className="text-sm text-red-600">{remove.error instanceof Error ? remove.error.message : "No se pudo borrar"}</p>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button variant="danger" onClick={() => remove.mutate()} disabled={remove.isPending}>
+              {remove.isPending ? <Spinner /> : "Borrar"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </>
+  );
+}
+
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const [tab, setTab] = useState<"timeline" | "meetings" | "changes" | "prepare">("timeline");
@@ -82,7 +129,8 @@ export default function ProjectDetail() {
     <div className="mx-auto max-w-4xl px-6 py-10">
       <header className="mb-6 flex items-center gap-3">
         <span className="h-4 w-4 rounded-full" style={{ backgroundColor: project.color }} />
-        <h1 className="text-2xl font-semibold tracking-tight text-ink-900">{project.name}</h1>
+        <h1 className="min-w-0 flex-1 break-words text-2xl font-semibold tracking-tight text-ink-900">{project.name}</h1>
+        <DeleteProjectButton id={project.id} name={project.name} meetings={project.meetings.length} />
       </header>
 
       <nav className="mb-6 flex gap-1 border-b border-ink-100">

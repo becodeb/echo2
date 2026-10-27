@@ -272,7 +272,13 @@ async def dashboard(ctx: OrgContext = Depends(get_org_context), db: AsyncSession
     recent_meetings = (
         await db.execute(
             select(Meeting)
-            .where(Meeting.organization_id == ctx.org_id, Meeting.deleted_at.is_(None), meeting_filter(scope))
+            .where(
+                Meeting.organization_id == ctx.org_id,
+                Meeting.deleted_at.is_(None),
+                meeting_filter(scope),
+                # Borradores ajenos no (ver routers/meetings.py, list_meetings).
+                or_(Meeting.status != "draft", Meeting.created_by == ctx.user.id),
+            )
             .order_by(Meeting.created_at.desc())
             .limit(6)
         )

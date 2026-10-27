@@ -122,6 +122,16 @@ async def _start_recordings_cleanup() -> None:
 
 
 @app.on_event("startup")
+async def _start_drafts_cleanup() -> None:
+    """Borra cada hora los borradores que nunca arrancaron (services/drafts.py)."""
+    from .services.background import spawn
+    from .services.drafts import cleanup_loop
+
+    if settings.echo_env != "test":
+        spawn(cleanup_loop(), name="drafts-cleanup")
+
+
+@app.on_event("startup")
 async def _start_people_retry() -> None:
     """Reintenta cada 15 min la separación de personas que quedó pendiente
     porque ElevenLabs falló (services/diarization.py)."""

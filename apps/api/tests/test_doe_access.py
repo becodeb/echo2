@@ -23,6 +23,8 @@ def _sede(client):
 def _meeting(client, who, title: str, **extra) -> str:
     created = client.post("/api/meetings", json={"title": title, "level": "primaria", **extra}, headers=who.headers)
     assert created.status_code == 201, created.text
+    # Arrancada: un borrador (nunca grabó) no aparece en la lista de los demás.
+    assert client.post(f"/api/meetings/{created.json()['id']}/start", headers=who.headers).status_code == 200
     return created.json()["id"]
 
 

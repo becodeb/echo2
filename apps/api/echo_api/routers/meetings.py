@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
@@ -365,6 +365,9 @@ async def list_meetings(
             Meeting.organization_id == ctx.org_id,
             Meeting.deleted_at.is_(None),
             meeting_filter(await ctx.scope(db)),
+            # Los borradores (reuniones que nunca arrancaron) solo los ve quien
+            # los creó: a quien ve toda la sede le llenaban la lista.
+            or_(Meeting.status != "draft", Meeting.created_by == ctx.user.id),
         )
         .group_by(Meeting.id)
         .order_by(Meeting.created_at.desc())

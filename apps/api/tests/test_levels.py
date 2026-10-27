@@ -67,6 +67,8 @@ def _school(client):
         assert created.status_code == 201, created.text
         assert created.json()["level"] == level
         ids[level] = created.json()["id"]
+        # Arrancada: un borrador (nunca grabó) solo lo ve quien lo creó.
+        assert client.post(f"/api/meetings/{ids[level]}/start", headers=owner.headers).status_code == 200
         task = client.post(
             "/api/tasks", json={"text": f"Tarea {word}", "meeting_id": ids[level]}, headers=owner.headers
         )

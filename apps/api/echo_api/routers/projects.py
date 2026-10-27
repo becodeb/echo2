@@ -80,6 +80,30 @@ async def create_project(
     )
 
 
+@router.delete("/{project_id}", status_code=204)
+async def delete_project(
+    project_id: uuid.UUID, ctx: OrgContext = Depends(get_org_context), db: AsyncSession = Depends(get_db)
+):
+    """Borra el proyecto, no sus reuniones: esas siguen donde estaban, sin proyecto.
+
+    Los proyectos no tienen dueño, así que los borran los directivos o quien
+    administra la sede. Baja lógica y en auditoría.
+    """
+    from datetime import UTC
+
+    from ..services.access import RANK_DIRECTIVO, scope_rank
+
+    if scope_rank(await ctx.scope(db)) < RANK_DIRECTIVO:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Borran proyectos los directivos de la sede")
+    project = await db.get(Project, project_id)
+    if project is None or project.organization_id != ctx.org_id or project.deleted_at is not None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Proyecto no encontrado")
+    project.deleted_at = datetime.now(UTC)
+    await db.execute(delete(ProjectMeeting).where(ProjectMeeting.project_id == project.id))
+    await audit(db, ctx.org_id, ctx.user.id, "project.delete", "project", str(project.id), detail={"name": project.name})
+    await db.commit()
+
+
 @router.get("", response_model=list[ProjectOut])
 async def list_projects(
     ctx: OrgContext = Depends(get_org_context), db: AsyncSession = Depends(get_db)
