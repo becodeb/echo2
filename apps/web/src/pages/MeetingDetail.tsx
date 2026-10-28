@@ -766,6 +766,29 @@ function TranscriptTab({
 function SpeakerEditor({ meeting, onChanged }: { meeting: MeetingOut; onChanged: () => void }) {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [name, setName] = useState("");
+  // Unir: la misma persona quedó partida en dos (27/10: 4 participantes y 21
+  // personas en una reunión de 2 horas, antes de unir los tramos por la voz).
+  const [merging, setMerging] = useState(false);
+  const [mergeFrom, setMergeFrom] = useState("");
+  const [mergeInto, setMergeInto] = useState("");
+  const [mergeError, setMergeError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const merge = useMutation({
+    mutationFn: () =>
+      api(`/api/meetings/${meeting.id}/speakers/${mergeFrom}/merge`, {
+        method: "POST",
+        body: JSON.stringify({ into_speaker_id: mergeInto }),
+      }),
+    onSuccess: () => {
+      setMerging(false);
+      setMergeFrom("");
+      setMergeInto("");
+      // Los renglones de la persona unida ahora son de la otra.
+      queryClient.invalidateQueries({ queryKey: ["transcript", meeting.id] });
+      onChanged();
+    },
+    onError: (err) => setMergeError(err instanceof Error ? err.message : "No se pudo unir"),
+  });
 
   if (meeting.speakers.length === 0) return null;
 
@@ -782,6 +805,10 @@ function SpeakerEditor({ meeting, onChanged }: { meeting: MeetingOut; onChanged:
     onChanged();
   };
   const byVoice = meeting.speakers.some((speaker) => speaker.name_source === "voz");
+  const speakerOptions = meeting.speakers.map((speaker) => ({
+    value: speaker.id,
+    label: speaker.display_name || speaker.label,
+  }));
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -856,11 +883,51 @@ function SpeakerEditor({ meeting, onChanged }: { meeting: MeetingOut; onChanged:
           )}
         </span>
       ))}
+      {meeting.speakers.length > 1 && (
+        <button
+          onClick={() => {
+            setMergeError(null);
+            setMerging(true);
+          }}
+          className="rounded-full px-2.5 py-1 text-xs font-medium text-accent-600 hover:bg-accent-50"
+        >
+          Unir personas
+        </button>
+      )}
       {byVoice && (
         <span className="basis-full text-xs text-ink-400">
           <VoiceMark /> = reconocida por su voz. Si algo está mal, tocá el nombre y corregilo.
         </span>
       )}
+      <Modal open={merging} onClose={() => setMerging(false)} title="Unir personas">
+        <div className="space-y-4">
+          <p className="text-sm text-ink-600">
+            Si Echo separó a una misma persona en dos, elegí las dos: todo lo que dijo la primera pasa a la
+            segunda.
+          </p>
+          <Select
+            label="Esta persona"
+            value={mergeFrom}
+            onChange={setMergeFrom}
+            options={speakerOptions.filter((option) => option.value !== mergeInto)}
+            placeholder="Elegí a quién"
+          />
+          <Select
+            label="es la misma que"
+            value={mergeInto}
+            onChange={setMergeInto}
+            options={speakerOptions.filter((option) => option.value !== mergeFrom)}
+            placeholder="Elegí con quién"
+          />
+          {mergeError && <p className="text-sm text-red-600">{mergeError}</p>}
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setMerging(false)}>Cancelar</Button>
+            <Button onClick={() => merge.mutate()} disabled={!mergeFrom || !mergeInto || merge.isPending}>
+              {merge.isPending ? <Spinner /> : "Unir"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

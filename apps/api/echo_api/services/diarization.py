@@ -145,8 +145,10 @@ def _pcm_array(path: Path) -> np.ndarray | None:
         return None
 
 
-async def _names(meeting_id: uuid.UUID, rows: list[Row], pcm_file: Path) -> dict[str, Naming]:
-    return await speaker_names.resolve(meeting_id, rows, _pcm_array(pcm_file))
+async def _names(
+    meeting_id: uuid.UUID, rows: list[Row], pcm_file: Path, prints: dict[str, np.ndarray] | None = None
+) -> dict[str, Naming]:
+    return await speaker_names.resolve(meeting_id, rows, _pcm_array(pcm_file), prints)
 
 
 # ── Llamadas a los proveedores ───────────────────────────────────
@@ -221,7 +223,7 @@ async def _chunked_text_rows(
 ) -> list[Row]:
     """Texto sin personas por tramos (los del en vivo + el resto en paralelo); si falla, como siempre."""
     try:
-        chunks = await final_chunks.all_chunks(meeting_id, path, total_ms, "groq", engine, language, vocabulary)
+        chunks, _ = await final_chunks.all_chunks(meeting_id, path, total_ms, "groq", engine, language, vocabulary)
         return _clean_rows(final_chunks.stitch_segments(chunks), language)
     except Exception as exc:  # noqa: BLE001 - respaldo: partes de 10 minutos, una detrás de otra
         log.warning("texto por tramos falló en %s, va como siempre: %s", meeting_id, exc)
@@ -375,11 +377,12 @@ async def _run_final_pass(
     after = _after_audio(live, total_ms)
 
     if decision.provider == "elevenlabs":
-        rows = await _people_pass(
+        people = await _people_pass(
             meeting_id, path, language, vocabulary, decision, organization_id, created_by, total_ms, hold_id
         )
-        if rows is not None:
-            await _replace_transcript(meeting_id, rows + after, await _names(meeting_id, rows, path))
+        if people is not None:
+            rows, prints = people
+            await _replace_transcript(meeting_id, rows + after, await _names(meeting_id, rows, path, prints))
             return True
 
     # Sin personas (o ElevenLabs falló): texto de Groq, sin etiquetar a nadie.
@@ -572,8 +575,8 @@ async def _people_pass(
     created_by: uuid.UUID,
     total_ms: int,
     hold_id: uuid.UUID | None = None,
-) -> list[Row] | None:
-    """Scribe sobre la reunión entera.
+) -> tuple[list[Row], dict[str, np.ndarray] | None] | None:
+    """Scribe sobre la reunión entera: los turnos y, si se unieron por la voz, la huella de cada persona.
 
     None = no hay personas: falló y quedó pendiente de reintento (con los
     créditos reservados), o no se pudo / no devolvió nada (créditos devueltos).
@@ -589,10 +592,18 @@ async def _people_pass(
     # Por tramos de 5 minutos (services/final_chunks.py): casi todos ya se
     # transcribieron mientras se grababa, así que al finalizar falta poco.
     result = None
+    prints: dict[str, np.ndarray] | None = None
     try:
         engine = get_stt_provider("elevenlabs", get_settings().elevenlabs_api_key)
-        chunks = await final_chunks.all_chunks(meeting_id, path, total_ms, "elevenlabs", engine, language, vocabulary)
-        stitched = final_chunks.stitch_words(chunks)
+        chunks, mode = await final_chunks.all_chunks(
+            meeting_id, path, total_ms, "elevenlabs", engine, language, vocabulary
+        )
+        stitched, voice_prints = final_chunks.stitch_words(chunks, mode)
+        people = {word.speaker for word in stitched if word.speaker}
+        log.info("personas de %s: %d (%s)", meeting_id, len(people), mode)
+        await _update_meta(meeting_id, people_stitch={"mode": mode, "people": len(people), "chunks": len(chunks)})
+        if mode == "voice" and voice_prints:
+            prints = voice_prints  # si no hay, "Mi voz" las saca como antes
         if stitched:
             result = SttResult(words=stitched, entities=final_chunks.entities(chunks))
     except Exception as exc:  # noqa: BLE001 - respaldo: la reunión entera de una vez
@@ -621,7 +632,7 @@ async def _people_pass(
         await _update_meta(meeting_id, people_status="failed", people_retry=None)
         return None
     await _charge(meeting_id, organization_id, created_by, retry, result)
-    return rows
+    return rows, prints
 
 
 async def _charge(

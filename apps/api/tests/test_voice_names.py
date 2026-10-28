@@ -125,6 +125,8 @@ def _diarize_with(monkeypatch, meeting_id) -> None:
     monkeypatch.setattr(voiceprint, "available", lambda: True)
     monkeypatch.setattr(voiceprint, "people_prints", lambda pcm, turns: {
         "speaker_1": _near(LAURA, 0.9), "speaker_2": _near(LAURA, 0.2)})
+    # Sin huellas por tramo (una sola persona por etiqueta): "Mi voz" usa las de arriba.
+    monkeypatch.setattr(diarization.final_chunks, "chunk_voices", lambda pcm, words, limit_ms=0: {})
     assert asyncio.run(diarization.diarize_meeting(meeting_id)) is True
     monkeypatch.undo()
 

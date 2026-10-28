@@ -76,7 +76,8 @@ def _get_extractor():
 
             if not path.exists():
                 raise FileNotFoundError(path)
-            config = sherpa_onnx.SpeakerEmbeddingExtractorConfig(model=str(path), num_threads=1, provider="cpu")
+            # 2 hilos: 1,6 veces más rápido (15 s de audio: 0,37 s en vez de 0,59 s, 28/10).
+            config = sherpa_onnx.SpeakerEmbeddingExtractorConfig(model=str(path), num_threads=2, provider="cpu")
             _extractor = sherpa_onnx.SpeakerEmbeddingExtractor(config)
         except Exception as exc:  # noqa: BLE001 - sin modelo no hay nombres por voz, nada más
             log.warning("huella de voz no disponible (%s): %s", path, exc)

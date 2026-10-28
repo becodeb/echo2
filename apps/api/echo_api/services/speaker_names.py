@@ -229,18 +229,27 @@ async def _candidates(db, meeting: Meeting) -> list[Candidate]:
     return [c for c in out if c.name.strip()]
 
 
-async def resolve(meeting_id: uuid.UUID, rows: list[Row], pcm: np.ndarray | None) -> dict[str, Naming]:
-    """Nombres de las personas de la reunión. Nunca corta la pasada final."""
+async def resolve(
+    meeting_id: uuid.UUID, rows: list[Row], pcm: np.ndarray | None, prints: dict[str, np.ndarray] | None = None
+) -> dict[str, Naming]:
+    """Nombres de las personas de la reunión. Nunca corta la pasada final.
+
+    `prints`: la huella de cada persona, si ya se sacó al unir los tramos
+    (services/final_chunks.py); si no, se saca acá con hasta 30 s de cada una.
+    """
     try:
         async with SessionLocal() as db:
             meeting = await db.get(Meeting, meeting_id)
             if meeting is None:
                 return {}
             candidates = await _candidates(db, meeting)
-        prints: dict[str, np.ndarray] = {}
-        if pcm is not None and any(c.voice is not None for c in candidates) and voiceprint.available():
-            turns = [(label, start, end) for label, _, start, end in rows]
-            prints = await asyncio.to_thread(voiceprint.people_prints, pcm, turns)
+        if not any(c.voice is not None for c in candidates):
+            prints = {}
+        elif prints is None:
+            prints = {}
+            if pcm is not None and voiceprint.available():
+                turns = [(label, start, end) for label, _, start, end in rows]
+                prints = await asyncio.to_thread(voiceprint.people_prints, pcm, turns)
         names = decide(rows, candidates, prints)
         if names:
             log.info("nombres de %s: %s", meeting_id,
