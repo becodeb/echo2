@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { MeetingStatus, StatusIcons, StatusPill } from "../components/MeetingStatus";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { api } from "../api/client";
-import type { AdminOrgOut, ChatOut, InsightsOut, MeetingOut, MinutesOut, SegmentOut } from "../api/types";
+import type { AdminOrgOut, ChatOut, FamilyDetailOut, InsightsOut, MeetingOut, MinutesOut, SegmentOut } from "../api/types";
 import { Tabs } from "../components/Tabs";
 import { useAuth } from "../state/auth";
 import { Badge, Button, Card, EmptyState, Input, Modal, Spinner, formatDate, formatDuration, formatMs } from "../components/ui";
 import { EchoFace } from "../components/EchoFace";
-import { ClassificationPanel } from "../components/ClassificationPanel";
+import { ClassificationPanel, SEVERITIES, useClassification } from "../components/ClassificationPanel";
+import { studentInitials } from "../components/StudentPicker";
 import { Attachments } from "../components/Attachments";
 import { RecordingCard } from "../components/RecordingCard";
 import { ExportMenu } from "../components/ExportMenu";
@@ -82,6 +83,13 @@ export default function MeetingDetail() {
     if (jumpMs != null) setTab("transcript");
   }, [jumpMs]);
 
+  const [classifying, setClassifying] = useState(false);
+  const selectTab = (next: TabId) => {
+    setTab(next);
+    params.set("tab", next);
+    setParams(params, { replace: true });
+  };
+
   if (!meeting) {
     return (
       <div className="flex h-full items-center justify-center text-ink-300">
@@ -100,14 +108,18 @@ export default function MeetingDetail() {
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
       <header className="mb-6">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="min-w-0 break-words text-2xl font-semibold tracking-tight text-ink-900">{meeting.title}</h1>
-          {(meeting.status === "processing" || meeting.status === "failed") && <MeetingStatus status={meeting.status} />}
-          <div className="ml-auto flex gap-2">
-            <ChangeSedeButton meeting={meeting} />
-            {user?.is_superadmin && <MoveMeetingButton meeting={meeting} />}
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <h1 className="break-words text-2xl font-semibold tracking-tight text-ink-900">{meeting.title}</h1>
+            {(meeting.status === "processing" || meeting.status === "failed") && (
+              <div className="mt-1.5">
+                <MeetingStatus status={meeting.status} />
+              </div>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
             <ShareButton meetingId={meeting.id} />
-            <DeleteMeetingButton meeting={meeting} />
+            <MeetingMenu meeting={meeting} />
           </div>
         </div>
         {internal ? (
@@ -116,21 +128,23 @@ export default function MeetingDetail() {
             {meeting.group_name && <Badge tone="gray">{meeting.group_name}</Badge>}
           </div>
         ) : (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <LevelControl meeting={meeting} />
-            {meeting.meta?.intersede && <Badge tone="sky">Intersede</Badge>}
-          </div>
+          <ClassificationLine meetingId={meeting.id} onEdit={() => setClassifying(true)} />
         )}
-        <p className="mt-1 text-sm text-ink-500">
-          {formatDate(meeting.started_at)} · {formatDuration(meeting.duration_seconds)}
-          {meeting.participants.some((participant) => !participant.user_id) &&
-            ` · ${meeting.participants
-              .filter((participant) => !participant.user_id)
-              .map((participant) => participant.name)
-              .join(", ")}`}
-        </p>
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm text-ink-500">
+          <span>
+            {formatDate(meeting.started_at)} · {formatDuration(meeting.duration_seconds)}
+            {meeting.participants.some((participant) => !participant.user_id) &&
+              ` · ${meeting.participants
+                .filter((participant) => !participant.user_id)
+                .map((participant) => participant.name)
+                .join(", ")}`}
+          </span>
+          {!internal && <LevelControl meeting={meeting} />}
+          {!internal && meeting.meta?.intersede && <Badge tone="sky">Intersede</Badge>}
+          {!internal && <ActaChip meetingId={meeting.id} onOpen={() => selectTab("minutes")} />}
+        </div>
         {!internal && <MeetingStaff meeting={meeting} />}
-        {!internal && <ClassificationPanel meetingId={meeting.id} />}
+        {!internal && <ClassificationPanel meetingId={meeting.id} editing={classifying} onClose={() => setClassifying(false)} />}
         {meeting.meta?.people_status === "pending" && (
           <p className="animate-fade-up mt-3 flex items-center gap-2 rounded-3xl bg-ink-50 px-3.5 py-2.5 text-sm text-ink-600">
             <Spinner className="h-3.5 w-3.5 shrink-0 text-ink-400" />
@@ -159,11 +173,7 @@ export default function MeetingDetail() {
         <Tabs
           items={tabs}
           value={activeTab}
-          onChange={(id) => {
-            setTab(id);
-            params.set("tab", id);
-            setParams(params, { replace: true });
-          }}
+          onChange={selectTab}
           label="Secciones de la reunión"
           idPrefix="reunion"
         />
@@ -186,6 +196,197 @@ export default function MeetingDetail() {
   );
 }
 
+// ── Cabecera ─────────────────────────────────────────────────────
+
+/** Los puntos de «…»: lo que se usa poco (cambiar de sede, borrar) no va suelto al lado del título. */
+function MeetingMenu({ meeting }: { meeting: MeetingOut }) {
+  const { user } = useAuth();
+  const canSede = useCanChangeSede(meeting);
+  const canMove = !!user?.is_superadmin;
+  const canDelete = useCanDelete(meeting);
+  const [open, setOpen] = useState(false);
+  const [dialog, setDialog] = useState<"sede" | "move" | "delete" | null>(null);
+  const box = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (event: MouseEvent | TouchEvent) => {
+      if (box.current && !box.current.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => event.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("touchstart", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("touchstart", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  if (!canSede && !canMove && !canDelete) return null;
+  const choose = (next: "sede" | "move" | "delete") => {
+    setOpen(false);
+    setDialog(next);
+  };
+  const item =
+    "flex min-h-11 w-full items-center rounded-2xl px-3 text-left text-sm text-ink-700 transition-colors hover:bg-ink-50 hover:text-ink-900";
+
+  return (
+    <div ref={box} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Más acciones"
+        title="Más acciones"
+        className="flex h-10 w-10 items-center justify-center rounded-full text-ink-600 transition-colors hover:bg-ink-100 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+          <circle cx="5" cy="12" r="1.8" />
+          <circle cx="12" cy="12" r="1.8" />
+          <circle cx="19" cy="12" r="1.8" />
+        </svg>
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="animate-fade-up absolute right-0 top-11 z-30 w-52 rounded-3xl border border-ink-100 bg-white p-1.5 shadow-[0_16px_48px_-12px_rgba(20,24,36,0.25)]"
+        >
+          {canSede && (
+            <button type="button" role="menuitem" onClick={() => choose("sede")} className={item}>
+              Cambiar de sede
+            </button>
+          )}
+          {canMove && (
+            <button type="button" role="menuitem" onClick={() => choose("move")} className={item}>
+              Mover de sede
+            </button>
+          )}
+          {canDelete && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => choose("delete")}
+              className={`${item} ${canSede || canMove ? "mt-1 border-t border-ink-100 " : ""}text-red-600 hover:bg-red-50 hover:text-red-700`}
+            >
+              Borrar
+            </button>
+          )}
+        </div>
+      )}
+      {canSede && <ChangeSedeDialog meeting={meeting} open={dialog === "sede"} onClose={() => setDialog(null)} />}
+      {canMove && <MoveMeetingDialog meeting={meeting} open={dialog === "move"} onClose={() => setDialog(null)} />}
+      {canDelete && <DeleteMeetingDialog meeting={meeting} open={dialog === "delete"} onClose={() => setDialog(null)} />}
+    </div>
+  );
+}
+
+const joinDot = (parts: ReactNode[]) =>
+  parts.flatMap((part, index) => (index === 0 ? [part] : [<span key={`dot-${index}`} className="text-ink-300">·</span>, part]));
+
+/**
+ * Lo que hay que saber de la reunión de un vistazo: familia, alumno (solo
+ * iniciales y curso: el colegio no quiere el nombre completo a la vista) y
+ * motivo. Sin clasificar queda un solo enlace para hacerlo, no una tarjeta.
+ */
+function ClassificationLine({ meetingId, onEdit }: { meetingId: string; onEdit: () => void }) {
+  const { data: classification } = useClassification(meetingId);
+  const familyId = classification?.family_id;
+  const { data: family } = useQuery({
+    queryKey: ["family", familyId],
+    queryFn: () => api<FamilyDetailOut>(`/api/families/${familyId}`),
+    enabled: !!familyId,
+  });
+  if (!classification) return null;
+
+  if (!classification.family_id && !classification.reason_name && !classification.severity) {
+    return (
+      <p className="mt-2">
+        <button type="button" onClick={onEdit} className="text-sm font-medium text-accent-600 underline-offset-2 hover:underline">
+          + Clasificar
+        </button>
+      </p>
+    );
+  }
+
+  // Con un solo hijo en la familia es ese, aunque no se haya marcado.
+  const kids = (family?.members ?? []).filter((member) => member.relationship_type === "estudiante");
+  const students = classification.student_ids.length
+    ? kids.filter((kid) => classification.student_ids.includes(kid.id))
+    : kids.length === 1
+      ? kids
+      : [];
+  const severity = SEVERITIES.find((item) => item.value === classification.severity);
+
+  const parts: ReactNode[] = [];
+  if (classification.family_id && classification.family_name) {
+    parts.push(
+      <Link key="family" to={`/families/${classification.family_id}`} title="Ver la familia" className="font-semibold text-ink-900 hover:underline">
+        {classification.family_name}
+      </Link>,
+    );
+  }
+  if (students.length) {
+    parts.push(
+      <span key="students">
+        {students.map((kid) => `${studentInitials(kid.name)}${kid.curso ? ` (${kid.curso})` : ""}`).join(", ")}
+      </span>,
+    );
+  }
+  if (classification.reason_name) parts.push(<span key="reason">{classification.reason_name}</span>);
+
+  return (
+    <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[15px] text-ink-700">
+      {joinDot(parts)}
+      {severity && (
+        <span
+          className={`h-2.5 w-2.5 rounded-full ${severity.dot}`}
+          title={`Gravedad: ${severity.label.toLowerCase()}`}
+          role="img"
+          aria-label={`Gravedad: ${severity.label.toLowerCase()}`}
+        />
+      )}
+      {classification.family_drive_url && (
+        <a href={classification.family_drive_url} target="_blank" rel="noopener noreferrer" className="text-sm text-accent-600 hover:underline">
+          Carpeta ↗
+        </a>
+      )}
+      <button type="button" onClick={onEdit} className="py-1 text-sm text-ink-400 hover:text-ink-700">
+        Editar
+      </button>
+    </p>
+  );
+}
+
+/** El estado del acta junto a la fecha; al tocarlo se abre la pestaña del acta. */
+function ActaChip({ meetingId, onOpen }: { meetingId: string; onOpen: () => void }) {
+  const { data: minutes } = useQuery({
+    queryKey: ["minutes", meetingId],
+    queryFn: () => api<MinutesOut | null>(`/api/meetings/${meetingId}/minutes`),
+  });
+  if (!minutes) return null;
+  const number = minutes.number != null ? ` N.º ${minutes.number}` : "";
+  let pill;
+  if (minutes.generation_status === "generating") {
+    pill = <StatusPill tone="busy" icon={StatusIcons.busy}>Redactando el acta…</StatusPill>;
+  } else if (minutes.generation_status === "failed" && !minutes.version) {
+    pill = <StatusPill tone="error" icon={StatusIcons.alert}>No se pudo hacer el acta</StatusPill>;
+  } else if (!minutes.version) {
+    return null;
+  } else if (minutes.status === "approved") {
+    pill = <StatusPill tone="done" icon={StatusIcons.check}>Acta{number} · confirmada</StatusPill>;
+  } else {
+    pill = <StatusPill tone="warn">Acta{number} · por confirmar</StatusPill>;
+  }
+  return (
+    <button type="button" onClick={onOpen} title="Ver el acta" className="rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500">
+      {pill}
+    </button>
+  );
+}
+
 // ── Mover de sede (superadmin) ───────────────────────────────────
 
 /**
@@ -198,11 +399,19 @@ export default function MeetingDetail() {
  * (el mismo permiso que DELETE /api/meetings/{id}); es baja lógica y queda en
  * auditoría. Pregunta antes, con el título a la vista.
  */
-function DeleteMeetingButton({ meeting }: { meeting: MeetingOut }) {
+function useCanDelete(meeting: MeetingOut): boolean {
   const { user, activeOrg } = useAuth();
+  return (
+    meeting.created_by === user?.id ||
+    !!user?.is_superadmin ||
+    activeOrg?.role === "admin" ||
+    activeOrg?.role === "owner"
+  );
+}
+
+function DeleteMeetingDialog({ meeting, open, onClose }: { meeting: MeetingOut; open: boolean; onClose: () => void }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
   const remove = useMutation({
     mutationFn: () => api(`/api/meetings/${meeting.id}`, { method: "DELETE" }),
     onSuccess: () => {
@@ -211,19 +420,10 @@ function DeleteMeetingButton({ meeting }: { meeting: MeetingOut }) {
       navigate("/meetings", { replace: true });
     },
   });
-  const canDelete =
-    meeting.created_by === user?.id ||
-    user?.is_superadmin ||
-    activeOrg?.role === "admin" ||
-    activeOrg?.role === "owner";
-  if (!canDelete) return null;
 
   return (
     <>
-      <Button variant="ghost" onClick={() => setOpen(true)} className="text-red-600 hover:bg-red-50 hover:text-red-700">
-        Borrar
-      </Button>
-      <Modal open={open} onClose={() => setOpen(false)} title="Borrar la reunión">
+      <Modal open={open} onClose={onClose} title="Borrar la reunión">
         <div className="space-y-4">
           <p className="text-sm text-ink-600">
             Se borra «{meeting.title}» con su transcripción, acta y tareas, y deja de verse para todos. Lo que ya se
@@ -235,7 +435,7 @@ function DeleteMeetingButton({ meeting }: { meeting: MeetingOut }) {
             </p>
           )}
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button variant="ghost" onClick={onClose}>Cancelar</Button>
             <Button variant="danger" onClick={() => remove.mutate()} disabled={remove.isPending}>
               {remove.isPending ? <Spinner /> : "Borrar"}
             </Button>
@@ -253,18 +453,23 @@ function DeleteMeetingButton({ meeting }: { meeting: MeetingOut }) {
  * (routers/meetings.py, move_to_other_sede). Después rehace el acta con el
  * formato de la sede nueva.
  */
-function ChangeSedeButton({ meeting }: { meeting: MeetingOut }) {
-  const { user, activeOrg, organizations, switchOrg } = useAuth();
+function useCanChangeSede(meeting: MeetingOut): boolean {
+  const { user, activeOrg, organizations } = useAuth();
   const others = organizations.filter((org) => !org.is_personal && org.id !== activeOrg?.id);
-  const [open, setOpen] = useState(false);
-  // Con una sola otra sede (Nordelta ↔ Puertos) ya viene elegida.
-  const [target, setTarget] = useState(others.length === 1 ? others[0].id : "");
-  const [redo, setRedo] = useState(true);
-  const canMove =
+  return (
     others.length > 0 &&
     meeting.kind !== "interna" &&
     !["live", "paused", "processing"].includes(meeting.status) &&
-    (meeting.created_by === user?.id || activeOrg?.role === "admin" || activeOrg?.role === "owner");
+    (meeting.created_by === user?.id || activeOrg?.role === "admin" || activeOrg?.role === "owner")
+  );
+}
+
+function ChangeSedeDialog({ meeting, open, onClose }: { meeting: MeetingOut; open: boolean; onClose: () => void }) {
+  const { activeOrg, organizations, switchOrg } = useAuth();
+  const others = organizations.filter((org) => !org.is_personal && org.id !== activeOrg?.id);
+  // Con una sola otra sede (Nordelta ↔ Puertos) ya viene elegida.
+  const [target, setTarget] = useState(others.length === 1 ? others[0].id : "");
+  const [redo, setRedo] = useState(true);
 
   const move = useMutation({
     mutationFn: async () => {
@@ -283,12 +488,9 @@ function ChangeSedeButton({ meeting }: { meeting: MeetingOut }) {
     },
   });
 
-  if (!canMove) return null;
-
   return (
     <>
-      <Button variant="ghost" onClick={() => setOpen(true)}>Cambiar de sede</Button>
-      <Modal open={open} onClose={() => setOpen(false)} title="Cambiar de sede">
+      <Modal open={open} onClose={onClose} title="Cambiar de sede">
         <div className="space-y-4">
           <p className="text-sm text-ink-600">
             Pasa «{meeting.title}» con su transcripción, acta y tareas a otra sede tuya. La familia, el motivo y los
@@ -317,7 +519,7 @@ function ChangeSedeButton({ meeting }: { meeting: MeetingOut }) {
             </p>
           )}
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button variant="ghost" onClick={onClose}>Cancelar</Button>
             <Button onClick={() => move.mutate()} disabled={!target || move.isPending}>
               {move.isPending ? <Spinner /> : "Cambiar de sede"}
             </Button>
@@ -328,9 +530,8 @@ function ChangeSedeButton({ meeting }: { meeting: MeetingOut }) {
   );
 }
 
-function MoveMeetingButton({ meeting }: { meeting: MeetingOut }) {
+function MoveMeetingDialog({ meeting, open, onClose }: { meeting: MeetingOut; open: boolean; onClose: () => void }) {
   const { activeOrg, switchOrg } = useAuth();
-  const [open, setOpen] = useState(false);
   const [target, setTarget] = useState("");
   const [level, setLevel] = useState<Level>("primaria");
 
@@ -360,8 +561,7 @@ function MoveMeetingButton({ meeting }: { meeting: MeetingOut }) {
 
   return (
     <>
-      <Button variant="ghost" onClick={() => setOpen(true)}>Mover de sede</Button>
-      <Modal open={open} onClose={() => setOpen(false)} title="Mover a otra sede">
+      <Modal open={open} onClose={onClose} title="Mover a otra sede">
         <div className="space-y-4">
           <p className="text-sm text-ink-600">
             Pasa «{meeting.title}» con su transcripción, acta y tareas a otra organización. Se sueltan la
@@ -388,7 +588,7 @@ function MoveMeetingButton({ meeting }: { meeting: MeetingOut }) {
             </p>
           )}
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button variant="ghost" onClick={onClose}>Cancelar</Button>
             <Button onClick={() => move.mutate()} disabled={!target || move.isPending}>
               {move.isPending ? <Spinner /> : "Mover"}
             </Button>
@@ -423,13 +623,11 @@ function LevelControl({ meeting }: { meeting: MeetingOut }) {
 
   if (!canMove) {
     return meeting.level ? (
-      <div className="mt-2">
-        <Badge tone="indigo">{LEVEL_LABEL[meeting.level] ?? meeting.level}</Badge>
-      </div>
+      <Badge tone="indigo">{LEVEL_LABEL[meeting.level] ?? meeting.level}</Badge>
     ) : null;
   }
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <Select
         size="sm"
         ariaLabel="Nivel"

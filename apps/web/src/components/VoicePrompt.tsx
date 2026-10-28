@@ -16,8 +16,8 @@ const VoiceRecorder = lazy(() => import("./VoiceRecorder").then((module) => ({ d
  * Echo reconoce a cada uno en las reuniones sin depender de que digan su
  * nombre. Mientras falte (o sea una de antes del mínimo de 8 s, que Echo no
  * usa) se pide por cuatro lados:
- * - VoiceNudge: fijo en la barra lateral (en el celular, arriba del contenido).
- *   "Más tarde" lo achica unas horas, nunca lo saca.
+ * - VoiceNudge: fijo en la barra lateral (en el celular, una línea arriba del
+ *   contenido). "Más tarde" lo achica unas horas, nunca lo saca.
  * - VoicePrompt: la ventana al entrar; "Más tarde" la frena un día (lo guarda
  *   el servidor). El viejo "No volver a mostrar" ya no existe.
  * - VoiceBeforeMeeting: antes de iniciar una reunión, sin frenarla.
@@ -169,7 +169,7 @@ function laterUntil(): number {
 
 /**
  * El aviso fijo: en la barra lateral ("sidebar"; "icon" con la barra en
- * íconos) o arriba del contenido en el celular ("mobile"). No tiene cruz:
+ * íconos) o una línea arriba del contenido en el celular ("mobile"). No tiene cruz:
  * está hasta que la persona grabe su voz. Fuera de la reunión en vivo.
  */
 export function VoiceNudge({ variant }: { variant: "sidebar" | "icon" | "mobile" }) {
@@ -233,30 +233,22 @@ export function VoiceNudge({ variant }: { variant: "sidebar" | "icon" | "mobile"
   }
 
   if (variant === "mobile") {
+    // Una línea fina, entera tocable: en el celular no puede comerse la quinta parte
+    // de la pantalla en cada página. La insistencia la pone la ventana al entrar.
     return (
       <>
-        <div className="flex items-center gap-3 border-b border-accent-100 bg-accent-50 px-4 py-2.5 md:hidden" role="status">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-accent-600">
-            <Icon name="mic" size={18} />
+        <button
+          type="button"
+          onClick={open}
+          className="flex min-h-9 w-full items-center gap-2 border-b border-accent-100 bg-accent-50 px-4 text-left text-[13px] text-ink-800 md:hidden"
+        >
+          <span className="relative flex shrink-0 text-accent-600">
+            <Icon name="mic" size={15} />
+            <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-red-500" />
           </span>
-          <div className="min-w-0 flex-1">
-            <p className={`text-[13px] leading-snug text-ink-800 ${small ? "truncate" : ""}`}>
-              {small ? "Falta grabar tu voz · 12 s" : message}
-            </p>
-            {!small && (
-              <button type="button" onClick={later} className="mt-0.5 text-xs font-medium text-ink-500 hover:text-ink-800">
-                Más tarde
-              </button>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={open}
-            className="min-h-10 shrink-0 rounded-full bg-ink-900 px-4 text-[13px] font-semibold text-white hover:bg-ink-700"
-          >
-            Grabar
-          </button>
-        </div>
+          <span className="min-w-0 flex-1 truncate">{short ? "Tu voz quedó corta · grabala de nuevo" : "Falta grabar tu voz · 12 s"}</span>
+          <span className="shrink-0 font-semibold text-accent-700">Grabar</span>
+        </button>
         {modal}
       </>
     );

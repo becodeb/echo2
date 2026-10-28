@@ -20,10 +20,11 @@ import { Badge, Button, Input, Modal, Spinner } from "./ui";
  * Clasificación de la reunión: familia, motivo, gravedad y quién vino.
  *
  * Se guarda todo junto porque en la práctica se completa de una sentada, al
- * terminar la reunión. Colapsado muestra el resumen; se abre para editar.
+ * terminar la reunión. El resumen vive en la cabecera de la reunión
+ * (MeetingDetail); acá solo está el editor, que la cabecera abre y cierra.
  */
 
-const SEVERITIES: { value: Severity; label: string; dot: string }[] = [
+export const SEVERITIES: { value: Severity; label: string; dot: string }[] = [
   { value: "verde", label: "Verde", dot: "bg-emerald-500" },
   { value: "amarillo", label: "Amarillo", dot: "bg-amber-400" },
   { value: "rojo", label: "Rojo", dot: "bg-red-500" },
@@ -37,17 +38,25 @@ export const AUDIENCES: { value: Audience; label: string }[] = [
   { value: "interna", label: "Interna del equipo" },
 ];
 
-const SEVERITY_TONE: Record<Severity, "green" | "amber" | "red"> = {
-  verde: "green",
-  amarillo: "amber",
-  rojo: "red",
-};
+export function useClassification(meetingId: string) {
+  return useQuery({
+    queryKey: ["classification", meetingId],
+    queryFn: () => api<ClassificationOut>(`/api/meetings/${meetingId}/classification`),
+  });
+}
 
-export function ClassificationPanel({ meetingId }: { meetingId: string }) {
+export function ClassificationPanel({
+  meetingId,
+  editing,
+  onClose,
+}: {
+  meetingId: string;
+  editing: boolean;
+  onClose: () => void;
+}) {
   const queryClient = useQueryClient();
   const { activeOrg } = useAuth();
   const canManageReasons = activeOrg?.role === "owner" || activeOrg?.role === "admin";
-  const [editing, setEditing] = useState(false);
   const [newReason, setNewReason] = useState<string | null>(null);
   const [familyId, setFamilyId] = useState("");
   const [reasonId, setReasonId] = useState("");
@@ -57,10 +66,7 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
   const [attendedPros, setAttendedPros] = useState<Set<string>>(new Set());
   const [students, setStudents] = useState<string[]>([]);
 
-  const { data: classification, isLoading } = useQuery({
-    queryKey: ["classification", meetingId],
-    queryFn: () => api<ClassificationOut>(`/api/meetings/${meetingId}/classification`),
-  });
+  const { data: classification, isLoading } = useClassification(meetingId);
   const { data: families } = useQuery({
     queryKey: ["families"],
     queryFn: () => api<FamilyOut[]>("/api/families"),
@@ -112,7 +118,7 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
         }),
       }),
     onSuccess: () => {
-      setEditing(false);
+      onClose();
       queryClient.invalidateQueries({ queryKey: ["classification", meetingId] });
       queryClient.invalidateQueries({ queryKey: ["families"] });
     },
@@ -156,72 +162,7 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
       : (classification?.professionals ?? []).filter((row) => row.linked).map((row) => row.professional_id),
   );
 
-  if (!editing) {
-    const nothingSet =
-      !classification?.family_id && !classification?.reason_id && !classification?.severity;
-    return (
-      <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-ink-100 bg-white px-4 py-3">
-        {nothingSet ? (
-          <span className="text-sm text-ink-500">Esta reunión no está clasificada.</span>
-        ) : (
-          <>
-            {classification?.family_name && classification.family_id && (
-              <Link to={`/families/${classification.family_id}`} title="Ver la familia" className="hover:opacity-80">
-                <Badge tone="indigo">{classification.family_name}</Badge>
-              </Link>
-            )}
-            {(classification?.student_ids ?? []).map((studentId) => {
-              const kid = families
-                ?.find((family) => family.id === classification?.family_id)
-                ?.members.find((member) => member.id === studentId);
-              return kid ? (
-                <Badge key={studentId} tone="gray">
-                  {kid.name}
-                  {kid.curso && ` · ${kid.curso}`}
-                </Badge>
-              ) : null;
-            })}
-            {classification?.audience && (
-              <Badge tone="sky">
-                {AUDIENCES.find((a) => a.value === classification.audience)?.label}
-              </Badge>
-            )}
-            {classification?.reason_name && <Badge>{classification.reason_name}</Badge>}
-            {classification?.severity && (
-              <Badge tone={SEVERITY_TONE[classification.severity]}>
-                {SEVERITIES.find((s) => s.value === classification.severity)?.label}
-              </Badge>
-            )}
-            {classification?.all_guardians_present === true && (
-              <Badge tone="green">Vinieron todos</Badge>
-            )}
-            {classification?.all_guardians_present === false && (
-              <Badge tone="amber">Faltó alguno</Badge>
-            )}
-            {classification?.family_id && classification.all_guardians_present === null && (
-              <Badge tone="gray">Asistencia sin registrar</Badge>
-            )}
-          </>
-        )}
-        {classification?.family_drive_url && (
-          <a
-            href={classification.family_drive_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm font-medium text-accent-600 hover:underline"
-          >
-            Carpeta de la familia ↗
-          </a>
-        )}
-        <button
-          onClick={() => setEditing(true)}
-          className="ml-auto text-sm font-medium text-accent-600 hover:underline"
-        >
-          {nothingSet ? "Clasificar" : "Editar"}
-        </button>
-      </div>
-    );
-  }
+  if (!editing) return null;
 
   return (
     <div className="mt-4 space-y-4 rounded-xl border border-ink-100 bg-white px-4 py-4">
@@ -375,7 +316,7 @@ export function ClassificationPanel({ meetingId }: { meetingId: string }) {
         <Button onClick={() => save.mutate()} disabled={save.isPending}>
           {save.isPending ? <Spinner /> : "Guardar"}
         </Button>
-        <Button variant="ghost" onClick={() => setEditing(false)}>
+        <Button variant="ghost" onClick={onClose}>
           Cancelar
         </Button>
         {save.isError && (
