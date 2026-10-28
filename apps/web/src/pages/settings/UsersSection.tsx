@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api/client";
 import { timeAgo } from "../../components/NotificationsPanel";
@@ -7,14 +7,7 @@ import { Avatar, Badge, Input } from "../../components/ui";
 import { useAuth } from "../../state/auth";
 import { LEVEL_LABEL, type Level } from "../../state/access";
 import { Block, ErrorText, Loading } from "./parts";
-
-interface Position {
-  id: string;
-  label: string;
-  description: string;
-  /** Dirección de la sede ve todo: los niveles no le cambian nada. */
-  needs_levels: boolean;
-}
+import { Chip, CustomPositions, permissionLines, type Group, type Position } from "./Positions";
 
 interface OrgUser {
   member_id: string;
@@ -38,52 +31,24 @@ interface OrgUser {
 interface OrgUsers {
   positions: Position[];
   levels: Level[];
+  groups: Group[];
   users: OrgUser[];
 }
 
 const NO_POSITION = "sin";
-
-function Chip({
-  active,
-  disabled,
-  title,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  disabled?: boolean;
-  title?: string;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      disabled={disabled}
-      title={title}
-      onClick={onClick}
-      className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-        active
-          ? "border-ink-900 bg-ink-900 text-white"
-          : "border-ink-200 bg-white text-ink-600 hover:border-ink-300 hover:text-ink-900"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
 
 /** Puesto y niveles de una persona: cada clic se guarda solo, en cuanto queda completo. */
 function UserEditor({
   user,
   positions,
   levels,
+  groups,
   isMe,
 }: {
   user: OrgUser;
   positions: Position[];
   levels: Level[];
+  groups: Group[];
   isMe: boolean;
 }) {
   const queryClient = useQueryClient();
@@ -137,7 +102,11 @@ function UserEditor({
             </Chip>
           ))}
         </div>
-        {current && <p className="mt-2 text-xs text-ink-500">{current.description}</p>}
+        {current && (
+          <p className="mt-2 text-xs text-ink-500">
+            {current.custom ? permissionLines(current, groups).join(" ") : current.description}
+          </p>
+        )}
       </div>
 
       {current && !current.needs_levels ? (
@@ -177,6 +146,7 @@ function UserRow({
   user,
   positions,
   levels,
+  groups,
   isMe,
   open,
   onToggle,
@@ -184,6 +154,7 @@ function UserRow({
   user: OrgUser;
   positions: Position[];
   levels: Level[];
+  groups: Group[];
   isMe: boolean;
   open: boolean;
   onToggle: () => void;
@@ -232,7 +203,7 @@ function UserRow({
         </div>
         <span className="mt-1 shrink-0 text-xs font-medium text-ink-500">{open ? "Cerrar" : "Cambiar"}</span>
       </button>
-      {open && <UserEditor user={user} positions={positions} levels={levels} isMe={isMe} />}
+      {open && <UserEditor user={user} positions={positions} levels={levels} groups={groups} isMe={isMe} />}
     </li>
   );
 }
@@ -285,6 +256,7 @@ export function UsersSection() {
         </>
       }
     >
+      <CustomPositions positions={data.positions} groups={data.groups} />
       <div className="mb-3 flex flex-col gap-2 sm:flex-row">
         <div className="flex-1">
           <Input placeholder="Buscar por nombre o mail…" value={term} onChange={(event) => setTerm(event.target.value)} />
@@ -322,6 +294,7 @@ export function UsersSection() {
             user={user}
             positions={data.positions}
             levels={data.levels}
+            groups={data.groups}
             isMe={user.user_id === me?.id}
             open={open === user.user_id}
             onToggle={() => setOpen(open === user.user_id ? null : user.user_id)}

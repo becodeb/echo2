@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, PKMixin, SoftDeleteMixin, TimestampMixin
@@ -86,11 +86,39 @@ class OrganizationMember(PKMixin, TimestampMixin, Base):
     role: Mapped[str] = mapped_column(String(20), default=ROLE_MEMBER, nullable=False)
     # Puesto que eligió quien administra la sede (DOE, docente, directivo...;
     # services/positions.py). Se guarda porque DOE y docente dan los mismos
-    # permisos y no se pueden deducir. Nulo = nadie lo eligió todavía.
-    position: Mapped[str | None] = mapped_column(String(30))
+    # permisos y no se pueden deducir. Nulo = nadie lo eligió todavía. Un
+    # puesto propio de la sede (CustomPosition) se guarda con su id.
+    position: Mapped[str | None] = mapped_column(String(40))
 
     organization: Mapped["Organization"] = relationship(back_populates="members")
     user: Mapped["User"] = relationship(back_populates="memberships")
+
+
+class CustomPosition(PKMixin, TimestampMixin, Base):
+    """Puesto que arma quien administra la sede ("Adviser", "Tutora"...).
+
+    Se traduce igual que los fijos de services/positions.py (rol de sede +
+    acceso en los niveles elegidos + grupo interno) y suma un permiso: ver las
+    reuniones no privadas de los integrantes de `watch_group_ids`.
+    """
+
+    __tablename__ = "custom_positions"
+    __table_args__ = (UniqueConstraint("organization_id", "name", name="uq_custom_position_name"),)
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(60), nullable=False)
+    description: Mapped[str] = mapped_column(String(200), default="", server_default="", nullable=False)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    # "total" (todo el nivel) o "limitado" (lo suyo) en cada nivel elegido.
+    access: Mapped[str] = mapped_column(String(20), default="limitado", server_default="limitado", nullable=False)
+    group_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("internal_groups.id", ondelete="SET NULL")
+    )
+    watch_group_ids: Mapped[list[uuid.UUID]] = mapped_column(
+        ARRAY(UUID(as_uuid=True)), default=list, server_default="{}", nullable=False
+    )
 
 
 # Niveles educativos. Fijos para toda la instalación: son los del sistema

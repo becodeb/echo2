@@ -14,8 +14,18 @@ El puesto se guarda (`OrganizationMember.position`) porque DOE, docente y
 secretaría dan los mismos permisos y no se pueden deducir. Si después alguien
 toca un acceso a mano desde Niveles y accesos, manda el acceso: el puesto es
 solo el nombre.
+
+Además de los seis fijos, cada sede puede armar los suyos (CustomPosition:
+"Adviser", "Tutora"...). Se traducen igual y pueden sumar un permiso más: ver
+las reuniones de los integrantes de ciertos grupos (services/access.py).
 """
-from dataclasses import dataclass
+import uuid
+from dataclasses import dataclass, field
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..models import CustomPosition, InternalGroup
 
 
 @dataclass(frozen=True)
@@ -29,6 +39,10 @@ class Position:
     # Grupo interno al que se lo suma (se crea si la sede no lo tiene).
     group: str | None
     description: str
+    # Solo los propios de la sede: se pueden editar y borrar.
+    custom: bool = False
+    # Grupos cuyas reuniones también ve (solo los propios).
+    watch_group_ids: tuple[uuid.UUID, ...] = field(default=())
 
 
 POSITIONS: tuple[Position, ...] = (
@@ -67,6 +81,26 @@ POSITIONS: tuple[Position, ...] = (
 )
 
 BY_ID = {position.id: position for position in POSITIONS}
+
+
+async def org_positions(db: AsyncSession, org_id: uuid.UUID) -> list[Position]:
+    """Los fijos y los propios de la sede, en el orden en que se muestran."""
+    rows = (
+        await db.execute(
+            select(CustomPosition, InternalGroup.name)
+            .outerjoin(InternalGroup, InternalGroup.id == CustomPosition.group_id)
+            .where(CustomPosition.organization_id == org_id)
+            .order_by(CustomPosition.name)
+        )
+    ).all()
+    return [*POSITIONS, *(custom_position(row, group) for row, group in rows)]
+
+
+def custom_position(row: CustomPosition, group: str | None) -> Position:
+    return Position(
+        str(row.id), row.name, "admin" if row.is_admin else "member", row.access, group, row.description,
+        custom=True, watch_group_ids=tuple(row.watch_group_ids or ()),
+    )
 
 
 def is_admin_role(role: str) -> bool:
