@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import type { InterviewFields, LetterheadOut } from "../api/types";
-import { actaFormatVars, actaScale } from "./actaFormat";
+import { actaFormatVars, actaScale, levelLines } from "./actaFormat";
 import "./interview-sheet.css";
 
 const MESES = [
@@ -60,7 +60,8 @@ export function InterviewSheet({
   const inicial = fields.nivel === "inicial";
 
   const alumno = (
-    <p className="ent-fila">
+    // Con "Folio Nro" arriba, la fila ya no es la primera <p> de la hoja: el aire va aparte.
+    <p className={school ? "ent-fila ent-primera" : "ent-fila"}>
       <b>Nombre del alumno:</b>
       <Fill className="ent-grow">{fields.alumno}</Fill>
       <b className="ent-curso">{inicial ? "Kinder:" : "Curso:"}</b>
@@ -85,9 +86,13 @@ export function InterviewSheet({
 
   return (
     <article className="entrevista-hoja" style={format.style}>
-      {number != null && <p className="ent-numero">Acta N.º {number}</p>}
+      {school ? (
+        <p className="ent-numero">Folio Nro: {number != null ? number : <span className="ent-folio-vacio" />}</p>
+      ) : (
+        number != null && <p className="ent-numero">Acta N.º {number}</p>
+      )}
       <header className="ent-membrete">
-        {letterhead.lines.map((line, index) => (
+        {levelLines(letterhead, fields.nivel).map((line, index) => (
           <p key={index}>{line}</p>
         ))}
       </header>
@@ -103,7 +108,8 @@ export function InterviewSheet({
         <>
           <p className="ent-parrafo">
             A los <Fill>{day ? String(day) : ""}</Fill> días del mes de <Fill>{month ? MESES[month - 1] : ""}</Fill> de{" "}
-            {year || "……"}, se reúnen <Fill>{fields.reunen}</Fill> {school} con: <Fill>{fields.con}</Fill>
+            {year || "……"}, se reúnen {fields.modalidad ? `de manera ${fields.modalidad}` : "de manera remota / presencial"}{" "}
+            <Fill>{fields.reunen}</Fill> {school} con: <Fill>{fields.con}</Fill>
           </p>
           <p className="ent-fila ent-motivo">
             <b>Motivo de la reunión:</b>
@@ -166,7 +172,7 @@ function ReunionSheet({
       {number != null && <p className="ent-numero">Acta N.º {number}</p>}
       <header className="reu-encabezado">
         <div className="reu-membrete">
-          {letterhead.lines.map((line, index) => (
+          {levelLines(letterhead, fields.nivel).map((line, index) => (
             <p key={index}>{line}</p>
           ))}
         </div>

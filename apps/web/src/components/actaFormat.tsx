@@ -1,8 +1,14 @@
 import type { CSSProperties, ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
-import type { LetterheadOut } from "../api/types";
+import type { ActaLevel, LetterheadOut } from "../api/types";
 import "./acta-format.css";
+
+/** El encabezado del acta: el del nivel si el membrete le cargó renglones, si no el de la sede. */
+export function levelLines(letterhead: LetterheadOut, nivel: string | null | undefined): string[] {
+  const own = nivel ? letterhead.levels?.[nivel as ActaLevel]?.lines : undefined;
+  return own && own.length > 0 ? own : letterhead.lines;
+}
 
 /** La fuente que el colegio eligió para sus actas (Ajustes → Membrete). */
 export const ACTA_FONT_CSS: Record<string, string> = {

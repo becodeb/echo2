@@ -39,6 +39,12 @@
   font-weight: 700;
 }
 
+.ent-folio-vacio {
+  display: inline-block;
+  min-width: 70pt;
+  border-bottom: 1pt dotted #000000;
+}
+
 .ent-membrete p {
   font-size: 10.8pt;
   line-height: 14pt;
@@ -69,6 +75,7 @@
 .ent-fila > b { flex: none; }
 .ent-fila > .ent-grow { min-width: 0; }
 .ent-fila:first-of-type { margin-top: 34pt; }
+.ent-fila.ent-primera { margin-top: 34pt; }
 .ent-solicitada { margin-top: 10pt; }
 .ent-motivo { margin-top: 15pt; }
 

@@ -29,6 +29,8 @@ export function LetterheadSection() {
   const [form, setForm] = useState<LetterheadOut | null>(null);
   const [linesText, setLinesText] = useState("");
   const [signaturesText, setSignaturesText] = useState("");
+  // Lo que se tipea en el encabezado de cada nivel (los renglones vacíos se descartan al guardar).
+  const [levelLinesText, setLevelLinesText] = useState<Record<string, string>>({});
   const [logoError, setLogoError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,6 +38,7 @@ export function LetterheadSection() {
       setForm(data);
       setLinesText(data.lines.join("\n"));
       setSignaturesText(data.signatures.join("\n"));
+      setLevelLinesText({});
     }
   }, [data]);
 
@@ -153,7 +156,7 @@ export function LetterheadSection() {
       >
         <div className="space-y-5">
           {LEVELS.map(({ key, label }) => {
-            const level = form.levels?.[key] ?? { format: "", school: "" };
+            const level = form.levels?.[key] ?? { format: "", school: "", lines: [] };
             const setLevel = (patch: Partial<LevelLetterhead>) =>
               setForm({ ...form, levels: { ...form.levels, [key]: { ...level, ...patch } } });
             return (
@@ -179,6 +182,21 @@ export function LetterheadSection() {
                       : "del Colegio … registro de DIEGEP N° … de nivel …"
                   }
                 />
+                <label className="block">
+                  <span className="mb-1.5 block text-sm font-medium text-ink-700">
+                    Encabezado de este nivel (una línea por renglón)
+                  </span>
+                  <textarea
+                    value={levelLinesText[key] ?? level.lines.join("\n")}
+                    onChange={(event) => {
+                      setLevelLinesText({ ...levelLinesText, [key]: event.target.value });
+                      setLevel({ lines: event.target.value.split("\n").map((line) => line.trim()).filter(Boolean) });
+                    }}
+                    rows={3}
+                    placeholder="Vacío: se usa el encabezado de arriba"
+                    className="w-full rounded-xl border border-ink-200 px-3 py-2 text-sm leading-relaxed focus:border-accent-500 focus:outline-none"
+                  />
+                </label>
                 <p className="-mt-1 text-xs text-ink-400">
                   {level.format === "reunion"
                     ? "Reemplaza al lugar de arriba: «A los … días … en esto, siendo las …»."

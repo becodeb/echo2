@@ -7,7 +7,7 @@ import type { LetterheadOut, MeetingOut, MinutesOut } from "../api/types";
 import { InterviewSheet } from "../components/InterviewSheet";
 import { MarkdownView } from "../components/MarkdownView";
 import { parseActaNumber, useNextActaNumber } from "../components/ActaNumber";
-import { actaFormatVars } from "../components/actaFormat";
+import { actaFormatVars, levelLines } from "../components/actaFormat";
 import { Spinner, formatDate, formatDuration } from "../components/ui";
 import "./acta-print.css";
 
@@ -144,7 +144,7 @@ export default function ActaPrint() {
         {number != null && <p className="acta-print-numero">Acta N.º {number}</p>}
         <header className="acta-print-membrete">
           <div className="acta-print-lineas">
-            {letterhead.lines.map((line, index) => (
+            {levelLines(letterhead, meeting.level).map((line, index) => (
               <p key={index}>{line}</p>
             ))}
           </div>

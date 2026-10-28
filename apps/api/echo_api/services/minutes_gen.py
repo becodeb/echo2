@@ -454,6 +454,9 @@ async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instru
         nivel = acta_entrevista.configured_level(letterhead, meeting.level)
         level_cfg = acta_entrevista.level_settings(letterhead, nivel)
         formato = level_cfg["format"] or acta_entrevista.template_format(template.body_markdown)
+        # "De manera presencial / remota" del párrafo de la planilla: remota si se
+        # grabó el audio de una llamada (Meet, Zoom, Teams).
+        modalidad = ("remota" if (meeting.meta or {}).get("remote") else "presencial") if level_cfg["school"] else ""
         hints = {**structured, "motivo_cargado": reason_name, "familia_cargada": family_hint}
         hidden = [(m.name, acta_entrevista.initials(m.name)) for m in students]
         draft_hidden = [(m.name, acta_entrevista.initials(m.name)) for m in all_kids]
@@ -461,7 +464,7 @@ async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instru
         def render_draft(values: dict[str, str]) -> str:
             # Lo mismo que el acta final con lo que llegó hasta ahora.
             partial = acta_entrevista.normalize_fields(
-                {**values, "fecha": fecha.isoformat(), "formato": formato, "hora": hora, "nivel": nivel},
+                {**values, "fecha": fecha.isoformat(), "formato": formato, "hora": hora, "nivel": nivel, "modalidad": modalidad},
                 fecha,
                 hora,
             )
@@ -505,7 +508,7 @@ Devolvé JSON:
         if not isinstance(result, dict) or not isinstance(result.get("fields"), dict):
             raise LLMError("El generador de actas no devolvió contenido")
         fields = acta_entrevista.normalize_fields(
-            {**result["fields"], "fecha": fecha.isoformat(), "formato": formato, "hora": hora, "nivel": nivel},
+            {**result["fields"], "fecha": fecha.isoformat(), "formato": formato, "hora": hora, "nivel": nivel, "modalidad": modalidad},
             fecha,
             hora,
         )

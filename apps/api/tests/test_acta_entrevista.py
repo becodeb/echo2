@@ -1,4 +1,5 @@
 """Acta de entrevista: formulario completado por la IA, confirmado por quien grabó."""
+import json
 import time
 import uuid
 from datetime import UTC, date, datetime
@@ -40,10 +41,15 @@ def _join_as_member(client, owner: EchoTestUser) -> EchoTestUser:
     return member
 
 
-def _finished_meeting(client, recorder: EchoTestUser, level: str | None = None) -> str:
+def _finished_meeting(client, recorder: EchoTestUser, level: str | None = None, remote: bool = False) -> str:
     body = {"title": "Entrevista", **({"level": level} if level else {})}
     meeting_id = client.post("/api/meetings", json=body, headers=recorder.headers).json()["id"]
     client.post(f"/api/meetings/{meeting_id}/start", headers=recorder.headers)
+    if remote:
+        # El navegador abre el audio de una llamada (micrófono + sistema): dos canales.
+        with client.websocket_connect(f"/api/meetings/{meeting_id}/ws?token={recorder.token}") as websocket:
+            websocket.send_text(json.dumps({"type": "hello", "role": "recorder", "sample_rate": 16000, "channels": 2}))
+            assert json.loads(websocket.receive_text())["type"] == "hello_ack"
     _record_meeting(client, recorder, meeting_id)
     client.post(f"/api/meetings/{meeting_id}/finish", headers=recorder.headers)
     deadline = time.time() + 30
@@ -176,7 +182,7 @@ class TestPorNivel:
         assert "**Nombre del alumno:** R. C.   **Kinder:** 3 F" in markdown
         assert "**Solicitada por:** Escuela" in markdown
         assert (
-            f"A los 28 días del mes de octubre de 2026, se reúnen la docente Laura Pérez {FRASE_INICIAL} "
+            f"A los 28 días del mes de octubre de 2026, se reúnen de manera remota / presencial la docente Laura Pérez {FRASE_INICIAL} "
             "con: la Sra. Ana, madre del alumno"
         ) in markdown
         # Como en el papel, el motivo va después del párrafo.
@@ -195,6 +201,17 @@ class TestPorNivel:
         assert "**Curso:** 3 F" in expected
         assert "**Solicitada por:** Colegio" in expected
         assert "en las instalaciones de la institución, se reúnen la docente Laura Pérez con la Sra. Ana" in expected
+
+    def test_modalidad_en_el_parrafo(self):
+        letterhead = {"levels": {"inicial": {"school": FRASE_INICIAL}}}
+        for modalidad in ("presencial", "remota"):
+            markdown = acta_entrevista.render_markdown(self._fields(nivel="inicial", modalidad=modalidad), letterhead)
+            assert f"se reúnen de manera {modalidad} la docente Laura Pérez {FRASE_INICIAL} con:" in markdown
+        # Un dato inválido no viaja; el acta sin frase por nivel no la nombra.
+        assert "modalidad" not in self._fields(modalidad="virtual")
+        assert "de manera" not in acta_entrevista.render_markdown(self._fields(modalidad="remota"))
+        # Solo con renglones de encabezado también cuenta como nivel configurado.
+        assert acta_entrevista.configured_level({"levels": {"inicial": {"lines": ["A"]}}}, "inicial") == "inicial"
 
     def test_equipo_de_profesionales(self):
         fields = self._fields(solicitada_por="equipo")
@@ -217,8 +234,10 @@ class TestPorNivel:
         levels = acta_entrevista.normalize_levels(
             {"inicial": {"format": "REUNION", "school": "  del  Colegio "}, "primaria": {"format": "otro"}, "x": {}}
         )
-        assert levels["inicial"] == {"format": "reunion", "school": "del Colegio"}
-        assert levels["primaria"] == {"format": "", "school": ""}
+        assert levels["inicial"] == {"format": "reunion", "school": "del Colegio", "lines": []}
+        assert levels["primaria"] == {"format": "", "school": "", "lines": []}
+        lines = acta_entrevista.normalize_levels({"inicial": {"lines": [" A ", "", "B"] + ["x"] * 10}})["inicial"]["lines"]
+        assert lines[:2] == ["A", "B"] and len(lines) == acta_entrevista.MAX_LINEAS
         assert set(levels) == {"inicial", "primaria", "secundaria"}
         assert acta_entrevista.configured_level({"levels": {"primaria": {"school": "x"}}}, "inicial") == ""
         assert acta_entrevista.configured_level({"levels": {"primaria": {"school": "x"}}}, "primaria") == "primaria"
@@ -236,13 +255,13 @@ def test_acta_de_inicial_por_nivel_en_el_membrete(client, fake_ai):
     assert saved.status_code == 200, saved.text
     # Sin configurar nada el membrete devuelve los tres niveles vacíos.
     letterhead = client.get("/api/org/letterhead", headers=owner.headers).json()
-    assert letterhead["levels"]["inicial"] == {"format": "", "school": ""}
+    assert letterhead["levels"]["inicial"] == {"format": "", "school": "", "lines": []}
     before = _finished_meeting(client, owner, "inicial")
     before_fields = client.get(f"/api/meetings/{before}/minutes", headers=owner.headers).json()["version"]["blocks"]["fields"]
     assert before_fields["formato"] == "reunion"
     assert "nivel" not in before_fields
 
-    levels = {"inicial": {"format": "entrevista", "school": FRASE_INICIAL}}
+    levels = {"inicial": {"format": "entrevista", "school": FRASE_INICIAL, "lines": ["COLEGIO CAMPO DEL NORTE NORDELTA", "DIEGEP N° 8335"]}}
     put = client.put(
         "/api/org/letterhead", json={**letterhead, "levels": levels}, headers=owner.headers
     )
@@ -262,7 +281,14 @@ def test_acta_de_inicial_por_nivel_en_el_membrete(client, fake_ai):
     assert fields["solicitada_por"] == "colegio"
     markdown = minutes["version"]["body_markdown"]
     assert "**Kinder:** 3N EP" in markdown
-    assert f"se reúnen la Directora Ana {FRASE_INICIAL} con: Marcos, padre del alumno" in markdown
+    assert f"se reúnen de manera presencial la Directora Ana {FRASE_INICIAL} con: Marcos, padre del alumno" in markdown
+    assert fields["modalidad"] == "presencial"
+
+    # Una reunión por llamada (audio de Meet/Zoom) dice "de manera remota".
+    remote_id = _finished_meeting(client, owner, "inicial", remote=True)
+    remote = client.get(f"/api/meetings/{remote_id}/minutes", headers=owner.headers).json()["version"]
+    assert remote["blocks"]["fields"]["modalidad"] == "remota"
+    assert f"se reúnen de manera remota la Directora Ana {FRASE_INICIAL}" in remote["body_markdown"]
 
     # Editarla (también por la API, sin nivel en los campos) conserva el nivel y la frase.
     edited = client.post(
@@ -273,6 +299,7 @@ def test_acta_de_inicial_por_nivel_en_el_membrete(client, fake_ai):
     assert edited.status_code == 200, edited.text
     version = edited.json()["version"]
     assert version["blocks"]["fields"]["nivel"] == "inicial"
+    assert version["blocks"]["fields"]["modalidad"] == "presencial"
     assert "**Kinder:** 3 F" in version["body_markdown"]
     assert "**Solicitada por:** Equipo de profesionales" in version["body_markdown"]
 

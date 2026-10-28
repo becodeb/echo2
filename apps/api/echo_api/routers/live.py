@@ -525,6 +525,10 @@ async def meeting_ws(websocket: WebSocket, meeting_id: uuid.UUID):
                     async with SessionLocal() as db:
                         fresh = await db.get(Meeting, meeting.id)
                         recording = fresh.recording if fresh else None
+                        # Audio de una llamada (dos canales): el acta dice "de manera remota".
+                        if channels == 2 and fresh is not None and not (fresh.meta or {}).get("remote"):
+                            fresh.meta = {**(fresh.meta or {}), "remote": True}
+                            await db.commit()
                     if is_enabled(recording) and recording.get("status") != "recording":
                         await update_state(meeting.id, status="recording")
                 await websocket.send_text(

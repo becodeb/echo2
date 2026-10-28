@@ -299,6 +299,8 @@ export interface InterviewFields {
   hora?: string;
   /** Nivel de la reunión, solo si el membrete le fijó formato o frase (Ajustes → Membrete). */
   nivel?: ActaLevel;
+  /** Cómo fue la reunión: "de manera presencial / remota" en la planilla de jardín. */
+  modalidad?: "presencial" | "remota";
 }
 
 export type ActaLevel = "inicial" | "primaria" | "secundaria";
@@ -307,6 +309,8 @@ export type ActaLevel = "inicial" | "primaria" | "secundaria";
 export interface LevelLetterhead {
   format: "" | "entrevista" | "reunion";
   school: string;
+  /** Renglones del encabezado de este nivel; sin ninguno, los de la sede. */
+  lines: string[];
 }
 
 /** Membrete del acta impresa (Ajustes → Membrete). */

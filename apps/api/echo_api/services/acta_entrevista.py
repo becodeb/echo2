@@ -41,6 +41,8 @@ SOLICITANTES = ("familia", "colegio", "equipo")
 FORMATOS = ("entrevista", "reunion")
 NIVELES = ("inicial", "primaria", "secundaria")
 MAX_FRASE = 300
+MODALIDADES = ("presencial", "remota")
+MAX_LINEAS = 8
 _HORA_RE = re.compile(r"^([01]?\d|2[0-3]):([0-5]\d)$")
 
 # Cierre del acta de reunión: va siempre igual, lo pone la hoja y no la IA.
@@ -133,10 +135,10 @@ def template_format(body_markdown: str | None) -> str:
 
 
 def normalize_levels(raw) -> dict[str, dict[str, str]]:
-    """Lo que el membrete fija por nivel: {nivel: {"format": "" | formato, "school": frase}}.
+    """Lo que el membrete fija por nivel: {nivel: {"format", "school", "lines"}}.
 
-    Vacío ("") quiere decir "como siempre": el formulario lo decide el modelo
-    de acta y el párrafo no nombra al colegio.
+    Vacío ("", []) quiere decir "como siempre": el formulario lo decide el
+    modelo de acta, el párrafo no nombra al colegio y el encabezado es el de la sede.
     """
     raw = raw if isinstance(raw, dict) else {}
     out: dict[str, dict[str, str]] = {}
@@ -144,23 +146,30 @@ def normalize_levels(raw) -> dict[str, dict[str, str]]:
         item = raw.get(nivel)
         item = item if isinstance(item, dict) else {}
         formato = str(item.get("format") or "").strip().lower()
+        lines = item.get("lines") if isinstance(item.get("lines"), list) else []
         out[nivel] = {
             "format": formato if formato in FORMATOS else "",
             "school": " ".join(str(item.get("school") or "").split())[:MAX_FRASE],
+            "lines": [" ".join(str(line).split())[:120] for line in lines if str(line).strip()][:MAX_LINEAS],
         }
     return out
 
 
-def level_settings(letterhead: dict | None, nivel: str | None) -> dict[str, str]:
-    """El formato y la frase del colegio de ese nivel ({"format": "", "school": ""} si no hay nada)."""
+def level_settings(letterhead: dict | None, nivel: str | None) -> dict:
+    """Formato, frase del colegio y encabezado de ese nivel (todo vacío si no hay nada)."""
     levels = normalize_levels((letterhead or {}).get("levels"))
-    return levels.get(nivel or "", {"format": "", "school": ""})
+    return levels.get(nivel or "", {"format": "", "school": "", "lines": []})
 
 
 def configured_level(letterhead: dict | None, nivel: str | None) -> str:
     """El nivel, si el membrete le fijó algo; si no, "" (la hoja sale como siempre)."""
     settings = level_settings(letterhead, nivel)
-    return nivel if nivel and (settings["format"] or settings["school"]) else ""
+    return nivel if nivel and (settings["format"] or settings["school"] or settings["lines"]) else ""
+
+
+def modalidad_text(modalidad: str | None) -> str:
+    """"de manera presencial"; sin dato, las dos opciones del papel para tachar a mano."""
+    return f"de manera {modalidad}" if modalidad in MODALIDADES else "de manera remota / presencial"
 
 
 def curso_label(nivel: str | None) -> str:
@@ -227,6 +236,10 @@ def normalize_fields(raw: dict | None, fallback_date: date, fallback_time: str =
     # Las actas de antes no traen formato: eran todas de entrevista.
     formato = str(raw.get("formato") or "").strip().lower()
     out["formato"] = formato if formato in FORMATOS else "entrevista"
+    # Cómo fue la reunión ("de manera presencial / remota"); sin dato, no viaja.
+    modalidad = str(raw.get("modalidad") or "").strip().lower()
+    if modalidad in MODALIDADES:
+        out["modalidad"] = modalidad
     # El nivel solo viaja cuando el membrete le fijó algo: las actas de antes
     # y las de sedes sin configurar siguen igual.
     nivel = str(raw.get("nivel") or "").strip().lower()
@@ -282,7 +295,8 @@ def render_markdown(fields: dict, letterhead: dict | None = None) -> str:
             f"**Solicitada por:** {solicitada}",
             "",
             f"A los {fecha.day} días del mes de {MESES[fecha.month - 1]} de {fecha.year}, "
-            f"se reúnen {fields['reunen'] or blank} {school} con: {fields['con'] or blank}",
+            f"se reúnen {modalidad_text(fields.get('modalidad'))} {fields['reunen'] or blank} {school} "
+            f"con: {fields['con'] or blank}",
             "",
             f"**Motivo de la reunión:** {fields['motivo'] or blank}",
             "",
