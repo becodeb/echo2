@@ -219,13 +219,19 @@ export default function MeetingLive() {
     return () => window.clearInterval(interval);
   }, [recording, paused]);
 
-  // autoscroll estable: solo si el usuario está al fondo
+  // autoscroll estable: solo si el usuario está al fondo. En "Todo listo para
+  // empezar" no hay transcript que seguir: al bajar hasta el fondo, en el
+  // celular la carita de Echo quedaba cortada arriba.
   useEffect(() => {
     const element = scrollRef.current;
-    if (element && stickToBottom.current) {
-      element.scrollTop = element.scrollHeight;
+    if (!element) return;
+    if (!recording && lines.length === 0) {
+      element.scrollTop = 0;
+      stickToBottom.current = true;
+      return;
     }
-  }, [lines, partial]);
+    if (stickToBottom.current) element.scrollTop = element.scrollHeight;
+  }, [lines, partial, recording]);
 
   const kindRef = useRef(meeting?.kind);
   kindRef.current = meeting?.kind;
@@ -583,6 +589,22 @@ export default function MeetingLive() {
     await start();
   }, [start]);
 
+  // Aviso al pausar (el botón y la barra espaciadora). Cerrarlo sin elegir
+  // deja la reunión en pausa, con "En pausa" arriba.
+  const [pauseNotice, setPauseNotice] = useState(false);
+  const pauseWithNotice = useCallback(async () => {
+    await pause();
+    setPauseNotice(true);
+  }, [pause]);
+  const resumeFromNotice = () => {
+    setPauseNotice(false);
+    void resume();
+  };
+  const finishFromNotice = () => {
+    setPauseNotice(false);
+    void finish();
+  };
+
   /** Suma el audio de la llamada sin terminar la reunión: pausa, pide la
    *  pestaña de Meet/Zoom y sigue. Si se cancela, sigue con el micrófono. */
   const addCallAudio = useCallback(async () => {
@@ -771,7 +793,7 @@ export default function MeetingLive() {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
-      if (noteModal) return;
+      if (noteModal || pauseNotice) return;
       const key = event.key.toLowerCase();
       if (key === "m") addBookmark("moment");
       else if (key === "n") setNoteModal({ kind: "note", label: "Agregar nota" });
@@ -780,12 +802,12 @@ export default function MeetingLive() {
       else if (key === " " && recording) {
         event.preventDefault();
         if (paused) resume();
-        else pause();
+        else void pauseWithNotice();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [recording, paused, noteModal, addBookmark, pause, resume]);
+  }, [recording, paused, noteModal, pauseNotice, addBookmark, pauseWithNotice, resume]);
 
   const mood: EchoMood = processing
     ? "thinking"
@@ -957,6 +979,7 @@ export default function MeetingLive() {
         <div
           ref={scrollRef}
           onScroll={(event) => {
+            if (!recording && lines.length === 0) return;
             const element = event.currentTarget;
             stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
           }}
@@ -1177,18 +1200,24 @@ export default function MeetingLive() {
               />
             ))}
           </div>
-          {recording && !paused && (
-            <Button variant="soft" onClick={pause}>Pausar</Button>
-          )}
-          {paused && <Button variant="soft" onClick={resume} disabled={starting}>Reanudar</Button>}
-          {!recording && lines.length > 0 && (
-            <Button variant="soft" onClick={start} disabled={starting}>Reanudar grabación</Button>
-          )}
-          {recording && !paused && (
-            <Button variant="ghost" onClick={() => setBlackout(true)} title="La pantalla queda negra y sigue grabando">
-              Pantalla negra
-            </Button>
-          )}
+          {/* Los botones ocupan siempre el mismo lugar: al pausar, "Pausar" pasa
+              a "Continuar" y lo que no aplica se deshabilita, no desaparece. */}
+          <Button
+            variant="soft"
+            className="w-32"
+            onClick={!recording ? start : paused ? resume : pauseWithNotice}
+            disabled={starting}
+          >
+            {!recording ? "Reanudar" :paused ? "Continuar" : "Pausar"}
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => setBlackout(true)}
+            disabled={!recording || paused}
+            title="La pantalla queda negra y sigue grabando"
+          >
+            Pantalla negra
+          </Button>
           <Button variant="ghost" onClick={() => addBookmark("moment")}>⭐ Momento</Button>
           <Button variant="ghost" onClick={() => setNoteModal({ kind: "note", label: "Agregar nota" })}>
             Nota
@@ -1260,6 +1289,30 @@ export default function MeetingLive() {
           </div>
         </form>
       </Modal>
+      <Modal open={pauseNotice && paused} onClose={() => setPauseNotice(false)} title="Reunión en pausa">
+        <div className="flex flex-col items-center text-center">
+          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+            <EchoFace mood="sleeping" size={36} />
+          </span>
+          <p className="mt-4 text-base font-medium text-ink-900">Echo no está grabando.</p>
+          <p className="mt-1 text-sm text-ink-500">
+            En pausa hace <PausedFor active={pauseNotice && paused} />
+          </p>
+        </div>
+        <div className="mt-6 space-y-2.5">
+          <Button
+            autoFocus
+            onClick={resumeFromNotice}
+            disabled={starting}
+            className="w-full !min-h-14 text-base"
+          >
+            Continuar
+          </Button>
+          <Button variant="soft" onClick={finishFromNotice} className="w-full !min-h-12">
+            Finalizar reunión
+          </Button>
+        </div>
+      </Modal>
       <VoiceBeforeMeeting
         open={voiceAsk}
         onClose={() => setVoiceAsk(false)}
@@ -1272,6 +1325,20 @@ export default function MeetingLive() {
   );
 }
 
+
+/** Cuánto lleva en pausa; cuenta desde que `active` pasa a verdadero. */
+function PausedFor({ active }: { active: boolean }) {
+  const since = useRef(Date.now());
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    since.current = Date.now();
+    setNow(since.current);
+    const interval = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, [active]);
+  return <span className="font-mono tabular-nums text-ink-700">{formatMs(now - since.current)}</span>;
+}
 
 // Cuánto se espera que tarde, según lo medido en producción el 27/10. Primero
 // la cola de la transcripción: lo que quedó sin transcribir mientras se
