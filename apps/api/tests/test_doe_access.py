@@ -2,7 +2,7 @@
 rango; y tareas para gente de afuera de Echo con un link por mail.
 
 Pedido de Bauti (26/10): que nadie vea las reuniones de los otros. Los
-directivos ven todo; el DOE ("limitado") solo las reuniones en las que estuvo
+los que ven todo ("total") ven todo; el DOE ("limitado") solo las reuniones en las que estuvo
 y las de las familias que tiene asignadas.
 """
 import uuid
@@ -120,7 +120,7 @@ def test_tareas_solo_a_igual_o_menor_rango(client):
 
     people = {p["id"]: p for p in client.get("/api/people", headers=ana.headers).json()}
     assert people[beto.user_id]["assignable"] and not people[owner.user_id]["assignable"]
-    assert people[directivo.user_id]["rank_label"] == "Directivo"
+    assert people[directivo.user_id]["rank_label"] == "Ve todo"
     me = client.get("/api/org/access/me", headers=ana.headers).json()
     assert me["rank"] == 1
 

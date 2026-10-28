@@ -301,7 +301,17 @@ export function formatDate(iso: string | null): string {
   yesterday.setDate(today.getDate() - 1);
   const sameDay = (a: Date, b: Date) =>
     a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
-  if (sameDay(date, today)) return "Hoy";
-  if (sameDay(date, yesterday)) return "Ayer";
+  // Hoy y ayer con la hora: "Hoy" solo no dice cuál de las reuniones del día es.
+  const time = date.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
+  if (sameDay(date, today)) return `Hoy, ${time}`;
+  if (sameDay(date, yesterday)) return `Ayer, ${time}`;
   return date.toLocaleDateString("es", { day: "numeric", month: "short" });
+}
+
+/** Fecha y hora completas ("martes, 14 de octubre de 2026, 10:32"), para el texto al pasar el mouse. */
+export function formatDateTime(iso: string | null): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleString("es", {
+    weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit",
+  });
 }

@@ -2,10 +2,10 @@
 
 - Cada persona dice de qué nivel es al entrar (queda con acceso "limitado":
   ve lo suyo). Nadie se da más acceso a sí mismo.
-- Dirección de un nivel ve todo ese nivel y asigna total/limitado/nulo a
-  quienes están en él. No puede nombrar ni sacar a otra dirección.
-- Admins de la sede y superadmins ven todo y asignan cualquier acceso,
-  incluida la dirección.
+- Un directivo ("direccion") de un nivel ve solo lo suyo y asigna
+  limitado/tutor/nulo a quienes están en él. No puede dar ni sacar total,
+  adviser ni directivo: eso muestra reuniones que él mismo no ve.
+- Admins de la sede y superadmins ven todo y asignan cualquier acceso.
 
 La regla de visibilidad que se deriva de esto está en services/access.py.
 """
@@ -19,12 +19,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..db import get_db
 from ..deps import OrgContext, get_org_context
 from ..models import LEVELS, MemberLevelAccess, OrganizationMember, User
-from ..services.access import scope_rank
+from ..services.access import DIRECTIVO_CAN_ASSIGN, scope_rank
 from ..services.audit import audit
 
 router = APIRouter(prefix="/api/org/access", tags=["levels"])
 
-ACCESS_VALUES = ("direccion", "total", "limitado", "nulo")
+ACCESS_VALUES = ("total", "adviser", "direccion", "limitado", "tutor", "nulo")
 
 
 class MyAccessOut(BaseModel):
@@ -89,6 +89,8 @@ class MemberAccessOut(BaseModel):
 class AccessListOut(BaseModel):
     managed_levels: list[str]
     can_assign_direction: bool
+    # Los accesos que quien mira puede dar: un admin todos, un directivo solo los que no suman visibilidad.
+    assignable: list[str]
     members: list[MemberAccessOut]
 
 
@@ -122,7 +124,12 @@ async def list_access(ctx: OrgContext = Depends(get_org_context), db: AsyncSessi
         if not scope.sees_everything and not access and user.id in {row.user_id for row in rows}:
             continue
         out.append(MemberAccessOut(user_id=user.id, name=user.name, email=user.email, role=role, access=access))
-    return AccessListOut(managed_levels=managed, can_assign_direction=scope.sees_everything, members=out)
+    return AccessListOut(
+        managed_levels=managed,
+        can_assign_direction=scope.sees_everything,
+        assignable=list(ACCESS_VALUES) if scope.sees_everything else list(DIRECTIVO_CAN_ASSIGN),
+        members=out,
+    )
 
 
 class SetAccessIn(BaseModel):
@@ -164,10 +171,11 @@ async def set_access(
         )
     ).scalar_one_or_none()
     if not scope.sees_everything:
-        if data.access == "direccion":
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "La dirección la asigna un admin")
-        if current is not None and current.access == "direccion":
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "No podés cambiar el acceso de otra dirección")
+        # Un directivo ve solo lo suyo: no puede darle a otro más de lo que ve él.
+        if data.access not in DIRECTIVO_CAN_ASSIGN:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Ese acceso lo asigna un admin")
+        if current is not None and current.access not in DIRECTIVO_CAN_ASSIGN:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "No podés cambiar el acceso de dirección, adviser ni de otro directivo")
         if user.id == ctx.user.id:
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Tu propio acceso lo cambia un admin")
 

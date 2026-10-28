@@ -127,10 +127,14 @@ LEVELS = ("inicial", "primaria", "secundaria")
 
 # Acceso de una persona a un nivel. Sin fila = nulo: no ve nada del nivel
 # salvo lo que creó o le compartieron.
-#   direccion: ve todo el nivel y asigna los accesos de ese nivel.
-#   total:     ve todas las reuniones del nivel.
-#   limitado:  ve solo lo propio y lo compartido, y puede crear reuniones ahí.
-LEVEL_ACCESS = ("direccion", "total", "limitado")
+#   total:     ve todas las reuniones del nivel (dirección).
+#   adviser:   lo suyo + las reuniones del nivel que crearon limitado o tutor.
+#   direccion: directivo: lo suyo (lo que creó, donde estuvo, compartido,
+#              sus familias) y asigna limitado/tutor/nulo en el nivel.
+#   limitado:  el DOE: ve solo lo propio y lo compartido, y puede crear reuniones ahí.
+#   tutor:     igual que limitado.
+# Es un string sin restricción en la base: sumar uno no pide migración.
+LEVEL_ACCESS = ("total", "adviser", "direccion", "limitado", "tutor")
 
 
 class MemberLevelAccess(PKMixin, TimestampMixin, Base):

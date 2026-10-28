@@ -167,25 +167,35 @@ def test_direction_manages_only_its_level(client):
     _grant(client, owner, director, "primaria", "direccion")
     _grant(client, owner, other_director, "primaria", "direccion")
 
-    # Ve todo primaria, nada de secundaria.
-    assert _titles(client.get("/api/meetings", headers=director.headers)) == {"Reunión primaria ALFA"}
+    # Un directivo ve solo lo suyo: ni las reuniones de primaria ni las de secundaria.
+    assert _titles(client.get("/api/meetings", headers=director.headers)) == set()
 
-    _grant(client, director, teacher, "primaria", "total")
     _grant(client, director, teacher, "primaria", "limitado")
+    _grant(client, director, teacher, "primaria", "tutor")
     _grant(client, director, teacher, "primaria", "nulo")
-    _grant(client, director, teacher, "primaria", "direccion", expect=403)
-    _grant(client, director, teacher, "secundaria", "total", expect=403)
+    # Total, adviser y directivo muestran reuniones que un directivo no ve: los da un admin.
+    for access in ("total", "adviser", "direccion"):
+        _grant(client, director, teacher, "primaria", access, expect=403)
+    _grant(client, director, teacher, "secundaria", "limitado", expect=403)
     _grant(client, director, other_director, "primaria", "nulo", expect=403)
+    _grant(client, owner, teacher, "primaria", "adviser")
+    _grant(client, director, teacher, "primaria", "limitado", expect=403)
 
     listing = client.get("/api/org/access", headers=director.headers).json()
     assert listing["managed_levels"] == ["primaria"]
     assert listing["can_assign_direction"] is False
+    assert listing["assignable"] == ["limitado", "tutor", "nulo"]
 
     # Mover una reunión de nivel: solo quien dirige los dos niveles (o un admin).
-    moved = client.patch(f"/api/meetings/{ids['primaria']}", json={"level": "secundaria"}, headers=director.headers)
+    own = client.post("/api/meetings", json={"title": "De la directora", "level": "primaria"}, headers=director.headers)
+    own_id = own.json()["id"]
+    moved = client.patch(f"/api/meetings/{own_id}", json={"level": "secundaria"}, headers=director.headers)
     assert moved.status_code == 403
-    moved = client.patch(f"/api/meetings/{ids['primaria']}", json={"level": "secundaria"}, headers=owner.headers)
+    moved = client.patch(f"/api/meetings/{own_id}", json={"level": "secundaria"}, headers=owner.headers)
     assert moved.status_code == 200 and moved.json()["level"] == "secundaria"
+    # La creó ella: la sigue viendo aunque ya no sea de su nivel.
+    assert client.get(f"/api/meetings/{own_id}", headers=director.headers).status_code == 200
+    # Lo de primaria que no es suyo no lo ve.
     assert client.get(f"/api/meetings/{ids['primaria']}", headers=director.headers).status_code == 404
 
 
@@ -256,6 +266,188 @@ def test_minutes_ready_notification_only_reaches_who_can_see(client, fake_ai):
     assert not any("Aviso PRIM" in title for title in titles(secundaria))
 
 
+def _meeting_of(client, who, title: str, level: str = "primaria", **extra) -> str:
+    created = client.post("/api/meetings", json={"title": title, "level": level, **extra}, headers=who.headers)
+    assert created.status_code == 201, created.text
+    # Arrancada: un borrador (nunca grabó) solo lo ve quien lo creó.
+    assert client.post(f"/api/meetings/{created.json()['id']}/start", headers=who.headers).status_code == 200
+    return created.json()["id"]
+
+
+def _sees(client, who, meeting_id: str) -> bool:
+    """El detalle y la lista tienen que coincidir: son las dos versiones de la regla."""
+    detail = client.get(f"/api/meetings/{meeting_id}", headers=who.headers).status_code == 200
+    listed = meeting_id in {item["id"] for item in client.get("/api/meetings", headers=who.headers).json()}
+    assert detail == listed, "el detalle y la lista no coinciden"
+    return listed
+
+
+def _roles_school(client):
+    """Una sede de primaria con una persona por acceso, y la reunión de cada una."""
+    owner = EchoTestUser(client, name="Admin Roles", org_name=f"Sede {uuid.uuid4().hex[:4]}")
+    people = {}
+    for name, access in (
+        ("Total", "total"),
+        ("Adviser", "adviser"),
+        ("Directivo", "direccion"),
+        ("OtroDirectivo", "direccion"),
+        ("Doe", "limitado"),
+        ("Tutora", "tutor"),
+        ("OtroDoe", "limitado"),
+    ):
+        member = Member(client, owner, name)
+        _grant(client, owner, member, "primaria", access)
+        people[name] = member
+    meetings = {name: _meeting_of(client, member, f"Reunión {name} {name.upper()}") for name, member in people.items()}
+    return owner, people, meetings
+
+
+def test_total_sees_every_meeting_of_the_level(client):
+    owner, people, meetings = _roles_school(client)
+    assert all(_sees(client, people["Total"], meeting_id) for meeting_id in meetings.values())
+
+
+def test_adviser_sees_what_doe_and_tutor_create_but_not_directivos(client):
+    owner, people, meetings = _roles_school(client)
+    adviser = people["Adviser"]
+
+    assert _sees(client, adviser, meetings["Adviser"])  # lo suyo
+    assert _sees(client, adviser, meetings["Doe"])
+    assert _sees(client, adviser, meetings["Tutora"])
+    assert _sees(client, adviser, meetings["OtroDoe"])
+    assert not _sees(client, adviser, meetings["Directivo"])
+    assert not _sees(client, adviser, meetings["OtroDirectivo"])
+    assert not _sees(client, adviser, meetings["Total"])
+
+    # Un directivo no ve lo del DOE.
+    assert not _sees(client, people["Directivo"], meetings["Doe"])
+    assert not _sees(client, people["Directivo"], meetings["Tutora"])
+
+
+def test_adviser_sees_doe_meetings_in_search_tasks_and_reports(client):
+    owner, people, meetings = _roles_school(client)
+    adviser = people["Adviser"]
+    created = client.post(
+        "/api/tasks", json={"text": "Tarea DOE", "meeting_id": meetings["Doe"]}, headers=people["Doe"].headers
+    )
+    assert created.status_code == 201, created.text
+    created = client.post(
+        "/api/tasks",
+        json={"text": "Tarea Directivo", "meeting_id": meetings["Directivo"]},
+        headers=people["Directivo"].headers,
+    )
+    assert created.status_code == 201, created.text
+
+    search = client.get("/api/search?q=DOE", headers=adviser.headers).json()
+    assert "Reunión Doe DOE" in {m["title"] for m in search["meetings"]}
+    assert client.get("/api/search?q=DIRECTIVO", headers=adviser.headers).json()["meetings"] == []
+    assert {t["text"] for t in client.get("/api/tasks", headers=adviser.headers).json()} == {"Tarea DOE"}
+    # La suya + las de Doe, Tutora y OtroDoe.
+    assert client.get("/api/reports/overview", headers=adviser.headers).json()["totals"]["meetings"] == 4
+
+
+def test_adviser_only_sees_doe_meetings_of_her_level_and_not_private_ones(client):
+    owner, people, meetings = _roles_school(client)
+    adviser = people["Adviser"]
+    doe = people["Doe"]
+    private = _meeting_of(client, doe, "Privada DOE", visibility="private")
+    assert not _sees(client, adviser, private)
+
+    # El mismo DOE con un nivel donde la adviser no tiene acceso.
+    _grant(client, owner, doe, "secundaria", "limitado")
+    other_level = _meeting_of(client, doe, "Secundaria DOE", level="secundaria")
+    assert not _sees(client, adviser, other_level)
+
+    # Si el DOE pasa a otro acceso en el nivel, lo que creó ya no es "del DOE".
+    _grant(client, owner, doe, "primaria", "direccion")
+    assert not _sees(client, adviser, meetings["Doe"])
+
+
+def test_directivo_sees_only_his_own(client):
+    owner, people, meetings = _roles_school(client)
+    directivo = people["Directivo"]
+
+    assert _sees(client, directivo, meetings["Directivo"])
+    for name in ("OtroDirectivo", "Total", "Adviser", "Doe", "Tutora"):
+        assert not _sees(client, directivo, meetings[name]), name
+    assert client.get("/api/search?q=OTRODIRECTIVO", headers=directivo.headers).json()["meetings"] == []
+    assert client.get("/api/reports/overview", headers=directivo.headers).json()["totals"]["meetings"] == 1
+
+    # Donde estuvo y lo compartido siguen valiendo.
+    staffed = client.put(
+        f"/api/meetings/{meetings['OtroDirectivo']}/staff",
+        json={"user_ids": [directivo.user_id]},
+        headers=people["OtroDirectivo"].headers,
+    )
+    assert staffed.status_code == 200, staffed.text
+    assert _sees(client, directivo, meetings["OtroDirectivo"])
+    shared = client.post(
+        f"/api/meetings/{meetings['Total']}/shares",
+        json={"user_id": directivo.user_id, "role": "viewer"},
+        headers=people["Total"].headers,
+    )
+    assert shared.status_code == 201, shared.text
+    assert _sees(client, directivo, meetings["Total"])
+
+
+def test_directivo_sees_the_meetings_of_his_assigned_families(client):
+    owner, people, _ = _roles_school(client)
+    directivo = people["Directivo"]
+    family = client.post("/api/families", json={"name": "Familia Pérez"}, headers=owner.headers).json()
+    meeting_id = _meeting_of(client, people["Doe"], "De la familia FAM")
+    classified = client.put(
+        f"/api/meetings/{meeting_id}/classification", json={"family_id": family["id"]}, headers=people["Doe"].headers
+    )
+    assert classified.status_code == 200, classified.text
+    assert not _sees(client, directivo, meeting_id)
+
+    assigned = client.put(
+        f"/api/families/{family['id']}/assignees", json={"user_ids": [directivo.user_id]}, headers=owner.headers
+    )
+    assert assigned.status_code == 200, assigned.text
+    assert _sees(client, directivo, meeting_id)
+
+
+def test_tutor_and_doe_see_only_their_own(client):
+    owner, people, meetings = _roles_school(client)
+    for name in ("Doe", "Tutora"):
+        who = people[name]
+        assert _sees(client, who, meetings[name])
+        others = [meeting_id for other, meeting_id in meetings.items() if other != name]
+        assert not any(_sees(client, who, meeting_id) for meeting_id in others), name
+        assert client.get("/api/reports/overview", headers=who.headers).json()["totals"]["meetings"] == 1
+
+
+def test_adviser_is_notified_of_what_the_doe_creates_but_not_a_directivo(client):
+    from echo_api.db import SessionLocal
+    from echo_api.models import Meeting
+    from echo_api.services.access import users_who_can_see
+
+    owner, people, meetings = _roles_school(client)
+
+    async def audience(meeting_id: str) -> set[str]:
+        async with SessionLocal() as db:
+            meeting = await db.get(Meeting, uuid.UUID(meeting_id))
+            return {str(user_id) for user_id in await users_who_can_see(db, meeting)}
+
+    doe_audience = asyncio.run(audience(meetings["Doe"]))
+    assert people["Adviser"].user_id in doe_audience and people["Total"].user_id in doe_audience
+    assert people["Directivo"].user_id not in doe_audience
+    directivo_audience = asyncio.run(audience(meetings["Directivo"]))
+    assert people["Adviser"].user_id not in directivo_audience
+    assert people["OtroDirectivo"].user_id not in directivo_audience
+
+
+def test_ranks_for_tasks(client):
+    owner, people, _ = _roles_school(client)
+
+    def rank(who) -> int:
+        return client.get("/api/org/access/me", headers=who.headers).json()["rank"]
+
+    assert [rank(people[name]) for name in ("Total", "Adviser", "Directivo", "Doe", "Tutora")] == [3, 2, 2, 1, 1]
+    assert rank(owner) == 4
+
+
 def test_puesto_propio_que_ve_las_reuniones_de_un_grupo(client):
     """Adviser: un puesto propio que ve las reuniones no privadas de los del DOE."""
     from test_doe_access import _meeting, _sees
@@ -271,7 +463,7 @@ def test_puesto_propio_que_ve_las_reuniones_de_un_grupo(client):
 
     created = client.post(
         "/api/org/positions",
-        json={"name": "Adviser", "description": "Jefa del DOE", "access": "limitado", "watch_group_ids": [groups["DOE"]]},
+        json={"name": "Jefa DOE", "description": "Jefa del DOE", "access": "limitado", "watch_group_ids": [groups["DOE"]]},
         headers=owner.headers,
     )
     assert created.status_code == 201, created.text
@@ -310,7 +502,7 @@ def test_puesto_propio_que_ve_las_reuniones_de_un_grupo(client):
     # Editar el puesto se aplica a quien lo tiene: sin grupos, deja de verlas.
     edited = client.put(
         f"/api/org/positions/{position_id}",
-        json={"name": "Adviser", "access": "total", "watch_group_ids": []},
+        json={"name": "Jefa DOE", "access": "total", "watch_group_ids": []},
         headers=owner.headers,
     )
     assert edited.status_code == 200, edited.text

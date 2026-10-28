@@ -526,6 +526,13 @@ class LevelIn(BaseModel):
     # "": el formulario que pide el modelo de acta de la sede.
     format: Literal["", "entrevista", "reunion"] = ""
     school: str = Field(default="", max_length=acta_entrevista.MAX_FRASE)
+    # Renglones del encabezado de este nivel; sin ninguno, los de la sede.
+    lines: list[str] = Field(default_factory=list, max_length=acta_entrevista.MAX_LINEAS)
+
+    @field_validator("lines")
+    @classmethod
+    def _sin_vacias(cls, value: list[str]) -> list[str]:
+        return [item.strip()[:120] for item in value if item and item.strip()]
 
 
 class LetterheadIn(BaseModel):

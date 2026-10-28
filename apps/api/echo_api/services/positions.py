@@ -6,8 +6,8 @@ siguen siendo las mismas:
 
 - rol de sede (`OrganizationMember.role`): admin para Dirección de la sede,
   member para el resto;
-- acceso en cada nivel elegido (`MemberLevelAccess`): direccion, total o
-  limitado; en los niveles no elegidos, ninguno;
+- acceso en cada nivel elegido (`MemberLevelAccess`): total, adviser,
+  direccion, limitado o tutor; en los niveles no elegidos, ninguno;
 - grupo interno (`InternalGroup`): el de las reuniones internas del puesto.
 
 El puesto se guarda (`OrganizationMember.position`) porque DOE, docente y
@@ -52,15 +52,23 @@ POSITIONS: tuple[Position, ...] = (
     ),
     Position(
         "directivo", "Directivo", "member", "direccion", "Directivos",
-        "Ve todo su nivel y asigna quién ve qué en él.",
+        "Ve lo suyo y sus familias, y asigna DOE y tutores en su nivel.",
     ),
     Position(
         "coordinacion", "Coordinación", "member", "total", "Coordinadores",
         "Ve todas las reuniones de su nivel.",
     ),
     Position(
+        "adviser", "Adviser", "member", "adviser", None,
+        "Jefa de las coordinadoras del DOE: ve lo suyo y lo que crea el DOE y los tutores de su nivel.",
+    ),
+    Position(
         "doe", "DOE", "member", "limitado", "DOE",
         "Ve lo suyo, sus familias, donde estuvo y las reuniones internas del DOE.",
+    ),
+    Position(
+        "tutor", "Tutor/a", "member", "tutor", "DOE",
+        "Igual que el DOE: lo suyo, sus familias, donde estuvo y las reuniones internas del DOE.",
     ),
     Position(
         "docente", "Docente", "member", "limitado", None,
@@ -105,10 +113,14 @@ def guess_position(role: str, accesses: list[str], groups: set[str]) -> str | No
         return "direccion_sede"
     if "direccion" in accesses:
         return "directivo"
+    if "adviser" in accesses:
+        return "adviser"
     if "total" in accesses:
         return "coordinacion"
     if "DOE" in groups:
-        return "doe"
+        return "tutor" if "tutor" in accesses else "doe"
+    if "tutor" in accesses:
+        return "tutor"
     if "limitado" in accesses:
         return "docente"
     return None

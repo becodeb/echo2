@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import type { InterviewFields, LetterheadOut } from "../api/types";
-import { actaFormatVars, actaScale } from "./actaFormat";
+import { actaFormatVars, actaScale, levelLines } from "./actaFormat";
 import "./interview-sheet.css";
 
 const MESES = [
@@ -10,6 +10,7 @@ const MESES = [
 
 /** Renglones vacíos mínimos: la hoja llega al pie aunque el acta sea corta. */
 const MIN_RULED_LINES = 16;
+const JARDIN_RULED_LINES = 13;
 /** Alto del renglón del formulario con la letra de siempre. */
 const RULED_LINE_PT = 20;
 
@@ -19,10 +20,10 @@ const RULED_LINE_PT = 20;
  * achica (por la escala al cuadrado: lo de arriba también crece). Medido con
  * membrete y logo: un acta corta en "muy grande" ocupa 268 de los 297 mm.
  */
-function sheetFormat(letterhead: LetterheadOut) {
+function sheetFormat(letterhead: LetterheadOut, minLines = MIN_RULED_LINES) {
   const { scale, line } = actaScale(letterhead);
   const ruled = Math.round(RULED_LINE_PT * scale * line * 100) / 100;
-  const lines = Math.max(6, Math.floor((MIN_RULED_LINES * RULED_LINE_PT) / scale ** 2 / ruled));
+  const lines = Math.max(6, Math.floor((minLines * RULED_LINE_PT) / scale ** 2 / ruled));
   return {
     style: { ...actaFormatVars(letterhead), "--ent-renglon": `${ruled}pt` } as CSSProperties,
     minRuledHeight: `${lines * ruled}pt`,
@@ -50,25 +51,36 @@ export function InterviewSheet({
   number?: number | null;
 }) {
   if (fields.formato === "reunion") return <ReunionSheet fields={fields} letterhead={letterhead} number={number} />;
+  // Con la frase del colegio cargada para el nivel, la hoja es la planilla del
+  // papel (jardín de Nordelta), con su propia maqueta.
+  const school = levelSchool(fields, letterhead);
+  if (school) return <JardinSheet fields={fields} letterhead={letterhead} number={number} school={school} />;
   const [year, month, day] = fields.fecha.split("-").map(Number);
   const place = letterhead.interview_place || `la institución ${letterhead.institution}`;
   const paragraphs = fields.desarrollo.split(/\n\s*\n|\n/).map((text) => text.trim()).filter(Boolean);
   const format = sheetFormat(letterhead);
-  // Con la frase del colegio cargada para el nivel, la hoja es la planilla del
-  // papel (jardín de Nordelta): sala, tres casilleros y el motivo después del párrafo.
-  const school = levelSchool(fields, letterhead);
   const inicial = fields.nivel === "inicial";
 
-  const alumno = (
-    <p className="ent-fila">
-      <b>Nombre del alumno:</b>
-      <Fill className="ent-grow">{fields.alumno}</Fill>
-      <b className="ent-curso">{inicial ? "Kinder:" : "Curso:"}</b>
-      <Fill className="ent-corto">{fields.curso}</Fill>
-    </p>
-  );
-  const solicitada = (
-    <>
+  return (
+    <article className="entrevista-hoja" style={format.style}>
+      {number != null && <p className="ent-numero">Acta N.º {number}</p>}
+      <header className="ent-membrete">
+        {levelLines(letterhead, fields.nivel).map((line, index) => (
+          <p key={index}>{line}</p>
+        ))}
+      </header>
+      {letterhead.logo_data_url && (
+        <img src={letterhead.logo_data_url} alt={letterhead.institution} className="ent-logo" />
+      )}
+      <h1 className="ent-titulo">{letterhead.title || "ACTA DE ENTREVISTA"}</h1>
+
+      <p className="ent-fila">
+        <b>Nombre del alumno:</b>
+        <Fill className="ent-grow">{fields.alumno}</Fill>
+        <b className="ent-curso">{inicial ? "Kinder:" : "Curso:"}</b>
+        <Fill className="ent-corto">{fields.curso}</Fill>
+      </p>
+
       <p className="ent-fila ent-solicitada">
         <b>Solicitada por:</b>
       </p>
@@ -80,51 +92,19 @@ export function InterviewSheet({
           <Check checked={fields.solicitada_por === "equipo"} label="Equipo de profesionales" />
         )}
       </p>
-    </>
-  );
 
-  return (
-    <article className="entrevista-hoja" style={format.style}>
-      {number != null && <p className="ent-numero">Acta N.º {number}</p>}
-      <header className="ent-membrete">
-        {letterhead.lines.map((line, index) => (
-          <p key={index}>{line}</p>
-        ))}
-      </header>
-      {letterhead.logo_data_url && (
-        <img src={letterhead.logo_data_url} alt={letterhead.institution} className="ent-logo" />
-      )}
-      <h1 className="ent-titulo">{letterhead.title || "ACTA DE ENTREVISTA"}</h1>
+      <p className="ent-fila ent-motivo">
+        <b>Motivo general :</b>
+        <Fill className="ent-grow">{fields.motivo}</Fill>
+      </p>
 
-      {alumno}
-      {solicitada}
-
-      {school ? (
-        <>
-          <p className="ent-parrafo">
-            A los <Fill>{day ? String(day) : ""}</Fill> días del mes de <Fill>{month ? MESES[month - 1] : ""}</Fill> de{" "}
-            {year || "……"}, se reúnen <Fill>{fields.reunen}</Fill> {school} con: <Fill>{fields.con}</Fill>
-          </p>
-          <p className="ent-fila ent-motivo">
-            <b>Motivo de la reunión:</b>
-            <Fill className="ent-grow">{fields.motivo}</Fill>
-          </p>
-        </>
-      ) : (
-        <>
-          <p className="ent-fila ent-motivo">
-            <b>Motivo general :</b>
-            <Fill className="ent-grow">{fields.motivo}</Fill>
-          </p>
-          <p className="ent-parrafo">
-            A los <Fill>{day ? String(day) : ""}</Fill> días del mes de <Fill>{month ? MESES[month - 1] : ""}</Fill> de{" "}
-            {year || "……"} en las instalaciones de {place}, se reúnen <Fill>{fields.reunen}</Fill>
-          </p>
-        </>
-      )}
+      <p className="ent-parrafo">
+        A los <Fill>{day ? String(day) : ""}</Fill> días del mes de <Fill>{month ? MESES[month - 1] : ""}</Fill> de{" "}
+        {year || "……"} en las instalaciones de {place}, se reúnen <Fill>{fields.reunen}</Fill>
+      </p>
 
       <div className="ent-renglones" style={{ minHeight: format.minRuledHeight }}>
-        {!school && <p>con {fields.con}{fields.con && !/[.:]$/.test(fields.con) ? "." : ""}</p>}
+        <p>con {fields.con}{fields.con && !/[.:]$/.test(fields.con) ? "." : ""}</p>
         {paragraphs.map((text, index) => (
           <p key={index}>{text}</p>
         ))}
@@ -139,6 +119,105 @@ export function InterviewSheet({
       )}
     </article>
   );
+}
+
+/** La frase del colegio con lo que va en negrita en el papel: "del **Colegio … registro de DIEGEP N° …** de nivel inicial". */
+function splitSchool(phrase: string): [string, string, string] {
+  const match = /^(del\s+)?(.*?)(\s+de nivel\s+\S+)?$/i.exec(phrase.trim());
+  return match ? [match[1] ?? "", match[2], match[3] ?? ""] : ["", phrase, ""];
+}
+
+/**
+ * La planilla de entrevista del jardín de Nordelta, como la hoja en papel: logo
+ * a la izquierda con "Folio Nro" a su derecha, membrete en mayúsculas debajo,
+ * "Kinder" en su renglón, tres casilleros y el párrafo corrido sobre líneas de
+ * guiones, con "de manera remota / presencial" para tachar la que no va.
+ */
+function JardinSheet({
+  fields,
+  letterhead,
+  number,
+  school,
+}: {
+  fields: InterviewFields;
+  letterhead: LetterheadOut;
+  number: number | null;
+  school: string;
+}) {
+  const [year, month, day] = fields.fecha.split("-").map(Number);
+  const paragraphs = fields.desarrollo.split(/\n\s*\n|\n/).map((text) => text.trim()).filter(Boolean);
+  // Con el logo y el párrafo corrido arriba, 13 renglones dejan la hoja en un A4.
+  const format = sheetFormat(letterhead, JARDIN_RULED_LINES);
+  const [pre, bold, post] = splitSchool(school);
+  // El papel trae "20" impreso: el blanco son los dos últimos dígitos.
+  const yearEnd = year ? String(year % 100).padStart(2, "0") : "";
+  const strike = (mode: "remota" | "presencial") => (fields.modalidad && fields.modalidad !== mode ? "jar-tachado" : "");
+
+  return (
+    <article className="entrevista-hoja jardin-hoja" style={format.style}>
+      <div className="jar-cabecera">
+        {letterhead.logo_data_url ? (
+          <img src={letterhead.logo_data_url} alt={letterhead.institution} className="jar-logo" />
+        ) : (
+          <span />
+        )}
+        <p className="jar-folio">
+          Folio Nro: {number != null ? <b>{number}</b> : <span className="ent-folio-vacio" />}
+        </p>
+      </div>
+      <header className="jar-membrete">
+        {levelLines(letterhead, fields.nivel).map((line, index) => (
+          <p key={index}>{line}</p>
+        ))}
+      </header>
+      {/* La planilla del nivel es siempre de entrevista, aunque el membrete de la
+          sede diga otro título (Nordelta: "ACTA DE REUNIÓN" en los otros niveles). */}
+      <h1 className="ent-titulo jar-titulo">ACTA DE ENTREVISTA</h1>
+
+      <p className="jar-fila jar-primera">
+        Nombre del alumno/a: <Blank className="jar-ancho">{fields.alumno}</Blank>
+      </p>
+      <p className="jar-fila">
+        {fields.nivel === "inicial" ? "Kinder:" : "Curso:"} <Blank className="jar-corto">{fields.curso}</Blank>
+      </p>
+
+      <p className="jar-fila jar-solicitada">Solicitada por:</p>
+      <p className="jar-checks">
+        <Check checked={fields.solicitada_por === "colegio"} label="Escuela" />
+        <Check checked={fields.solicitada_por === "familia"} label="Familia" />
+        <Check checked={fields.solicitada_por === "equipo"} label="Equipo de profesionales" />
+      </p>
+
+      <p className="jar-parrafo">
+        A los <Blank className="jar-dia">{day ? String(day) : ""}</Blank> días del mes de{" "}
+        <Blank className="jar-mes">{month ? MESES[month - 1] : ""}</Blank> de 20
+        <Blank className="jar-anio">{yearEnd}</Blank>, se reúnen de manera <span className={strike("remota")}>remota</span> /{" "}
+        <span className={strike("presencial")}>presencial</span> <Blank className="jar-largo">{fields.reunen}</Blank> {pre}
+        <b>{bold}</b>
+        {post} con: <Blank className="jar-largo">{fields.con}</Blank>
+      </p>
+
+      <div className="ent-renglones jar-renglones" style={{ minHeight: format.minRuledHeight }}>
+        <p>Motivo de la reunión: {fields.motivo}</p>
+        {paragraphs.map((text, index) => (
+          <p key={index}>{text}</p>
+        ))}
+      </div>
+
+      {letterhead.signatures.length > 0 && (
+        <footer className="ent-firmas">
+          {letterhead.signatures.map((label, index) => (
+            <span key={index}>{label}</span>
+          ))}
+        </footer>
+      )}
+    </article>
+  );
+}
+
+function Blank({ children, className = "" }: { children: string; className?: string }) {
+  // Como en el papel: una línea de guiones para completar a mano.
+  return <span className={`jar-fill ${children ? "" : "jar-vacio"} ${className}`}>{children || " "}</span>;
 }
 
 /**
@@ -166,7 +245,7 @@ function ReunionSheet({
       {number != null && <p className="ent-numero">Acta N.º {number}</p>}
       <header className="reu-encabezado">
         <div className="reu-membrete">
-          {letterhead.lines.map((line, index) => (
+          {levelLines(letterhead, fields.nivel).map((line, index) => (
             <p key={index}>{line}</p>
           ))}
         </div>

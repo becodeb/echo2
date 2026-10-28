@@ -3,7 +3,8 @@ import { api } from "../api/client";
 import { useAuth } from "./auth";
 
 export type Level = "inicial" | "primaria" | "secundaria";
-export type LevelAccess = "direccion" | "total" | "limitado";
+/** total: ve todo · adviser: lo suyo + lo del DOE · direccion: directivo, solo lo suyo · limitado: DOE · tutor: como el DOE. */
+export type LevelAccess = "total" | "adviser" | "direccion" | "limitado" | "tutor";
 
 export const LEVELS: { value: Level; label: string }[] = [
   { value: "inicial", label: "Inicial" },
@@ -24,7 +25,7 @@ export interface MyAccess {
   creatable_levels: Level[];
   managed_levels: Level[];
   needs_level: boolean;
-  /** 3 dirección de la sede, 2 directivo, 1 equipo (DOE, docentes). */
+  /** 4 dirección de la sede, 3 ve todo, 2 adviser o directivo, 1 equipo (DOE, tutores, docentes). */
   rank: number;
 }
 

@@ -39,6 +39,12 @@
   font-weight: 700;
 }
 
+.ent-folio-vacio {
+  display: inline-block;
+  min-width: 70pt;
+  border-bottom: 1pt dotted #000000;
+}
+
 .ent-membrete p {
   font-size: 10.8pt;
   line-height: 14pt;
@@ -144,6 +150,10 @@
   }
   .ent-fila { flex-wrap: wrap; row-gap: 6pt; }
   .ent-checks { justify-content: flex-start; flex-wrap: wrap; gap: 6pt 24pt; }
+  .jar-checks { justify-content: flex-start; flex-wrap: wrap; gap: 6pt 24pt; padding: 0; }
+  .jar-fila { flex-wrap: wrap; row-gap: 4pt; }
+  .jar-cabecera { flex-wrap: wrap; row-gap: 8pt; }
+  .jar-logo { height: 34pt; }
 }
 
 /* Sin márgenes del navegador: sin ellos tampoco salen la URL ni la fecha en
@@ -183,3 +193,66 @@
   .reu-encabezado { flex-direction: column-reverse; }
   .reunion-hoja .reu-logo { height: 36pt; }
 }
+
+/* Planilla de entrevista del jardín (Nordelta): copia de la hoja en papel.
+ * Arial, rótulos en letra normal, líneas de guiones para completar y solo el
+ * nombre del colegio en negrita. */
+.jardin-hoja { padding-top: calc(10mm * var(--acta-margin, 1)); }
+.jar-cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12pt;
+}
+.jar-logo { height: 40pt; width: auto; flex: none; }
+.jar-folio {
+  font-size: calc(10pt * var(--acta-scale, 1));
+  white-space: nowrap;
+}
+.jar-membrete { margin-top: 8pt; }
+.jar-membrete p {
+  font-size: 9.5pt;
+  line-height: 12.5pt;
+  color: #222222;
+  text-transform: uppercase;
+}
+.jar-titulo { margin-top: 22pt; }
+
+.jar-fila {
+  display: flex;
+  align-items: baseline;
+  gap: 4pt;
+  margin-top: 16pt;
+}
+.jar-primera { margin-top: 26pt; }
+.jar-fila .jar-fill { border-bottom: 1pt solid #000000; }
+.jar-ancho { flex: 1 1 auto; min-width: 0; }
+.jar-corto { flex: 0 0 110pt; }
+.jar-solicitada { margin-top: 18pt; }
+
+.jar-checks {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 26pt 0 18pt;
+  margin-top: 6pt;
+}
+.jardin-hoja .ent-check b { font-weight: 400; }
+
+.jar-fill {
+  border-bottom: 1pt dashed #000000;
+  padding: 0 3pt;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.jar-vacio { display: inline-block; }
+.jar-dia { min-width: 26pt; text-align: center; }
+.jar-mes { min-width: 90pt; text-align: center; }
+.jar-anio { min-width: 22pt; text-align: center; }
+.jar-largo { min-width: 150pt; }
+.jar-tachado { text-decoration: line-through; }
+
+.jar-parrafo {
+  margin-top: 22pt;
+  line-height: calc(var(--ent-renglon, 20pt) * 1.15);
+}
+.jar-renglones { margin-top: 8pt; }

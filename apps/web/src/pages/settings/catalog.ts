@@ -213,7 +213,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   {
     section: "access",
     label: "Niveles y accesos",
-    keywords: ["nivel", "niveles", "acceso", "permisos", "inicial", "primaria", "secundaria", "direccion", "limitado", "quien ve que", "rol"],
+    keywords: ["nivel", "niveles", "acceso", "permisos", "inicial", "primaria", "secundaria", "direccion", "limitado", "adviser", "tutor", "doe", "directivo", "quien ve que", "rol"],
   },
   {
     section: "drive",

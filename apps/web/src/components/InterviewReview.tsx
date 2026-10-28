@@ -94,7 +94,9 @@ export function InterviewReview({ meetingId, minutes, fields }: {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-[1fr_10rem]">
-        <Input label="Nombre del alumno" value={form.alumno} onChange={(e) => set("alumno")(e.target.value)} />
+        <Input
+          label={!reunion && form.nivel && letterhead?.levels[form.nivel].school ? "Nombre del alumno/a" : "Nombre del alumno"}
+          value={form.alumno} onChange={(e) => set("alumno")(e.target.value)} />
         <Input
           label={form.nivel === "inicial" ? "Kinder" : "Curso"}
           value={form.curso}
@@ -121,6 +123,25 @@ export function InterviewReview({ meetingId, minutes, fields }: {
                     : form.nivel === "inicial"
                       ? "Escuela"
                       : "Colegio"}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
+
+      {!reunion && form.nivel && letterhead?.levels[form.nivel].school && (
+        <fieldset>
+          <legend className="mb-1.5 text-sm font-medium text-ink-700">Modalidad</legend>
+          <div className="flex flex-wrap gap-x-5 gap-y-1.5">
+            {(["presencial", "remota"] as const).map((option) => (
+              <label key={option} className="flex items-center gap-2 text-sm text-ink-800">
+                <input
+                  type="radio"
+                  name="modalidad"
+                  checked={form.modalidad === option}
+                  onChange={() => set("modalidad")(option)}
+                />
+                {option === "presencial" ? "De manera presencial" : "De manera remota"}
               </label>
             ))}
           </div>

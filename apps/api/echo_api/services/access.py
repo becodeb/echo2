@@ -9,10 +9,12 @@ Una reunión es visible para una persona si se cumple cualquiera de estas:
 - se la compartieron (MeetingShare);
 - no es privada y la persona está asignada a la familia de la reunión
   (FamilyAssignment: la tutora, el DOE que sigue a esa familia);
-- no es privada y la persona tiene acceso "total" o "direccion" a su nivel;
+- no es privada y la persona tiene acceso "total" a su nivel;
+- no es privada, la persona es "adviser" del nivel y la creó alguien con
+  acceso "limitado" o "tutor" en ese nivel (la adviser es la jefa de las
+  coordinadoras del DOE: ve lo que hace el DOE, no lo de los directivos);
 - no es privada y la creó, o estuvo en ella, alguien de un grupo que el puesto
-  de la persona "ve" (puesto propio de la sede, CustomPosition.watch_group_ids:
-  la Adviser ve las reuniones del DOE).
+  de la persona "ve" (puesto propio de la sede, CustomPosition.watch_group_ids).
 
 Las reuniones internas (kind="interna": directivos, coordinadores...) tienen
 otra regla: las ve quien la creó, quien estuvo, a quien se la compartieron y
@@ -20,9 +22,10 @@ quien es del grupo de la reunión. Ser admin u owner NO alcanza, y el nivel no c
 reunión de directivos no la ve la secretaria que administra la sede salvo que
 la sumen al grupo (y eso queda en auditoría).
 
-"limitado" en un nivel no suma nada a lo de arriba: deja crear reuniones en
-ese nivel, pero solo se ve lo propio, donde estuvo, lo compartido y lo de sus
-familias. Es el rol del DOE. Sin fila es "nulo".
+"limitado" (el DOE), "tutor" (igual que el DOE) y "direccion" (directivo) no
+suman nada a lo de arriba: dejan crear reuniones en ese nivel, pero solo se
+ve lo propio, donde estuvo, lo compartido y lo de sus familias. Un directivo
+no ve las reuniones de otro directivo. Sin fila es "nulo".
 
 Todo lo que muestra contenido de reuniones pasa por acá: el detalle (vía
 deps.check_meeting_access) y también los listados que cruzan reuniones
@@ -52,7 +55,12 @@ from ..models import (
     Speaker,
 )
 
-FULL_ACCESS = ("direccion", "total")
+# Acceso por nivel (member_level_access.access, un string: sumar uno no pide migración).
+FULL_ACCESS = ("total",)  # ve todo el nivel
+ADVISER_ACCESS = "adviser"  # lo suyo + lo que crea el DOE del nivel
+DOE_ACCESS = ("limitado", "tutor")  # el DOE y las tutoras: solo lo suyo
+# Lo que un directivo puede dar o sacar: nada que muestre más de lo que ve él.
+DIRECTIVO_CAN_ASSIGN = ("limitado", "tutor", "nulo")
 
 
 @dataclass(frozen=True)
@@ -73,6 +81,10 @@ class Scope:
     @property
     def full_levels(self) -> set[str]:
         return {level for level, access in self.access.items() if access in FULL_ACCESS}
+
+    @property
+    def adviser_levels(self) -> set[str]:
+        return {level for level, access in self.access.items() if access == ADVISER_ACCESS}
 
     @property
     def managed_levels(self) -> set[str]:
@@ -161,6 +173,17 @@ def _present_any(user_ids) -> ColumnElement[bool]:
     )
 
 
+def _created_by_doe() -> ColumnElement[bool]:
+    """Quien creó la reunión tiene acceso "limitado" o "tutor" al nivel de la reunión."""
+    creator = aliased(MemberLevelAccess)
+    return exists().where(
+        creator.organization_id == Meeting.organization_id,
+        creator.user_id == Meeting.created_by,
+        creator.level == Meeting.level,
+        creator.access.in_(DOE_ACCESS),
+    )
+
+
 def meeting_filter(scope: Scope) -> ColumnElement[bool]:
     """Condición sobre `Meeting` para usar en un WHERE. No filtra por org ni borradas."""
     shared = exists().where(MeetingShare.meeting_id == Meeting.id, MeetingShare.user_id == scope.user_id)
@@ -171,12 +194,18 @@ def meeting_filter(scope: Scope) -> ColumnElement[bool]:
         return or_(Meeting.kind != "interna", internal)
     full_levels = scope.full_levels
     by_level = and_(Meeting.level.in_(full_levels), _not_private()) if full_levels else false()
+    adviser_levels = scope.adviser_levels
+    by_adviser = (
+        and_(Meeting.level.in_(adviser_levels), _not_private(), _created_by_doe()) if adviser_levels else false()
+    )
     by_family = and_(Meeting.family_id.in_(scope.families), _not_private()) if scope.families else false()
     watched = list(scope.watched_users)
     by_watch = (
         and_(_not_private(), or_(Meeting.created_by.in_(watched), _present_any(watched))) if watched else false()
     )
-    return or_(and_(Meeting.kind != "interna", or_(own_or_shared, by_level, by_family, by_watch)), internal)
+    return or_(
+        and_(Meeting.kind != "interna", or_(own_or_shared, by_level, by_adviser, by_family, by_watch)), internal
+    )
 
 
 async def is_present(db: AsyncSession, meeting_id: uuid.UUID, user_id: uuid.UUID) -> bool:
@@ -204,6 +233,32 @@ async def is_present_any(db: AsyncSession, meeting_id: uuid.UUID, user_ids) -> b
     return bool((await db.execute(select(or_(participant, speaker)))).scalar())
 
 
+async def creator_is_doe(db: AsyncSession, meeting: Meeting) -> bool:
+    """Espejo de _created_by_doe para una reunión ya cargada."""
+    if meeting.level is None:
+        return False
+    found = exists().where(
+        MemberLevelAccess.organization_id == meeting.organization_id,
+        MemberLevelAccess.user_id == meeting.created_by,
+        MemberLevelAccess.level == meeting.level,
+        MemberLevelAccess.access.in_(DOE_ACCESS),
+    )
+    return bool((await db.execute(select(found))).scalar())
+
+
+async def can_see(db: AsyncSession, scope: Scope, meeting: Meeting) -> bool:
+    """Misma regla que meeting_filter para una reunión ya cargada (el compartido lo mira quien llama)."""
+    if can_see_by_rule(scope, meeting) or await is_present(db, meeting.id, scope.user_id):
+        return True
+    if watches(scope, meeting) and await is_present_any(db, meeting.id, scope.watched_users):
+        return True
+    if meeting.kind == "interna" or meeting.level not in scope.adviser_levels:
+        return False
+    if (meeting.meta or {}).get("visibility", "org") == "private":
+        return False
+    return await creator_is_doe(db, meeting)
+
+
 def visible_meeting_ids(scope: Scope):
     """Subconsulta con los ids de reuniones visibles de la organización."""
     return select(Meeting.id).where(
@@ -229,22 +284,42 @@ async def visible_meeting_id_list(db: AsyncSession, scope: Scope) -> list[uuid.U
 
 # Rango dentro de la sede, para repartir tareas: a alguien de igual o menor
 # rango, nunca para arriba (un DOE no le asigna tareas a la directora).
-RANK_ADMIN = 3  # owner o admin de la sede
-RANK_DIRECTIVO = 2  # "direccion" o "total" en algún nivel
-RANK_EQUIPO = 1  # "limitado" (DOE, docentes) o sin nivel
-RANK_LABEL = {RANK_ADMIN: "Dirección de la sede", RANK_DIRECTIVO: "Directivo", RANK_EQUIPO: "Equipo"}
+RANK_ADMIN = 4  # owner o admin de la sede
+RANK_TOTAL = 3  # "total" en algún nivel: ve todo, es dirección del nivel
+RANK_DIRECTIVO = 2  # "adviser" o "direccion" en algún nivel
+RANK_EQUIPO = 1  # "limitado"/"tutor" (DOE, docentes) o sin nivel
+RANK_LABEL = {
+    RANK_ADMIN: "Dirección de la sede",
+    RANK_TOTAL: "Ve todo",
+    RANK_DIRECTIVO: "Directivo",
+    RANK_EQUIPO: "Equipo",
+}
+ADVISER_LABEL = "Adviser"
 
 
 def rank_of(role: str, accesses) -> int:
+    accesses = list(accesses)
     if role in ("admin", "owner"):
         return RANK_ADMIN
     if any(access in FULL_ACCESS for access in accesses):
+        return RANK_TOTAL
+    if any(access in (ADVISER_ACCESS, "direccion") for access in accesses):
         return RANK_DIRECTIVO
     return RANK_EQUIPO
 
 
-async def member_ranks(db: AsyncSession, org_id: uuid.UUID) -> dict[uuid.UUID, int]:
-    """Rango de cada persona de la sede."""
+def label_of(role: str, accesses) -> str:
+    accesses = list(accesses)
+    rank = rank_of(role, accesses)
+    if rank == RANK_DIRECTIVO and "direccion" not in accesses:
+        return ADVISER_LABEL
+    return RANK_LABEL[rank]
+
+
+async def member_ranks_and_labels(
+    db: AsyncSession, org_id: uuid.UUID
+) -> tuple[dict[uuid.UUID, int], dict[uuid.UUID, str]]:
+    """Rango y nombre del rango de cada persona de la sede."""
     roles = dict(
         (
             await db.execute(
@@ -263,7 +338,14 @@ async def member_ranks(db: AsyncSession, org_id: uuid.UUID) -> dict[uuid.UUID, i
         )
     ).all():
         accesses.setdefault(user_id, []).append(access)
-    return {user_id: rank_of(role, accesses.get(user_id, [])) for user_id, role in roles.items()}
+    ranks = {user_id: rank_of(role, accesses.get(user_id, [])) for user_id, role in roles.items()}
+    labels = {user_id: label_of(role, accesses.get(user_id, [])) for user_id, role in roles.items()}
+    return ranks, labels
+
+
+async def member_ranks(db: AsyncSession, org_id: uuid.UUID) -> dict[uuid.UUID, int]:
+    """Rango de cada persona de la sede."""
+    return (await member_ranks_and_labels(db, org_id))[0]
 
 
 def scope_rank(scope: Scope) -> int:
@@ -331,6 +413,30 @@ async def users_who_can_see(db: AsyncSession, meeting: Meeting) -> list[uuid.UUI
                     MemberLevelAccess.level == meeting.level,
                     MemberLevelAccess.access.in_(FULL_ACCESS),
                 )
+            )
+        )
+    if meeting.kind != "interna" and not private and meeting.level:
+        # La adviser del nivel se entera de lo que crea el DOE de ese nivel.
+        creator_is_doe_row = (
+            select(MemberLevelAccess.id)
+            .where(
+                MemberLevelAccess.organization_id == meeting.organization_id,
+                MemberLevelAccess.user_id == meeting.created_by,
+                MemberLevelAccess.level == meeting.level,
+                MemberLevelAccess.access.in_(DOE_ACCESS),
+            )
+            .exists()
+        )
+        conditions.append(
+            and_(
+                OrganizationMember.user_id.in_(
+                    select(MemberLevelAccess.user_id).where(
+                        MemberLevelAccess.organization_id == meeting.organization_id,
+                        MemberLevelAccess.level == meeting.level,
+                        MemberLevelAccess.access == ADVISER_ACCESS,
+                    )
+                ),
+                creator_is_doe_row,
             )
         )
     return list(
