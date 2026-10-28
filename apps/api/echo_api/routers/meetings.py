@@ -13,7 +13,11 @@ from ..models import (
     LEVELS,
     MEETING_KINDS,
     ActionItem,
+    Family,
+    FamilyMember,
     InternalGroup,
+    MeetingReason,
+    Minutes,
     Notification,
     OrganizationMember,
     User,
@@ -28,6 +32,7 @@ from ..models import (
     TranscriptSegment,
 )
 from ..services import plans
+from ..services.acta_entrevista import initials
 from ..services.access import meeting_filter
 from ..services.audit import audit
 from ..services.pipeline import run_finalize_pipeline
@@ -142,6 +147,17 @@ class MeetingListItem(BaseModel):
     group_id: uuid.UUID | None = None
     group_name: str | None = None
     recorded: bool = False
+    # Lo que cada fila dice de una reunión de familia. Del alumno solo las
+    # iniciales: el colegio no quiere el nombre completo a la vista.
+    family_id: uuid.UUID | None = None
+    family_name: str | None = None
+    student_initials: list[str] = []
+    reason_name: str | None = None
+    # draft|in_review|approved; None = todavía no hay acta.
+    minutes_status: str | None = None
+    minutes_number: int | None = None
+    # idle|generating|ok|failed
+    minutes_generation: str | None = None
 
 
 RECORDING_FIELDS = ("enabled", "status", "user_id", "drive_url", "expires_at", "size_bytes", "duration_seconds", "error")
@@ -352,9 +368,13 @@ async def list_meetings(
     level: str | None = None,
     kind: str | None = None,
     group_id: uuid.UUID | None = None,
+    family_id: uuid.UUID | None = None,
+    # approved | pending (borrador o en revisión) | none (todavía sin acta)
+    minutes: str | None = Query(default=None, pattern="^(approved|pending|none)$"),
 ):
     # La visibilidad va en el WHERE y no filtrando después: filtrar después
     # del LIMIT devolvía páginas cortas y se salteaba lo compartido.
+    when = func.coalesce(Meeting.started_at, Meeting.created_at)
     q = (
         select(
             Meeting,
@@ -370,12 +390,22 @@ async def list_meetings(
             or_(Meeting.status != "draft", Meeting.created_by == ctx.user.id),
         )
         .group_by(Meeting.id)
-        .order_by(Meeting.created_at.desc())
+        # Por cuándo fue (no cuándo se creó): la lista se agrupa por esa fecha.
+        .order_by(when.desc(), Meeting.id.desc())
         .limit(limit)
         .offset(offset)
     )
     if status_filter:
         q = q.where(Meeting.status == status_filter)
+    if family_id:
+        q = q.where(Meeting.family_id == family_id)
+    if minutes:
+        has_minutes = select(Minutes.id).where(Minutes.meeting_id == Meeting.id)
+        if minutes == "none":
+            q = q.where(~has_minutes.exists())
+        else:
+            wanted = ("approved",) if minutes == "approved" else ("draft", "in_review")
+            q = q.where(has_minutes.where(Minutes.status.in_(wanted)).exists())
     if level:
         q = q.where(Meeting.level == level)
     if kind:
@@ -407,6 +437,33 @@ async def list_meetings(
             (await db.execute(select(InternalGroup.id, InternalGroup.name).where(InternalGroup.id.in_(group_ids)))).all()
         )
 
+    # Familia, alumno, motivo y acta: una consulta por lote, no una por fila.
+    family_names: dict[uuid.UUID, str] = {}
+    family_ids = {m.family_id for m, _ in rows if m.family_id}
+    if family_ids:
+        family_names = dict((await db.execute(select(Family.id, Family.name).where(Family.id.in_(family_ids)))).all())
+    reason_names: dict[uuid.UUID, str] = {}
+    reason_ids = {m.reason_id for m, _ in rows if m.reason_id}
+    if reason_ids:
+        reason_names = dict(
+            (await db.execute(select(MeetingReason.id, MeetingReason.name).where(MeetingReason.id.in_(reason_ids)))).all()
+        )
+    student_ids = {uuid.UUID(str(s)) for m, _ in rows for s in m.student_ids or []}
+    student_initials: dict[uuid.UUID, str] = {}
+    if student_ids:
+        student_initials = {
+            sid: initials(name)
+            for sid, name in (
+                await db.execute(select(FamilyMember.id, FamilyMember.name).where(FamilyMember.id.in_(student_ids)))
+            ).all()
+        }
+    actas: dict[uuid.UUID, Minutes] = {}
+    if meeting_ids:
+        actas = {
+            a.meeting_id: a
+            for a in (await db.execute(select(Minutes).where(Minutes.meeting_id.in_(meeting_ids)))).scalars()
+        }
+
     return [
         MeetingListItem(
             id=m.id,
@@ -422,6 +479,17 @@ async def list_meetings(
             group_id=m.group_id,
             group_name=group_names.get(m.group_id) if m.group_id else None,
             recorded=bool(m.recording and m.recording.get("enabled")),
+            family_id=m.family_id,
+            family_name=family_names.get(m.family_id) if m.family_id else None,
+            student_initials=[
+                student_initials[sid]
+                for sid in (uuid.UUID(str(s)) for s in m.student_ids or [])
+                if student_initials.get(sid)
+            ],
+            reason_name=reason_names.get(m.reason_id) if m.reason_id else None,
+            minutes_status=actas[m.id].status if m.id in actas else None,
+            minutes_number=actas[m.id].number if m.id in actas else None,
+            minutes_generation=actas[m.id].generation_status if m.id in actas else None,
         )
         for m, pcount in rows
     ]

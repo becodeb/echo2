@@ -171,6 +171,15 @@ export interface MeetingListItem {
   group_id: string | null;
   group_name: string | null;
   recorded: boolean;
+  family_id: string | null;
+  family_name: string | null;
+  /** Del alumno solo las iniciales ("A. P."), nunca el nombre. */
+  student_initials: string[];
+  reason_name: string | null;
+  /** null = todavía no hay acta. */
+  minutes_status: "draft" | "in_review" | "approved" | null;
+  minutes_number: number | null;
+  minutes_generation: "idle" | "generating" | "ok" | "failed" | null;
 }
 
 export interface SegmentOut {
