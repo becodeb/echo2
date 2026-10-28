@@ -226,7 +226,7 @@ async def _require_another_admin(db: AsyncSession, org_id: uuid.UUID, member_id:
 # nivel + grupo interno (services/positions.py), así que quién ve qué y a
 # quién se le asignan tareas sigue saliendo de services/access.py.
 
-ACCESS_ORDER = {"limitado": 1, "total": 2, "direccion": 3}
+ACCESS_ORDER = {"limitado": 1, "tutor": 1, "direccion": 2, "adviser": 3, "total": 4}
 
 
 def _require_user_manager(ctx: OrgContext) -> None:
