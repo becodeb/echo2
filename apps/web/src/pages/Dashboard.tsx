@@ -224,7 +224,11 @@ function PlanLine() {
 
 const STEPS_KEY = "echo_primeros_pasos_ocultos";
 
-/** Primeros pasos para quien recién empieza; se van solos al completarlos (o al cerrarlos). */
+/**
+ * Primeros pasos para quien recién empieza. Con reuniones ya no es nuevo: no se
+ * muestra (la voz se sigue pidiendo por el aviso fijo y la ventana al entrar).
+ * Se va solo al completarlos, o al cerrarlos.
+ */
 function FirstSteps({ hasMeetings }: { hasMeetings: boolean }) {
   const [hidden, setHidden] = useState(() => {
     try {
@@ -236,9 +240,9 @@ function FirstSteps({ hasMeetings }: { hasMeetings: boolean }) {
   const { data: myVoice } = useQuery({
     queryKey: ["my-voice"],
     queryFn: () => api<{ has_sample: boolean }>("/api/me/voice", { skipOrg: true }),
-    enabled: !hidden,
+    enabled: !hidden && !hasMeetings,
   });
-  if (hidden || !myVoice) return null;
+  if (hidden || hasMeetings || !myVoice) return null;
   const steps = [
     { done: hasMeetings, label: "Grabá tu primera reunión", to: "/meetings?new=1" },
     { done: myVoice.has_sample, label: "Grabá tu voz para aparecer con tu nombre", to: "/settings/my-voice" },

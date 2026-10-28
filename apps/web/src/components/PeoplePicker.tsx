@@ -138,15 +138,17 @@ export function MeetingStaff({ meeting }: { meeting: MeetingOut }) {
   }
 
   const names = meeting.participants.filter((participant) => participant.user_id).map((p) => p.name);
+  // Sin nadie sumado es una acción discreta, no una frase: la mayoría de las
+  // reuniones las graba una sola persona y no hay nada que avisar.
   return (
-    <p className="mt-1 text-sm text-ink-500">
-      {names.length ? <>Del colegio estuvieron: {names.join(", ")}. </> : <>Nadie más del colegio figura en esta reunión. </>}
+    <p className="mt-2 text-sm text-ink-500">
+      {names.length > 0 && <>Del colegio estuvieron: {names.join(", ")}. </>}
       <button
         type="button"
         onClick={() => setEditing(staff)}
-        className="font-medium text-ink-700 underline-offset-2 hover:underline"
+        className="font-medium text-accent-600 underline-offset-2 hover:underline"
       >
-        {names.length ? "Cambiar" : "Sumar a quienes estuvieron"}
+        {names.length ? "Cambiar" : "+ Sumar a quienes estuvieron"}
       </button>
     </p>
   );

@@ -41,6 +41,18 @@ export function StudentPicker({
   );
 }
 
+/** Iniciales del alumno, como las arma la API para el acta: "MUNAFO, Allegra" → "A. M.". */
+export function studentInitials(name: string): string {
+  const clean = name.split(/\s+/).filter(Boolean).join(" ");
+  const words = clean.includes(",")
+    ? [...clean.split(",")[1].split(/\s+/), ...clean.split(",")[0].split(/\s+/)]
+    : clean.split(" ");
+  return words
+    .filter((word) => /^\p{L}/u.test(word))
+    .map((word) => `${word[0].toUpperCase()}.`)
+    .join(" ");
+}
+
 /** El hijo que se elige solo: si la familia tiene uno, es ese. */
 export function onlyStudent(family: FamilyOut | undefined): string[] {
   const kids = (family?.members ?? []).filter((member) => member.relationship_type === "estudiante");

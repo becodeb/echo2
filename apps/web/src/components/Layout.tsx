@@ -228,7 +228,7 @@ export function Layout({ children }: { children: ReactNode }) {
           <RoundButton label="Notificaciones" onClick={() => setNotificationsOpen((open) => !open)} badge={unread} toggle="notifications" active={notificationsOpen}>
             <Icon name="bell" />
           </RoundButton>
-          <SettingsButton open={settingsOpen} onClick={openSettings} />
+          {/* Ajustes está en el menú del avatar: con la ruedita acá el título de la página queda cortado. */}
           <ProfileMenu />
         </header>
         <VoiceNudge variant="mobile" />
