@@ -254,3 +254,91 @@ def test_minutes_ready_notification_only_reaches_who_can_see(client, fake_ai):
 
     assert any("Aviso PRIM" in title for title in titles(primaria))
     assert not any("Aviso PRIM" in title for title in titles(secundaria))
+
+
+def test_puesto_propio_que_ve_las_reuniones_de_un_grupo(client):
+    """Adviser: un puesto propio que ve las reuniones no privadas de los del DOE."""
+    from test_doe_access import _meeting, _sees
+
+    owner = EchoTestUser(client, name="Admin Sede", org_name=f"Sede {uuid.uuid4().hex[:4]}")
+    doe, docente, adviser, colega = (Member(client, owner, name) for name in ("Doe", "Docente", "Adviser", "Colega"))
+    for who, position in ((doe, "doe"), (docente, "docente"), (colega, "doe")):
+        put = client.put(
+            f"/api/org/users/{who.user_id}", json={"position": position, "levels": ["primaria"]}, headers=owner.headers
+        )
+        assert put.status_code == 200, put.text
+    groups = {g["name"]: g["id"] for g in client.get("/api/org/users", headers=owner.headers).json()["groups"]}
+
+    created = client.post(
+        "/api/org/positions",
+        json={"name": "Adviser", "description": "Jefa del DOE", "access": "limitado", "watch_group_ids": [groups["DOE"]]},
+        headers=owner.headers,
+    )
+    assert created.status_code == 201, created.text
+    position_id = created.json()["id"]
+    assert client.put(
+        f"/api/org/users/{adviser.user_id}", json={"position": position_id, "levels": ["primaria"]}, headers=owner.headers
+    ).status_code == 200
+
+    del_doe = _meeting(client, doe, "Del DOE")
+    privada = _meeting(client, doe, "Privada del DOE", visibility="private")
+    del_docente = _meeting(client, docente, "De la docente")
+    con_doe = _meeting(client, docente, "La docente con el DOE")
+    staffed = client.put(f"/api/meetings/{con_doe}/staff", json={"user_ids": [colega.user_id]}, headers=docente.headers)
+    assert staffed.status_code == 200, staffed.text
+
+    assert _sees(client, adviser, del_doe)
+    assert _sees(client, adviser, con_doe)  # estuvo alguien del DOE
+    assert not _sees(client, adviser, privada)
+    assert not _sees(client, adviser, del_docente)
+    # El DOE no ve lo de otro DOE: el permiso es del puesto, no del grupo.
+    assert not _sees(client, doe, con_doe)
+    # A la Adviser le llegan los avisos de lo que ve.
+    from echo_api.db import SessionLocal
+    from echo_api.models import Meeting
+    from echo_api.services.access import users_who_can_see
+
+    async def who_sees(meeting_id):
+        async with SessionLocal() as db:
+            return {str(u) for u in await users_who_can_see(db, await db.get(Meeting, uuid.UUID(meeting_id)))}
+
+    assert adviser.user_id in asyncio.run(who_sees(del_doe))
+    assert adviser.user_id in asyncio.run(who_sees(con_doe))
+    assert adviser.user_id not in asyncio.run(who_sees(del_docente))
+    assert adviser.user_id not in asyncio.run(who_sees(privada))
+
+    # Editar el puesto se aplica a quien lo tiene: sin grupos, deja de verlas.
+    edited = client.put(
+        f"/api/org/positions/{position_id}",
+        json={"name": "Adviser", "access": "total", "watch_group_ids": []},
+        headers=owner.headers,
+    )
+    assert edited.status_code == 200, edited.text
+    users = {u["user_id"]: u for u in client.get("/api/org/users", headers=owner.headers).json()["users"]}
+    assert users[adviser.user_id]["levels"] == {"primaria": "total"}
+    assert _sees(client, adviser, del_docente)  # ahora por el nivel
+
+    # Borrarlo en uso pide a qué puesto pasar a esa gente.
+    assert client.delete(f"/api/org/positions/{position_id}", headers=owner.headers).status_code == 409
+    assert client.delete(f"/api/org/positions/{position_id}?move_to=docente", headers=owner.headers).status_code == 204
+    users = {u["user_id"]: u for u in client.get("/api/org/users", headers=owner.headers).json()["users"]}
+    assert users[adviser.user_id]["position"] == "docente"
+    assert users[adviser.user_id]["levels"] == {"primaria": "limitado"}
+    assert not _sees(client, adviser, del_docente)
+
+
+def test_puesto_propio_lo_arma_solo_quien_administra_y_nadie_se_da_mas(client):
+    owner = EchoTestUser(client, name="Admin Sede", org_name=f"Sede {uuid.uuid4().hex[:4]}")
+    doe = Member(client, owner, "Doe")
+    assert client.post("/api/org/positions", json={"name": "X"}, headers=doe.headers).status_code == 403
+    # Ni repetir el nombre de un fijo.
+    assert client.post("/api/org/positions", json={"name": "docente"}, headers=owner.headers).status_code == 409
+    other = EchoTestUser(client, name="Otra", org_name=f"Sede {uuid.uuid4().hex[:4]}")
+    put = client.put(f"/api/org/users/{owner.user_id}", json={"position": "doe", "levels": ["primaria"]}, headers=other.headers)
+    assert put.status_code in (403, 404)
+    foreign = client.get("/api/org/users", headers=other.headers).json()["groups"]
+    if foreign:
+        bad = client.post(
+            "/api/org/positions", json={"name": "Y", "watch_group_ids": [foreign[0]["id"]]}, headers=owner.headers
+        )
+        assert bad.status_code == 400

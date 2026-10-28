@@ -22,6 +22,7 @@ from .core import (
     ROLE_MEMBER,
     ROLE_OWNER,
     ROLE_VIEWER,
+    CustomPosition,
     MemberLevelAccess,
     Organization,
     OrganizationInvite,
@@ -68,6 +69,7 @@ from .workspace import (
 )
 
 __all__ = [
+    "CustomPosition",
     "Base", "BillingPlan", "PlanRequest", "UsageEvent", "ORG_PLANS", "USER_PLANS", "User", "Organization", "OrganizationMember", "OrganizationInvite",
     "MemberLevelAccess", "LEVELS", "LEVEL_ACCESS",
     "Family", "FamilyAssignment", "FamilyMember", "FamilySummary", "MeetingReason", "MeetingAttendance",

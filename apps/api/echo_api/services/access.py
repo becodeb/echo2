@@ -9,7 +9,10 @@ Una reunión es visible para una persona si se cumple cualquiera de estas:
 - se la compartieron (MeetingShare);
 - no es privada y la persona está asignada a la familia de la reunión
   (FamilyAssignment: la tutora, el DOE que sigue a esa familia);
-- no es privada y la persona tiene acceso "total" o "direccion" a su nivel.
+- no es privada y la persona tiene acceso "total" o "direccion" a su nivel;
+- no es privada y la creó, o estuvo en ella, alguien de un grupo que el puesto
+  de la persona "ve" (puesto propio de la sede, CustomPosition.watch_group_ids:
+  la Adviser ve las reuniones del DOE).
 
 Las reuniones internas (kind="interna": directivos, coordinadores...) tienen
 otra regla: las ve quien la creó, quien estuvo, a quien se la compartieron y
@@ -31,13 +34,14 @@ cambia una, se cambia la otra; los tests de test_levels.py cubren las dos.
 import uuid
 from dataclasses import dataclass
 
-from sqlalchemy import String, and_, cast, exists, false, func, literal, null, or_, select, union_all
+from sqlalchemy import String, and_, any_, cast, exists, false, func, literal, null, or_, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 from sqlalchemy.sql.elements import ColumnElement
 
 from ..models import (
     LEVELS,
+    CustomPosition,
     FamilyAssignment,
     InternalGroupMember,
     Meeting,
@@ -63,6 +67,8 @@ class Scope:
     groups: frozenset[uuid.UUID] = frozenset()
     # Familias a las que está asignada: ve todas sus reuniones no privadas.
     families: frozenset[uuid.UUID] = frozenset()
+    # Integrantes de los grupos que su puesto "ve": ve sus reuniones no privadas.
+    watched_users: frozenset[uuid.UUID] = frozenset()
 
     @property
     def full_levels(self) -> set[str]:
@@ -99,7 +105,29 @@ async def load_scope(db: AsyncSession, org_id: uuid.UUID, user_id: uuid.UUID, ro
         literal("familia").label("tipo"), cast(FamilyAssignment.family_id, String).label("clave"),
         cast(null(), String).label("valor"),
     ).where(FamilyAssignment.organization_id == org_id, FamilyAssignment.user_id == user_id)
-    rows = (await db.execute(union_all(levels, groups, families))).all()
+    watched = (
+        select(
+            literal("visto").label("tipo"), cast(InternalGroupMember.user_id, String).label("clave"),
+            cast(null(), String).label("valor"),
+        )
+        .select_from(OrganizationMember)
+        .join(
+            CustomPosition,
+            and_(
+                cast(CustomPosition.id, String) == OrganizationMember.position,
+                CustomPosition.organization_id == org_id,
+            ),
+        )
+        .join(
+            InternalGroupMember,
+            and_(
+                InternalGroupMember.group_id == any_(CustomPosition.watch_group_ids),
+                InternalGroupMember.organization_id == org_id,
+            ),
+        )
+        .where(OrganizationMember.organization_id == org_id, OrganizationMember.user_id == user_id)
+    )
+    rows = (await db.execute(union_all(levels, groups, families, watched))).all()
     return Scope(
         user_id=user_id,
         org_id=org_id,
@@ -107,6 +135,7 @@ async def load_scope(db: AsyncSession, org_id: uuid.UUID, user_id: uuid.UUID, ro
         access={key: value for kind, key, value in rows if kind == "nivel"},
         groups=frozenset(uuid.UUID(key) for kind, key, _ in rows if kind == "grupo"),
         families=frozenset(uuid.UUID(key) for kind, key, _ in rows if kind == "familia"),
+        watched_users=frozenset(uuid.UUID(key) for kind, key, _ in rows if kind == "visto"),
     )
 
 
@@ -115,6 +144,10 @@ def _not_private() -> ColumnElement[bool]:
 
 
 def _present(user_id: uuid.UUID) -> ColumnElement[bool]:
+    return _present_any([user_id])
+
+
+def _present_any(user_ids) -> ColumnElement[bool]:
     """Estuvo en la reunión: la marcaron como presente o Echo la reconoció por la voz.
 
     Con alias: hay listados que ya hacen join con los participantes y, sin
@@ -123,8 +156,8 @@ def _present(user_id: uuid.UUID) -> ColumnElement[bool]:
     participant = aliased(MeetingParticipant)
     speaker = aliased(Speaker)
     return or_(
-        exists().where(participant.meeting_id == Meeting.id, participant.user_id == user_id),
-        exists().where(speaker.meeting_id == Meeting.id, speaker.user_id == user_id),
+        exists().where(participant.meeting_id == Meeting.id, participant.user_id.in_(user_ids)),
+        exists().where(speaker.meeting_id == Meeting.id, speaker.user_id.in_(user_ids)),
     )
 
 
@@ -139,19 +172,34 @@ def meeting_filter(scope: Scope) -> ColumnElement[bool]:
     full_levels = scope.full_levels
     by_level = and_(Meeting.level.in_(full_levels), _not_private()) if full_levels else false()
     by_family = and_(Meeting.family_id.in_(scope.families), _not_private()) if scope.families else false()
-    return or_(and_(Meeting.kind != "interna", or_(own_or_shared, by_level, by_family)), internal)
+    watched = list(scope.watched_users)
+    by_watch = (
+        and_(_not_private(), or_(Meeting.created_by.in_(watched), _present_any(watched))) if watched else false()
+    )
+    return or_(and_(Meeting.kind != "interna", or_(own_or_shared, by_level, by_family, by_watch)), internal)
 
 
 async def is_present(db: AsyncSession, meeting_id: uuid.UUID, user_id: uuid.UUID) -> bool:
     """La presencia para una reunión ya cargada (can_see_by_rule no mira la base)."""
+    return await is_present_any(db, meeting_id, [user_id])
+
+
+async def is_present_any(db: AsyncSession, meeting_id: uuid.UUID, user_ids) -> bool:
+    """Si estuvo alguna de estas personas, en una sola consulta."""
+    user_ids = list(user_ids)
+    if not user_ids:
+        return False
     participant = (
         select(MeetingParticipant.id)
-        .where(MeetingParticipant.meeting_id == meeting_id, MeetingParticipant.user_id == user_id)
+        .where(MeetingParticipant.meeting_id == meeting_id, MeetingParticipant.user_id.in_(user_ids))
         .correlate(None)
         .exists()
     )
     speaker = (
-        select(Speaker.id).where(Speaker.meeting_id == meeting_id, Speaker.user_id == user_id).correlate(None).exists()
+        select(Speaker.id)
+        .where(Speaker.meeting_id == meeting_id, Speaker.user_id.in_(user_ids))
+        .correlate(None)
+        .exists()
     )
     return bool((await db.execute(select(or_(participant, speaker)))).scalar())
 
@@ -259,6 +307,22 @@ async def users_who_can_see(db: AsyncSession, meeting: Meeting) -> list[uuid.UUI
                 select(FamilyAssignment.user_id).where(FamilyAssignment.family_id == meeting.family_id)
             )
         )
+    if meeting.kind != "interna" and not private:
+        # Quien tiene un puesto que "ve" el grupo de alguien que la creó o estuvo.
+        people = select(MeetingParticipant.user_id).where(
+            MeetingParticipant.meeting_id == meeting.id, MeetingParticipant.user_id.is_not(None)
+        ).union(
+            select(Speaker.user_id).where(Speaker.meeting_id == meeting.id, Speaker.user_id.is_not(None)),
+            select(InternalGroupMember.user_id).where(InternalGroupMember.user_id == meeting.created_by),
+        )
+        watchers = select(cast(CustomPosition.id, String)).where(
+            CustomPosition.organization_id == meeting.organization_id,
+            exists().where(
+                InternalGroupMember.group_id == any_(CustomPosition.watch_group_ids),
+                InternalGroupMember.user_id.in_(people),
+            ),
+        )
+        conditions.append(OrganizationMember.position.in_(watchers))
     if meeting.kind != "interna" and not private and meeting.level:
         conditions.append(
             OrganizationMember.user_id.in_(
@@ -293,6 +357,17 @@ def can_see_by_rule(scope: Scope, meeting: Meeting) -> bool:
     private = (meeting.meta or {}).get("visibility", "org") == "private"
     if private:
         return False
-    return meeting.level in scope.full_levels or (
-        meeting.family_id is not None and meeting.family_id in scope.families
+    return (
+        meeting.level in scope.full_levels
+        or (meeting.family_id is not None and meeting.family_id in scope.families)
+        or meeting.created_by in scope.watched_users
+    )
+
+
+def watches(scope: Scope, meeting: Meeting) -> bool:
+    """Si a esta reunión la puede abrir la presencia de alguien de los grupos que ve."""
+    return (
+        bool(scope.watched_users)
+        and meeting.kind != "interna"
+        and (meeting.meta or {}).get("visibility", "org") != "private"
     )
