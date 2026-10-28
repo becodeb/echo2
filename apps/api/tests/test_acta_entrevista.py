@@ -40,8 +40,9 @@ def _join_as_member(client, owner: EchoTestUser) -> EchoTestUser:
     return member
 
 
-def _finished_meeting(client, recorder: EchoTestUser) -> str:
-    meeting_id = client.post("/api/meetings", json={"title": "Entrevista"}, headers=recorder.headers).json()["id"]
+def _finished_meeting(client, recorder: EchoTestUser, level: str | None = None) -> str:
+    body = {"title": "Entrevista", **({"level": level} if level else {})}
+    meeting_id = client.post("/api/meetings", json=body, headers=recorder.headers).json()["id"]
     client.post(f"/api/meetings/{meeting_id}/start", headers=recorder.headers)
     _record_meeting(client, recorder, meeting_id)
     client.post(f"/api/meetings/{meeting_id}/finish", headers=recorder.headers)
@@ -155,6 +156,125 @@ class TestActaDeReunion:
 
 
 TEMPLATE_REUNION = "# ACTA DE REUNIÓN\n\nA las {{hora}} se reúnen {{con}} con {{reunen}} por {{alumno}}.\n\n{{desarrollo}}\n"
+
+FRASE_INICIAL = "del Colegio Campo del Norte Nordelta registro de DIEGEP N° 8335 de nivel inicial"
+
+
+class TestPorNivel:
+    FIELDS = {
+        "alumno": "R. C.", "curso": "3 F", "solicitada_por": "colegio", "motivo": "Adaptación",
+        "reunen": "la docente Laura Pérez", "con": "la Sra. Ana, madre del alumno",
+        "desarrollo": "Se acuerda un seguimiento.", "fecha": "2026-10-28",
+    }
+
+    def _fields(self, **extra):
+        return acta_entrevista.normalize_fields({**self.FIELDS, **extra}, date(2026, 1, 1))
+
+    def test_inicial_con_frase_sale_como_la_planilla(self):
+        letterhead = {"levels": {"inicial": {"format": "entrevista", "school": FRASE_INICIAL}}}
+        markdown = acta_entrevista.render_markdown(self._fields(nivel="inicial"), letterhead)
+        assert "**Nombre del alumno:** R. C.   **Kinder:** 3 F" in markdown
+        assert "**Solicitada por:** Escuela" in markdown
+        assert (
+            f"A los 28 días del mes de octubre de 2026, se reúnen la docente Laura Pérez {FRASE_INICIAL} "
+            "con: la Sra. Ana, madre del alumno"
+        ) in markdown
+        # Como en el papel, el motivo va después del párrafo.
+        assert markdown.index("A los 28") < markdown.index("**Motivo de la reunión:** Adaptación")
+        assert "la institución" not in markdown
+
+    def test_sin_configuracion_igual_que_antes(self):
+        fields = self._fields()
+        assert "nivel" not in fields
+        expected = acta_entrevista.render_markdown(fields)
+        # Un nivel sin nada cargado, o la frase de otro nivel, no cambian nada.
+        assert acta_entrevista.render_markdown(self._fields(nivel="primaria"), {"levels": {}}) == expected
+        assert acta_entrevista.render_markdown(
+            fields, {"levels": {"inicial": {"school": FRASE_INICIAL}}}
+        ) == expected
+        assert "**Curso:** 3 F" in expected
+        assert "**Solicitada por:** Colegio" in expected
+        assert "en las instalaciones de la institución, se reúnen la docente Laura Pérez con la Sra. Ana" in expected
+
+    def test_equipo_de_profesionales(self):
+        fields = self._fields(solicitada_por="equipo")
+        assert fields["solicitada_por"] == "equipo"
+        assert "**Solicitada por:** Equipo de profesionales" in acta_entrevista.render_markdown(fields)
+
+    def test_el_texto_nombra_el_lugar_de_la_sede(self):
+        place = "la sede del COLEGIO CAMPO DEL NORTE NORDELTA"
+        letterhead = {"interview_place": place}
+        assert f"en las instalaciones de {place}, se reúnen" in acta_entrevista.render_markdown(self._fields(), letterhead)
+        reunion = self._fields(formato="reunion", hora="10:00")
+        assert f"en {place}, siendo las 10:00 hs" in acta_entrevista.render_markdown(reunion, letterhead)
+        # La frase del nivel manda sobre el lugar de la sede.
+        letterhead["levels"] = {"primaria": {"school": "la sede de primaria"}}
+        assert "en la sede de primaria, siendo" in acta_entrevista.render_markdown(
+            self._fields(formato="reunion", hora="10:00", nivel="primaria"), letterhead
+        )
+
+    def test_niveles_normalizados(self):
+        levels = acta_entrevista.normalize_levels(
+            {"inicial": {"format": "REUNION", "school": "  del  Colegio "}, "primaria": {"format": "otro"}, "x": {}}
+        )
+        assert levels["inicial"] == {"format": "reunion", "school": "del Colegio"}
+        assert levels["primaria"] == {"format": "", "school": ""}
+        assert set(levels) == {"inicial", "primaria", "secundaria"}
+        assert acta_entrevista.configured_level({"levels": {"primaria": {"school": "x"}}}, "inicial") == ""
+        assert acta_entrevista.configured_level({"levels": {"primaria": {"school": "x"}}}, "primaria") == "primaria"
+        assert acta_entrevista.configured_level(None, "inicial") == ""
+
+
+def test_acta_de_inicial_por_nivel_en_el_membrete(client, fake_ai):
+    owner = EchoTestUser(client, name="Directora", org_name="Colegio Niveles")
+    # El modelo de la sede es el de reunión; inicial pide la entrevista.
+    saved = client.put(
+        "/api/org/minutes-template",
+        json={"name": "Acta de reunión", "body_markdown": TEMPLATE_REUNION},
+        headers=owner.headers,
+    )
+    assert saved.status_code == 200, saved.text
+    # Sin configurar nada el membrete devuelve los tres niveles vacíos.
+    letterhead = client.get("/api/org/letterhead", headers=owner.headers).json()
+    assert letterhead["levels"]["inicial"] == {"format": "", "school": ""}
+    before = _finished_meeting(client, owner, "inicial")
+    before_fields = client.get(f"/api/meetings/{before}/minutes", headers=owner.headers).json()["version"]["blocks"]["fields"]
+    assert before_fields["formato"] == "reunion"
+    assert "nivel" not in before_fields
+
+    levels = {"inicial": {"format": "entrevista", "school": FRASE_INICIAL}}
+    put = client.put(
+        "/api/org/letterhead", json={**letterhead, "levels": levels}, headers=owner.headers
+    )
+    assert put.status_code == 200, put.text
+    assert put.json()["levels"]["inicial"] == levels["inicial"]
+    # Guardar el membrete sin `levels` no los borra.
+    kept = client.put(
+        "/api/org/letterhead", json={"institution": "Colegio Niveles"}, headers=owner.headers
+    )
+    assert kept.json()["levels"]["inicial"] == levels["inicial"]
+
+    meeting_id = _finished_meeting(client, owner, "inicial")
+    minutes = client.get(f"/api/meetings/{meeting_id}/minutes", headers=owner.headers).json()
+    fields = minutes["version"]["blocks"]["fields"]
+    assert fields["formato"] == "entrevista"
+    assert fields["nivel"] == "inicial"
+    assert fields["solicitada_por"] == "colegio"
+    markdown = minutes["version"]["body_markdown"]
+    assert "**Kinder:** 3N EP" in markdown
+    assert f"se reúnen la Directora Ana {FRASE_INICIAL} con: Marcos, padre del alumno" in markdown
+
+    # Editarla (también por la API, sin nivel en los campos) conserva el nivel y la frase.
+    edited = client.post(
+        f"/api/meetings/{meeting_id}/minutes/versions",
+        json={"fields": {**{k: v for k, v in fields.items() if k != "nivel"}, "curso": "3 F", "solicitada_por": "equipo"}},
+        headers=owner.headers,
+    )
+    assert edited.status_code == 200, edited.text
+    version = edited.json()["version"]
+    assert version["blocks"]["fields"]["nivel"] == "inicial"
+    assert "**Kinder:** 3 F" in version["body_markdown"]
+    assert "**Solicitada por:** Equipo de profesionales" in version["body_markdown"]
 
 
 def test_reunion_acta_generada_con_hora_y_editable(client, fake_ai):

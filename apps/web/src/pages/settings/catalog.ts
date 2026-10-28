@@ -239,6 +239,12 @@ export const SETTINGS_INDEX: SettingEntry[] = [
     keywords: ["membrete", "encabezado", "imprimir", "impresion", "institucion", "direccion", "telefono", "fuente", "titulo del acta"],
   },
   { section: "letterhead", label: "Logo del acta", keywords: ["logo", "imagen", "escudo"], target: "letterhead-logo" },
+  {
+    section: "letterhead",
+    label: "Formulario y colegio por nivel",
+    keywords: ["nivel", "inicial", "primaria", "secundaria", "jardin", "kinder", "formulario", "entrevista", "diegep", "frase"],
+    target: "letterhead-levels",
+  },
   { section: "letterhead", label: "Firmas al pie", keywords: ["firma", "firmas", "pie"], target: "letterhead-signatures" },
   {
     section: "numbering",

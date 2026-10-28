@@ -1,10 +1,16 @@
 import { useEffect, useState, type ChangeEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api/client";
-import type { LetterheadOut } from "../../api/types";
+import type { ActaLevel, LetterheadOut, LevelLetterhead } from "../../api/types";
 import { Select } from "../../components/Select";
 import { Button, Input, Spinner } from "../../components/ui";
 import { Block, Loading } from "./parts";
+
+const LEVELS: { key: ActaLevel; label: string }[] = [
+  { key: "inicial", label: "Inicial" },
+  { key: "primaria", label: "Primaria" },
+  { key: "secundaria", label: "Secundaria" },
+];
 
 const LOGO_MAX_BYTES = 400 * 1024;
 
@@ -137,6 +143,50 @@ export function LetterheadSection() {
           <p className="-mt-2 text-xs text-ink-400">
             Completa el párrafo del formulario: «A los … días del mes de … en las instalaciones de <em>esto</em>, se reúnen…».
           </p>
+        </div>
+      </Block>
+
+      <Block
+        id="letterhead-levels"
+        title="Formulario y colegio por nivel"
+        hint="Cada nivel puede usar su formulario y nombrar al colegio a su manera. Si no cargás nada, sale como hasta ahora."
+      >
+        <div className="space-y-5">
+          {LEVELS.map(({ key, label }) => {
+            const level = form.levels?.[key] ?? { format: "", school: "" };
+            const setLevel = (patch: Partial<LevelLetterhead>) =>
+              setForm({ ...form, levels: { ...form.levels, [key]: { ...level, ...patch } } });
+            return (
+              <div key={key} className="space-y-3 rounded-2xl border border-ink-100 p-4">
+                <h4 className="text-sm font-semibold text-ink-900">{label}</h4>
+                <Select
+                  label="Formulario"
+                  value={level.format}
+                  onChange={(format) => setLevel({ format: format as LevelLetterhead["format"] })}
+                  options={[
+                    { value: "", label: "El del modelo de acta de la sede" },
+                    { value: "entrevista", label: "Acta de entrevista (con casilleros)" },
+                    { value: "reunion", label: "Acta de reunión (en prosa)" },
+                  ]}
+                />
+                <Input
+                  label="Cómo se nombra al colegio"
+                  value={level.school}
+                  onChange={(event) => setLevel({ school: event.target.value })}
+                  placeholder={
+                    level.format === "reunion"
+                      ? "la sede del Colegio … (sigue a «en»)"
+                      : "del Colegio … registro de DIEGEP N° … de nivel …"
+                  }
+                />
+                <p className="-mt-1 text-xs text-ink-400">
+                  {level.format === "reunion"
+                    ? "Reemplaza al lugar de arriba: «A los … días … en esto, siendo las …»."
+                    : "Con esto el acta de entrevista sale como la planilla: «A los … días del mes de …, se reúnen … esto con: …»."}
+                </p>
+              </div>
+            );
+          })}
         </div>
       </Block>
 

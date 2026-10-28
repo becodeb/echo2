@@ -95,14 +95,18 @@ export function InterviewReview({ meetingId, minutes, fields }: {
 
       <div className="grid gap-3 sm:grid-cols-[1fr_10rem]">
         <Input label="Nombre del alumno" value={form.alumno} onChange={(e) => set("alumno")(e.target.value)} />
-        <Input label="Curso" value={form.curso} onChange={(e) => set("curso")(e.target.value)} />
+        <Input
+          label={form.nivel === "inicial" ? "Kinder" : "Curso"}
+          value={form.curso}
+          onChange={(e) => set("curso")(e.target.value)}
+        />
       </div>
 
       {!reunion && (
         <fieldset>
           <legend className="mb-1.5 text-sm font-medium text-ink-700">Solicitada por</legend>
-          <div className="flex gap-5">
-            {(["familia", "colegio"] as const).map((option) => (
+          <div className="flex flex-wrap gap-x-5 gap-y-1.5">
+            {(["familia", "colegio", "equipo"] as const).map((option) => (
               <label key={option} className="flex items-center gap-2 text-sm text-ink-800">
                 <input
                   type="radio"
@@ -110,7 +114,13 @@ export function InterviewReview({ meetingId, minutes, fields }: {
                   checked={form.solicitada_por === option}
                   onChange={() => set("solicitada_por")(option)}
                 />
-                {option === "familia" ? "Familia" : "Colegio"}
+                {option === "familia"
+                  ? "Familia"
+                  : option === "equipo"
+                    ? "Equipo de profesionales"
+                    : form.nivel === "inicial"
+                      ? "Escuela"
+                      : "Colegio"}
               </label>
             ))}
           </div>

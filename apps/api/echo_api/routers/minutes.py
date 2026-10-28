@@ -234,11 +234,16 @@ async def save_minutes_edit(
     body_markdown = data.body_markdown
     if data.fields is not None:
         moment = meeting.started_at or meeting.created_at
+        org = await db.get(Organization, ctx.org_id)
+        letterhead = org.letterhead if org else None
+        # El nivel es el de la reunión; solo viaja si el membrete le fijó algo.
         fields = acta_entrevista.normalize_fields(
-            data.fields, acta_entrevista.meeting_date(moment), acta_entrevista.meeting_time(moment)
+            {**data.fields, "nivel": acta_entrevista.configured_level(letterhead, meeting.level)},
+            acta_entrevista.meeting_date(moment),
+            acta_entrevista.meeting_time(moment),
         )
         blocks = acta_entrevista.to_blocks(fields)
-        body_markdown = acta_entrevista.render_markdown(fields)
+        body_markdown = acta_entrevista.render_markdown(fields, letterhead)
     if not body_markdown:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "El acta no puede quedar vacía")
     next_version = minutes.current_version + 1
@@ -517,6 +522,12 @@ def acta_format_of(letterhead: dict | None) -> dict[str, str]:
     }
 
 
+class LevelIn(BaseModel):
+    # "": el formulario que pide el modelo de acta de la sede.
+    format: Literal["", "entrevista", "reunion"] = ""
+    school: str = Field(default="", max_length=acta_entrevista.MAX_FRASE)
+
+
 class LetterheadIn(BaseModel):
     institution: str = Field(default="", max_length=200)
     lines: list[str] = Field(default_factory=list, max_length=8)
@@ -529,6 +540,10 @@ class LetterheadIn(BaseModel):
     # Acta de entrevista: cómo se nombra el lugar en el párrafo fijo del
     # formulario ("A los … días … en las instalaciones de {esto}, se reúnen…").
     interview_place: str = Field(default="", max_length=400)
+    # Por nivel (inicial / primaria / secundaria): el formulario del acta y cómo
+    # se nombra al colegio en el párrafo ("del Colegio … registro de DIEGEP N°
+    # … de nivel inicial"). Sin mandarlo, queda lo que ya estaba guardado.
+    levels: dict[str, LevelIn] | None = None
     # La fuente del acta (impresa, Word y PDF): hay colegios que tienen que
     # presentarlas en una en particular.
     font: Literal["arial", "calibri", "times", "trebuchet"] = "arial"
@@ -560,6 +575,7 @@ def _letterhead_out(org: Organization) -> dict:
         "signatures": data.get("signatures") if data.get("signatures") is not None else ["Firma", "Firma"],
         "logo_data_url": data.get("logo_data_url") or None,
         "interview_place": data.get("interview_place") or "",
+        "levels": acta_entrevista.normalize_levels(data.get("levels")),
         "font": data.get("font") if data.get("font") in ACTA_FONTS else "arial",
         **acta_format_of(data),
     }
@@ -587,7 +603,14 @@ async def update_letterhead(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Organización no encontrada")
     # El formato se guarda desde su propio bloque: guardar el membrete no lo toca.
     kept = {key: value for key, value in (org.letterhead or {}).items() if key in ACTA_FORMAT_DEFAULTS}
-    org.letterhead = {**data.model_dump(), **kept}
+    levels = data.levels if data.levels is not None else (org.letterhead or {}).get("levels")
+    org.letterhead = {
+        **data.model_dump(exclude={"levels"}),
+        **kept,
+        "levels": acta_entrevista.normalize_levels(
+            {key: item.model_dump() if isinstance(item, BaseModel) else item for key, item in (levels or {}).items()}
+        ),
+    }
     await audit(db, ctx.org_id, ctx.user.id, "letterhead.update", "organization", str(org.id))
     await db.commit()
     return _letterhead_out(org)

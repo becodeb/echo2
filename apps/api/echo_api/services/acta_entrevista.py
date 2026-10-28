@@ -15,6 +15,12 @@ Hay dos formularios, según el modelo de acta de cada sede:
 - "reunion" (Nordelta, modelo con `{{hora}}`): "ACTA DE REUNIÓN" en prosa;
   "A los … días … siendo las HH:MM hs, se reúnen {familia} con {colegio}.",
   el desarrollo y el cierre fijo de lectura y firma.
+
+El membrete puede fijar, por nivel (inicial / primaria / secundaria), el
+formulario y cómo se nombra al colegio (`letterhead["levels"]`). Con la frase
+cargada, el de entrevista sale como la planilla del jardín: "A los … días del
+mes de … de …, se reúnen {reunen} {frase} con: {con}", y el motivo va después
+del párrafo. Sin nada cargado sale como siempre.
 """
 import re
 from datetime import date, datetime, timedelta, timezone
@@ -31,8 +37,10 @@ MESES = (
 )
 
 TEXT_FIELDS = ("alumno", "curso", "motivo", "reunen", "con", "desarrollo")
-SOLICITANTES = ("familia", "colegio")
+SOLICITANTES = ("familia", "colegio", "equipo")
 FORMATOS = ("entrevista", "reunion")
+NIVELES = ("inicial", "primaria", "secundaria")
+MAX_FRASE = 300
 _HORA_RE = re.compile(r"^([01]?\d|2[0-3]):([0-5]\d)$")
 
 # Cierre del acta de reunión: va siempre igual, lo pone la hoja y no la IA.
@@ -54,7 +62,8 @@ REGLAS CRÍTICAS:
 FIELDS_SPEC = """Campos del formulario (todos texto plano):
 - "alumno": apellido y nombre del alumno/a ("APELLIDO, Nombre" si se sabe).
 - "curso": curso o grado (ej. "3N EP", "5to grado").
-- "solicitada_por": "familia" o "colegio" según quién pidió la entrevista; "" si no surge.
+- "solicitada_por": "familia", "colegio" (la escuela) o "equipo" (equipo de profesionales)
+  según quién pidió la entrevista; "" si no surge.
 - "motivo": motivo general en pocas palabras (ej. "Actitudinal", "Seguimiento pedagógico").
 - "reunen": quiénes se reúnen por la institución, con nombre y cargo
   (ej. "la Directora Mariana Gibson y la docente Sonia Albertin").
@@ -123,8 +132,65 @@ def template_format(body_markdown: str | None) -> str:
     return "reunion" if "{{hora}}" in (body_markdown or "") else "entrevista"
 
 
-def fields_spec(formato: str) -> str:
-    return FIELDS_SPEC_REUNION if formato == "reunion" else FIELDS_SPEC
+def normalize_levels(raw) -> dict[str, dict[str, str]]:
+    """Lo que el membrete fija por nivel: {nivel: {"format": "" | formato, "school": frase}}.
+
+    Vacío ("") quiere decir "como siempre": el formulario lo decide el modelo
+    de acta y el párrafo no nombra al colegio.
+    """
+    raw = raw if isinstance(raw, dict) else {}
+    out: dict[str, dict[str, str]] = {}
+    for nivel in NIVELES:
+        item = raw.get(nivel)
+        item = item if isinstance(item, dict) else {}
+        formato = str(item.get("format") or "").strip().lower()
+        out[nivel] = {
+            "format": formato if formato in FORMATOS else "",
+            "school": " ".join(str(item.get("school") or "").split())[:MAX_FRASE],
+        }
+    return out
+
+
+def level_settings(letterhead: dict | None, nivel: str | None) -> dict[str, str]:
+    """El formato y la frase del colegio de ese nivel ({"format": "", "school": ""} si no hay nada)."""
+    levels = normalize_levels((letterhead or {}).get("levels"))
+    return levels.get(nivel or "", {"format": "", "school": ""})
+
+
+def configured_level(letterhead: dict | None, nivel: str | None) -> str:
+    """El nivel, si el membrete le fijó algo; si no, "" (la hoja sale como siempre)."""
+    settings = level_settings(letterhead, nivel)
+    return nivel if nivel and (settings["format"] or settings["school"]) else ""
+
+
+def curso_label(nivel: str | None) -> str:
+    return "Kinder" if nivel == "inicial" else "Curso"
+
+
+def solicitante_labels(nivel: str | None) -> dict[str, str]:
+    return {
+        "familia": "Familia",
+        "colegio": "Escuela" if nivel == "inicial" else "Colegio",
+        "equipo": "Equipo de profesionales",
+    }
+
+
+def fields_spec(formato: str, nivel: str | None = None, frase: str = "") -> str:
+    if formato == "reunion":
+        return FIELDS_SPEC_REUNION
+    spec = FIELDS_SPEC
+    if nivel == "inicial":
+        spec = spec.replace(
+            '- "curso": curso o grado (ej. "3N EP", "5to grado").',
+            '- "curso": sala (ej. "3 F"; el formulario dice "Kinder").',
+        )
+    if frase:
+        spec = spec.replace(
+            "(ej. \"la Directora Mariana Gibson y la docente Sonia Albertin\").",
+            "(ej. \"la Directora Mariana Gibson y la docente Sonia Albertin\"). No nombres al\n"
+            "  colegio: el formulario lo agrega después.",
+        )
+    return spec
 
 
 def meeting_time(started_at: datetime | None) -> str:
@@ -161,6 +227,11 @@ def normalize_fields(raw: dict | None, fallback_date: date, fallback_time: str =
     # Las actas de antes no traen formato: eran todas de entrevista.
     formato = str(raw.get("formato") or "").strip().lower()
     out["formato"] = formato if formato in FORMATOS else "entrevista"
+    # El nivel solo viaja cuando el membrete le fijó algo: las actas de antes
+    # y las de sedes sin configurar siguen igual.
+    nivel = str(raw.get("nivel") or "").strip().lower()
+    if nivel in NIVELES:
+        out["nivel"] = nivel
     if out["formato"] == "reunion":
         hora = _HORA_RE.match(str(raw.get("hora") or "").strip())
         out["hora"] = f"{int(hora.group(1)):02d}:{hora.group(2)}" if hora else fallback_time
@@ -177,33 +248,58 @@ def fields_from_blocks(blocks) -> dict | None:
     return None
 
 
-def render_markdown(fields: dict) -> str:
-    """El acta como texto, para búsqueda, chat y exportaciones."""
+def render_markdown(fields: dict, letterhead: dict | None = None) -> str:
+    """El acta como texto, para búsqueda, chat y exportaciones.
+
+    Con el membrete, el texto nombra al colegio como lo hace la hoja (la frase
+    del nivel o el lugar de la sede) en vez de "la institución".
+    """
     fecha = date.fromisoformat(fields["fecha"])
     blank = "……………"
+    nivel = fields.get("nivel")
+    school = level_settings(letterhead, nivel)["school"]
+    lugar = ((letterhead or {}).get("interview_place") or "").strip()
     if fields.get("formato") == "reunion":
         hora = f", siendo las {fields['hora']} hs" if fields.get("hora") else ""
+        sede = school or lugar or "la sede de la institución"
         parts = [
             "# ACTA DE REUNIÓN",
-            f"A los {fecha.day} días del mes de {MESES[fecha.month - 1]} del {fecha.year} en la sede de la "
-            f"institución{hora}, se reúnen {fields['con'] or blank} con {fields['reunen'] or blank}"
+            f"A los {fecha.day} días del mes de {MESES[fecha.month - 1]} del {fecha.year} en {sede}"
+            f"{hora}, se reúnen {fields['con'] or blank} con {fields['reunen'] or blank}"
             f"{'' if fields['reunen'].endswith(('.', ':')) else '.'}",
             fields["desarrollo"],
             *CIERRE_REUNION,
         ]
         return "\n\n".join(part for part in parts if part) + "\n"
-    solicitada = {"familia": "Familia", "colegio": "Colegio"}.get(fields["solicitada_por"], blank)
+    solicitada = solicitante_labels(nivel).get(fields["solicitada_por"], blank)
+    if school:
+        # Como la planilla en papel: el motivo va después del párrafo.
+        parts = [
+            "# ACTA DE ENTREVISTA",
+            "",
+            f"**Nombre del alumno:** {fields['alumno'] or blank}   **{curso_label(nivel)}:** {fields['curso'] or blank}",
+            "",
+            f"**Solicitada por:** {solicitada}",
+            "",
+            f"A los {fecha.day} días del mes de {MESES[fecha.month - 1]} de {fecha.year}, "
+            f"se reúnen {fields['reunen'] or blank} {school} con: {fields['con'] or blank}",
+            "",
+            f"**Motivo de la reunión:** {fields['motivo'] or blank}",
+            "",
+            fields["desarrollo"] or "",
+        ]
+        return "\n".join(parts).rstrip() + "\n"
     parts = [
         "# ACTA DE ENTREVISTA",
         "",
-        f"**Nombre del alumno:** {fields['alumno'] or blank}   **Curso:** {fields['curso'] or blank}",
+        f"**Nombre del alumno:** {fields['alumno'] or blank}   **{curso_label(nivel)}:** {fields['curso'] or blank}",
         "",
         f"**Solicitada por:** {solicitada}",
         "",
         f"**Motivo general:** {fields['motivo'] or blank}",
         "",
         f"A los {fecha.day} días del mes de {MESES[fecha.month - 1]} de {fecha.year}, "
-        f"en las instalaciones de la institución, se reúnen {fields['reunen'] or blank} "
+        f"en las instalaciones de {lugar or 'la institución'}, se reúnen {fields['reunen'] or blank} "
         f"con {fields['con'] or blank}.",
         "",
         fields["desarrollo"] or "",

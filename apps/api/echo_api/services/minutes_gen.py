@@ -33,6 +33,7 @@ from ..models import (
     Minutes,
     MinutesTemplate,
     MinutesVersion,
+    Organization,
     Question,
 )
 from . import acta_entrevista
@@ -319,6 +320,8 @@ async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instru
             return
         org_id = meeting.organization_id
         template = await template_for(db, meeting)
+        org = await db.get(Organization, org_id)
+        letterhead = (org.letterhead if org else None) or {}
         lines = await load_transcript_lines(db, meeting_id)
         participants = (
             (
@@ -447,7 +450,10 @@ async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instru
     if acta_entrevista.is_interview_template(template.body_markdown):
         fecha = acta_entrevista.meeting_date(meeting.started_at or meeting.created_at)
         hora = acta_entrevista.meeting_time(meeting.started_at or meeting.created_at)
-        formato = acta_entrevista.template_format(template.body_markdown)
+        # El membrete puede fijar el formulario por nivel; si no, el del modelo de acta.
+        nivel = acta_entrevista.configured_level(letterhead, meeting.level)
+        level_cfg = acta_entrevista.level_settings(letterhead, nivel)
+        formato = level_cfg["format"] or acta_entrevista.template_format(template.body_markdown)
         hints = {**structured, "motivo_cargado": reason_name, "familia_cargada": family_hint}
         hidden = [(m.name, acta_entrevista.initials(m.name)) for m in students]
         draft_hidden = [(m.name, acta_entrevista.initials(m.name)) for m in all_kids]
@@ -455,7 +461,9 @@ async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instru
         def render_draft(values: dict[str, str]) -> str:
             # Lo mismo que el acta final con lo que llegó hasta ahora.
             partial = acta_entrevista.normalize_fields(
-                {**values, "fecha": fecha.isoformat(), "formato": formato, "hora": hora}, fecha, hora
+                {**values, "fecha": fecha.isoformat(), "formato": formato, "hora": hora, "nivel": nivel},
+                fecha,
+                hora,
             )
             if not (partial["desarrollo"] or partial["con"] or partial["reunen"]):
                 return ""
@@ -468,7 +476,7 @@ async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instru
                 partial["motivo"] = reason_name
             for key in ("alumno", "desarrollo", "con", "reunen", "motivo"):
                 partial[key] = acta_entrevista.hide_student_names(partial[key], draft_hidden)
-            return acta_entrevista.render_markdown(partial)
+            return acta_entrevista.render_markdown(partial, letterhead)
 
         with reasoning("none"), streaming(_drafter(meeting_id, render_draft)):
             result = await provider.chat_json(
@@ -476,7 +484,7 @@ async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instru
                 [
                     {
                         "role": "user",
-                        "content": f"""{acta_entrevista.fields_spec(formato)}
+                        "content": f"""{acta_entrevista.fields_spec(formato, nivel, level_cfg["school"])}
 
 DATOS DE LA REUNIÓN (lo "cargado" lo ingresó una persona: tiene prioridad):
 {json.dumps(hints, ensure_ascii=False, indent=1)}
@@ -497,7 +505,9 @@ Devolvé JSON:
         if not isinstance(result, dict) or not isinstance(result.get("fields"), dict):
             raise LLMError("El generador de actas no devolvió contenido")
         fields = acta_entrevista.normalize_fields(
-            {**result["fields"], "fecha": fecha.isoformat(), "formato": formato, "hora": hora}, fecha, hora
+            {**result["fields"], "fecha": fecha.isoformat(), "formato": formato, "hora": hora, "nivel": nivel},
+            fecha,
+            hora,
         )
         if reason_name and not fields["motivo"]:
             fields["motivo"] = reason_name
@@ -523,7 +533,7 @@ Devolvé JSON:
         for key in ("desarrollo", "con", "reunen", "motivo"):
             fields[key] = acta_entrevista.hide_student_names(fields[key], hidden)
         await _publish_and_verify(
-            meeting_id, org_id, template.id, acta_entrevista.render_markdown(fields),
+            meeting_id, org_id, template.id, acta_entrevista.render_markdown(fields, letterhead),
             acta_entrevista.to_blocks(fields), result, lines, provider, instructions,
         )
         return

@@ -29,6 +29,11 @@ function sheetFormat(letterhead: LetterheadOut) {
   };
 }
 
+/** Cómo el membrete nombra al colegio para el nivel del acta ("" si no hay frase cargada). */
+function levelSchool(fields: InterviewFields, letterhead: LetterheadOut): string {
+  return (fields.nivel && letterhead.levels?.[fields.nivel]?.school) || "";
+}
+
 /**
  * El formulario "Acta de entrevista" del colegio, completo. Replica el papel:
  * membrete gris, logo centrado, campos punteados, casilleros Familia/Colegio,
@@ -49,6 +54,34 @@ export function InterviewSheet({
   const place = letterhead.interview_place || `la institución ${letterhead.institution}`;
   const paragraphs = fields.desarrollo.split(/\n\s*\n|\n/).map((text) => text.trim()).filter(Boolean);
   const format = sheetFormat(letterhead);
+  // Con la frase del colegio cargada para el nivel, la hoja es la planilla del
+  // papel (jardín de Nordelta): sala, tres casilleros y el motivo después del párrafo.
+  const school = levelSchool(fields, letterhead);
+  const inicial = fields.nivel === "inicial";
+
+  const alumno = (
+    <p className="ent-fila">
+      <b>Nombre del alumno:</b>
+      <Fill className="ent-grow">{fields.alumno}</Fill>
+      <b className="ent-curso">{inicial ? "Kinder:" : "Curso:"}</b>
+      <Fill className="ent-corto">{fields.curso}</Fill>
+    </p>
+  );
+  const solicitada = (
+    <>
+      <p className="ent-fila ent-solicitada">
+        <b>Solicitada por:</b>
+      </p>
+      <p className="ent-checks">
+        {inicial && <Check checked={fields.solicitada_por === "colegio"} label="Escuela" />}
+        <Check checked={fields.solicitada_por === "familia"} label="Familia" />
+        {!inicial && <Check checked={fields.solicitada_por === "colegio"} label="Colegio" />}
+        {(inicial || fields.solicitada_por === "equipo") && (
+          <Check checked={fields.solicitada_por === "equipo"} label="Equipo de profesionales" />
+        )}
+      </p>
+    </>
+  );
 
   return (
     <article className="entrevista-hoja" style={format.style}>
@@ -63,33 +96,35 @@ export function InterviewSheet({
       )}
       <h1 className="ent-titulo">{letterhead.title || "ACTA DE ENTREVISTA"}</h1>
 
-      <p className="ent-fila">
-        <b>Nombre del alumno:</b>
-        <Fill className="ent-grow">{fields.alumno}</Fill>
-        <b className="ent-curso">Curso:</b>
-        <Fill className="ent-corto">{fields.curso}</Fill>
-      </p>
+      {alumno}
+      {solicitada}
 
-      <p className="ent-fila ent-solicitada">
-        <b>Solicitada por:</b>
-      </p>
-      <p className="ent-checks">
-        <Check checked={fields.solicitada_por === "familia"} label="Familia" />
-        <Check checked={fields.solicitada_por === "colegio"} label="Colegio" />
-      </p>
-
-      <p className="ent-fila ent-motivo">
-        <b>Motivo general :</b>
-        <Fill className="ent-grow">{fields.motivo}</Fill>
-      </p>
-
-      <p className="ent-parrafo">
-        A los <Fill>{day ? String(day) : ""}</Fill> días del mes de <Fill>{month ? MESES[month - 1] : ""}</Fill> de{" "}
-        {year || "……"} en las instalaciones de {place}, se reúnen <Fill>{fields.reunen}</Fill>
-      </p>
+      {school ? (
+        <>
+          <p className="ent-parrafo">
+            A los <Fill>{day ? String(day) : ""}</Fill> días del mes de <Fill>{month ? MESES[month - 1] : ""}</Fill> de{" "}
+            {year || "……"}, se reúnen <Fill>{fields.reunen}</Fill> {school} con: <Fill>{fields.con}</Fill>
+          </p>
+          <p className="ent-fila ent-motivo">
+            <b>Motivo de la reunión:</b>
+            <Fill className="ent-grow">{fields.motivo}</Fill>
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="ent-fila ent-motivo">
+            <b>Motivo general :</b>
+            <Fill className="ent-grow">{fields.motivo}</Fill>
+          </p>
+          <p className="ent-parrafo">
+            A los <Fill>{day ? String(day) : ""}</Fill> días del mes de <Fill>{month ? MESES[month - 1] : ""}</Fill> de{" "}
+            {year || "……"} en las instalaciones de {place}, se reúnen <Fill>{fields.reunen}</Fill>
+          </p>
+        </>
+      )}
 
       <div className="ent-renglones" style={{ minHeight: format.minRuledHeight }}>
-        <p>con {fields.con}{fields.con && !/[.:]$/.test(fields.con) ? "." : ""}</p>
+        {!school && <p>con {fields.con}{fields.con && !/[.:]$/.test(fields.con) ? "." : ""}</p>}
         {paragraphs.map((text, index) => (
           <p key={index}>{text}</p>
         ))}
@@ -121,7 +156,7 @@ function ReunionSheet({
   number: number | null;
 }) {
   const [year, month, day] = fields.fecha.split("-").map(Number);
-  const place = letterhead.interview_place || `la sede de ${letterhead.institution}`;
+  const place = levelSchool(fields, letterhead) || letterhead.interview_place || `la sede de ${letterhead.institution}`;
   const paragraphs = fields.desarrollo.split(/\n\s*\n|\n/).map((text) => text.trim()).filter(Boolean);
   // Sin etiquetas cargadas, igual van las dos líneas de firma del modelo.
   const signatures = letterhead.signatures.length > 0 ? letterhead.signatures : ["", ""];

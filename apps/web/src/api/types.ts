@@ -286,7 +286,7 @@ export interface MinutesOut {
 export interface InterviewFields {
   alumno: string;
   curso: string;
-  solicitada_por: "familia" | "colegio" | "";
+  solicitada_por: "familia" | "colegio" | "equipo" | "";
   motivo: string;
   /** ISO yyyy-mm-dd; de acá salen el día, el mes y el año del párrafo. */
   fecha: string;
@@ -297,6 +297,16 @@ export interface InterviewFields {
   formato?: "entrevista" | "reunion";
   /** HH:MM, solo en el acta de reunión ("siendo las 11:30 hs"). */
   hora?: string;
+  /** Nivel de la reunión, solo si el membrete le fijó formato o frase (Ajustes → Membrete). */
+  nivel?: ActaLevel;
+}
+
+export type ActaLevel = "inicial" | "primaria" | "secundaria";
+
+/** Lo que el membrete fija para un nivel: el formulario ("" = el del modelo de acta) y cómo se nombra al colegio. */
+export interface LevelLetterhead {
+  format: "" | "entrevista" | "reunion";
+  school: string;
 }
 
 /** Membrete del acta impresa (Ajustes → Membrete). */
@@ -310,6 +320,7 @@ export interface LetterheadOut {
   signatures: string[];
   logo_data_url: string | null;
   interview_place: string;
+  levels: Record<ActaLevel, LevelLetterhead>;
   /** Fuente del acta impresa, en Word y en PDF. */
   font: "arial" | "calibri" | "times" | "trebuchet";
   /** Cómo se ve el acta (Ajustes → Formato de acta): impresa, en la reunión, Word y PDF. */
