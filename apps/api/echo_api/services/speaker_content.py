@@ -29,9 +29,10 @@ QUOTE_CHARS = 600
 REFERENCE_CHARS = 1500
 # Pares a revisar como mucho por reunión (cada uno es una consulta).
 MAX_PAIRS = 2
-# Apagado hasta probarlo con las reuniones reales del 26/10 (28/10): mientras
-# tanto, meta.people_stitch["similar"] anota cuándo habría corrido.
-ENABLED = False
+# Probado el 28/10 con las reuniones reales del 26/10: la de la docente y la
+# mamá pasó de 74 % a 100 % de lo dicho con la persona correcta, ninguna
+# empeoró, y la que tenía voces claras no lo corrió. Suma 3-5 s solo ahí.
+ENABLED = True
 
 SYSTEM = """Sos un asistente que ayuda a separar quién habló en la transcripción de una reunión de un colegio.
 Dos personas de la reunión tienen la voz parecida y el sistema puede haberlas confundido entre tramos.
