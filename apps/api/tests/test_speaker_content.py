@@ -6,6 +6,12 @@ from echo_api.services import speaker_content
 from echo_api.services.final_chunks import CHUNK_MS, Chunk
 from echo_api.services.llm.base import LLMProvider
 from echo_api.services.stt.base import SttWord
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _encendido(monkeypatch):
+    monkeypatch.setattr(speaker_content, "ENABLED", True)
 
 
 def _turn(start: int, text: str, speaker: str) -> list[SttWord]:

@@ -29,6 +29,9 @@ QUOTE_CHARS = 600
 REFERENCE_CHARS = 1500
 # Pares a revisar como mucho por reunión (cada uno es una consulta).
 MAX_PAIRS = 2
+# Apagado hasta probarlo con las reuniones reales del 26/10 (28/10): mientras
+# tanto, meta.people_stitch["similar"] anota cuándo habría corrido.
+ENABLED = False
 
 SYSTEM = """Sos un asistente que ayuda a separar quién habló en la transcripción de una reunión de un colegio.
 Dos personas de la reunión tienen la voz parecida y el sistema puede haberlas confundido entre tramos.
@@ -60,6 +63,8 @@ async def check(
     provider: LLMProvider,
 ) -> list[dict[str, str]]:
     """Las mismas asignaciones, corregidas donde el contenido dice otra cosa que la voz."""
+    if not ENABLED:
+        return mappings
     mappings = [dict(mapping) for mapping in mappings]
     for a, b, score in pairs[:MAX_PAIRS]:
         both = [
