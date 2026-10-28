@@ -13,7 +13,7 @@ export interface SedePerson {
   email: string;
   job_title: string | null;
   role: string;
-  /** 3 dirección de la sede, 2 directivo, 1 equipo (DOE, docentes). */
+  /** 4 dirección de la sede, 3 ve todo, 2 adviser o directivo, 1 equipo. */
   rank: number;
   rank_label: string | null;
   /** Si quien mira le puede asignar tareas (igual o menor rango). */

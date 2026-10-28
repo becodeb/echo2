@@ -18,15 +18,21 @@ interface AccessMember {
 interface AccessList {
   managed_levels: Level[];
   can_assign_direction: boolean;
+  /** Los accesos que quien mira puede dar (un directivo no da los que muestran más de lo que ve él). */
+  assignable: string[];
   members: AccessMember[];
 }
 
-const ACCESS_LABEL: Record<string, string> = {
-  direccion: "Dirección",
-  total: "Total",
-  limitado: "Limitado",
-  nulo: "Sin acceso",
-};
+/** Cada acceso: cómo se llama en pantalla y qué ve (services/access.py). */
+const ACCESS: { value: string; label: string; sees: string }[] = [
+  { value: "total", label: "Ve todo (dirección)", sees: "Todas las reuniones del nivel." },
+  { value: "adviser", label: "Adviser", sees: "Lo suyo y lo que crean el DOE y los tutores del nivel." },
+  { value: "direccion", label: "Directivo", sees: "Solo lo suyo: lo que creó, donde estuvo, lo compartido y sus familias." },
+  { value: "limitado", label: "DOE", sees: "Solo lo suyo: lo que creó, donde estuvo, lo compartido y sus familias." },
+  { value: "tutor", label: "Tutor/a", sees: "Lo mismo que el DOE." },
+  { value: "nulo", label: "Sin acceso", sees: "Nada del nivel." },
+];
+const ACCESS_LABEL: Record<string, string> = Object.fromEntries(ACCESS.map((item) => [item.value, item.label]));
 
 export function AccessSection() {
   const queryClient = useQueryClient();
@@ -55,9 +61,11 @@ export function AccessSection() {
     return <p className="text-sm text-ink-500">{error instanceof Error ? error.message : "No se pudieron cargar los accesos."}</p>;
   }
 
-  const options = (["direccion", "total", "limitado", "nulo"] as const)
-    .filter((value) => value !== "direccion" || data.can_assign_direction)
-    .map((value) => ({ value, label: ACCESS_LABEL[value] }));
+  const options = ACCESS.filter((item) => data.assignable.includes(item.value)).map((item) => ({
+    value: item.value,
+    label: item.label,
+    description: item.sees,
+  }));
   const term = filter.trim().toLowerCase();
   const members = data.members.filter(
     (member) => !term || member.name.toLowerCase().includes(term) || member.email.toLowerCase().includes(term),
@@ -68,19 +76,19 @@ export function AccessSection() {
       id="access-members"
       hint={
         <>
-          Niveles que dirigís: {data.managed_levels.map((level) => LEVEL_LABEL[level]).join(", ")}.{" "}
-          <span className="font-medium text-ink-700">Total</span>: todas las reuniones del nivel.{" "}
-          <span className="font-medium text-ink-700">Limitado</span>: solo las suyas y las que le compartan.{" "}
-          <span className="font-medium text-ink-700">Sin acceso</span>: nada del nivel.
-          {data.can_assign_direction && (
-            <>
-              {" "}
-              <span className="font-medium text-ink-700">Dirección</span>: todo el nivel, y asigna estos accesos.
-            </>
-          )}
+          Niveles que dirigís: {data.managed_levels.map((level) => LEVEL_LABEL[level]).join(", ")}. Qué ve cada uno en el nivel:
         </>
       }
     >
+      <dl className="mb-5 grid gap-x-4 gap-y-0 text-sm sm:gap-y-1.5 sm:grid-cols-[max-content_1fr]">
+        {ACCESS.filter((item) => data.assignable.includes(item.value)).map((item) => (
+          <div key={item.value} className="contents">
+            <dt className="font-medium text-ink-700">{item.label}</dt>
+            <dd className="mb-2.5 text-ink-500 sm:mb-0">{item.sees}</dd>
+          </div>
+        ))}
+      </dl>
+
       {data.members.length > 6 && (
         <Input placeholder="Buscar persona…" value={filter} onChange={(event) => setFilter(event.target.value)} />
       )}
@@ -103,11 +111,12 @@ export function AccessSection() {
                 <div className="flex flex-wrap gap-2">
                   {data.managed_levels.map((level) => {
                     const current = member.access[level] ?? "nulo";
-                    // Dirección no se toca a sí misma ni a otra dirección: eso es de un admin.
+                    // Quien dirige no se toca a sí misma ni cambia accesos que ella no puede dar: eso es de un admin.
                     const locked =
-                      !data.can_assign_direction && (current === "direccion" || member.user_id === user?.id);
+                      !data.can_assign_direction &&
+                      (!data.assignable.includes(current) || member.user_id === user?.id);
                     return (
-                      <div key={level} className="w-36">
+                      <div key={level} className="w-44">
                         <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink-400">
                           {LEVEL_LABEL[level]}
                         </span>

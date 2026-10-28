@@ -2,8 +2,8 @@
 
 Pedido de Bauti (27/10). El puesto (DOE, docente, directivo...) se traduce a
 lo que ya existía (rol de sede + acceso por nivel + grupo interno), así que
-estos tests miran que un DOE elegido así vea solo lo suyo y que un directivo
-vea todo su nivel, igual que si se le hubieran dado los accesos a mano.
+estos tests miran que un DOE o un directivo elegidos así vean solo lo suyo,
+igual que si se les hubieran dado los accesos a mano.
 """
 import uuid
 
@@ -31,7 +31,7 @@ def _users(client, by) -> dict[str, dict]:
     return {user["user_id"]: user for user in response.json()["users"]}
 
 
-def test_doe_elegido_ve_solo_lo_suyo_y_directivo_todo_su_nivel(client):
+def test_doe_elegido_ve_solo_lo_suyo_y_tambien_el_directivo(client):
     owner, ana, beto, carla = _sede(client)
     doe = _set(client, owner, ana, "doe", ["primaria"])
     assert doe["position"] == "doe" and doe["role"] == "member"
@@ -49,8 +49,8 @@ def test_doe_elegido_ve_solo_lo_suyo_y_directivo_todo_su_nivel(client):
     # El DOE ve lo suyo y nada de los demás.
     assert _sees(client, ana, de_ana)
     assert not _sees(client, ana, de_beto)
-    # El directivo de primaria ve todo primaria, y nada de secundaria.
-    assert _sees(client, carla, de_beto) and _sees(client, carla, de_ana)
+    # El directivo ve solo lo suyo, como el DOE: ni lo de primaria ni lo de secundaria.
+    assert not _sees(client, carla, de_beto) and not _sees(client, carla, de_ana)
     assert not _sees(client, carla, secundaria.json()["id"])
 
     # Las tareas siguen yendo a igual o menor rango.
@@ -133,3 +133,20 @@ def test_puesto_sin_nivel_o_desconocido(client):
     _set(client, owner, ana, "doe", [], expect=400)
     _set(client, owner, ana, "rector", ["primaria"], expect=400)
     _set(client, owner, ana, "doe", ["universidad"], expect=400)
+
+
+def test_puestos_adviser_y_tutor(client):
+    owner, ana, beto, _ = _sede(client)
+    adviser = _set(client, owner, ana, "adviser", ["primaria"])
+    assert adviser["levels"] == {"primaria": "adviser"} and adviser["role"] == "member"
+    tutor = _set(client, owner, beto, "tutor", ["primaria"])
+    assert tutor["levels"] == {"primaria": "tutor"}
+    assert [group["name"] for group in tutor["groups"]] == ["DOE"]  # igual que el DOE
+
+    de_beto = _meeting(client, beto, "Entrevista de la tutora")
+    assert _sees(client, ana, de_beto)  # la adviser ve lo que crea el tutor
+    assert not _sees(client, beto, _meeting(client, ana, "De la adviser"))
+
+    users = _users(client, owner)
+    assert users[ana.user_id]["guessed_position"] == "adviser"
+    assert users[beto.user_id]["guessed_position"] == "tutor"

@@ -23,6 +23,8 @@ export interface SelectOption {
   label: string;
   /** Texto secundario a la derecha; también entra en la búsqueda. */
   hint?: string;
+  /** Una línea debajo del texto, para explicar qué es la opción (se ve en la lista, no en el botón). */
+  description?: string;
   /** Clase de color de fondo para un punto antes del texto (ej. "bg-red-500"). */
   dot?: string;
 }
@@ -111,7 +113,8 @@ export function Select({
     const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
 
     // Nunca más angosto que el botón ni que 14rem, nunca más ancho que la pantalla.
-    const width = Math.min(Math.max(rect.width, 224), viewportWidth - MARGIN * 2);
+    const minWidth = options.some((option) => option.description) ? 288 : 224;
+    const width = Math.min(Math.max(rect.width, minWidth), viewportWidth - MARGIN * 2);
     let left = rect.left;
     if (left + width > viewportWidth - MARGIN) left = rect.right - width;
     left = Math.max(MARGIN, Math.min(left, viewportWidth - width - MARGIN));
@@ -302,12 +305,19 @@ export function Select({
                     aria-selected={isSelected}
                     onPointerMove={() => setActive(index)}
                     onClick={() => choose(option)}
-                    className={`flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-2 text-sm ${
+                    className={`flex cursor-pointer ${option.description ? "items-start" : "items-center"} gap-2 rounded-xl px-2.5 py-2 text-sm ${
                       index === active ? "bg-ink-50" : ""
                     } ${option.value === "" ? "text-ink-500" : "text-ink-800"}`}
                   >
                     {option.dot && <span className={`h-2 w-2 shrink-0 rounded-full ${option.dot}`} />}
-                    <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                    {option.description ? (
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate">{option.label}</span>
+                        <span className="block text-xs leading-snug text-ink-400">{option.description}</span>
+                      </span>
+                    ) : (
+                      <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                    )}
                     {option.hint && (
                       <span className="max-w-[40%] shrink-0 truncate text-xs text-ink-400">{option.hint}</span>
                     )}
@@ -317,7 +327,7 @@ export function Select({
                       viewBox="0 0 16 16"
                       fill="none"
                       aria-hidden
-                      className={`shrink-0 text-accent-600 ${isSelected ? "" : "invisible"}`}
+                      className={`shrink-0 text-accent-600 ${option.description ? "mt-1" : ""} ${isSelected ? "" : "invisible"}`}
                     >
                       <path d="m3.5 8.5 3 3 6-7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
