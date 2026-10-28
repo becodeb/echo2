@@ -62,7 +62,7 @@ export function InterviewSheet({
   const alumno = (
     // Con "Folio Nro" arriba, la fila ya no es la primera <p> de la hoja: el aire va aparte.
     <p className={school ? "ent-fila ent-primera" : "ent-fila"}>
-      <b>Nombre del alumno:</b>
+      <b>{school ? "Nombre del alumno/a:" : "Nombre del alumno:"}</b>
       <Fill className="ent-grow">{fields.alumno}</Fill>
       <b className="ent-curso">{inicial ? "Kinder:" : "Curso:"}</b>
       <Fill className="ent-corto">{fields.curso}</Fill>
@@ -99,7 +99,9 @@ export function InterviewSheet({
       {letterhead.logo_data_url && (
         <img src={letterhead.logo_data_url} alt={letterhead.institution} className="ent-logo" />
       )}
-      <h1 className="ent-titulo">{letterhead.title || "ACTA DE ENTREVISTA"}</h1>
+      {/* La planilla del nivel es siempre de entrevista, aunque el membrete de la
+          sede diga otro título (Nordelta: "ACTA DE REUNIÓN" en los otros niveles). */}
+      <h1 className="ent-titulo">{school ? "ACTA DE ENTREVISTA" : letterhead.title || "ACTA DE ENTREVISTA"}</h1>
 
       {alumno}
       {solicitada}
