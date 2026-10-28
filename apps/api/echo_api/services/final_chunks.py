@@ -88,6 +88,9 @@ NEW_RAW = 0.50
 # (centradas) son la misma: por ejemplo, ElevenLabs partió a alguien en dos
 # dentro de un tramo y eso sumó una persona de más.
 MERGE_CENTERED = 0.50
+# Dos personas con la voz así de parecida (centradas) se revisan por lo que
+# dice cada una (services/speaker_content.py).
+SIMILAR_CENTERED = -0.10
 ITERATIONS = 20
 
 _semaphore = asyncio.Semaphore(MAX_PARALLEL)
@@ -520,17 +523,8 @@ def _overlap_mappings(chunks: list[Chunk]) -> list[dict[str, str]]:
     return mappings
 
 
-def stitch_words(chunks: list[Chunk], mode: str = "voice") -> tuple[list[SttWord], dict[str, np.ndarray]]:
-    """Las palabras de toda la reunión, con una sola numeración de personas, y la huella de cada una.
-
-    Las huellas (solo en el modo por voz) las usa "Mi voz" para sugerir
-    nombres sin volver a calcularlas al finalizar.
-    """
-    prints: dict[str, np.ndarray] = {}
-    if mode == "voice":
-        mappings, prints = link_voices(chunks)
-    else:
-        mappings = _overlap_mappings(chunks)
+def relabel(chunks: list[Chunk], mappings: list[dict[str, str]]) -> list[SttWord]:
+    """Las palabras de toda la reunión con la persona de la reunión (y sin repetir el solapamiento, si hay)."""
     words: list[SttWord] = []
     for position, (chunk, mapping) in enumerate(zip(chunks, mappings, strict=True)):
         relabeled = [replace(word, speaker=mapping.get(word.speaker) if word.speaker else None) for word in chunk.words]
@@ -540,7 +534,50 @@ def stitch_words(chunks: list[Chunk], mode: str = "voice") -> tuple[list[SttWord
             words = [w for w in words if w.start_ms < cut] + [w for w in relabeled if w.start_ms >= cut]
         else:
             words = relabeled
-    return words, prints
+    return words
+
+
+def stitch_words(chunks: list[Chunk], mode: str = "voice") -> tuple[list[SttWord], dict[str, np.ndarray]]:
+    """Las palabras de toda la reunión, con una sola numeración de personas, y la huella de cada una.
+
+    Las huellas (solo en el modo por voz) las usa "Mi voz" para sugerir
+    nombres sin volver a calcularlas al finalizar.
+    """
+    if mode == "voice":
+        mappings, prints = link_voices(chunks)
+        return relabel(chunks, mappings), prints
+    return relabel(chunks, _overlap_mappings(chunks)), {}
+
+
+def similar_voices(chunks: list[Chunk], mappings: list[dict[str, str]]) -> list[tuple[str, str, float]]:
+    """Pares de personas de la reunión con la voz parecida (centradas), del más parecido al menos.
+
+    Son las que la voz puede confundir entre tramos: la docente y la mamá del
+    27/10 daban ~0,15; en la reunión clara del 26/10, dos personas distintas
+    daban −0,3 a −0,5.
+    """
+    nodes = [
+        (mappings[position][label], np.asarray(chunk.voices[label]["vector"], dtype=np.float64),
+         float(chunk.voices[label]["ms"]))
+        for position, chunk in enumerate(chunks)
+        for label in chunk.voices
+        if label in mappings[position]
+    ]
+    if len(nodes) < 3:
+        return []
+    raw = _unit(np.array([vector for _, vector, _ in nodes]))
+    vectors = _unit(raw - raw.mean(axis=0))
+    people: dict[str, np.ndarray] = {}
+    for (person, _, weight), vector in zip(nodes, vectors, strict=True):
+        people[person] = people.get(person, np.zeros_like(vector)) + vector * weight
+    names = sorted(people)
+    pairs = []
+    for i, a in enumerate(names):
+        for b in names[i + 1:]:
+            score = float(_unit(people[a]) @ _unit(people[b]))
+            if score >= SIMILAR_CENTERED:
+                pairs.append((a, b, score))
+    return sorted(pairs, key=lambda pair: -pair[2])
 
 
 def stitch_segments(chunks: list[Chunk]) -> list[SttSegment]:

@@ -85,6 +85,16 @@ def _get_extractor():
     return _extractor
 
 
+def warm_up() -> None:
+    """Carga el modelo y hace una huella de prueba.
+
+    El primer cálculo después de cargar tarda varias veces más (28/10, en el
+    servidor: 1,3 s contra 0,3 s para 8 s de audio); sin esto lo pagaba el
+    primer "Finalizar" después de cada reinicio.
+    """
+    embed(np.zeros(SAMPLE_RATE * 2, dtype=np.int16) + 1)
+
+
 def embed(samples: np.ndarray) -> np.ndarray | None:
     """Huella normalizada de audio PCM16 (int16) o float32 en [-1, 1], 16 kHz mono."""
     extractor = _get_extractor()

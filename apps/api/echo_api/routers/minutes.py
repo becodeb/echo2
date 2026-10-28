@@ -26,7 +26,7 @@ from ..services.audit import audit
 from ..services.llm import get_llm_provider
 from ..services.privacy import protect
 from ..services.drive import upload_minutes
-from ..services.minutes_gen import DEFAULT_TEMPLATE, generate_minutes, get_active_template
+from ..services.minutes_gen import DEFAULT_TEMPLATE, draft_for, generate_minutes, get_active_template
 
 router = APIRouter(tags=["minutes"])
 
@@ -62,6 +62,8 @@ class MinutesOut(BaseModel):
     can_confirm: bool = False
     # Número de acta; None hasta que se genera o se imprime por primera vez.
     number: int | None = None
+    # Mientras se escribe: lo que la IA lleva escrito (se muestra como si se tipeara).
+    draft_markdown: str | None = None
 
 
 @router.get("/api/meetings/{meeting_id}/minutes", response_model=MinutesOut | None)
@@ -127,6 +129,7 @@ async def get_minutes(
         generation_started_at=minutes.generation_started_at,
         can_confirm=_can_confirm(ctx, meeting),
         number=minutes.number,
+        draft_markdown=draft_for(meeting.id) if minutes.generation_status == "generating" else None,
     )
 
 

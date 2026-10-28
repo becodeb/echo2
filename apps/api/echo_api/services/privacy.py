@@ -51,7 +51,7 @@ from dataclasses import dataclass, field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .llm.base import LLMProvider, collect_usage
+from .llm.base import LLMProvider, collect_usage, current_on_text, streaming
 
 log = logging.getLogger("echo.privacy")
 
@@ -120,6 +120,8 @@ _EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 _NUMBER = re.compile(r'(?<![\w\[])(?<!": )(?<!":)\+?\d(?:[\d.\s-]{5,}\d)(?![\w\]])')
 _DATE = re.compile(r"^\d{1,2}[-.]\d{1,2}[-.]\d{2,4}$")
 _TOKEN = re.compile(r"\[?\b(" + "|".join(ALL_LABELS) + r")_(\d+)\b\]?", re.IGNORECASE)
+# Un marcador cortado al final de un texto que todavía está llegando.
+_TOKEN_TAIL = re.compile(r"\b[A-Z]{2,}(?:_\d*)?$")
 
 
 def _nice(word: str) -> str:
@@ -405,8 +407,22 @@ class PrivateLLMProvider(LLMProvider):
         safe_system = p.apply(system, guess=False)
         if p.used:
             safe_system += PRIVACY_NOTE
+        outer = current_on_text()
         with collect_usage() as used:
-            answer = await self.inner.chat(safe_system, safe_messages, temperature, max_tokens)
+            if outer is None:
+                answer = await self.inner.chat(safe_system, safe_messages, temperature, max_tokens)
+            else:
+                # Lo que se va mostrando también con los nombres de verdad. Un
+                # marcador a medio llegar ("[PERSO") espera al próximo pedazo.
+                def restored(text: str) -> None:
+                    cut = text.rfind("[")
+                    if cut != -1 and "]" not in text[cut:]:
+                        text = text[:cut]
+                    text = _TOKEN_TAIL.sub("", text)  # también sin corchetes ("PERSONA_")
+                    outer(p.restore(text))
+
+                with streaming(restored):
+                    answer = await self.inner.chat(safe_system, safe_messages, temperature, max_tokens)
         if used and self.org_id is not None:
             await _record_llm_usage(used, self.org_id, self.meeting_id, self.user_id)
         return p.restore(answer)

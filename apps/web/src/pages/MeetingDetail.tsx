@@ -949,6 +949,43 @@ function VoiceMark({ title }: { title?: string }) {
 
 // ── Acta ─────────────────────────────────────────────────────────
 
+// Muestra el texto de a poco, alcanzando lo que llegó en ~0,6 s: el borrador
+// llega por pedazos y así se ve escribirse en vez de saltar de a bloques.
+function useTypewriter(target: string): string {
+  const [shown, setShown] = useState(target);
+  const shownRef = useRef(target);
+  useEffect(() => {
+    // Temporizador y no requestAnimationFrame: ese se frena con la pestaña
+    // atrás y el acta se quedaba en las primeras líneas.
+    const timer = window.setInterval(() => {
+      const current = shownRef.current;
+      // Si la IA empezó de nuevo (otro modelo), se arranca desde lo que coincide.
+      let common = 0;
+      while (common < current.length && common < target.length && current[common] === target[common]) common++;
+      const remaining = target.length - common;
+      if (remaining <= 0 && common === current.length) {
+        window.clearInterval(timer);
+        return;
+      }
+      const next = target.slice(0, common + Math.max(1, Math.ceil(remaining / 20)));
+      shownRef.current = next;
+      setShown(next);
+    }, 30);
+    return () => window.clearInterval(timer);
+  }, [target]);
+  return shown;
+}
+
+function DraftView({ markdown }: { markdown: string }) {
+  const shown = useTypewriter(markdown);
+  return (
+    <ActaFormatted>
+      <MarkdownView markdown={shown} />
+      <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-ink-400 align-middle" aria-hidden />
+    </ActaFormatted>
+  );
+}
+
 function MinutesTab({ meetingId, minutesTitle }: { meetingId: string; minutesTitle: string }) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
@@ -963,11 +1000,13 @@ function MinutesTab({ meetingId, minutesTitle }: { meetingId: string; minutesTit
     queryFn: () => api<MinutesOut | null>(`/api/meetings/${meetingId}/minutes`),
     // Generar el acta es una tarea de fondo: sin esto la pantalla se queda en
     // "generando" hasta que la persona recarga a mano.
+    // Mientras se escribe se pide seguido: el borrador aparece casi en vivo.
     refetchInterval: (query) =>
-      query.state.data?.generation_status === "generating" ||
-      query.state.data?.generation_status === "verifying"
-        ? 3000
-        : false,
+      query.state.data?.generation_status === "generating"
+        ? 700
+        : query.state.data?.generation_status === "verifying"
+          ? 3000
+          : false,
   });
 
   const regenerate = useMutation({
@@ -1020,7 +1059,21 @@ function MinutesTab({ meetingId, minutesTitle }: { meetingId: string; minutesTit
     </div>
   );
 
+  const liveDraft = minutes?.generation_status === "generating" ? minutes.draft_markdown : null;
+
   if (!minutes || !minutes.version) {
+    if (generating && !generationFailed && liveDraft) {
+      return (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 rounded-xl bg-ink-50 px-4 py-3 text-sm text-ink-600">
+            <Spinner /> Echo está escribiendo el acta…
+          </div>
+          <Card>
+            <DraftView markdown={liveDraft} />
+          </Card>
+        </div>
+      );
+    }
     if (generating && !generationFailed) {
       return (
         <Card>
@@ -1229,6 +1282,10 @@ function MinutesTab({ meetingId, minutesTitle }: { meetingId: string; minutesTit
               {saveEdit.isPending ? <Spinner /> : "Guardar nueva versión"}
             </Button>
           </div>
+        </Card>
+      ) : liveDraft ? (
+        <Card>
+          <DraftView markdown={liveDraft} />
         </Card>
       ) : (
         <Card>

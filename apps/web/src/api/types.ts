@@ -269,6 +269,8 @@ export interface MinutesOut {
   generation_started_at: string | null;
   /** Quien grabó la reunión (o un admin) puede confirmar el acta. */
   can_confirm: boolean;
+  /** Mientras se escribe: lo que la IA lleva escrito. */
+  draft_markdown?: string | null;
 }
 
 /** Campos del formulario del acta del colegio (de entrevista o de reunión). */

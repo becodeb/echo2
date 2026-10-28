@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
 from contextlib import contextmanager
 from contextvars import ContextVar
 import re
@@ -63,6 +64,32 @@ def reasoning(effort: str):
         yield
     finally:
         _effort.reset(token)
+
+
+# Quien quiere ver la respuesta a medida que se escribe (el acta, 28/10:
+# "ver el acta mientras se escribe"). Recibe el texto acumulado hasta ahí.
+_on_text: ContextVar[Callable[[str], None] | None] = ContextVar("echo_llm_on_text", default=None)
+
+
+@contextmanager
+def streaming(on_text: Callable[[str], None]):
+    """Las llamadas de adentro del bloque van pasando su texto a `on_text` mientras llega."""
+    token = _on_text.set(on_text)
+    try:
+        yield
+    finally:
+        _on_text.reset(token)
+
+
+def current_on_text() -> Callable[[str], None] | None:
+    return _on_text.get()
+
+
+def _tell(on_text: Callable[[str], None], text: str) -> None:
+    try:
+        on_text(text)
+    except Exception:  # noqa: BLE001 - mostrar el borrador nunca corta la respuesta
+        log.exception("llm: falló el aviso de texto parcial")
 
 
 class LLMProvider:
@@ -150,9 +177,14 @@ class OpenAICompatibleProvider(LLMProvider):
         self.omit_max_tokens = omit_max_tokens
 
     async def chat(self, system, messages, temperature=0.2, max_tokens: int | None = 4096) -> str:
-        headers = {"Content-Type": "application/json"}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
+        on_text = _on_text.get()
+        if on_text is not None:
+            streamed = await self._chat_streaming(system, messages, temperature, max_tokens, on_text)
+            if streamed is not None:
+                return streamed
+        return await self._chat_once(system, messages, temperature, max_tokens)
+
+    def _payload(self, system, messages, temperature, max_tokens) -> dict:
         payload = {
             "model": self.model,
             "messages": [{"role": "system", "content": system}, *messages],
@@ -174,6 +206,65 @@ class OpenAICompatibleProvider(LLMProvider):
             # caía siempre al modelo de reserva. Sin razonar el acta sale igual
             # de bien (medido), en ~7s en vez de ~33s y con un cuarto de tokens.
             payload["thinking"] = {"type": "disabled"}
+        return payload
+
+    async def _chat_streaming(self, system, messages, temperature, max_tokens, on_text) -> str | None:
+        """La misma llamada, pero leyendo la respuesta a medida que llega.
+
+        None = no se pudo empezar (el proveedor no acepta streaming, un 429, un
+        nivel de razonamiento que no toma...): quien llama repite sin streaming,
+        con los reintentos de siempre. Una falla a mitad de camino sí es error.
+        """
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        payload = {**self._payload(system, messages, temperature, max_tokens), "stream": True,
+                   "stream_options": {"include_usage": True}}
+        started = time.monotonic()
+        text, usage, finish = "", {}, None
+        try:
+            async with httpx.AsyncClient(timeout=180) as client:
+                async with client.stream(
+                    "POST", f"{self.base_url}/chat/completions", json=payload, headers=headers
+                ) as response:
+                    if response.status_code != 200:
+                        body = (await response.aread()).decode(errors="ignore")[:200]
+                        log.info("llm %s: sin streaming (%s %s)", self.name, response.status_code, body)
+                        return None
+                    async for line in response.aiter_lines():
+                        if not line.startswith("data:"):
+                            continue
+                        data = line[5:].strip()
+                        if data == "[DONE]":
+                            break
+                        try:
+                            chunk = json.loads(data)
+                        except json.JSONDecodeError:
+                            continue
+                        usage = chunk.get("usage") or usage
+                        for choice in chunk.get("choices") or []:
+                            delta = (choice.get("delta") or {}).get("content")
+                            if delta:
+                                text += delta
+                                _tell(on_text, text)
+                            finish = choice.get("finish_reason") or finish
+        except httpx.HTTPError as exc:
+            if not text:
+                log.info("llm %s: sin streaming (%s)", self.name, exc)
+                return None
+            raise LLMError(f"Error de red con {self.name}: {exc}") from exc
+        log.info("llm %s model=%s latency_ms=%d streaming", self.name, self.model, int((time.monotonic() - started) * 1000))
+        note_usage(self.name, self.model, usage.get("prompt_tokens"), usage.get("completion_tokens"))
+        if not text.strip():
+            detail = " (se quedó sin tokens razonando)" if finish == "length" else ""
+            raise LLMError(f"{self.name} devolvió una respuesta vacía{detail}")
+        return text
+
+    async def _chat_once(self, system, messages, temperature=0.2, max_tokens: int | None = 4096) -> str:
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        payload = self._payload(system, messages, temperature, max_tokens)
         started = time.monotonic()
         try:
             async with httpx.AsyncClient(timeout=180) as client:

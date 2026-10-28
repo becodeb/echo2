@@ -154,6 +154,18 @@ async def _start_final_prepass() -> None:
 
 
 @app.on_event("startup")
+async def _warm_up_voiceprint() -> None:
+    """Carga el modelo de huellas de voz al arrancar (services/voiceprint.py)."""
+    import asyncio
+
+    from .services.background import spawn
+    from .services.voiceprint import warm_up
+
+    if settings.echo_env != "test":
+        spawn(asyncio.to_thread(warm_up), name="voiceprint-warm-up")
+
+
+@app.on_event("startup")
 async def _start_voice_reminder() -> None:
     """Recuerda en la campanita, cada 3 días, grabar "Mi voz" a quien no la
     tiene (services/voice_reminder.py)."""

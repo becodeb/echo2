@@ -15,6 +15,7 @@ import asyncio
 import json
 import logging
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -37,10 +38,79 @@ from ..models import (
 from . import acta_entrevista
 from .insights_prompts import language_name
 from .llm import LLMError, LLMProvider
-from .llm.base import reasoning
+from .llm.base import reasoning, streaming
 from .transcript_util import format_ms, load_transcript_lines, transcript_to_text
 
 log = logging.getLogger("echo.minutes")
+
+# ── El acta mientras se escribe ──────────────────────────────────
+# El borrador de cada acta que se está escribiendo, en memoria (una sola API
+# corre el pipeline y atiende la pantalla). La pantalla lo pide mientras el
+# acta está "generating" y lo muestra como si se tipeara (28/10: "ver el acta
+# mientras se escribe").
+_drafts: dict[uuid.UUID, str] = {}
+
+
+def draft_for(meeting_id: uuid.UUID) -> str | None:
+    return _drafts.get(meeting_id)
+
+
+def partial_json_strings(text: str) -> dict[str, str]:
+    """Los textos de un JSON que todavía está llegando: clave → valor (el último, a medias).
+
+    Solo strings, en cualquier nivel ({"fields": {"desarrollo": "..."}} da
+    "desarrollo"). Un escape cortado al final se descarta hasta que llega entero.
+    """
+    out: dict[str, str] = {}
+    key: str | None = None
+    index, size = 0, len(text)
+    while index < size:
+        if text[index] != '"':
+            index += 1
+            continue
+        end = index + 1
+        while end < size and text[end] != '"':
+            end += 2 if text[end] == "\\" else 1
+        raw = text[index + 1:min(end, size)]
+        complete = end < size
+        if not complete:
+            # Un escape o un \uXXXX a medias al final: se espera.
+            cut = raw.rfind("\\")
+            if cut != -1 and (cut == len(raw) - 1 or (raw[cut + 1] == "u" and len(raw) - cut < 6)):
+                raw = raw[:cut]
+        try:
+            value = json.loads(f'"{raw}"')
+        except json.JSONDecodeError:
+            value = raw
+        rest = text[end + 1:].lstrip() if complete else ""
+        if complete and rest.startswith(":"):
+            key = value
+        elif key is not None:
+            out[key] = value
+            key = None
+        index = end + 1
+    return out
+
+
+def _drafter(meeting_id: uuid.UUID, render: Callable[[dict[str, str]], str]) -> Callable[[str], None]:
+    """El aviso que recibe el texto de la IA a medida que llega y arma el borrador."""
+    announced = False
+
+    def on_text(raw: str) -> None:
+        nonlocal announced
+        markdown = render(partial_json_strings(raw))
+        if not markdown.strip():
+            return
+        _drafts[meeting_id] = markdown
+        if not announced:
+            # Con la primera línea, la pantalla de "Finalizar" ya pasa al acta.
+            announced = True
+            from .background import spawn
+            from .pipeline import announce_ready  # pipeline importa este módulo
+
+            spawn(announce_ready(meeting_id, "minutes"), name=f"acta-escribiendo:{meeting_id}")
+
+    return on_text
 
 DEFAULT_TEMPLATE_NAME = "Acta estándar (provisional)"
 
@@ -231,6 +301,8 @@ async def generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instruc
         log.exception("falló la generación del acta de %s", meeting_id)
         await _set_generation_state(meeting_id, "failed", friendly_generation_error(exc))
         return
+    finally:
+        _drafts.pop(meeting_id, None)
     # Al Drive de la sede apenas está, sin esperar a que la aprueben.
     from .drive import upload_minutes
 
@@ -298,6 +370,9 @@ async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instru
         # De qué hijo(s) es la reunión: lo eligió quien la creó; si la familia
         # tiene un solo estudiante, es ese. Van al acta con iniciales y curso.
         students: list[FamilyMember] = []
+        # Todos los hijos de la familia: el borrador los oculta a todos (el
+        # acta final, al elegido o al que nombró la IA).
+        all_kids: list[FamilyMember] = []
         if meeting.family_id:
             family = await db.get(Family, meeting.family_id)
             if family is not None:
@@ -308,6 +383,7 @@ async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instru
                 )
                 chosen = {str(student_id) for student_id in meeting.student_ids or []}
                 kids = [m for m in members if m.relationship_type == "estudiante"]
+                all_kids = kids
                 students = [m for m in kids if str(m.id) in chosen] or (kids if len(kids) == 1 else [])
                 family_hint = {
                     "familia": family.name,
@@ -374,7 +450,27 @@ async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instru
         formato = acta_entrevista.template_format(template.body_markdown)
         hints = {**structured, "motivo_cargado": reason_name, "familia_cargada": family_hint}
         hidden = [(m.name, acta_entrevista.initials(m.name)) for m in students]
-        with reasoning("none"):
+        draft_hidden = [(m.name, acta_entrevista.initials(m.name)) for m in all_kids]
+
+        def render_draft(values: dict[str, str]) -> str:
+            # Lo mismo que el acta final con lo que llegó hasta ahora.
+            partial = acta_entrevista.normalize_fields(
+                {**values, "fecha": fecha.isoformat(), "formato": formato, "hora": hora}, fecha, hora
+            )
+            if not (partial["desarrollo"] or partial["con"] or partial["reunen"]):
+                return ""
+            if students:
+                partial["alumno"] = ", ".join(acta_entrevista.initials(m.name) for m in students)
+                cursos = [m.curso for m in students if m.curso]
+                if cursos:
+                    partial["curso"] = ", ".join(dict.fromkeys(cursos))
+            if reason_name and not partial["motivo"]:
+                partial["motivo"] = reason_name
+            for key in ("alumno", "desarrollo", "con", "reunen", "motivo"):
+                partial[key] = acta_entrevista.hide_student_names(partial[key], draft_hidden)
+            return acta_entrevista.render_markdown(partial)
+
+        with reasoning("none"), streaming(_drafter(meeting_id, render_draft)):
             result = await provider.chat_json(
                 acta_entrevista.GENERATOR_SYSTEM.format(language=language),
                 [
@@ -448,7 +544,12 @@ Devolvé JSON:
   "markdown": "el acta completa en markdown siguiendo el modelo"
 }}"""
 
-    with reasoning("none"):
+    draft_hidden = [(m.name, acta_entrevista.initials(m.name)) for m in all_kids]
+
+    def render_draft(values: dict[str, str]) -> str:
+        return acta_entrevista.hide_student_names(values.get("markdown", ""), draft_hidden)
+
+    with reasoning("none"), streaming(_drafter(meeting_id, render_draft)):
         result = await provider.chat_json(
             GENERATOR_SYSTEM.format(language=language),
             [{"role": "user", "content": prompt}],

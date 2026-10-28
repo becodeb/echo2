@@ -598,10 +598,22 @@ async def _people_pass(
         chunks, mode = await final_chunks.all_chunks(
             meeting_id, path, total_ms, "elevenlabs", engine, language, vocabulary
         )
-        stitched, voice_prints = final_chunks.stitch_words(chunks, mode)
+        similar: list[tuple[str, str, float]] = []
+        if mode == "voice":
+            mappings, voice_prints = final_chunks.link_voices(chunks)
+            similar = final_chunks.similar_voices(chunks, mappings)
+            if similar:
+                # Dos voces parecidas: quién es quién por lo que dice cada una.
+                mappings = await _check_by_content(meeting_id, organization_id, created_by, chunks, mappings, similar)
+            stitched = final_chunks.relabel(chunks, mappings)
+        else:
+            stitched, voice_prints = final_chunks.stitch_words(chunks, mode)
         people = {word.speaker for word in stitched if word.speaker}
         log.info("personas de %s: %d (%s)", meeting_id, len(people), mode)
-        await _update_meta(meeting_id, people_stitch={"mode": mode, "people": len(people), "chunks": len(chunks)})
+        await _update_meta(meeting_id, people_stitch={
+            "mode": mode, "people": len(people), "chunks": len(chunks),
+            "similar": [[a, b, round(score, 2)] for a, b, score in similar],
+        })
         if mode == "voice" and voice_prints:
             prints = voice_prints  # si no hay, "Mi voz" las saca como antes
         if stitched:
@@ -633,6 +645,26 @@ async def _people_pass(
         return None
     await _charge(meeting_id, organization_id, created_by, retry, result)
     return rows, prints
+
+
+async def _check_by_content(meeting_id, organization_id, created_by, chunks, mappings, similar):
+    """Revisión por contenido de dos voces parecidas (services/speaker_content.py). Nunca corta la pasada."""
+    from . import speaker_content
+    from .ai_settings import resolve_llm
+    from .llm import get_llm_provider
+    from .privacy import protect
+
+    try:
+        async with SessionLocal() as db:
+            config = await resolve_llm(db, organization_id)
+            if config is None:
+                return mappings
+            provider = get_llm_provider(config.provider, config.api_key, config.model, config.base_url)
+            provider = await protect(db, organization_id, provider, meeting_id, created_by)
+        return await speaker_content.check(chunks, mappings, similar, provider)
+    except Exception:  # noqa: BLE001 - queda lo que dijo la voz
+        log.exception("revisión por contenido de %s falló", meeting_id)
+        return mappings
 
 
 async def _charge(
