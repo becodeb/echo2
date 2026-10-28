@@ -6,7 +6,7 @@ import { api } from "../api/client";
 import type { AdminOrgOut, ChatOut, FamilyDetailOut, InsightsOut, MeetingOut, MinutesOut, SegmentOut } from "../api/types";
 import { Tabs } from "../components/Tabs";
 import { useAuth } from "../state/auth";
-import { Badge, Button, Card, EmptyState, Input, Modal, Spinner, formatDate, formatDuration, formatMs } from "../components/ui";
+import { Badge, Button, Card, EmptyState, Input, Modal, Spinner, formatDate, formatDateTime, formatDuration, formatMs } from "../components/ui";
 import { EchoFace } from "../components/EchoFace";
 import { ClassificationPanel, SEVERITIES, useClassification } from "../components/ClassificationPanel";
 import { studentInitials } from "../components/StudentPicker";
@@ -131,7 +131,7 @@ export default function MeetingDetail() {
           <ClassificationLine meetingId={meeting.id} onEdit={() => setClassifying(true)} />
         )}
         <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm text-ink-500">
-          <span>
+          <span title={formatDateTime(meeting.started_at)}>
             {formatDate(meeting.started_at)} · {formatDuration(meeting.duration_seconds)}
             {meeting.participants.some((participant) => !participant.user_id) &&
               ` · ${meeting.participants

@@ -59,9 +59,11 @@ function Row({ meeting, today }: { meeting: MeetingListItem; today: boolean }) {
   const target = detail ? `/meetings/${meeting.id}` : `/meetings/${meeting.id}/live`;
   const warm = detail ? () => prefetchMeeting(queryClient, meeting.id) : undefined;
   const date = meetingDate(meeting);
+  // La hora siempre: con varias reuniones el mismo día, es lo que las distingue.
+  const time = date.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
   const when = today
-    ? date.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })
-    : date.toLocaleDateString("es", { weekday: "short", day: "numeric", month: "short" });
+    ? time
+    : `${date.toLocaleDateString("es", { weekday: "short", day: "numeric", month: "short" })}, ${time}`;
   const about = [meeting.family_name, meeting.student_initials.join(" · "), meeting.reason_name].filter(Boolean);
   const chip = (
     <span className="flex shrink-0 items-center gap-2">

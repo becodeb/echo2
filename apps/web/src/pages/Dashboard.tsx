@@ -5,7 +5,7 @@ import { effectivePlan, PLAN_NAME, useBilling } from "../components/billing";
 import { api } from "../api/client";
 import { DeleteDraft } from "../components/DeleteDraft";
 import { MeetingStatus } from "../components/MeetingStatus";
-import { Card, EmptyState, formatDate, formatDuration } from "../components/ui";
+import { Card, EmptyState, formatDate, formatDateTime, formatDuration } from "../components/ui";
 import { EchoFace } from "../components/EchoFace";
 import { useAuth } from "../state/auth";
 import { prefetchMeeting } from "../lib/prefetch";
@@ -109,7 +109,7 @@ export default function Dashboard() {
                 >
                   <div className="min-w-0">
                     <p className="truncate font-medium text-ink-900">{meeting.title}</p>
-                    <p className="mt-0.5 text-xs text-ink-400">
+                    <p className="mt-0.5 text-xs text-ink-400" title={formatDateTime(meeting.started_at ?? meeting.created_at)}>
                       {formatDate(meeting.started_at ?? meeting.created_at)}
                       {meeting.duration_seconds > 0 && ` · ${formatDuration(meeting.duration_seconds)}`}
                     </p>

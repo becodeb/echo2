@@ -8,7 +8,7 @@ import { InterviewSheet } from "../components/InterviewSheet";
 import { MarkdownView } from "../components/MarkdownView";
 import { parseActaNumber, useNextActaNumber } from "../components/ActaNumber";
 import { actaFormatVars, levelLines } from "../components/actaFormat";
-import { Spinner, formatDate, formatDuration } from "../components/ui";
+import { Spinner, formatDateTime, formatDuration } from "../components/ui";
 import "./acta-print.css";
 
 /**
@@ -160,7 +160,8 @@ export default function ActaPrint() {
         {!bodyHasTitle && <h1 className="acta-print-titulo">{letterhead.title}</h1>}
 
         <p className="acta-print-meta">
-          {meeting.title} · {formatDate(meeting.started_at)} · {formatDuration(meeting.duration_seconds)}
+          {/* En papel, la fecha entera: "Hoy" no dice nada una semana después. */}
+          {meeting.title} · {formatDateTime(meeting.started_at)} · {formatDuration(meeting.duration_seconds)}
           {meeting.participants.length > 0 &&
             ` · ${meeting.participants.map((participant) => participant.name).join(", ")}`}
         </p>
