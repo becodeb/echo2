@@ -179,7 +179,7 @@ class TestPorNivel:
     def test_inicial_con_frase_sale_como_la_planilla(self):
         letterhead = {"levels": {"inicial": {"format": "entrevista", "school": FRASE_INICIAL}}}
         markdown = acta_entrevista.render_markdown(self._fields(nivel="inicial"), letterhead)
-        assert "**Nombre del alumno:** R. C.   **Kinder:** 3 F" in markdown
+        assert "**Nombre del alumno/a:** R. C.   **Kinder:** 3 F" in markdown
         assert "**Solicitada por:** Escuela" in markdown
         assert (
             f"A los 28 días del mes de octubre de 2026, se reúnen de manera remota / presencial la docente Laura Pérez {FRASE_INICIAL} "

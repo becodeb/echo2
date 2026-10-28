@@ -94,7 +94,9 @@ export function InterviewReview({ meetingId, minutes, fields }: {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-[1fr_10rem]">
-        <Input label="Nombre del alumno" value={form.alumno} onChange={(e) => set("alumno")(e.target.value)} />
+        <Input
+          label={!reunion && form.nivel && letterhead?.levels[form.nivel].school ? "Nombre del alumno/a" : "Nombre del alumno"}
+          value={form.alumno} onChange={(e) => set("alumno")(e.target.value)} />
         <Input
           label={form.nivel === "inicial" ? "Kinder" : "Curso"}
           value={form.curso}

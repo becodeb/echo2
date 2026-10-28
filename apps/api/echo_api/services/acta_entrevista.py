@@ -290,7 +290,7 @@ def render_markdown(fields: dict, letterhead: dict | None = None) -> str:
         parts = [
             "# ACTA DE ENTREVISTA",
             "",
-            f"**Nombre del alumno:** {fields['alumno'] or blank}   **{curso_label(nivel)}:** {fields['curso'] or blank}",
+            f"**Nombre del alumno/a:** {fields['alumno'] or blank}   **{curso_label(nivel)}:** {fields['curso'] or blank}",
             "",
             f"**Solicitada por:** {solicitada}",
             "",
