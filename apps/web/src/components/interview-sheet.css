@@ -256,3 +256,9 @@
   line-height: calc(var(--ent-renglon, 20pt) * 1.15);
 }
 .jar-renglones { margin-top: 8pt; }
+
+/* "Sin líneas" (Ajustes → Actas): el texto sin renglones y sin raya debajo de
+ * lo completado. Lo que quedó en blanco conserva su raya para escribir a mano. */
+.ent-sin-lineas .ent-renglones { background-image: none; }
+.ent-sin-lineas .ent-fill:not(.ent-vacio),
+.ent-sin-lineas .jar-fill:not(.jar-vacio) { border-bottom: none; }

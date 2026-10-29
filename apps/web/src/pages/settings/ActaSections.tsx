@@ -54,7 +54,7 @@ function MinutesLanguage() {
   );
 }
 
-type ActaLookValue = Pick<LetterheadOut, "font_size" | "line_spacing" | "margins">;
+type ActaLookValue = Pick<LetterheadOut, "font_size" | "line_spacing" | "margins" | "ruled_lines">;
 
 const SAMPLE_PARAGRAPHS = [
   "A los 27 días del mes de octubre, se reúnen la docente y la familia del alumno para conversar sobre su adaptación al grupo.",
@@ -97,6 +97,7 @@ function ActaLook() {
       font_size: current.font_size,
       line_spacing: current.line_spacing,
       margins: current.margins,
+      ruled_lines: current.ruled_lines ?? "con",
       ...patch,
     });
   const { scale, line, margin } = actaScale(current);
@@ -138,6 +139,16 @@ function ActaLook() {
             options={[
               { value: "normal", label: "Normales" },
               { value: "angosto", label: "Angostos" },
+            ]}
+          />
+          <LookChoice
+            label="Rayas del formulario"
+            value={current.ruled_lines ?? "con"}
+            disabled={!isAdmin}
+            onChange={(ruled_lines) => change({ ruled_lines })}
+            options={[
+              { value: "con", label: "Con líneas" },
+              { value: "sin", label: "Sin líneas" },
             ]}
           />
           <p className="text-xs leading-relaxed text-ink-400">

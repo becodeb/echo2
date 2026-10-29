@@ -105,3 +105,13 @@ def test_only_admins_change_the_format(client):
     assert denied.status_code == 403
     # Todos ven el formato: la hoja de impresión lo necesita.
     assert client.get("/api/org/letterhead", headers=member.headers).json()["font_size"] == "normal"
+
+
+def test_the_form_lines_can_be_turned_off_and_stay_off(client):
+    user, _ = _org_with_acta(client)
+    assert client.get("/api/org/letterhead", headers=user.headers).json()["ruled_lines"] == "con"
+    saved = client.put("/api/org/letterhead/format", json={"ruled_lines": "sin"}, headers=user.headers)
+    assert saved.status_code == 200 and saved.json()["ruled_lines"] == "sin"
+    assert client.get("/api/org/letterhead", headers=user.headers).json()["ruled_lines"] == "sin"
+    bad = client.put("/api/org/letterhead/format", json={"ruled_lines": "punteadas"}, headers=user.headers)
+    assert bad.status_code == 422

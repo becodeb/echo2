@@ -331,11 +331,14 @@ export interface LetterheadOut {
   font_size: ActaFontSize;
   line_spacing: ActaLineSpacing;
   margins: ActaMargins;
+  /** Rayas del formulario de entrevista: renglones y debajo de lo completado. */
+  ruled_lines: ActaRuledLines;
 }
 
 export type ActaFontSize = "normal" | "grande" | "muy_grande";
 export type ActaLineSpacing = "simple" | "1.5";
 export type ActaMargins = "normal" | "angosto";
+export type ActaRuledLines = "con" | "sin";
 
 export interface FamilyMemberOut {
   id: string;

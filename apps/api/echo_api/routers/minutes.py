@@ -509,8 +509,16 @@ ACTA_SIZES = {"normal": (11, 10), "grande": (13, 12), "muy_grande": (15, 14)}
 ACTA_LINE_SPACINGS = {"simple": 1.0, "1.5": 1.5}
 # Márgenes en mm (arriba y abajo, costados); None = los de siempre.
 ACTA_MARGINS = {"normal": None, "angosto": (13, 13)}
-ACTA_FORMAT_DEFAULTS = {"font_size": "normal", "line_spacing": "1.5", "margins": "normal"}
-_ACTA_FORMAT_CHOICES = {"font_size": ACTA_SIZES, "line_spacing": ACTA_LINE_SPACINGS, "margins": ACTA_MARGINS}
+# Las rayas del formulario de entrevista (renglones del desarrollo y debajo de
+# lo completado). "sin": el texto suelto, sin rayas, como pidió Nordelta.
+ACTA_RULED_LINES = {"con": True, "sin": False}
+ACTA_FORMAT_DEFAULTS = {"font_size": "normal", "line_spacing": "1.5", "margins": "normal", "ruled_lines": "con"}
+_ACTA_FORMAT_CHOICES = {
+    "font_size": ACTA_SIZES,
+    "line_spacing": ACTA_LINE_SPACINGS,
+    "margins": ACTA_MARGINS,
+    "ruled_lines": ACTA_RULED_LINES,
+}
 
 
 def acta_format_of(letterhead: dict | None) -> dict[str, str]:
@@ -627,6 +635,7 @@ class ActaFormatIn(BaseModel):
     font_size: Literal["normal", "grande", "muy_grande"] = "normal"
     line_spacing: Literal["simple", "1.5"] = "1.5"
     margins: Literal["normal", "angosto"] = "normal"
+    ruled_lines: Literal["con", "sin"] = "con"
 
 
 @router.put("/api/org/letterhead/format")
@@ -635,7 +644,7 @@ async def update_acta_format(
     ctx: OrgContext = Depends(get_org_context),
     db: AsyncSession = Depends(get_db),
 ):
-    """Tamaño de letra, interlineado y márgenes del acta: impresa, en Word y en PDF."""
+    """Tamaño de letra, interlineado, márgenes y rayas del acta: impresa, en Word y en PDF."""
     ctx.require_role("admin")
     org = await db.get(Organization, ctx.org_id)
     if org is None:

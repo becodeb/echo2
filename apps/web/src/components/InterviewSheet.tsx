@@ -26,6 +26,8 @@ function sheetFormat(letterhead: LetterheadOut, minLines = MIN_RULED_LINES) {
   const lines = Math.max(6, Math.floor((minLines * RULED_LINE_PT) / scale ** 2 / ruled));
   return {
     style: { ...actaFormatVars(letterhead), "--ent-renglon": `${ruled}pt` } as CSSProperties,
+    // "Sin líneas" (Ajustes → Actas): sin renglones ni raya bajo lo completado.
+    lines: letterhead.ruled_lines === "sin" ? " ent-sin-lineas" : "",
     minRuledHeight: `${lines * ruled}pt`,
   };
 }
@@ -62,7 +64,7 @@ export function InterviewSheet({
   const inicial = fields.nivel === "inicial";
 
   return (
-    <article className="entrevista-hoja" style={format.style}>
+    <article className={`entrevista-hoja${format.lines}`} style={format.style}>
       {number != null && <p className="ent-numero">Acta N.º {number}</p>}
       <header className="ent-membrete">
         {levelLines(letterhead, fields.nivel).map((line, index) => (
@@ -154,7 +156,7 @@ function JardinSheet({
   const strike = (mode: "remota" | "presencial") => (fields.modalidad && fields.modalidad !== mode ? "jar-tachado" : "");
 
   return (
-    <article className="entrevista-hoja jardin-hoja" style={format.style}>
+    <article className={`entrevista-hoja jardin-hoja${format.lines}`} style={format.style}>
       <div className="jar-cabecera">
         {letterhead.logo_data_url ? (
           <img src={letterhead.logo_data_url} alt={letterhead.institution} className="jar-logo" />
