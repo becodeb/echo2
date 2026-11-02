@@ -1,3 +1,4 @@
+from .agenda import SCHEDULE_STATUSES, ScheduledMeeting
 from .base import Base
 from .billing import ORG_PLANS, USER_PLANS, BillingPlan, PlanRequest, UsageEvent
 from .families import (
@@ -69,7 +70,7 @@ from .workspace import (
 )
 
 __all__ = [
-    "CustomPosition",
+    "CustomPosition", "ScheduledMeeting", "SCHEDULE_STATUSES",
     "Base", "BillingPlan", "PlanRequest", "UsageEvent", "ORG_PLANS", "USER_PLANS", "User", "Organization", "OrganizationMember", "OrganizationInvite",
     "MemberLevelAccess", "LEVELS", "LEVEL_ACCESS",
     "Family", "FamilyAssignment", "FamilyMember", "FamilySummary", "MeetingReason", "MeetingAttendance",

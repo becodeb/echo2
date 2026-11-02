@@ -83,6 +83,8 @@ class MeetingCreateIn(BaseModel):
     minors: bool = False
     # Entre las dos sedes: el acta sale sin el formulario de ninguna.
     intersede: bool = False
+    # Empezada desde la Agenda: la reunión agendada queda enlazada a esta.
+    scheduled_id: uuid.UUID | None = None
 
 
 class ParticipantOut(BaseModel):
@@ -350,6 +352,11 @@ async def create_meeting(
         if not project:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Proyecto no encontrado")
         db.add(ProjectMeeting(project_id=project.id, meeting_id=meeting.id))
+
+    if data.scheduled_id:
+        from .agenda import link_meeting
+
+        await link_meeting(db, ctx, data.scheduled_id, meeting)
 
     await audit(db, ctx.org_id, ctx.user.id, "meeting.create", "meeting", str(meeting.id))
     await db.commit()

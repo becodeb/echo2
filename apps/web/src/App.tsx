@@ -17,6 +17,8 @@ const loadMeetingDetail = () => import("./pages/MeetingDetail");
 const MeetingDetail = lazy(loadMeetingDetail);
 const loadMeetings = () => import("./pages/Meetings");
 const Meetings = lazy(loadMeetings);
+const loadAgenda = () => import("./pages/Agenda");
+const Agenda = lazy(loadAgenda);
 const loadInternalMeetings = () => import("./pages/InternalMeetings");
 const InternalMeetings = lazy(loadInternalMeetings);
 const loadProjects = () => import("./pages/Projects");
@@ -67,7 +69,7 @@ const Contact = lazy(loadContact);
 // Las páginas se bajan de a una la primera vez que se abren, y mientras tanto
 // la pantalla quedaba vacía: al cambiar de sección "se teletransportaba". Con
 // la sesión abierta se bajan todas en segundo plano, así cambiar es inmediato.
-const PAGE_LOADERS = [loadMeetingLive, loadMeetingDetail, loadMeetings, loadInternalMeetings, loadProjects, loadProjectDetail, loadPeople, loadPersonDetail, loadTasks, loadAskEcho, loadSearchPage, loadSettings, loadAdmin, loadFamilies, loadFamilyDetail, loadReports, loadChooseLevel, loadPlans, loadUsage, loadLegal];
+const PAGE_LOADERS = [loadMeetingLive, loadMeetingDetail, loadMeetings, loadAgenda, loadInternalMeetings, loadProjects, loadProjectDetail, loadPeople, loadPersonDetail, loadTasks, loadAskEcho, loadSearchPage, loadSettings, loadAdmin, loadFamilies, loadFamilyDetail, loadReports, loadChooseLevel, loadPlans, loadUsage, loadLegal];
 
 /** Sin sesión: a Ingresar, recordando el link que se quería abrir. */
 function ToLogin() {
@@ -216,6 +218,7 @@ function AppRoutes({ superadmin }: { superadmin: boolean }) {
         <Routes location={page}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/meetings" element={<Meetings />} />
+          <Route path="/agenda" element={<Agenda />} />
           <Route path="/internal" element={<InternalMeetings />} />
           <Route path="/meetings/:id/live" element={<MeetingLive />} />
           <Route path="/meetings/:id" element={<MeetingDetail />} />

@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { effectivePlan, PLAN_NAME, useBilling } from "../components/billing";
 import { api } from "../api/client";
 import { DeleteDraft } from "../components/DeleteDraft";
+import { TodayAgenda } from "../components/TodayAgenda";
 import { MeetingStatus } from "../components/MeetingStatus";
 import { Card, EmptyState, formatDate, formatDateTime, formatDuration } from "../components/ui";
 import { EchoFace } from "../components/EchoFace";
@@ -65,6 +66,7 @@ export default function Dashboard() {
         </button>
       </div>
 
+      <TodayAgenda />
       {data && <FirstSteps hasMeetings={data.recent_meetings.length > 0} />}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

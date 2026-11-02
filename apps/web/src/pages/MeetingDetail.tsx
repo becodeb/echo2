@@ -15,6 +15,7 @@ import { RecordingCard } from "../components/RecordingCard";
 import { ExportMenu } from "../components/ExportMenu";
 import { AnswerText } from "../components/AnswerText";
 import { MarkdownView } from "../components/MarkdownView";
+import { NextMeetingSuggestion } from "../components/NextMeetingSuggestion";
 import { InterviewReview } from "../components/InterviewReview";
 import { ActaFormatted } from "../components/actaFormat";
 import { Select } from "../components/Select";
@@ -188,7 +189,12 @@ export default function MeetingDetail() {
         </div>
       )}
       {activeTab === "transcript" && <TranscriptTab meeting={meeting} jumpMs={jumpMs ? Number(jumpMs) : null} onRefetch={refetch} />}
-      {activeTab === "minutes" && <MinutesTab meetingId={meeting.id} minutesTitle={meeting.title} />}
+      {activeTab === "minutes" && (
+        <div className="space-y-4">
+          <MinutesTab meetingId={meeting.id} minutesTitle={meeting.title} />
+          <NextMeetingSuggestion meeting={meeting} />
+        </div>
+      )}
       {activeTab === "tasks" && <TasksTab meetingId={meeting.id} />}
       {activeTab === "chat" && <ChatTab meetingId={meeting.id} onJump={(ms) => { params.set("t", String(ms)); setParams(params); setTab("transcript"); }} />}
       </div>

@@ -2,7 +2,8 @@ import { useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
-import type { Audience, FamilyOut, MeetingOut } from "../api/types";
+import type { Audience, FamilyOut, MeetingOut, ScheduledMeetingOut } from "../api/types";
+import { dayLabel, isoDay } from "../lib/agenda";
 import { AUDIENCES } from "./ClassificationPanel";
 import { FamilySelect } from "./FamilySelect";
 import { usePaid } from "./billing";
@@ -39,6 +40,7 @@ export function NewMeetingModal({
   initialKind = "familia",
   initialGroup = "",
   initialFamily = "",
+  scheduled,
 }: {
   open: boolean;
   onClose: () => void;
@@ -46,6 +48,8 @@ export function NewMeetingModal({
   initialGroup?: string;
   /** Desde la página de una familia: la reunión ya viene con ella. */
   initialFamily?: string;
+  /** Desde la Agenda: la reunión arranca con todo lo que se cargó al agendarla. */
+  scheduled?: ScheduledMeetingOut;
 }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -55,28 +59,34 @@ export function NewMeetingModal({
   const myGroups = (groupsData?.groups ?? []).filter((group) => group.is_member);
   const canTeam = myGroups.length > 0;
 
-  const [kindChoice, setKindChoice] = useState<Kind | null>(null);
+  const [kindChoice, setKindChoice] = useState<Kind | null>(
+    scheduled ? (scheduled.kind === "interna" ? "equipo" : "familia") : null,
+  );
+  // Agendada: primero el resumen de lo cargado; "Cambiar" abre el formulario.
+  const [summary, setSummary] = useState(!!scheduled);
   const kind: Kind = canTeam ? (kindChoice ?? initialKind) : "familia";
 
   const [title, setTitle] = useState("");
   const [language, setLanguage] = useState(() => localStorage.getItem("echo_pref_lang") ?? "es");
   const [participants, setParticipants] = useState("");
   // Quiénes del colegio están: con eso la ven (además de quien la crea).
-  const [staff, setStaff] = useState<string[]>([]);
+  const [staff, setStaff] = useState<string[]>(
+    (scheduled?.staff ?? []).map((person) => person.id).filter((id) => id !== user?.id),
+  );
   const [recordAudio, setRecordAudio] = useState(false);
   // Quién habló (gasta un crédito en el plan Gratis) y si hablan menores.
   const [people, setPeople] = useState(false);
   const [minors, setMinors] = useState(false);
   // Familia
-  const [familyId, setFamilyId] = useState(initialFamily);
-  const [students, setStudents] = useState<string[]>([]);
+  const [familyId, setFamilyId] = useState(scheduled?.family_id ?? initialFamily);
+  const [students, setStudents] = useState<string[]>((scheduled?.students ?? []).map((student) => student.id));
   const [intersede, setIntersede] = useState(false);
   const [audience, setAudience] = useState<Audience | "">("");
   const [visibility, setVisibility] = useState<"org" | "private">("org");
   const creatable = myAccess?.creatable_levels ?? [];
-  const [levelChoice, setLevelChoice] = useState<Level | "">("");
+  const [levelChoice, setLevelChoice] = useState<Level | "">((scheduled?.level as Level | null) ?? "");
   // Equipo
-  const [groupChoice, setGroupChoice] = useState("");
+  const [groupChoice, setGroupChoice] = useState(scheduled?.group_id ?? "");
   const [wantsMinutes, setWantsMinutes] = useState(false);
   const [projectId, setProjectId] = useState("");
   const groupId = groupChoice || initialGroup || myGroups[0]?.id || "";
@@ -142,6 +152,7 @@ export function NewMeetingModal({
         staff_ids: staff,
         people: people && !minors,
         minors,
+        scheduled_id: scheduled?.id ?? null,
       };
       const meeting = await api<MeetingOut>("/api/meetings", {
         method: "POST",
@@ -154,12 +165,14 @@ export function NewMeetingModal({
       // La familia se guarda antes de grabar: así la seudonimización ya
       // prioriza sus nombres desde el primer minuto. Si esto falla no se
       // frena la reunión; se puede clasificar después desde el detalle.
-      if (kind === "familia" && (familyId || audience)) {
+      const reasonId = scheduled?.reason_id ?? null;
+      if (kind === "familia" && (familyId || audience || reasonId)) {
         await api(`/api/meetings/${meeting.id}/classification`, {
           method: "PUT",
           body: JSON.stringify({
             family_id: familyId || null,
             audience: audience || null,
+            ...(reasonId ? { reason_id: reasonId } : {}),
             student_ids: familyId ? (students.length ? students : onlyStudent(family)) : [],
           }),
         }).catch(() => undefined);
@@ -176,6 +189,7 @@ export function NewMeetingModal({
       queryClient.invalidateQueries({ queryKey: ["billing"] });
       queryClient.invalidateQueries({ queryKey: ["meetings"] });
       queryClient.invalidateQueries({ queryKey: ["families"] });
+      queryClient.invalidateQueries({ queryKey: ["agenda"] });
       // El modal no se desmonta: que la próxima reunión arranque en blanco.
       setTitle("");
       setParticipants("");
@@ -201,8 +215,75 @@ export function NewMeetingModal({
     create.mutate(upload ?? undefined);
   };
 
+  if (scheduled && summary) {
+    const today = isoDay(new Date());
+    const rows: [string, string][] = [
+      ...(scheduled.students.length
+        ? [["Alumno/a", scheduled.students.map((s) => (s.curso ? `${s.name} · ${s.curso}` : s.name)).join(", ")] as [string, string]]
+        : []),
+      ...(scheduled.reason_name ? [["Motivo", scheduled.reason_name] as [string, string]] : []),
+      ...(scheduled.level ? [["Nivel", LEVEL_LABEL[scheduled.level]] as [string, string]] : []),
+      ["Por el colegio", ["Vos", ...scheduled.staff.filter((p) => p.id !== user?.id).map((p) => p.name)].join(", ")],
+      ...(scheduled.note ? [["Nota", scheduled.note] as [string, string]] : []),
+    ];
+    return (
+      <Modal open={open} onClose={onClose} title="Empezar la reunión agendada">
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm font-medium text-accent-600">
+              {scheduled.date === today ? "Agendada para hoy" : `Agendada para el ${dayLabel(scheduled.date).toLowerCase()}`}
+              {scheduled.time ? `, ${scheduled.time}` : ""}
+            </p>
+            <h3 className="mt-0.5 text-xl font-semibold text-ink-900">
+              {scheduled.kind === "interna" ? `Reunión interna · ${scheduled.group_name ?? ""}` : (scheduled.family_name ?? "Reunión")}
+            </h3>
+          </div>
+          <dl className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-3 gap-y-2.5 rounded-2xl border border-ink-100 p-4 text-sm">
+            {rows.map(([label, value]) => (
+              <div key={label} className="contents">
+                <dt className="text-ink-500">{label}</dt>
+                <dd className="font-medium text-ink-900">{value}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="text-sm text-ink-500">
+            {scheduled.kind === "interna"
+              ? "La reunión arranca en el grupo, con quienes sumaste."
+              : "Todo esto ya va al acta: alumno, curso, motivo y quiénes estuvieron. Si algo cambió, tocá «Cambiar»."}
+          </p>
+          <MeetingAiPlan
+            people={people}
+            onPeople={setPeople}
+            minors={minors}
+            onMinors={setMinors}
+            minutes={kind === "familia" || wantsMinutes}
+            enabled={open}
+          />
+          {create.isError && (
+            <p className="text-sm text-red-600">
+              {create.error instanceof Error ? create.error.message : "Error al crear"}
+            </p>
+          )}
+          <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+            <Button type="button" variant="ghost" onClick={() => setSummary(false)}>
+              Cambiar
+            </Button>
+            <Button
+              type="button"
+              className="min-h-12 bg-red-600 px-6 text-base hover:bg-red-500"
+              onClick={() => create.mutate(undefined)}
+              disabled={create.isPending}
+            >
+              {create.isPending ? <Spinner /> : "Empezar a grabar"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
   return (
-    <Modal open={open} onClose={onClose} title="Nueva reunión">
+    <Modal open={open} onClose={onClose} title={scheduled ? "Empezar la reunión agendada" : "Nueva reunión"}>
       <form onSubmit={submit} className="space-y-4">
         {canTeam && (
           <SegmentedToggle

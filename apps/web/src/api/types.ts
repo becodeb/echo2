@@ -401,6 +401,36 @@ export interface ProfessionalAttendanceRow {
   linked: boolean;
 }
 
+/** Una reunión agendada (Agenda): el día, y lo que ya queda cargado para empezarla. */
+export interface ScheduledMeetingOut {
+  id: string;
+  /** yyyy-mm-dd */
+  date: string;
+  /** HH:MM, o null si se agendó solo por día. */
+  time: string | null;
+  kind: "familia" | "interna";
+  title: string;
+  family_id: string | null;
+  family_name: string | null;
+  students: { id: string; name: string; curso: string | null }[];
+  reason_id: string | null;
+  reason_name: string | null;
+  level: "inicial" | "primaria" | "secundaria" | null;
+  group_id: string | null;
+  group_name: string | null;
+  staff: { id: string; name: string }[];
+  /** Para ese día; no va al acta. */
+  note: string;
+  status: "agendada" | "no_se_hizo";
+  created_by: string;
+  created_by_name: string;
+  /** La reunión grabada al tocar "Empezar". */
+  meeting_id: string | null;
+  meeting_status: string | null;
+  minutes_status: string | null;
+  can_edit: boolean;
+}
+
 export interface ReasonOut {
   id: string;
   name: string;

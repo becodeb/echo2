@@ -27,6 +27,7 @@ function Svg({ children, size = 18 }: { children: ReactNode; size?: number }) {
 export type IconName =
   | "home"
   | "meetings"
+  | "agenda"
   | "internal"
   | "tasks"
   | "projects"
@@ -77,6 +78,15 @@ export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
           <circle cx="9" cy="11.5" r="0.6" fill="currentColor" />
           <circle cx="12.5" cy="11.5" r="0.6" fill="currentColor" />
           <circle cx="16" cy="11.5" r="0.6" fill="currentColor" />
+        </Svg>
+      );
+    case "agenda":
+      return (
+        <Svg size={size}>
+          <rect x="3.5" y="4.5" width="17" height="16" rx="3.5" />
+          <path d="M3.5 9.5h17M8 2.8v3.4M16 2.8v3.4" />
+          <circle cx="8.5" cy="14" r="0.6" fill="currentColor" />
+          <circle cx="12" cy="14" r="0.6" fill="currentColor" />
         </Svg>
       );
     case "internal":

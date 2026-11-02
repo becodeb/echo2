@@ -30,6 +30,7 @@ interface NavItem {
 const NAV_MAIN: NavItem[] = [
   { to: "/", label: "Inicio", icon: "home" },
   { to: "/meetings", label: "Reuniones", icon: "meetings" },
+  { to: "/agenda", label: "Agenda", icon: "agenda" },
   { to: "/internal", label: "Reuniones internas", icon: "internal" },
   { to: "/tasks", label: "Mi trabajo", icon: "tasks" },
 ];
@@ -49,6 +50,7 @@ function pageTitle(pathname: string): string {
   const exact: Record<string, string> = {
     "/": "Inicio",
     "/meetings": "Reuniones",
+    "/agenda": "Agenda",
     "/internal": "Reuniones internas",
     "/tasks": "Mi trabajo",
     "/projects": "Proyectos",
