@@ -5,6 +5,7 @@ gravedad y quién de la familia vino. Va todo junto en un solo PUT porque en la
 práctica se completa de una sola sentada, al terminar la reunión.
 """
 import uuid
+from typing import Literal
 from datetime import date, datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, status
@@ -1291,11 +1292,74 @@ async def set_classification(
             if professional_id not in wanted:
                 await db.delete(row)
 
+    if meeting.family_id and (meeting.meta or {}).get("family_suggestion", {}).get("status") == "pending":
+        # Ya eligió la familia a mano: el cartel de la sugerencia se va.
+        meeting.meta = {**meeting.meta, "family_suggestion": {**meeting.meta["family_suggestion"], "status": "done"}}
+
     await audit(db, ctx.org_id, ctx.user.id, "meeting.classify", "meeting", str(meeting.id))
     await db.commit()
     await db.refresh(meeting)
     if folder_changed and meeting.drive_folder_id:
         # La carpeta de Drive sigue a la reunión: a la familia nueva, con el motivo nuevo.
+        from ..services.drive import sync_meeting_folder
+
+        background.add_task(sync_meeting_folder, meeting.id)
+    return await _classification_out(meeting, db)
+
+
+class SuggestionIn(BaseModel):
+    # accept: la familia sugerida (o crearla, si la sugerencia es crearla);
+    # dismiss: no es con una familia o la elige a mano.
+    action: Literal["accept", "dismiss"]
+
+
+@router.post("/api/meetings/{meeting_id}/family-suggestion", response_model=ClassificationOut)
+async def answer_family_suggestion(
+    meeting_id: uuid.UUID,
+    data: SuggestionIn,
+    background: BackgroundTasks,
+    ctx: OrgContext = Depends(get_org_context),
+    db: AsyncSession = Depends(get_db),
+):
+    """La familia que Echo sugirió al terminar una reunión sin familia (services/family_suggest.py)."""
+    meeting = await get_meeting_or_404(meeting_id, ctx, db, minimum_role="editor")
+    if not can_edit_meeting(ctx, meeting):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Sin permiso de edición")
+    suggestion = dict((meeting.meta or {}).get("family_suggestion") or {})
+    if suggestion.get("status") != "pending":
+        raise HTTPException(status.HTTP_409_CONFLICT, "La sugerencia ya se respondió")
+    if data.action == "accept":
+        if meeting.family_id is not None:
+            raise HTTPException(status.HTTP_409_CONFLICT, "La reunión ya tiene familia")
+        if suggestion.get("family_id"):
+            family = await _get_family(uuid.UUID(suggestion["family_id"]), ctx, db)
+        elif suggestion.get("create_name"):
+            family = Family(organization_id=ctx.org_id, name=suggestion["create_name"][:200])
+            db.add(family)
+            await db.flush()
+            await audit(db, ctx.org_id, ctx.user.id, "family.create", "family", str(family.id))
+        else:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "No hay familia para sugerir")
+        students = [
+            str(member_id)
+            for member_id in (
+                await db.execute(
+                    select(FamilyMember.id).where(
+                        FamilyMember.family_id == family.id,
+                        FamilyMember.id.in_([uuid.UUID(sid) for sid in suggestion.get("student_ids") or []]),
+                    )
+                )
+            ).scalars()
+        ]
+        meeting.family_id = family.id
+        meeting.student_ids = sorted(students) or None
+        suggestion["family_id"] = str(family.id)
+    suggestion["status"] = "accepted" if data.action == "accept" else "dismissed"
+    meeting.meta = {**(meeting.meta or {}), "family_suggestion": suggestion}
+    await audit(db, ctx.org_id, ctx.user.id, f"meeting.family_suggestion.{data.action}", "meeting", str(meeting.id))
+    await db.commit()
+    await db.refresh(meeting)
+    if data.action == "accept" and meeting.drive_folder_id:
         from ..services.drive import sync_meeting_folder
 
         background.add_task(sync_meeting_folder, meeting.id)

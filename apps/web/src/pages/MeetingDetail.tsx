@@ -16,6 +16,7 @@ import { ExportMenu } from "../components/ExportMenu";
 import { AnswerText } from "../components/AnswerText";
 import { MarkdownView } from "../components/MarkdownView";
 import { NextMeetingSuggestion } from "../components/NextMeetingSuggestion";
+import { FamilySuggestion } from "../components/FamilySuggestion";
 import { InterviewReview } from "../components/InterviewReview";
 import { ActaFormatted } from "../components/actaFormat";
 import { Select } from "../components/Select";
@@ -145,6 +146,7 @@ export default function MeetingDetail() {
           {!internal && <ActaChip meetingId={meeting.id} onOpen={() => selectTab("minutes")} />}
         </div>
         {!internal && <MeetingStaff meeting={meeting} />}
+        {!internal && !classifying && <FamilySuggestion meeting={meeting} onPick={() => setClassifying(true)} />}
         {!internal && <ClassificationPanel meetingId={meeting.id} editing={classifying} onClose={() => setClassifying(false)} />}
         {meeting.meta?.people_status === "pending" && (
           <p className="animate-fade-up mt-3 flex items-center gap-2 rounded-3xl bg-ink-50 px-3.5 py-2.5 text-sm text-ink-600">

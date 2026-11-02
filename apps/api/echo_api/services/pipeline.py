@@ -68,6 +68,7 @@ from .live_bus import live_bus
 from .llm import LLMError, get_llm_provider
 from .llm.base import reasoning
 from .privacy import protect
+from . import family_suggest
 from .diarization import diarize_meeting, name_speakers
 from .memory_svc import update_memory_from_meeting
 from .recording import finalize_recording
@@ -352,8 +353,41 @@ async def _finish(meeting_id: uuid.UUID, skipped: list[str], timings: dict | Non
                     link=f"/meetings/{meeting.id}",
                 )
             )
+        await _suggest_family(db, meeting)
         await db.commit()
     await live_bus.publish(str(meeting_id), {"type": "status", "status": "completed"})
+
+
+async def _suggest_family(db, meeting: Meeting) -> None:
+    """Terminó sin familia: Echo sugiere una por el título y le avisa a quien la grabó."""
+    if meeting.kind != "familia" or meeting.family_id is not None or (meeting.meta or {}).get("family_suggestion"):
+        return
+    try:
+        found = await family_suggest.suggest(db, meeting)
+    except Exception as exc:  # noqa: BLE001 - una sugerencia no frena la reunión
+        log.warning("sugerencia de familia fallo: %s", exc)
+        found = {}
+    # Junto al resto de meta sin pisarlo (otras etapas también escriben ahí).
+    await db.execute(
+        text("UPDATE meetings SET meta = coalesce(meta, '{}'::jsonb) || cast(:patch AS jsonb) WHERE id = :id"),
+        {"patch": json.dumps({"family_suggestion": {**found, "status": "pending"}}), "id": meeting.id},
+    )
+    if found.get("family_name"):
+        body = f"Parece la {found['family_name']}: confirmalo con un toque."
+    elif found.get("create_name"):
+        body = f"No hay ninguna familia cargada con ese nombre: Echo puede crear «{found['create_name']}»."
+    else:
+        body = "Elegí la familia para que la reunión quede en su historial."
+    db.add(
+        Notification(
+            user_id=meeting.created_by,
+            organization_id=meeting.organization_id,
+            kind="family_missing",
+            title=f"¿De qué familia es «{meeting.title}»?",
+            body=body,
+            link=f"/meetings/{meeting.id}",
+        )
+    )
 
 
 # ── Hablantes ────────────────────────────────────────────────────

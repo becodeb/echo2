@@ -98,6 +98,15 @@ export interface MeetingOut {
     text_status?: "pending" | "done" | "failed" | "skipped";
     timeline?: { at_ms: number; label: string }[];
     next_steps?: string[];
+    /** Terminó sin familia: la que Echo sugiere por el título (services/family_suggest.py). */
+    family_suggestion?: {
+      status: "pending" | "accepted" | "dismissed" | "done";
+      family_id?: string;
+      family_name?: string;
+      student_ids?: string[];
+      /** No hay ninguna cargada con ese nombre: Echo puede crearla. */
+      create_name?: string;
+    };
     mentions?: Record<string, unknown>;
   };
   /** inicial | primaria | secundaria; null = sin nivel (solo admins y quien la creó). */
