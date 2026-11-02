@@ -2,17 +2,23 @@
 
 Cada uno ve lo que agendó, a lo que lo sumaron y lo de sus grupos internos.
 Quien ve todo un nivel (o administra la sede) puede pedir "Todo mi nivel".
+Cada uno puede además ver lo suyo en Google Calendar, iPhone u Outlook con un
+enlace .ics personal (/calendar y /feed).
 """
 import datetime as dt
+import hashlib
+import hmac
+import secrets
 import uuid
-from datetime import timedelta
+from datetime import UTC, timedelta
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import and_, false, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..config import get_settings
 from ..db import get_db
 from ..deps import OrgContext, get_org_context
 from ..models import (
@@ -23,10 +29,12 @@ from ..models import (
     Meeting,
     MeetingReason,
     Minutes,
+    Organization,
+    OrganizationMember,
     ScheduledMeeting,
     User,
 )
-from ..services.access import Scope
+from ..services.access import Scope, load_scope
 from ..services.audit import audit
 
 router = APIRouter(prefix="/api/agenda", tags=["agenda"])
@@ -245,6 +253,170 @@ async def pending(
     )
     items = (await db.execute(_order(query))).scalars().all()
     return await _out(db, scope, list(items))
+
+
+# --- La Agenda en el calendario de cada uno (Google Calendar, iPhone, Outlook) ---
+# Un enlace .ics que el calendario vuelve a leer solo cada tanto: lo que agendó,
+# a lo que lo sumaron y lo de sus grupos (nunca "Todo mi nivel"). El enlace no se
+# guarda: se firma con la clave de la membresía, y cambiarla corta el anterior.
+
+FEED_PAST_DAYS = 60
+FEED_FUTURE_DAYS = 365
+# La Agenda no tiene hora de fin: en el calendario cada reunión ocupa 45 minutos.
+FEED_MEETING_MINUTES = 45
+FEED_TZ = "America/Argentina/Buenos_Aires"
+
+
+def _feed_token(member: OrganizationMember) -> str:
+    message = f"agenda-ics:{member.id}:{member.calendar_key}".encode()
+    signature = hmac.new(get_settings().jwt_secret.encode(), message, hashlib.sha256).hexdigest()[:32]
+    return member.id.hex + signature
+
+
+class CalendarLinkOut(BaseModel):
+    # "/api/agenda/feed/<token>.ics"; la web le pone adelante su dirección.
+    path: str | None
+
+
+def _calendar_out(member: OrganizationMember) -> CalendarLinkOut:
+    return CalendarLinkOut(path=f"/api/agenda/feed/{_feed_token(member)}.ics" if member.calendar_key else None)
+
+
+@router.get("/calendar", response_model=CalendarLinkOut)
+async def calendar_link(ctx: OrgContext = Depends(get_org_context)):
+    return _calendar_out(ctx.member)
+
+
+@router.post("/calendar", response_model=CalendarLinkOut)
+async def connect_calendar(ctx: OrgContext = Depends(get_org_context), db: AsyncSession = Depends(get_db)):
+    """Crea el enlace, o uno nuevo que corta el anterior (por si se compartió)."""
+    if ctx.superadmin_visit:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Solo para quienes son parte de la sede")
+    ctx.member.calendar_key = secrets.token_urlsafe(12)
+    await audit(db, ctx.org_id, ctx.user.id, "agenda.calendar_connect", "organization_member", str(ctx.member.id))
+    await db.commit()
+    return _calendar_out(ctx.member)
+
+
+@router.delete("/calendar", response_model=CalendarLinkOut)
+async def disconnect_calendar(ctx: OrgContext = Depends(get_org_context), db: AsyncSession = Depends(get_db)):
+    if ctx.superadmin_visit:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Solo para quienes son parte de la sede")
+    ctx.member.calendar_key = None
+    await audit(db, ctx.org_id, ctx.user.id, "agenda.calendar_disconnect", "organization_member", str(ctx.member.id))
+    await db.commit()
+    return _calendar_out(ctx.member)
+
+
+def _ics_text(value: str) -> str:
+    value = value.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,")
+    return value.replace("\r\n", "\n").replace("\n", "\\n")
+
+
+def _fold(line: str) -> str:
+    """Las líneas de un .ics van de a 75 bytes; las que siguen arrancan con un espacio."""
+    parts, current, limit = [], "", 75
+    for char in line:
+        if len((current + char).encode()) > limit:
+            parts.append(current)
+            current, limit = char, 74
+        else:
+            current += char
+    parts.append(current)
+    return "\r\n ".join(parts)
+
+
+def _event(item: ScheduleOut, stamp: str, link: str) -> list[str]:
+    if item.kind == "interna":
+        summary = f"Reunión interna · {item.group_name or item.title or 'grupo'}"
+    else:
+        summary = item.family_name or item.title or "Reunión"
+        if item.reason_name:
+            summary += f" · {item.reason_name}"
+    details = []
+    if item.students:
+        details.append(" · ".join(f"{s.name}, {s.curso}" if s.curso else s.name for s in item.students))
+    if item.staff:
+        details.append("Van: " + ", ".join(person.name for person in item.staff))
+    if item.note:
+        details.append(item.note)
+    details.append(f"En Echo: {link}")
+    if item.time:
+        start = dt.datetime.combine(item.date, dt.time.fromisoformat(item.time))
+        end = start + timedelta(minutes=FEED_MEETING_MINUTES)
+        when = [f"DTSTART;TZID={FEED_TZ}:{start:%Y%m%dT%H%M%S}", f"DTEND;TZID={FEED_TZ}:{end:%Y%m%dT%H%M%S}"]
+    else:
+        when = [f"DTSTART;VALUE=DATE:{item.date:%Y%m%d}", f"DTEND;VALUE=DATE:{item.date + timedelta(days=1):%Y%m%d}"]
+    return [
+        "BEGIN:VEVENT",
+        f"UID:{item.id}@echo",
+        f"DTSTAMP:{stamp}",
+        *when,
+        f"SUMMARY:{_ics_text(summary)}",
+        f"DESCRIPTION:{_ics_text(chr(10).join(details))}",
+        f"URL:{link}",
+        "END:VEVENT",
+    ]
+
+
+@router.get("/feed/{token}.ics", include_in_schema=False)
+async def calendar_feed(token: str, db: AsyncSession = Depends(get_db)):
+    """Lo lee el calendario, sin sesión: el enlace mismo es la llave."""
+    member = None
+    if len(token) == 64:
+        try:
+            member = await db.get(OrganizationMember, uuid.UUID(hex=token[:32]))
+        except ValueError:
+            member = None
+    if member is None or not member.calendar_key or not hmac.compare_digest(_feed_token(member), token):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Enlace de calendario no válido")
+    org = await db.get(Organization, member.organization_id)
+    user = await db.get(User, member.user_id)
+    if org is None or org.deleted_at is not None or user is None or not user.is_active:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Enlace de calendario no válido")
+
+    scope = await load_scope(db, org.id, user.id, member.role)
+    today = dt.date.today()
+    query = select(ScheduledMeeting).where(
+        ScheduledMeeting.organization_id == org.id,
+        ScheduledMeeting.date >= today - timedelta(days=FEED_PAST_DAYS),
+        ScheduledMeeting.date <= today + timedelta(days=FEED_FUTURE_DAYS),
+        ScheduledMeeting.status != "no_se_hizo",
+        _visible(scope, False),
+    )
+    items = await _out(db, scope, list((await db.execute(_order(query))).scalars().all()))
+
+    stamp = dt.datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    link = get_settings().api_public_url.rstrip("/") + "/agenda"
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Echo//Agenda//ES",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        f"X-WR-CALNAME:{_ics_text(f'Echo · {org.name}')}",
+        f"X-WR-TIMEZONE:{FEED_TZ}",
+        "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
+        "X-PUBLISHED-TTL:PT1H",
+        # Argentina no cambia la hora: un solo tramo, -03 todo el año.
+        "BEGIN:VTIMEZONE",
+        f"TZID:{FEED_TZ}",
+        "BEGIN:STANDARD",
+        "DTSTART:19700101T000000",
+        "TZOFFSETFROM:-0300",
+        "TZOFFSETTO:-0300",
+        "TZNAME:-03",
+        "END:STANDARD",
+        "END:VTIMEZONE",
+    ]
+    for item in items:
+        lines += _event(item, stamp, link)
+    lines.append("END:VCALENDAR")
+    return Response(
+        "\r\n".join(_fold(line) for line in lines) + "\r\n",
+        media_type="text/calendar; charset=utf-8",
+        headers={"Cache-Control": "private, max-age=900", "Content-Disposition": 'inline; filename="echo-agenda.ics"'},
+    )
 
 
 @router.post("", response_model=ScheduleOut, status_code=201)

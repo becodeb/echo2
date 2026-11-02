@@ -92,6 +92,9 @@ class OrganizationMember(PKMixin, TimestampMixin, Base):
     # permisos y no se pueden deducir. Nulo = nadie lo eligió todavía. Un
     # puesto propio de la sede (CustomPosition) se guarda con su id.
     position: Mapped[str | None] = mapped_column(String(40))
+    # Con esto se firma el enlace de la Agenda para Google Calendar, iPhone u
+    # Outlook (routers/agenda.py). Nulo = no lo conectó; cambiarla corta el viejo.
+    calendar_key: Mapped[str | None] = mapped_column(String(24))
 
     organization: Mapped["Organization"] = relationship(back_populates="members")
     user: Mapped["User"] = relationship(back_populates="memberships")

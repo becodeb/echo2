@@ -411,6 +411,11 @@ export interface ProfessionalAttendanceRow {
 }
 
 /** Una reunión agendada (Agenda): el día, y lo que ya queda cargado para empezarla. */
+/** Enlace .ics personal de la Agenda; null = no lo conectó. */
+export interface CalendarLinkOut {
+  path: string | null;
+}
+
 export interface ScheduledMeetingOut {
   id: string;
   /** yyyy-mm-dd */

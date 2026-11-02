@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { ScheduledMeetingOut } from "../api/types";
+import { CalendarConnect } from "../components/CalendarConnect";
 import { NewMeetingModal } from "../components/NewMeetingModal";
 import { ScheduleModal } from "../components/ScheduleModal";
 import { Select } from "../components/Select";
@@ -196,6 +197,7 @@ export default function Agenda() {
               onChanged={() => queryClient.invalidateQueries({ queryKey: ["agenda"] })}
             />
           )}
+          <CalendarConnect />
         </aside>
       </div>
 

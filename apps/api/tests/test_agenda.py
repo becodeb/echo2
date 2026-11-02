@@ -122,3 +122,47 @@ def test_solo_cambia_quien_corresponde(client):
     # Rango demasiado largo.
     far = client.get(f"/api/agenda?start={HOY.isoformat()}&end={(HOY + timedelta(days=90)).isoformat()}", headers=owner.headers)
     assert far.status_code == 422
+
+
+def test_la_agenda_en_el_calendario_de_cada_uno(client):
+    owner = EchoTestUser(client, name="Directora", org_name="Colegio Calendario")
+    docente = Member(client, owner, "Docente")
+    family = _family(client, owner)
+    manana = date.today() + timedelta(days=1)
+    _agendar(
+        client, docente, date=manana.isoformat(), time="10:30", family_id=family["id"],
+        student_ids=[family["members"][0]["id"]], note="Traer el informe; y la carpeta",
+    )
+    sin_hora = _agendar(client, docente, date=manana.isoformat(), title="Familia Pérez")
+    descartada = _agendar(client, docente, date=manana.isoformat(), title="No va")
+    client.patch(f"/api/agenda/{descartada['id']}", json={"status": "no_se_hizo"}, headers=docente.headers)
+    _agendar(client, owner, date=manana.isoformat(), title="De la directora")
+
+    assert client.get("/api/agenda/calendar", headers=docente.headers).json() == {"path": None}
+    path = client.post("/api/agenda/calendar", headers=docente.headers).json()["path"]
+    assert path.startswith("/api/agenda/feed/") and path.endswith(".ics")
+    assert client.get("/api/agenda/calendar", headers=docente.headers).json()["path"] == path
+
+    # Sin sesión: el enlace es la llave. Trae lo suyo, no lo de la directora ni lo descartado.
+    feed = client.get(path)
+    assert feed.status_code == 200, feed.text
+    assert feed.headers["content-type"].startswith("text/calendar")
+    text = feed.text.replace("\r\n ", "")
+    assert text.count("BEGIN:VEVENT") == 2
+    assert f"DTSTART;TZID=America/Argentina/Buenos_Aires:{manana:%Y%m%d}T103000" in text
+    assert f"DTEND;TZID=America/Argentina/Buenos_Aires:{manana:%Y%m%d}T111500" in text
+    assert "SUMMARY:Fernández" in text and r"Lucas Fernández\, 5B" in text
+    assert r"Traer el informe\; y la carpeta" in text
+    assert f"UID:{sin_hora['id']}@echo" in text and f"DTSTART;VALUE=DATE:{manana:%Y%m%d}" in text
+    assert "De la directora" not in text and "No va" not in text
+    assert all(len(line.encode()) <= 75 for line in feed.text.split("\r\n"))
+
+    # Un enlace nuevo corta el anterior; desconectar corta todo.
+    nuevo = client.post("/api/agenda/calendar", headers=docente.headers).json()["path"]
+    assert nuevo != path
+    assert client.get(path).status_code == 404
+    assert client.get(nuevo).status_code == 200
+    client.delete("/api/agenda/calendar", headers=docente.headers)
+    assert client.get(nuevo).status_code == 404
+    assert client.get("/api/agenda/feed/" + "0" * 64 + ".ics").status_code == 404
+    assert client.get("/api/agenda/feed/nada.ics").status_code == 404
