@@ -301,6 +301,8 @@ export interface InterviewFields {
   nivel?: ActaLevel;
   /** Cómo fue la reunión: "de manera presencial / remota" en la planilla de jardín. */
   modalidad?: "presencial" | "remota";
+  /** Con o sin rayas en esta acta; sin dato, las de la sede (Ajustes → Actas). */
+  rayas?: ActaRuledLines;
 }
 
 export type ActaLevel = "inicial" | "primaria" | "secundaria";
@@ -339,6 +341,11 @@ export type ActaFontSize = "normal" | "grande" | "muy_grande";
 export type ActaLineSpacing = "simple" | "1.5";
 export type ActaMargins = "normal" | "angosto";
 export type ActaRuledLines = "con" | "sin";
+
+/** Cómo salen las actas que hace cada uno (Mi cuenta → Mis actas); "" = como la sede. */
+export interface MyActaPrefs {
+  ruled_lines: "" | ActaRuledLines;
+}
 
 export interface FamilyMemberOut {
   id: string;

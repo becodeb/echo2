@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..deps import ROLE_ORDER, OrgContext, can_edit_meeting, get_meeting_or_404, get_org_context
+from ..deps import ROLE_ORDER, OrgContext, can_edit_meeting, get_current_user, get_meeting_or_404, get_org_context
 from ..models import (
     MeetingSummary,
     Minutes,
@@ -18,6 +18,7 @@ from ..models import (
     Notification,
     Organization,
     OrganizationMember,
+    User,
 )
 from ..services import acta_entrevista, acta_number
 from ..services.access import users_who_can_see
@@ -653,3 +654,25 @@ async def update_acta_format(
     await audit(db, ctx.org_id, ctx.user.id, "letterhead.format", "organization", str(org.id))
     await db.commit()
     return _letterhead_out(org)
+
+
+class MyActaPrefs(BaseModel):
+    # "": las de la sede (Ajustes → Actas → Cómo se ve el acta).
+    ruled_lines: Literal["", "con", "sin"] = ""
+
+
+@router.get("/api/me/acta-preferences", response_model=MyActaPrefs)
+async def my_acta_preferences(user: User = Depends(get_current_user)):
+    """Cómo salen las actas que hace cada uno (Mi cuenta → Mis actas)."""
+    return MyActaPrefs(ruled_lines=user.acta_lines or "")
+
+
+@router.put("/api/me/acta-preferences", response_model=MyActaPrefs)
+async def update_my_acta_preferences(
+    data: MyActaPrefs, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
+    """Vale para las actas que se generen desde ahora; en cada una se puede cambiar al revisarla."""
+    row = await db.get(User, user.id)
+    row.acta_lines = data.ruled_lines or None
+    await db.commit()
+    return MyActaPrefs(ruled_lines=row.acta_lines or "")

@@ -42,6 +42,8 @@ FORMATOS = ("entrevista", "reunion")
 NIVELES = ("inicial", "primaria", "secundaria")
 MAX_FRASE = 300
 MODALIDADES = ("presencial", "remota")
+# Rayas del formulario: renglones y raya bajo lo completado (Ajustes → Actas).
+RAYAS = ("con", "sin")
 MAX_LINEAS = 8
 _HORA_RE = re.compile(r"^([01]?\d|2[0-3]):([0-5]\d)$")
 
@@ -240,6 +242,10 @@ def normalize_fields(raw: dict | None, fallback_date: date, fallback_time: str =
     modalidad = str(raw.get("modalidad") or "").strip().lower()
     if modalidad in MODALIDADES:
         out["modalidad"] = modalidad
+    # Con o sin rayas, si lo eligió quien hizo el acta; sin dato, lo de la sede.
+    rayas = str(raw.get("rayas") or "").strip().lower()
+    if rayas in RAYAS:
+        out["rayas"] = rayas
     # El nivel solo viaja cuando el membrete le fijó algo: las actas de antes
     # y las de sedes sin configurar siguen igual.
     nivel = str(raw.get("nivel") or "").strip().lower()

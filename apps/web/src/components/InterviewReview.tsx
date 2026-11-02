@@ -42,7 +42,14 @@ export function InterviewReview({ meetingId, minutes, fields }: {
 
   const confirm = useMutation({
     mutationFn: async () => {
-      if (dirty) await save.mutateAsync();
+      // Guardado directo, sin refrescar en el medio: la versión nueva remonta
+      // este formulario (key) y quedaría abierto aunque el acta se confirme.
+      if (dirty) {
+        await api<MinutesOut>(`/api/meetings/${meetingId}/minutes/versions`, {
+          method: "POST",
+          body: JSON.stringify({ fields: form }),
+        });
+      }
       return api<MinutesOut>(`/api/meetings/${meetingId}/minutes/status`, {
         method: "PATCH",
         body: JSON.stringify({ status: "approved" }),
@@ -142,6 +149,26 @@ export function InterviewReview({ meetingId, minutes, fields }: {
                   onChange={() => set("modalidad")(option)}
                 />
                 {option === "presencial" ? "De manera presencial" : "De manera remota"}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
+
+      {!reunion && (
+        <fieldset>
+          <legend className="mb-1.5 text-sm font-medium text-ink-700">Rayas del formulario</legend>
+          <div className="flex flex-wrap gap-x-5 gap-y-1.5">
+            {(["con", "sin"] as const).map((option) => (
+              <label key={option} className="flex items-center gap-2 text-sm text-ink-800">
+                <input
+                  type="radio"
+                  name="rayas"
+                  // Sin elegir en esta acta, lo que usa la sede.
+                  checked={(form.rayas ?? letterhead?.ruled_lines ?? "con") === option}
+                  onChange={() => set("rayas")(option)}
+                />
+                {option === "con" ? "Con líneas" : "Sin líneas"}
               </label>
             ))}
           </div>

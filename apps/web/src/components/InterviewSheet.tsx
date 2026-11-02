@@ -20,14 +20,15 @@ const RULED_LINE_PT = 20;
  * achica (por la escala al cuadrado: lo de arriba también crece). Medido con
  * membrete y logo: un acta corta en "muy grande" ocupa 268 de los 297 mm.
  */
-function sheetFormat(letterhead: LetterheadOut, minLines = MIN_RULED_LINES) {
+function sheetFormat(letterhead: LetterheadOut, minLines = MIN_RULED_LINES, rayas?: InterviewFields["rayas"]) {
   const { scale, line } = actaScale(letterhead);
   const ruled = Math.round(RULED_LINE_PT * scale * line * 100) / 100;
   const lines = Math.max(6, Math.floor((minLines * RULED_LINE_PT) / scale ** 2 / ruled));
   return {
     style: { ...actaFormatVars(letterhead), "--ent-renglon": `${ruled}pt` } as CSSProperties,
-    // "Sin líneas" (Ajustes → Actas): sin renglones ni raya bajo lo completado.
-    lines: letterhead.ruled_lines === "sin" ? " ent-sin-lineas" : "",
+    // "Sin líneas": sin renglones ni raya bajo lo completado. Manda lo elegido
+    // en el acta (o por quien la hizo); si no, lo de la sede (Ajustes → Actas).
+    lines: (rayas ?? letterhead.ruled_lines) === "sin" ? " ent-sin-lineas" : "",
     minRuledHeight: `${lines * ruled}pt`,
   };
 }
@@ -60,7 +61,7 @@ export function InterviewSheet({
   const [year, month, day] = fields.fecha.split("-").map(Number);
   const place = letterhead.interview_place || `la institución ${letterhead.institution}`;
   const paragraphs = fields.desarrollo.split(/\n\s*\n|\n/).map((text) => text.trim()).filter(Boolean);
-  const format = sheetFormat(letterhead);
+  const format = sheetFormat(letterhead, MIN_RULED_LINES, fields.rayas);
   const inicial = fields.nivel === "inicial";
 
   return (
@@ -149,7 +150,7 @@ function JardinSheet({
   const [year, month, day] = fields.fecha.split("-").map(Number);
   const paragraphs = fields.desarrollo.split(/\n\s*\n|\n/).map((text) => text.trim()).filter(Boolean);
   // Con el logo y el párrafo corrido arriba, 13 renglones dejan la hoja en un A4.
-  const format = sheetFormat(letterhead, JARDIN_RULED_LINES);
+  const format = sheetFormat(letterhead, JARDIN_RULED_LINES, fields.rayas);
   const [pre, bold, post] = splitSchool(school);
   // El papel trae "20" impreso: el blanco son los dos últimos dígitos.
   const yearEnd = year ? String(year % 100).padStart(2, "0") : "";

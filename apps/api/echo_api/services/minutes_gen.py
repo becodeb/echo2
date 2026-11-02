@@ -35,6 +35,7 @@ from ..models import (
     MinutesVersion,
     Organization,
     Question,
+    User,
 )
 from . import acta_entrevista
 from .insights_prompts import language_name
@@ -400,6 +401,9 @@ async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instru
                         {"iniciales": acta_entrevista.initials(m.name), **({"curso": m.curso} if m.curso else {})}
                         for m in students
                     ]
+        # Las rayas que eligió quien hizo la reunión (Mi cuenta → Mis actas).
+        creator = await db.get(User, meeting.created_by) if meeting.created_by else None
+        rayas = (creator.acta_lines if creator else None) or ""
 
     # El pipeline no pasa por el endpoint de regenerar: sin esto la pantalla
     # dice "todavía no hay acta" mientras el acta se está escribiendo.
@@ -464,7 +468,7 @@ async def _generate_minutes(meeting_id: uuid.UUID, provider: LLMProvider, instru
         def render_draft(values: dict[str, str]) -> str:
             # Lo mismo que el acta final con lo que llegó hasta ahora.
             partial = acta_entrevista.normalize_fields(
-                {**values, "fecha": fecha.isoformat(), "formato": formato, "hora": hora, "nivel": nivel, "modalidad": modalidad},
+                {**values, "fecha": fecha.isoformat(), "formato": formato, "hora": hora, "nivel": nivel, "modalidad": modalidad, "rayas": rayas},
                 fecha,
                 hora,
             )
@@ -508,7 +512,7 @@ Devolvé JSON:
         if not isinstance(result, dict) or not isinstance(result.get("fields"), dict):
             raise LLMError("El generador de actas no devolvió contenido")
         fields = acta_entrevista.normalize_fields(
-            {**result["fields"], "fecha": fecha.isoformat(), "formato": formato, "hora": hora, "nivel": nivel, "modalidad": modalidad},
+            {**result["fields"], "fecha": fecha.isoformat(), "formato": formato, "hora": hora, "nivel": nivel, "modalidad": modalidad, "rayas": rayas},
             fecha,
             hora,
         )

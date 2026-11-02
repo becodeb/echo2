@@ -302,6 +302,36 @@ def test_acta_de_inicial_por_nivel_en_el_membrete(client, fake_ai):
     assert version["blocks"]["fields"]["modalidad"] == "presencial"
     assert "**Kinder:** 3 F" in version["body_markdown"]
     assert "**Solicitada por:** Equipo de profesionales" in version["body_markdown"]
+    # Sin elegir rayas, el acta no las fija: valen las de la sede.
+    assert "rayas" not in fields
+
+
+def test_rayas_de_quien_hace_el_acta_y_al_revisarla(client, fake_ai):
+    owner = EchoTestUser(client, name="Directora", org_name="Colegio Rayas")
+    client.put(
+        "/api/org/minutes-template", json={"name": "Acta de entrevista", "body_markdown": TEMPLATE}, headers=owner.headers
+    )
+    assert client.get("/api/me/acta-preferences", headers=owner.headers).json() == {"ruled_lines": ""}
+    put = client.put("/api/me/acta-preferences", json={"ruled_lines": "sin"}, headers=owner.headers)
+    assert put.status_code == 200 and put.json() == {"ruled_lines": "sin"}
+    assert client.put("/api/me/acta-preferences", json={"ruled_lines": "x"}, headers=owner.headers).status_code == 422
+
+    # El acta que genera lleva lo que eligió en Mi cuenta.
+    meeting_id = _finished_meeting(client, owner)
+    fields = client.get(f"/api/meetings/{meeting_id}/minutes", headers=owner.headers).json()["version"]["blocks"]["fields"]
+    assert fields["rayas"] == "sin"
+
+    # Al revisarla se cambia solo para esa acta.
+    edited = client.post(
+        f"/api/meetings/{meeting_id}/minutes/versions", json={"fields": {**fields, "rayas": "con"}}, headers=owner.headers
+    )
+    assert edited.json()["version"]["blocks"]["fields"]["rayas"] == "con"
+    assert client.get("/api/me/acta-preferences", headers=owner.headers).json() == {"ruled_lines": "sin"}
+
+    # Volver a "como la sede" deja de fijarlas.
+    client.put("/api/me/acta-preferences", json={"ruled_lines": ""}, headers=owner.headers)
+    again = _finished_meeting(client, owner)
+    assert "rayas" not in client.get(f"/api/meetings/{again}/minutes", headers=owner.headers).json()["version"]["blocks"]["fields"]
 
 
 def test_reunion_acta_generada_con_hora_y_editable(client, fake_ai):

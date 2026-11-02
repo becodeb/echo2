@@ -43,6 +43,9 @@ class User(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
     # Cuándo eligió "No volver a mostrar" en la invitación a grabar su voz.
     # Hasta entonces, a quien no tiene muestra le aparece en cada entrada.
     voice_prompt_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Rayas del formulario en las actas que hace ("con" / "sin"); sin dato, las
+    # de la sede. Se estampa en cada acta al generarla (Mi cuenta → Mis actas).
+    acta_lines: Mapped[str | None] = mapped_column(String(3))
 
     memberships: Mapped[list["OrganizationMember"]] = relationship(back_populates="user")
 

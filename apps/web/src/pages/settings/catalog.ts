@@ -18,6 +18,7 @@ export interface Viewer {
 export type SectionId =
   | "my-voice"
   | "my-drive"
+  | "my-actas"
   | "privacy"
   | "org"
   | "users"
@@ -72,6 +73,13 @@ export const SECTIONS: SectionMeta[] = [
     label: "Mi Google Drive",
     description: "Adónde van las grabaciones que hacés vos.",
     icon: "cloud",
+    group: "account",
+  },
+  {
+    id: "my-actas",
+    label: "Mis actas",
+    description: "Cómo salen las actas que hacés vos: con o sin rayas en el formulario.",
+    icon: "doc",
     group: "account",
   },
   {
@@ -182,6 +190,11 @@ export const SETTINGS_INDEX: SettingEntry[] = [
     section: "my-drive",
     label: "Mi Google Drive",
     keywords: ["drive", "google", "grabaciones", "audio", "carpeta", "conectar drive", "mis grabaciones"],
+  },
+  {
+    section: "my-actas",
+    label: "Rayas de mis actas",
+    keywords: ["rayas", "lineas", "renglones", "sin lineas", "con lineas", "mis actas", "formulario"],
   },
   {
     section: "privacy",

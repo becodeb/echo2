@@ -17,7 +17,7 @@ import {
 import { closeSettings } from "./settings/pageLocation";
 import { Loading } from "./settings/parts";
 import { AccessSection } from "./settings/AccessSection";
-import { NumberingSection, ReasonsSection, TemplateSection } from "./settings/ActaSections";
+import { MyActasSection, NumberingSection, ReasonsSection, TemplateSection } from "./settings/ActaSections";
 import { DevicesSection, DictionarySection } from "./settings/AdvancedSections";
 import { DriveSection, MyDriveSection } from "./settings/DriveSections";
 import { LetterheadSection } from "./settings/LetterheadSection";
@@ -29,6 +29,7 @@ import { UsersSection } from "./settings/UsersSection";
 const SECTION_COMPONENTS: Record<SectionId, ComponentType> = {
   "my-voice": MyVoiceSection,
   "my-drive": MyDriveSection,
+  "my-actas": MyActasSection,
   privacy: PrivacySection,
   org: OrgSection,
   users: UsersSection,

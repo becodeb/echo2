@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api/client";
-import type { LetterheadOut, ReasonOut } from "../../api/types";
+import type { LetterheadOut, MyActaPrefs, ReasonOut } from "../../api/types";
 import { ACTA_FONT_CSS, actaScale } from "../../components/actaFormat";
 import { Select } from "../../components/Select";
 import { Badge, Button, Input, Spinner } from "../../components/ui";
@@ -190,6 +190,64 @@ function ActaLook() {
           </div>
           <figcaption className="mt-2 text-center text-xs text-ink-500">Vista previa</figcaption>
         </figure>
+      </div>
+    </Block>
+  );
+}
+
+/**
+ * Mi cuenta → Mis actas: con o sin rayas en las actas que hace cada uno. Se
+ * estampa en el acta al generarla; al revisarla se puede cambiar solo para esa.
+ */
+export function MyActasSection() {
+  const queryClient = useQueryClient();
+  const { data: prefs } = useQuery({
+    queryKey: ["my-acta-prefs"],
+    queryFn: () => api<MyActaPrefs>("/api/me/acta-preferences", { skipOrg: true }),
+  });
+  const { data: letterhead } = useQuery({
+    queryKey: ["letterhead"],
+    queryFn: () => api<LetterheadOut>("/api/org/letterhead"),
+  });
+  const save = useMutation({
+    mutationFn: (value: MyActaPrefs) =>
+      api<MyActaPrefs>("/api/me/acta-preferences", { method: "PUT", body: JSON.stringify(value), skipOrg: true }),
+    onSuccess: (saved) => queryClient.setQueryData(["my-acta-prefs"], saved),
+  });
+
+  if (!prefs) {
+    return (
+      <Block id="my-actas" title="Rayas del formulario">
+        <Loading />
+      </Block>
+    );
+  }
+  const current = save.isPending && save.variables ? save.variables.ruled_lines : prefs.ruled_lines;
+  const sede = letterhead?.ruled_lines === "sin" ? "sin líneas" : "con líneas";
+
+  return (
+    <Block
+      id="my-actas"
+      title="Rayas del formulario"
+      hint="Los renglones del acta y la raya debajo de lo completado. Vale para las actas que hagas desde ahora; en cada una se puede cambiar al revisarla."
+    >
+      <LookChoice
+        label="Mis actas salen"
+        value={current}
+        onChange={(ruled_lines) => save.mutate({ ruled_lines })}
+        options={[
+          { value: "", label: "Como la sede" },
+          { value: "con", label: "Con líneas" },
+          { value: "sin", label: "Sin líneas" },
+        ]}
+      />
+      <p className="mt-2 text-xs text-ink-400">Hoy la sede usa {sede}.</p>
+      <div className="mt-1 h-5 text-sm">
+        {save.isPending && <Spinner />}
+        {save.isSuccess && !save.isPending && <span className="text-emerald-600">Guardado ✓</span>}
+        {save.isError && (
+          <span className="text-red-600">{save.error instanceof Error ? save.error.message : "No se pudo guardar"}</span>
+        )}
       </div>
     </Block>
   );

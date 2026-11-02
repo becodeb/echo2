@@ -58,9 +58,9 @@ describe("searchSettings", () => {
 
 describe("visibleSections", () => {
   it("cada uno ve sus grupos", () => {
-    expect(visibleSections(member).map((section) => section.id)).toEqual(["my-voice", "my-drive", "privacy", "org", "drive"]);
+    expect(visibleSections(member).map((section) => section.id)).toEqual(["my-voice", "my-drive", "my-actas", "privacy", "org", "drive"]);
     expect(visibleSections(directive).map((section) => section.group)).not.toContain("advanced");
-    expect(visibleSections(admin)).toHaveLength(13);
+    expect(visibleSections(admin)).toHaveLength(14);
   });
 });
 
