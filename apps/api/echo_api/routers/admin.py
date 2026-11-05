@@ -8,6 +8,7 @@ El superadmin nunca lee una API key: la carga y la ve enmascarada, igual que
 en Ajustes → IA. Lo que se guarda va cifrado con la misma clave de siempre.
 """
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -62,6 +63,8 @@ class AdminOrgOut(BaseModel):
     plan: str = "base"
     is_personal: bool = False
     limits: dict = {}
+    # Para ver de un vistazo qué sedes están vivas.
+    last_meeting_at: datetime | None = None
 
 
 class AdminOrgAIIn(BaseModel):
@@ -97,15 +100,17 @@ async def list_organizations(
             )
         ).all()
     )
-    meeting_counts = dict(
-        (
-            await db.execute(
-                select(Meeting.organization_id, func.count())
-                .where(Meeting.deleted_at.is_(None))
-                .group_by(Meeting.organization_id)
-            )
-        ).all()
-    )
+    meeting_counts: dict[uuid.UUID, int] = {}
+    last_meetings: dict[uuid.UUID, datetime] = {}
+    for org_id, count, last in (
+        await db.execute(
+            select(Meeting.organization_id, func.count(), func.max(Meeting.created_at))
+            .where(Meeting.deleted_at.is_(None))
+            .group_by(Meeting.organization_id)
+        )
+    ).all():
+        meeting_counts[org_id] = count
+        last_meetings[org_id] = last
     settings_rows = {
         row.organization_id: row
         for row in (await db.execute(select(OrgAISettings))).scalars().all()
@@ -133,6 +138,7 @@ async def list_organizations(
                 plan=org.plan,
                 is_personal=org.is_personal,
                 limits=org.limits or {},
+                last_meeting_at=last_meetings.get(org.id),
             )
         )
     return out

@@ -10,6 +10,7 @@ import { Avatar } from "./ui";
 import { EchoFace } from "./EchoFace";
 import { AnnouncementPopup } from "./AnnouncementPopup";
 import { CommandPalette } from "./CommandPalette";
+import { FeedbackPrompt, OPEN_FEEDBACK_EVENT } from "./FeedbackPrompt";
 import { Icon, type IconName } from "./icons";
 import { NotificationsPanel } from "./NotificationsPanel";
 import { VoiceNudge, VoicePrompt } from "./VoicePrompt";
@@ -279,6 +280,8 @@ export function Layout({ children }: { children: ReactNode }) {
       )}
       <AnnouncementPopup />
       <VoicePrompt />
+      {/* Durante una reunión en vivo no se interrumpe con preguntas. */}
+      {!live && <FeedbackPrompt />}
     </div>
   );
 }
@@ -501,6 +504,17 @@ function ProfileMenu() {
             </button>
             <button type="button" role="menuitem" onClick={() => go("/settings")} className={item}>
               <Icon name="gear" size={17} /> Ajustes
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                window.dispatchEvent(new Event(OPEN_FEEDBACK_EVENT));
+              }}
+              className={item}
+            >
+              <Icon name="comment" size={17} /> Contanos qué cambiarías
             </button>
             {user.is_superadmin && (
               <button type="button" role="menuitem" onClick={() => go("/admin")} className={item}>

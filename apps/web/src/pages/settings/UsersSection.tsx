@@ -28,7 +28,7 @@ interface OrgUser {
   is_owner: boolean;
 }
 
-interface OrgUsers {
+export interface OrgUsers {
   positions: Position[];
   levels: Level[];
   groups: Group[];
@@ -38,18 +38,21 @@ interface OrgUsers {
 const NO_POSITION = "sin";
 
 /** Puesto y niveles de una persona: cada clic se guarda solo, en cuanto queda completo. */
-function UserEditor({
+export function UserEditor({
   user,
   positions,
   levels,
   groups,
   isMe,
+  orgId,
 }: {
   user: OrgUser;
   positions: Position[];
   levels: Level[];
   groups: Group[];
   isMe: boolean;
+  // Otra sede que la activa: el Panel de Becode edita gente de todas.
+  orgId?: string;
 }) {
   const queryClient = useQueryClient();
   const { activeOrg } = useAuth();
@@ -59,13 +62,17 @@ function UserEditor({
 
   const save = useMutation({
     mutationFn: (change: { position: string; levels: Level[] }) =>
-      api<OrgUser>(`/api/org/users/${user.user_id}`, { method: "PUT", body: JSON.stringify(change) }),
+      api<OrgUser>(`/api/org/users/${user.user_id}`, {
+        method: "PUT",
+        body: JSON.stringify(change),
+        ...(orgId ? { skipOrg: true, headers: { "X-Organization-Id": orgId } } : {}),
+      }),
     onSuccess: (saved) => {
-      queryClient.setQueryData<OrgUsers>(["org-users", activeOrg?.id], (data) =>
+      queryClient.setQueryData<OrgUsers>(["org-users", orgId ?? activeOrg?.id], (data) =>
         data ? { ...data, users: data.users.map((item) => (item.user_id === saved.user_id ? saved : item)) } : data,
       );
       // Lo que se arma con los mismos permisos en otras pantallas.
-      for (const key of ["level-access", "members", "people", "my-access", "internal-groups"]) {
+      for (const key of ["level-access", "members", "people", "my-access", "internal-groups", "admin-people"]) {
         queryClient.invalidateQueries({ queryKey: [key] });
       }
     },

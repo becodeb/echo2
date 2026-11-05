@@ -27,6 +27,7 @@ export interface AdminOrgOut {
   plan: string;
   is_personal: boolean;
   limits: Record<string, number>;
+  last_meeting_at?: string | null;
 }
 
 export interface OrgOut {

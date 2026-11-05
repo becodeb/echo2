@@ -97,6 +97,8 @@ def _include_optional_routers() -> None:
         "password_reset",
         "external",
         "agenda",
+        "admin_users",
+        "feedback",
     ):
         try:
             module = import_module(f".routers.{name}", package="echo_api")

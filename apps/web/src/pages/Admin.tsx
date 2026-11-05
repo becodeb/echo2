@@ -1,506 +1,43 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "../api/client";
-import type { AdminOrgOut, ServerAIOut, ServerAITestOut } from "../api/types";
-import { Select } from "../components/Select";
-import { useAuth } from "../state/auth";
-import { Badge, Button, Card, EmptyState, Input, Spinner } from "../components/ui";
-import { GlobalUsage, OrgPlanControl, PlanRequests, PlansEditor, UserPlans } from "./admin/AdminBilling";
+import { ServerDefaultCard } from "./admin/AdminAI";
+import { GlobalUsage, PlanRequests, PlansEditor, UserPlans } from "./admin/AdminBilling";
+import { AdminOpinion } from "./admin/AdminOpinion";
+import { AdminSedes } from "./admin/AdminSedes";
+import { AdminUsers } from "./admin/AdminUsers";
 
 const TABS = [
-  { id: "organizaciones", label: "Organizaciones" },
+  { id: "organizaciones", label: "Sedes" },
+  { id: "usuarios", label: "Usuarios" },
+  { id: "opinion", label: "Opinión" },
   { id: "planes", label: "Planes y topes" },
   { id: "pedidos", label: "Pedidos" },
   { id: "consumo", label: "Consumo" },
+  { id: "ia", label: "IA" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 
 /**
- * Panel de superadmin: todas las organizaciones de la instalación y la IA de
- * cada una.
+ * Panel de superadmin: las sedes, todas las personas, lo que opinan, los planes y
+ * la IA de la instalación.
  *
  * Es transversal, así que las llamadas van con skipOrg: no hay organización
  * activa que aplique acá, y el superadmin no es miembro de las que administra.
  */
-
-const LLM_PROVIDERS = ["openai", "anthropic", "gemini", "groq", "openrouter", "orcarouter", "gmi", "vercel", "deepseek", "ollama"];
-const PROVIDER_OPTIONS = LLM_PROVIDERS.map((provider) => ({ value: provider, label: provider }));
-
-interface AIForm {
-  llm_provider: string;
-  llm_model: string;
-  llm_api_key: string;
-}
-
-function OrgRow({ org }: { org: AdminOrgOut }) {
-  const queryClient = useQueryClient();
-  const { switchOrg } = useAuth();
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<AIForm>({
-    llm_provider: org.uses_own_key ? org.llm_provider ?? "" : "",
-    llm_model: org.uses_own_key ? org.llm_model ?? "" : "",
-    llm_api_key: "",
-  });
-
-  const save = useMutation({
-    mutationFn: () =>
-      api<AdminOrgOut>(`/api/admin/organizations/${org.id}/ai`, {
-        method: "PUT",
-        skipOrg: true,
-        body: JSON.stringify({
-          llm_provider: form.llm_provider,
-          llm_model: form.llm_model,
-          // Vacío = no tocar la key que ya está guardada.
-          llm_api_key: form.llm_api_key === "" ? null : form.llm_api_key,
-        }),
-      }),
-    onSuccess: () => {
-      setForm((current) => ({ ...current, llm_api_key: "" }));
-      queryClient.invalidateQueries({ queryKey: ["admin-orgs"] });
-    },
-  });
-
-  const clearKey = useMutation({
-    mutationFn: () =>
-      api<AdminOrgOut>(`/api/admin/organizations/${org.id}/ai`, {
-        method: "PUT",
-        skipOrg: true,
-        body: JSON.stringify({ llm_provider: "", llm_model: "", llm_api_key: "" }),
-      }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-orgs"] }),
-  });
-
-  return (
-    <Card className="space-y-3">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <OrgName org={org} />
-          <p className="mt-0.5 text-sm text-ink-500">
-            {org.members} {org.members === 1 ? "miembro" : "miembros"} · {org.meetings}{" "}
-            {org.meetings === 1 ? "reunión" : "reuniones"}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {org.uses_own_key ? (
-            <Badge tone="green">Key propia</Badge>
-          ) : org.llm_provider ? (
-            <Badge tone="amber">Usa el default del servidor</Badge>
-          ) : (
-            <Badge tone="red">Sin IA</Badge>
-          )}
-          <Button variant="soft" onClick={() => setOpen((value) => !value)}>
-            {open ? "Cerrar" : "Configurar IA"}
-          </Button>
-          <Button
-            onClick={() => {
-              // Entra a la sede como la ve un admin: reuniones, niveles, personas.
-              switchOrg(org.id);
-              window.location.href = "/settings/access";
-            }}
-          >
-            Entrar
-          </Button>
-        </div>
-      </div>
-
-      <OrgPlanControl org={org} />
-      <JoinRules org={org} />
-
-      <p className="text-sm text-ink-500">
-        {org.llm_provider ? (
-          <>
-            Genera actas con <span className="font-medium text-ink-700">{org.llm_provider}</span>
-            {org.llm_model && ` · ${org.llm_model}`}
-            {org.llm_api_key_masked && ` · ${org.llm_api_key_masked}`}
-          </>
-        ) : (
-          "No hay ningún modelo disponible: las actas de esta organización no se van a generar."
-        )}
-      </p>
-
-      {open && (
-        <div className="space-y-4 border-t border-ink-100 pt-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Select
-              label="Proveedor"
-              value={form.llm_provider}
-              onChange={(next) => setForm({ ...form, llm_provider: next })}
-              options={[{ value: "", label: "Usar default del servidor" }, ...PROVIDER_OPTIONS]}
-            />
-            <Input
-              label="Modelo"
-              placeholder="ej: gpt-4o-mini, anthropic/claude-sonnet-4.5"
-              value={form.llm_model}
-              onChange={(event) => setForm({ ...form, llm_model: event.target.value })}
-            />
-          </div>
-          <Input
-            label="API key"
-            type="password"
-            autoComplete="off"
-            placeholder={
-              org.uses_own_key ? "Dejar vacío para no cambiarla" : "Pegá la key del proveedor"
-            }
-            value={form.llm_api_key}
-            onChange={(event) => setForm({ ...form, llm_api_key: event.target.value })}
-          />
-          <p className="text-xs text-ink-400">
-            La key se guarda cifrada y no se puede volver a leer desde ninguna pantalla, ni
-            siquiera acá.
-          </p>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={() => save.mutate()} disabled={save.isPending}>
-              {save.isPending ? <Spinner /> : "Guardar"}
-            </Button>
-            {org.uses_own_key && (
-              <Button
-                variant="soft"
-                onClick={() => clearKey.mutate()}
-                disabled={clearKey.isPending}
-              >
-                Quitar key y volver al default
-              </Button>
-            )}
-            {save.isSuccess && <span className="text-sm text-emerald-600">Guardado</span>}
-            {save.isError && (
-              <span className="text-sm text-red-600">
-                {save.error instanceof Error ? save.error.message : "No se pudo guardar"}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-    </Card>
-  );
-}
-
-/** El nombre, que es lo que ve quien elige sede al registrarse ("Northfield Puertos"). */
-function OrgName({ org }: { org: AdminOrgOut }) {
-  const queryClient = useQueryClient();
-  const [draft, setDraft] = useState<string | null>(null);
-  const rename = useMutation({
-    mutationFn: (name: string) =>
-      api(`/api/admin/organizations/${org.id}`, { method: "PATCH", skipOrg: true, body: JSON.stringify({ name }) }),
-    onSuccess: () => {
-      setDraft(null);
-      queryClient.invalidateQueries({ queryKey: ["admin-orgs"] });
-    },
-  });
-  if (draft == null) {
-    return (
-      <h3 className="text-[15px] font-semibold text-ink-900">
-        {org.name}{" "}
-        <button onClick={() => setDraft(org.name)} className="text-xs font-medium text-accent-600 hover:underline">
-          Renombrar
-        </button>
-      </h3>
-    );
-  }
-  return (
-    <form
-      className="flex items-center gap-2"
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (draft.trim().length >= 2) rename.mutate(draft.trim());
-      }}
-    >
-      <Input value={draft} onChange={(event) => setDraft(event.target.value)} aria-label="Nombre" autoFocus />
-      <Button type="submit" disabled={rename.isPending}>{rename.isPending ? <Spinner /> : "Guardar"}</Button>
-      <Button type="button" variant="ghost" onClick={() => setDraft(null)}>Cancelar</Button>
-    </form>
-  );
-}
-
-/**
- * Una sede nueva sin miembros (ej. "Northfield Nordelta"). Con el mismo
- * dominio que otra sede, a quien se registra se le pregunta de cuál es.
- */
-function NewCampus() {
-  const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [rules, setRules] = useState("");
-  const create = useMutation({
-    mutationFn: () =>
-      api("/api/admin/organizations", {
-        method: "POST",
-        skipOrg: true,
-        body: JSON.stringify({
-          name: name.trim(),
-          join_rules: rules.split(/[\n,]/).map((rule) => rule.trim()).filter(Boolean),
-        }),
-      }),
-    onSuccess: () => {
-      setOpen(false);
-      setName("");
-      setRules("");
-      queryClient.invalidateQueries({ queryKey: ["admin-orgs"] });
-    },
-  });
-  if (!open) {
-    return (
-      <Button variant="soft" onClick={() => setOpen(true)}>
-        + Nueva sede
-      </Button>
-    );
-  }
-  return (
-    <Card className="space-y-3">
-      <h3 className="text-[15px] font-semibold text-ink-900">Nueva sede</h3>
-      <Input label="Nombre" value={name} onChange={(event) => setName(event.target.value)} placeholder="Northfield Nordelta" />
-      <Input
-        label="Se unen solos (dominio o emails, separados por coma)"
-        value={rules}
-        onChange={(event) => setRules(event.target.value)}
-        placeholder="northfield.edu.ar"
-      />
-      <p className="text-xs text-ink-400">
-        Si otra sede ya tiene el mismo dominio, a quien se registre con ese mail se le pregunta de cuál es. Quienes ya
-        están en una sede no cambian.
-      </p>
-      {create.isError && (
-        <p className="text-sm text-red-600">{create.error instanceof Error ? create.error.message : "No se pudo crear"}</p>
-      )}
-      <div className="flex gap-2">
-        <Button onClick={() => create.mutate()} disabled={create.isPending || name.trim().length < 2}>
-          {create.isPending ? <Spinner /> : "Crear sede"}
-        </Button>
-        <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
-      </div>
-    </Card>
-  );
-}
-
-/**
- * Quién entra a esta organización sin invitación: dominios del colegio o
- * emails puntuales. Si dos organizaciones comparten dominio (dos sedes), a
- * quien entra se le pregunta de cuál es.
- */
-function JoinRules({ org }: { org: AdminOrgOut }) {
-  const queryClient = useQueryClient();
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
-
-  const save = useMutation({
-    mutationFn: (rules: string[]) =>
-      api<string[]>(`/api/admin/organizations/${org.id}/join-rules`, {
-        method: "PUT",
-        skipOrg: true,
-        body: JSON.stringify({ rules }),
-      }),
-    onSuccess: () => {
-      setEditing(false);
-      queryClient.invalidateQueries({ queryKey: ["admin-orgs"] });
-    },
-  });
-
-  if (!editing) {
-    return (
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-ink-500">Se unen solos:</span>
-        {org.join_rules.length === 0 ? (
-          <span className="text-ink-400">nadie (solo por invitación)</span>
-        ) : (
-          org.join_rules.map((rule) => (
-            <Badge key={rule} tone={rule.includes("@") ? "sky" : "indigo"}>
-              {rule.includes("@") ? rule : `@${rule}`}
-            </Badge>
-          ))
-        )}
-        <button
-          onClick={() => {
-            setDraft(org.join_rules.join("\n"));
-            save.reset();
-            setEditing(true);
-          }}
-          className="text-sm font-medium text-accent-600 hover:underline"
-        >
-          Editar
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-2 rounded-xl border border-ink-100 bg-ink-50 p-3">
-      <label className="block">
-        <span className="mb-1.5 block text-sm font-medium text-ink-700">Quién se une sin invitación</span>
-        <textarea
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          rows={3}
-          placeholder={"northfield.edu.ar\nmariana.gibson@gmail.com"}
-          className="w-full rounded-xl border border-ink-200 bg-white px-3 py-2 font-mono text-sm text-ink-900 placeholder:text-ink-400 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20"
-        />
-      </label>
-      <p className="text-xs text-ink-400">
-        Uno por renglón. Un dominio suma a todo el que entre con Google con un mail de ese dominio;
-        si otra organización tiene el mismo dominio (otra sede), se le pregunta de cuál es. Un email
-        exacto suma a esa persona directo. Correos públicos como gmail.com no se aceptan como
-        dominio.
-      </p>
-      {save.isError && (
-        <p className="text-sm text-red-600">
-          {save.error instanceof Error ? save.error.message : "No se pudo guardar"}
-        </p>
-      )}
-      <div className="flex gap-2">
-        <Button
-          onClick={() => save.mutate(draft.split(/[\n,]/).map((rule) => rule.trim()).filter(Boolean))}
-          disabled={save.isPending}
-        >
-          {save.isPending ? <Spinner /> : "Guardar"}
-        </Button>
-        <Button variant="ghost" onClick={() => setEditing(false)}>
-          Cancelar
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function ServerDefaultCard() {
-  const queryClient = useQueryClient();
-  const [form, setForm] = useState({ llm_provider: "", llm_model: "", llm_api_key: "" });
-  const [loaded, setLoaded] = useState(false);
-  const [test, setTest] = useState<ServerAITestOut | null>(null);
-
-  const { data: defaults } = useQuery({
-    queryKey: ["ai-defaults"],
-    queryFn: () => api<ServerAIOut>("/api/admin/ai-defaults", { skipOrg: true }),
-  });
-
-  if (defaults && !loaded) {
-    setForm({
-      llm_provider: defaults.llm_provider ?? "",
-      llm_model: defaults.llm_model ?? "",
-      llm_api_key: "",
-    });
-    setLoaded(true);
-  }
-
-  const save = useMutation({
-    mutationFn: () =>
-      api<ServerAIOut>("/api/admin/ai-defaults", {
-        method: "PUT",
-        skipOrg: true,
-        body: JSON.stringify({
-          llm_provider: form.llm_provider,
-          llm_model: form.llm_model,
-          llm_api_key: form.llm_api_key === "" ? null : form.llm_api_key,
-        }),
-      }),
-    onSuccess: () => {
-      setForm((current) => ({ ...current, llm_api_key: "" }));
-      setTest(null);
-      queryClient.invalidateQueries({ queryKey: ["ai-defaults"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-orgs"] });
-    },
-  });
-
-  const probe = useMutation({
-    mutationFn: () =>
-      api<ServerAITestOut>("/api/admin/ai-defaults/test", { method: "POST", skipOrg: true }),
-    onSuccess: (result) => setTest(result),
-  });
-
-  return (
-    <Card className="space-y-4">
-      <div>
-        <h2 className="text-[15px] font-semibold text-ink-900">Modelo por defecto</h2>
-        <p className="mt-1 text-sm text-ink-500">
-          Lo que usa toda organización que no configuró el suyo. Cambiarlo acá aplica al
-          instante, sin reiniciar nada.
-        </p>
-      </div>
-
-      {defaults?.source === "entorno" && (
-        <p className="rounded-xl bg-ink-50 px-3 py-2 text-sm text-ink-600">
-          Hoy sale de las variables de entorno del servidor
-          {defaults.llm_provider && <> (<span className="font-medium">{defaults.llm_provider}</span>)</>}.
-          Lo que cargues acá pasa a mandar.
-        </p>
-      )}
-      {defaults?.source === "sin_configurar" && (
-        <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
-          No hay ningún modelo por defecto: ninguna organización sin configuración propia puede
-          generar actas.
-        </p>
-      )}
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Select
-          label="Proveedor"
-          value={form.llm_provider}
-          onChange={(next) => setForm({ ...form, llm_provider: next })}
-          options={[{ value: "", label: "Sin default" }, ...PROVIDER_OPTIONS]}
-        />
-        <Input
-          label="Modelo"
-          placeholder="ej: Qwen/Qwen3.8-Max-0902"
-          value={form.llm_model}
-          onChange={(event) => setForm({ ...form, llm_model: event.target.value })}
-        />
-      </div>
-      <Input
-        label="API key"
-        type="password"
-        autoComplete="off"
-        placeholder={
-          defaults?.llm_api_key_masked
-            ? `Guardada (${defaults.llm_api_key_masked}). Dejar vacío para no cambiarla`
-            : "Pegá la key del proveedor"
-        }
-        value={form.llm_api_key}
-        onChange={(event) => setForm({ ...form, llm_api_key: event.target.value })}
-      />
-
-      <div className="flex flex-wrap items-center gap-2">
-        <Button onClick={() => save.mutate()} disabled={save.isPending}>
-          {save.isPending ? <Spinner /> : "Guardar"}
-        </Button>
-        <Button variant="soft" onClick={() => probe.mutate()} disabled={probe.isPending}>
-          {probe.isPending ? <Spinner /> : "Probar ahora"}
-        </Button>
-        {save.isSuccess && <span className="text-sm text-emerald-600">Guardado</span>}
-      </div>
-
-      {test && (
-        <div
-          className={`rounded-xl px-3 py-2 text-sm ${
-            test.ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"
-          }`}
-        >
-          <span className="font-medium">
-            {test.ok ? "Funciona" : "No funciona"}
-            {test.provider && ` · ${test.provider}`}
-            {test.model && ` · ${test.model}`}
-          </span>
-          <p className="mt-0.5 break-words">{test.message}</p>
-        </div>
-      )}
-      <p className="text-xs text-ink-400">
-        "Probar ahora" le pide una respuesta real al proveedor. Es la única forma de distinguir
-        una key bien escrita de una que de verdad funciona: una cuenta sin saldo pasa cualquier
-        validación y recién falla cuando alguien intenta generar un acta.
-      </p>
-    </Card>
-  );
-}
-
 export default function Admin() {
   const [tab, setTabState] = useState<Tab>(() => {
     const hash = window.location.hash.replace("#", "");
     return (TABS.find((item) => item.id === hash)?.id ?? "organizaciones") as Tab;
   });
+  // La sede de la que se vino con "Ver sus usuarios".
+  const [usersOrg, setUsersOrg] = useState<string | null>(null);
   // Por el router (no con history directo): así un link a otra pestaña del
   // panel (por ejemplo, una notificación de un pedido) con el panel ya abierto
   // también la cambia, aunque la página no se monte de nuevo.
   const navigate = useNavigate();
   const setTab = (next: Tab) => {
     setTabState(next);
+    if (next !== "usuarios") setUsersOrg(null);
     navigate({ hash: next }, { replace: true });
   };
   const { hash } = useLocation();
@@ -510,9 +47,9 @@ export default function Admin() {
   }, [hash]);
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-10">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
       <h1 className="text-2xl font-semibold tracking-tight text-ink-900">Panel de Becode</h1>
-      <nav className="mt-5 flex flex-wrap gap-1 rounded-full bg-ink-100 p-1 sm:inline-flex" aria-label="Secciones del panel">
+      <nav className="mt-5 flex flex-wrap gap-1 rounded-3xl bg-ink-100 p-1 sm:inline-flex sm:rounded-full" aria-label="Secciones del panel">
         {TABS.map((item) => (
           <button
             key={item.id}
@@ -528,7 +65,17 @@ export default function Admin() {
         ))}
       </nav>
       <div key={tab} className="animate-fade-up mt-6">
-        {tab === "organizaciones" && <Organizations />}
+        {tab === "organizaciones" && (
+          <AdminSedes
+            onViewUsers={(orgId) => {
+              setUsersOrg(orgId);
+              setTabState("usuarios");
+              navigate({ hash: "usuarios" }, { replace: true });
+            }}
+          />
+        )}
+        {tab === "usuarios" && <AdminUsers initialOrg={usersOrg} />}
+        {tab === "opinion" && <AdminOpinion />}
         {tab === "planes" && (
           <div className="space-y-4">
             <p className="text-sm text-ink-500">
@@ -541,72 +88,8 @@ export default function Admin() {
         )}
         {tab === "pedidos" && <PlanRequests />}
         {tab === "consumo" && <GlobalUsage />}
+        {tab === "ia" && <ServerDefaultCard />}
       </div>
-    </div>
-  );
-}
-
-function Organizations() {
-  const { data: orgs, isLoading, isError, error } = useQuery({
-    queryKey: ["admin-orgs"],
-    queryFn: () => api<AdminOrgOut[]>("/api/admin/organizations", { skipOrg: true }),
-  });
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center py-16 text-ink-300">
-        <Spinner className="h-6 w-6" />
-      </div>
-    );
-  }
-
-  if (isError) {
-    return (
-      <div className="mx-auto max-w-4xl px-6 py-10">
-        <Card>
-          <EmptyState title="No se pudo cargar el panel" mood="error">
-            <p>{error instanceof Error ? error.message : "Probá de nuevo en un momento."}</p>
-          </EmptyState>
-        </Card>
-      </div>
-    );
-  }
-
-  const sinIA = (orgs ?? []).filter((org) => !org.llm_provider).length;
-
-  return (
-    <div className="space-y-5">
-      <div>
-        <p className="text-sm text-ink-500">
-          Todas las organizaciones de esta instalación y el modelo de IA que usa cada una.
-        </p>
-      </div>
-
-      <ServerDefaultCard />
-
-      <NewCampus />
-
-      {sinIA > 0 && (
-        <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          {sinIA === 1
-            ? "Hay 1 organización sin ningún modelo de IA disponible: sus actas no se van a generar."
-            : `Hay ${sinIA} organizaciones sin ningún modelo de IA disponible: sus actas no se van a generar.`}
-        </div>
-      )}
-
-      {(orgs ?? []).length === 0 ? (
-        <Card>
-          <EmptyState title="Todavía no hay organizaciones" mood="idle">
-            <p>Cuando alguien cree la primera, va a aparecer acá.</p>
-          </EmptyState>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {(orgs ?? []).map((org) => (
-            <OrgRow key={org.id} org={org} />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
