@@ -98,6 +98,7 @@ def _include_optional_routers() -> None:
         "external",
         "agenda",
         "admin_users",
+        "admin_moves",
         "feedback",
     ):
         try:

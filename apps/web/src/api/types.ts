@@ -258,9 +258,27 @@ export interface ChatSource {
   speaker: string | null;
 }
 
+export interface MoveOut {
+  user_id: string;
+  name: string;
+  email: string;
+  from_id: string;
+  from_name: string;
+  to_id: string;
+  to_name: string;
+  already_there: boolean;
+  role: string;
+  position: string | null;
+  levels: Record<string, string>;
+  meetings_left: number;
+  tasks_left: number;
+}
+
 export interface ChatOut {
   answer: string;
   sources: ChatSource[];
+  move?: MoveOut | null;
+  options?: { label: string; question: string }[];
 }
 
 export interface MinutesOut {

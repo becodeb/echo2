@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api/client";
-import type { AdminOrgOut } from "../../api/types";
+import type { AdminOrgOut, MoveOut } from "../../api/types";
 import { DotsMenu } from "../../components/DotsMenu";
+import { MoveSummary, useMovePerson } from "../../components/MoveCard";
 import { PLAN_NAME } from "../../components/billing";
 import { timeAgo } from "../../components/NotificationsPanel";
 import { Select } from "../../components/Select";
@@ -209,6 +210,80 @@ function AddToCampus({ person, orgs }: { person: AdminPerson; orgs: AdminOrgOut[
   );
 }
 
+/** Sale de una sede y queda en otra en un solo paso; antes de confirmar se ve con qué queda. */
+function MovePerson({ person, orgs, onDone }: { person: AdminPerson; orgs: AdminOrgOut[]; onDone: () => void }) {
+  const movable = campuses(person).filter((membership) => membership.role !== "owner");
+  const [fromId, setFromId] = useState(movable.length === 1 ? movable[0].organization_id : "");
+  const [toId, setToId] = useState("");
+  const destinations = orgs
+    .filter((org) => !org.is_personal && org.id !== fromId)
+    .map((org) => ({ value: org.id, label: org.name }));
+  const preview = useQuery({
+    queryKey: ["admin-move", person.id, fromId, toId],
+    queryFn: () =>
+      api<MoveOut>(
+        `/api/admin/people/${person.id}/move?from_organization_id=${fromId}&to_organization_id=${toId}`,
+        { skipOrg: true },
+      ),
+    enabled: !!fromId && !!toId,
+    retry: false,
+  });
+  const run = useMovePerson(onDone);
+
+  if (movable.length === 0) {
+    return <p className="text-sm text-ink-500">{person.name} no tiene una sede de la que se pueda mover.</p>;
+  }
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-ink-600">
+        <span className="font-semibold text-ink-900">{person.name}</span> · {person.email}
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Select
+          label="De"
+          value={fromId}
+          onChange={(value) => {
+            setFromId(value);
+            if (value === toId) setToId("");
+          }}
+          options={movable.map((membership) => ({ value: membership.organization_id, label: membership.organization }))}
+          placeholder="Elegir sede…"
+        />
+        <Select
+          label="A"
+          value={toId}
+          onChange={setToId}
+          options={destinations}
+          placeholder="Elegir sede…"
+          searchable={destinations.length > 6}
+        />
+      </div>
+      {preview.isFetching && (
+        <div className="flex justify-center py-2 text-ink-300">
+          <Spinner />
+        </div>
+      )}
+      {preview.isError && (
+        <p className="text-sm text-red-600">{preview.error instanceof Error ? preview.error.message : "No se puede mover"}</p>
+      )}
+      {preview.data && !preview.isFetching && (
+        <div className="rounded-2xl bg-ink-50/70 p-4">
+          <MoveSummary move={preview.data} />
+        </div>
+      )}
+      {run.isError && <p className="text-sm text-red-600">{run.error instanceof Error ? run.error.message : "No se pudo mover"}</p>}
+      <div className="flex justify-end">
+        <Button
+          onClick={() => preview.data && run.mutate(preview.data)}
+          disabled={!preview.data || preview.isFetching || preview.isError || run.isPending}
+        >
+          {run.isPending ? <Spinner /> : "Mover"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function PersonEditor({ person, orgs }: { person: AdminPerson; orgs: AdminOrgOut[] }) {
   const queryClient = useQueryClient();
   const setPlan = useMutation({
@@ -279,7 +354,7 @@ function CampusTag({ membership }: { membership: AdminMembership }) {
   );
 }
 
-function PersonRow({ person, onEdit }: { person: AdminPerson; onEdit: () => void }) {
+function PersonRow({ person, onEdit, onMove }: { person: AdminPerson; onEdit: () => void; onMove: () => void }) {
   const own = campuses(person);
   return (
     <li className="flex items-start gap-3 px-4 py-3.5 sm:px-5">
@@ -315,6 +390,7 @@ function PersonRow({ person, onEdit }: { person: AdminPerson; onEdit: () => void
         label={`Opciones de ${person.name}`}
         items={[
           { label: "Editar permisos y roles", onSelect: onEdit },
+          ...(own.length > 0 ? [{ label: "Mover a otra sede", onSelect: onMove }] : []),
           { label: "Copiar el mail", onSelect: () => void navigator.clipboard?.writeText(person.email) },
         ]}
       />
@@ -335,6 +411,7 @@ export function AdminUsers({ initialOrg }: { initialOrg: string | null }) {
   const [orgFilter, setOrgFilter] = useState(initialOrg ?? "");
   const [onlyMissing, setOnlyMissing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [movingId, setMovingId] = useState<string | null>(null);
   useEffect(() => setOrgFilter(initialOrg ?? ""), [initialOrg]);
 
   const shown = useMemo(() => {
@@ -373,6 +450,7 @@ export function AdminUsers({ initialOrg }: { initialOrg: string | null }) {
     .filter((org) => !org.is_personal)
     .map((org) => ({ value: org.id, label: `${org.name} (${org.members})` }));
   const editing = (people ?? []).find((person) => person.id === editingId) ?? null;
+  const moving = (people ?? []).find((person) => person.id === movingId) ?? null;
 
   return (
     <div className="space-y-4">
@@ -416,10 +494,24 @@ export function AdminUsers({ initialOrg }: { initialOrg: string | null }) {
       ) : (
         <ul className="divide-y divide-ink-100 rounded-3xl border border-ink-100 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.03)]">
           {shown.map((person) => (
-            <PersonRow key={person.id} person={person} onEdit={() => setEditingId(person.id)} />
+            <PersonRow
+              key={person.id}
+              person={person}
+              onEdit={() => setEditingId(person.id)}
+              onMove={() => setMovingId(person.id)}
+            />
           ))}
         </ul>
       )}
+
+      <p className="px-1 text-xs text-ink-400">
+        También podés pedírselo a Echo con el botón de arriba: «mové a Ana Gómez de Nordelta a Puertos». Te muestra lo que
+        va a hacer y lo confirmás.
+      </p>
+
+      <Modal open={!!moving} onClose={() => setMovingId(null)} title="Mover a otra sede">
+        {moving && <MovePerson key={moving.id} person={moving} orgs={orgs ?? []} onDone={() => setMovingId(null)} />}
+      </Modal>
 
       <Modal open={!!editing} onClose={() => setEditingId(null)} title="Permisos y roles" wide>
         {editing && <PersonEditor key={editing.id} person={editing} orgs={orgs ?? []} />}

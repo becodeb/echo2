@@ -5,6 +5,7 @@ Si no hay evidencia: "No encontré eso" — nunca conocimiento general del model
 Toda respuesta incluye fuentes con timestamps.
 """
 import json
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -23,6 +24,9 @@ from ..services.privacy import protect
 from ..services.memory_svc import query_memory_entities
 from ..services.rag import retrieve_context
 from ..services.transcript_util import format_ms
+from .admin_moves import MOVE_SYSTEM, MoveOut, answer_move, campus_list, looks_like_move
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["chat"])
 
@@ -97,9 +101,18 @@ class SourceOut(BaseModel):
     speaker: str | None = None
 
 
+class ChatOptionOut(BaseModel):
+    label: str
+    # Lo que se le vuelve a pedir a Echo si se toca esta opción.
+    question: str
+
+
 class ChatOut(BaseModel):
     answer: str
     sources: list[SourceOut]
+    # Solo Becode: un movimiento de sede listo para confirmar, o para elegir entre varios.
+    move: MoveOut | None = None
+    options: list[ChatOptionOut] = Field(default_factory=list)
 
 
 def _context_block(chunks: list[dict], include_meeting: bool) -> str:
@@ -388,6 +401,39 @@ async def meeting_chat(
     return await _ask(db, ctx, data.question, data.history, meeting.id)
 
 
+async def _move_request(db: AsyncSession, ctx: OrgContext, question: str) -> ChatOut | None:
+    """Si Becode le pide a Echo mover a alguien de sede, la propuesta para confirmar; si no, nada."""
+    campuses = await campus_list(db)
+    if not looks_like_move(question, campuses):
+        return None
+    llm_config = await resolve_llm(db, ctx.org_id)
+    if llm_config is None:
+        return None
+    provider = await protect(
+        db,
+        ctx.org_id,
+        get_llm_provider(llm_config.provider, llm_config.api_key, llm_config.model, llm_config.base_url),
+        None,
+        ctx.user.id,
+    )
+    system = MOVE_SYSTEM.format(sedes=", ".join(org.name for org in campuses))
+    try:
+        parsed = await provider.chat_json(system, [{"role": "user", "content": question}], temperature=llm_config.temperature)
+    except LLMError:
+        # Que el modelo falle acá no es motivo para no contestar: sigue como pregunta común.
+        log.exception("chat: no se pudo interpretar un pedido de mover")
+        return None
+    if not isinstance(parsed, dict) or parsed.get("move") is not True:
+        return None
+    result = await answer_move(db, campuses, parsed)
+    return ChatOut(
+        answer=result.answer,
+        sources=[],
+        move=result.move,
+        options=[ChatOptionOut(label=label, question=again) for label, again in result.options],
+    )
+
+
 @router.post("/api/ask", response_model=ChatOut)
 async def global_chat(
     data: ChatIn,
@@ -400,4 +446,8 @@ async def global_chat(
     # reunión, en su pestaña de chat, puede cualquiera).
     require_paid(ctx, "Preguntar sobre todas tus reuniones")
     rate_limit(f"chat:{ctx.user.id}", settings.rate_limit_chat_per_minute)
+    if ctx.user.is_superadmin and not data.voice:
+        move = await _move_request(db, ctx, data.question)
+        if move is not None:
+            return move
     return await _ask(db, ctx, data.question, data.history, None, exclude_minors=data.voice)

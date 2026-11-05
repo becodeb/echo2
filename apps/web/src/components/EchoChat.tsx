@@ -6,12 +6,15 @@ import type { ChatOut } from "../api/types";
 import { AnswerText } from "./AnswerText";
 import { useBilling } from "./billing";
 import { EchoFace } from "./EchoFace";
+import { MoveCard } from "./MoveCard";
 import { formatMs } from "./ui";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
   sources?: ChatOut["sources"];
+  move?: ChatOut["move"];
+  options?: ChatOut["options"];
   failed?: boolean;
 }
 
@@ -58,7 +61,16 @@ export function EchoChat({
         body: JSON.stringify({ question, history: messages.slice(-6).map(({ role, content }) => ({ role, content })) }),
       }),
     onSuccess: (response) =>
-      setMessages((current) => [...current, { role: "assistant", content: response.answer, sources: response.sources }]),
+      setMessages((current) => [
+        ...current,
+        {
+          role: "assistant",
+          content: response.answer,
+          sources: response.sources,
+          move: response.move,
+          options: response.options,
+        },
+      ]),
     onError: (error) =>
       setMessages((current) => [
         ...current,
@@ -142,7 +154,7 @@ export function EchoChat({
                   </p>
                 </div>
               ) : (
-                <Answer key={index} message={message} onRetry={() => {
+                <Answer key={index} message={message} onPick={send} onRetry={() => {
                   const question = [...messages.slice(0, index)].reverse().find((item) => item.role === "user");
                   if (question) send(question.content);
                 }} />
@@ -237,7 +249,15 @@ function EchoAvatar({ mood = "idle" }: { mood?: "idle" | "thinking" }) {
   );
 }
 
-function Answer({ message, onRetry }: { message: Message; onRetry: () => void }) {
+function Answer({
+  message,
+  onRetry,
+  onPick,
+}: {
+  message: Message;
+  onRetry: () => void;
+  onPick: (question: string) => void;
+}) {
   return (
     <div className="animate-fade-up flex gap-3">
       <EchoAvatar />
@@ -252,6 +272,21 @@ function Answer({ message, onRetry }: { message: Message; onRetry: () => void })
         ) : (
           <div className="[&_.text-sm]:text-[15px]">
             <AnswerText text={message.content} />
+          </div>
+        )}
+        {message.move && <MoveCard move={message.move} />}
+        {message.options && message.options.length > 0 && (
+          <div className="mt-3 flex flex-col items-start gap-1.5">
+            {message.options.map((option) => (
+              <button
+                key={option.question}
+                type="button"
+                onClick={() => onPick(option.question)}
+                className="max-w-full truncate rounded-full border border-ink-200 bg-white px-3.5 py-1.5 text-left text-sm font-medium text-ink-700 transition-colors hover:border-ink-300 hover:text-ink-900"
+              >
+                {option.label}
+              </button>
+            ))}
           </div>
         )}
         {message.sources && message.sources.length > 0 && (
