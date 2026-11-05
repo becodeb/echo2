@@ -97,29 +97,35 @@ export function FamilySelect({
           }}
         >
           <p className="text-sm font-medium text-ink-800">Nueva familia</p>
-          <div className="grid gap-2 sm:grid-cols-[1fr_10rem]">
-            <Input
-              placeholder="Familia Gómez"
-              aria-label="Nombre de la familia"
-              autoFocus
-              value={draft.name}
-              onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-            />
-            <Input
-              placeholder="Legajo (opcional)"
-              aria-label="Legajo o matrícula"
-              value={draft.reference}
-              onChange={(event) => setDraft({ ...draft, reference: event.target.value })}
-            />
+          {/* Según el lugar que haya y no el ancho de la pantalla: en los modales
+              va en media columna, y en una grilla el nombre quedaba de 2 cm. */}
+          <div className="flex flex-wrap gap-2">
+            <div className="min-w-0 flex-[2_1_12rem]">
+              <Input
+                placeholder="Familia Gómez"
+                aria-label="Nombre de la familia"
+                autoFocus
+                value={draft.name}
+                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+              />
+            </div>
+            <div className="min-w-0 flex-[1_1_8rem]">
+              <Input
+                placeholder="Legajo (opcional)"
+                aria-label="Legajo o matrícula"
+                value={draft.reference}
+                onChange={(event) => setDraft({ ...draft, reference: event.target.value })}
+              />
+            </div>
           </div>
           {create.isError && (
             <p className="text-sm text-red-600">
               {create.error instanceof Error ? create.error.message : "No se pudo crear"}
             </p>
           )}
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-ink-400">Los integrantes se cargan después en Familias.</p>
-            <div className="flex shrink-0 gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="min-w-40 flex-1 text-xs text-ink-400">Los integrantes se cargan después en Familias.</p>
+            <div className="ml-auto flex shrink-0 gap-2">
               <Button type="button" variant="ghost" onClick={() => setDraft(null)}>
                 Cancelar
               </Button>
